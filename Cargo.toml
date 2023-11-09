@@ -3,12 +3,9 @@ members = [ "crates/*" ]
 # exclude = [ ]
 resolver = "2"
 
-[net]
-git-fetch-with-cli = true
-
 [profile.dev.package.similar]
 opt-level = 3
 
 [patch.crates-io]
-rustc_plugin = { git = "https://github.com/gavinleroy/rustc_plugin" }
-rustc_utils = { git = "https://github.com/gavinleroy/rustc_plugin" }
+rustc_plugin = { git = "https://github.com/gavinleroy/rustc-plugin.git" }
+rustc_utils = { git = "https://github.com/gavinleroy/rustc-plugin.git" }

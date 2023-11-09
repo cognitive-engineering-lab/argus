@@ -9,11 +9,10 @@ fn main() {
             let file_short = components[components.len() - 2..].join(OsStr::new("/"));
             writeln!(
                 buf,
-                "[{} {}:{} {}] - {}",
+                "[{} {}:{}] - {}",
                 record.level(),
                 file_short.to_string_lossy(),
                 record.line().unwrap_or(0),
-                buf.timestamp(),
                 record.args()
             )
         })

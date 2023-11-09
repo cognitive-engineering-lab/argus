@@ -9,7 +9,10 @@ edition = "2021"
 rustc_private = true
 
 [dependencies]
-rustc_plugin = "0.7.0-nightly-2023-11-08"
+rustc_plugin = "0.7.3-nightly-2023-11-08"
+rustc_utils = { version = "0.7.3-nightly-2023-11-08", features = ["serde"] }
 # For binaries
+log = "0.4"
 env_logger = {version = "0.9", default-features = false}
 clap = {version = "3.1", default-features = false, features = ["std", "derive"]}
+serde = { version = "1.0.192", features = ["derive"] }
