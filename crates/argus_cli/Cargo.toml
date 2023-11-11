@@ -9,6 +9,8 @@ edition = "2021"
 rustc_private = true
 
 [dependencies]
+argus = { path = "../argus" }
+
 rustc_plugin = "0.7.3-nightly-2023-11-08"
 rustc_utils = { version = "0.7.3-nightly-2023-11-08", features = ["serde"] }
 # For binaries

@@ -3,10 +3,10 @@ skip_core_tasks = true
 default_to_workspace = false
 
 [tasks.watch-front]
-script = "cargo watch -i frontend -x 'install --path crates/argus_cli --offline'"
+script = "cargo watch -i frontend -x 'install --path crates/argus_cli'"
 
 [tasks.watch-front-debug]
-script = "cargo watch -i frontend -x 'install --path crates/argus_cli --offline --debug'"
+script = "cargo watch -i frontend -x 'install --path crates/argus_cli --debug'"
 
 [tasks.watch.run_task]
 name = ["watch-front"]

@@ -1,9 +1,9 @@
-use std::{borrow::Cow, env, process::exit};
+use std::{borrow::Cow, env, process::exit, time::Instant};
 
 use clap::{Parser, Subcommand};
 use rustc_interface::interface::Result as RustcResult;
 use rustc_plugin::{CrateFilter, RustcPlugin, RustcPluginArgs, Utf8Path};
-use rustc_utils::source_map::range::CharRange;
+use rustc_utils::source_map::{find_bodies::find_bodies, range::CharRange};
 use serde::{self, Deserialize, Serialize};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -17,6 +17,7 @@ pub struct ArgusPluginArgs {
 
 #[derive(Debug, Subcommand, Serialize, Deserialize)]
 enum ArgusCommand {
+  Trees,
   RustcVersion,
 }
 
@@ -64,6 +65,16 @@ impl RustcPlugin for ArgusPlugin {
   ) -> RustcResult<()> {
     use ArgusCommand::*;
     match plugin_args.command {
+      Trees => {
+        let mut callbacks = ArgusCallbacks {
+          rustc_start: Instant::now(),
+        };
+
+        log::info!("Starting rustc analysis...");
+        let _ = run_with_callbacks(&compiler_args, &mut callbacks);
+
+        Ok(())
+      }
       _ => unreachable!(),
     }
   }
@@ -83,7 +94,7 @@ pub fn run_with_callbacks(
   let mut args = args.to_vec();
   args.extend(
     // "-Z identify-regions -Z mir-opt-level=0 -Z track-diagnostics=yes -Z maximal-hir-to-mir-coverage -Z trait-solver=next -A warnings"
-    "-Z identify-regions -Z trait-solver=next -A warnings"
+    "-Z identify-regions -Z trait-solver=next -Z dump-solver-proof-tree=always -A warnings"
       .split(' ')
       .map(|s| s.to_owned()),
   );
@@ -97,4 +108,26 @@ pub fn run_with_callbacks(
   compiler
     .run()
     .map_err(|_| ArgusError::BuildError { range: None })
+}
+
+struct ArgusCallbacks {
+  rustc_start: Instant,
+}
+
+impl rustc_driver::Callbacks for ArgusCallbacks {
+  fn after_expansion<'tcx>(
+    &mut self,
+    _compiler: &rustc_interface::interface::Compiler,
+    queries: &'tcx rustc_interface::Queries<'tcx>,
+  ) -> rustc_driver::Compilation {
+    queries.global_ctxt().unwrap().enter(|tcx| {
+      find_bodies(tcx).into_iter().for_each(|(_, body_id)| {
+        argus::trees_in_body(&tcx, body_id);
+      });
+    });
+
+    log::debug!("Callback analysis took {:?}", self.rustc_start.elapsed());
+
+    rustc_driver::Compilation::Stop
+  }
 }
