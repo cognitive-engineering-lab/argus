@@ -1,9 +1,10 @@
 use std::{borrow::Cow, env, process::exit, time::Instant};
 
 use clap::{Parser, Subcommand};
+use rustc_errors::Handler;
 use rustc_interface::interface::Result as RustcResult;
 use rustc_plugin::{CrateFilter, RustcPlugin, RustcPluginArgs, Utf8Path};
-use rustc_utils::source_map::{find_bodies::find_bodies, range::CharRange};
+use rustc_utils::{source_map::{find_bodies::find_bodies, range::CharRange}, errors::silent_emitter::SilentEmitter};
 use serde::{self, Deserialize, Serialize};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -58,6 +59,7 @@ impl RustcPlugin for ArgusPlugin {
     }
   }
 
+
   fn run(
     self,
     compiler_args: Vec<String>,
@@ -68,12 +70,12 @@ impl RustcPlugin for ArgusPlugin {
       Trees => {
         let mut callbacks = ArgusCallbacks {
           rustc_start: Instant::now(),
+          result: Vec::default(),
         };
 
         log::info!("Starting rustc analysis...");
         let _ = run_with_callbacks(&compiler_args, &mut callbacks);
-
-        Ok(())
+        postprocess(callbacks.result)
       }
       _ => unreachable!(),
     }
@@ -94,7 +96,8 @@ pub fn run_with_callbacks(
   let mut args = args.to_vec();
   args.extend(
     // "-Z identify-regions -Z mir-opt-level=0 -Z track-diagnostics=yes -Z maximal-hir-to-mir-coverage -Z trait-solver=next -A warnings"
-    "-Z identify-regions -Z trait-solver=next -Z dump-solver-proof-tree=always -A warnings"
+    //
+    "-Z identify-regions -Z trait-solver=next -A warnings"
       .split(' ')
       .map(|s| s.to_owned()),
   );
@@ -110,11 +113,27 @@ pub fn run_with_callbacks(
     .map_err(|_| ArgusError::BuildError { range: None })
 }
 
+fn postprocess<T: Serialize>(result: T) -> RustcResult<()> {
+  println!("{}", serde_json::to_string(&result).unwrap());
+  Ok(())
+}
+
 struct ArgusCallbacks {
   rustc_start: Instant,
+  result: Vec<argus::proof_tree::SerializedTree>,
 }
 
 impl rustc_driver::Callbacks for ArgusCallbacks {
+ fn config(&mut self, config: &mut rustc_interface::Config) {
+    config.parse_sess_created = Some(Box::new(|sess| {
+      // Create a new emitter writer which consumes *silently* all
+      // errors. There most certainly is a *better* way to do this,
+      // if you, the reader, know what that is, please open an issue :)
+      let handler = Handler::with_emitter(Box::new(SilentEmitter));
+      sess.span_diagnostic = handler;
+    }));
+ }
+
   fn after_expansion<'tcx>(
     &mut self,
     _compiler: &rustc_interface::interface::Compiler,
@@ -122,7 +141,8 @@ impl rustc_driver::Callbacks for ArgusCallbacks {
   ) -> rustc_driver::Compilation {
     queries.global_ctxt().unwrap().enter(|tcx| {
       find_bodies(tcx).into_iter().for_each(|(_, body_id)| {
-        argus::trees_in_body(&tcx, body_id);
+        let trees_in_body = argus::analysis::trees_in_body(tcx, body_id);
+        self.result.extend(trees_in_body);
       });
     });
 

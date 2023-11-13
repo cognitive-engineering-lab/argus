@@ -11,6 +11,13 @@ checksum = "a4668cab20f66d8d020e1fbc0ebe47217433c1b6c8f2040faf858554e394ace6"
 [[package]]
 name = "argus"
 version = "0.1.0"
+dependencies = [
+ "index_vec",
+ "log",
+ "rustc_utils",
+ "serde",
+ "smallvec",
+]
 
 [[package]]
 name = "argus_cli"
@@ -23,6 +30,7 @@ dependencies = [
  "rustc_plugin",
  "rustc_utils",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -144,6 +152,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
+name = "index_vec"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74086667896a940438f2118212f313abba4aff3831fef6f4b17d02add5c8bb60"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -247,7 +264,6 @@ dependencies = [
 [[package]]
 name = "rustc_plugin"
 version = "0.7.3-nightly-2023-11-08"
-source = "git+https://github.com/gavinleroy/rustc-plugin.git#ae9044d13f26369136b539bd2eac2289624371e1"
 dependencies = [
  "cargo_metadata",
  "log",
@@ -266,7 +282,6 @@ checksum = "b3c5a95edfa0c893236ae4778bb7c4752760e4c0d245e19b5eff33c5aa5eb9dc"
 [[package]]
 name = "rustc_utils"
 version = "0.7.3-nightly-2023-11-08"
-source = "git+https://github.com/gavinleroy/rustc-plugin.git#ae9044d13f26369136b539bd2eac2289624371e1"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -332,9 +347,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.11.1"
+version = "1.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "942b4a808e05215192e39f4ab80813e599068285906cc91aa64f923db842bd5a"
+checksum = "4dccd0940a2dcdf68d092b8cbab7dc0ad8fa938bf95787e1b916b0e3d0e8e970"
 
 [[package]]
 name = "syn"
