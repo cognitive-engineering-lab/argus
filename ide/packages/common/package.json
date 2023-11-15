@@ -1,0 +1,26 @@
+{
+  "name": "@argus/common",
+  "version": "0.0.1",
+  "files": [
+    "dist"
+  ],
+  "main": "dist/lib.js",
+  "exports": {
+    ".": {
+      "default": "./dist/lib.js"
+    },
+    "./*": {
+      "default": "./dist/*.js"
+    }
+  },
+  "type": "module",
+  "depot": {
+    "platform": "browser"
+  },
+  "typedoc": {
+    "entryPoint": "./src/lib.ts"
+  },
+  "devDependencies": {
+    "jsdom": "^22.1.0"
+  }
+}

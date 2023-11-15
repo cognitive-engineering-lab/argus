@@ -20,6 +20,7 @@ use index_vec::IndexVec;
 
 use crate::proof_tree::{ProofNodeIdx, SerializedTree, TreeDescription};
 use crate::proof_tree::ext::{CanonicalGoal, InspectGoalExt};
+use crate::proof_tree::serialize::serialize_proof_tree;
 use crate::proof_tree::topology::TreeTopology;
 // use crate::proof_tree::visitor::{ProofTreeInferCtxtExt, ProofTreeVisitor, InspectGoal};
 
@@ -49,80 +50,21 @@ pub fn trees_in_body(tcx: TyCtxt, body_id: BodyId) -> Vec<SerializedTree> {
       tcx.features().unsized_fn_params,
     );
 
-    let infcx = fcx.infcx().expect("`FnCtxt` missing a `InferCtxt`.");
     let errors = fcx.fulfillment_errors.borrow();
 
     errors.iter().flat_map(|error| {
-      serialize_error_tree(error, infcx)
+      serialize_error_tree(error, &fcx)
     }).collect::<Vec<_>>()
   } else {
       Vec::default()
   }
 }
 
-pub struct DumbVisitor {
-    pub root: Option<ProofNodeIdx>,
-    pub nodes: IndexVec<ProofNodeIdx, String>,
-    pub error_leaves: Vec<ProofNodeIdx>,
-    pub topology: TreeTopology<ProofNodeIdx>,
-    pub previous: Option<ProofNodeIdx>,
-}
+fn serialize_error_tree<'tcx>(error: &FulfillmentError<'tcx>, fcx: &FnCtxt<'_, 'tcx>) -> Option<SerializedTree> {
+  let o = &error.root_obligation;
+  let goal = Goal { predicate: o.predicate, param_env: o.param_env };
+  let def_id = fcx.item_def_id();
+  let infcx = fcx.infcx().expect("`FnCtxt` missing a `InferCtxt`.");
 
-
-impl ProofTreeVisitor<'_> for DumbVisitor {
-    type BreakTy = !;
-
-    fn visit_goal(
-        &mut self,
-        goal: &InspectGoal<'_, '_>
-    ) -> ControlFlow<Self::BreakTy> {
-        log::debug!("Visiting {:?}", goal.goal().predicate);
-
-        log::debug!("#candidates {}", goal.candidates().len());
-
-        for c in goal.candidates() {
-            c.visit_nested(self)?;
-        }
-
-        ControlFlow::Continue(())
-    }
-}
-
-fn serialize_error_tree<'tcx>(error: &FulfillmentError<'tcx>, infcx: &InferCtxt<'tcx>) -> Option<SerializedTree> {
-  infcx.probe(|_| {
-    let o = &error.root_obligation;
-    let goal = Goal { predicate: o.predicate, param_env: o.param_env };
-
-    // rustc_trait_selection::traits::error_reporting::dump_proof_tree(o, infcx);
-
-    let mut visitor = DumbVisitor {
-        root: None,
-        nodes: IndexVec::default(),
-        topology: TreeTopology::new(),
-        error_leaves: Vec::default(),
-        previous: None,
-    };
-
-    infcx.visit_proof_tree(goal, &mut visitor);
-
-    // let InefficientVisitor {
-    //     root: Some(root),
-    //     nodes,
-    //     topology,
-    //     error_leaves,
-    //     ..
-    // } = visitor else {
-    //     log::warn!("ProofTreeVisitor could not find root!");
-    //     return None;
-    // };
-
-    None
-
-    // Some(SerializedTree {
-    //     descr: TreeDescription { root, leaf: root, },
-    //     nodes,
-    //     error_leaves,
-    //     topology,
-    // })
-  })
+  serialize_proof_tree(goal, infcx, def_id)
 }

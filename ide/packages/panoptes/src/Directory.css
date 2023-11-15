@@ -1,0 +1,23 @@
+.DirRecursive {
+    line-height: 2;
+    margin-left: 0.25em;
+}
+
+#Collapsible {
+    padding-left: 1em;
+    height: auto;
+}
+
+#Collapsible.collapsed {
+    height: 0;
+    overflow: hidden;
+}
+
+.DirNode {
+    font-family: monospace;
+}
+
+.information::before {
+    content: ' ';
+    padding-right: 1em;
+}

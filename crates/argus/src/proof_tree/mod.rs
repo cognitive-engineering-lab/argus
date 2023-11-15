@@ -1,5 +1,7 @@
 pub mod topology;
 pub mod ext;
+pub mod pretty;
+pub(super) mod serialize;
 
 use topology::*;
 

@@ -1,0 +1,19 @@
+/* .TabContainer { } */
+
+/* .TabGroup { } */
+
+.TabGroup button {
+  cursor: pointer;
+  opacity: 0.6;
+  border: 0;
+  outline: 0;
+}
+
+.TabGroup button.active {
+    border-bottom: 2px solid black;
+    opacity: 1;
+}
+
+.TabContentArea {
+  margin: 1em;
+}

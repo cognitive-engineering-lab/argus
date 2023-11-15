@@ -121,13 +121,17 @@ impl<N: Idx> TreeTopology<N> {
             .is_some()
     }
 
+    pub fn is_leaf(&self, node: N) -> bool {
+        match self.children.get(&node) {
+            None => true,
+            Some(children) => children.is_empty(),
+        }
+    }
+
     pub fn leaves(&self) -> impl Iterator<Item = N> + '_ {
         self.parent
             .keys()
-            .filter(|n| match self.children.get(n) {
-                None => true,
-                Some(children) => children.is_empty(),
-            })
+            .filter(|n| self.is_leaf(**n))
             .copied()
     }
 

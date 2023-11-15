@@ -1,0 +1,61 @@
+{
+  "name": "@argus/extension",
+  "displayName": "Argus Extension",
+  "description": "Something with types, probably?",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.22.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "argus.showAllTrees",
+        "title": "Show All Trees"
+      }
+    ]
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/lib.js",
+  "exports": {
+    ".": {
+      "default": "./dist/lib.js"
+    },
+    "./*": {
+      "default": "./dist/*.js"
+    }
+  },
+  "type": "commonjs",
+  "depot": {
+    "platform": "node"
+  },
+  "typedoc": {
+    "entryPoint": "./src/lib.ts"
+  },
+  "dependencies": {
+    "@argus/common": "workspace:*",
+    "lodash": "^4.17.21",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "peerDependencies": {
+    "vscode": "*"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/lodash": "^4.14.195",
+    "@types/node": "20.2.5",
+    "@types/react": "^18.2.14",
+    "@types/react-dom": "^18.2.6",
+    "@types/vscode": "^1.79.0",
+    "@vscode/test-electron": "^2.3.2",
+    "glob": "^8.1.0",
+    "typescript": "^5.1.3",
+    "vite": "^4.4.9"
+  }
+}

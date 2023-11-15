@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "jsx": "react",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    "declaration": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "allowJs": true,
+    "strict": true
+  }
+}
