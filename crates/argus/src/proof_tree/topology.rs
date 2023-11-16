@@ -1,5 +1,7 @@
 //! Topology structures, mainly used by the `ProofTree`.
 
+use std::marker::PhantomData;
+
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use std::{fmt::Debug, hash::Hash};
@@ -112,6 +114,21 @@ impl<I: Idx> TreeTopology<I> {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct FromRoot;
+
+#[derive(Clone, Debug)]
+pub struct ToRoot;
+
+/// The path from or to the root for a given node.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Path<N: Idx, Marker> {
+    pub root: N,
+    pub node: N,
+    pub path: Vec<N>,
+    _marker: PhantomData<Marker>,
+}
+
 impl<N: Idx> TreeTopology<N> {
     pub fn is_member(&self, node: N) -> bool {
         self.children
@@ -161,6 +178,28 @@ impl<N: Idx> TreeTopology<N> {
         let root = dfs.dfs(start, &mut *closure);
 
         (root, dfs.new_topo)
+    }
+
+    pub fn path_to_root(&self, node: N) -> Path<N, ToRoot> {
+        let mut root = node;
+        let mut curr = Some(node);
+        let path = std::iter::from_fn(move || {
+            let prev = curr;
+            if let Some(n) = curr {
+                curr = self.parent(n);
+                root = n;
+            }
+
+            prev
+        });
+        let path = path.collect::<Vec<_>>();
+
+        Path {
+            root,
+            node,
+            path,
+            _marker: PhantomData,
+        }
     }
 }
 

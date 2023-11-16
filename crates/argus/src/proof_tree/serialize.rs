@@ -1,5 +1,6 @@
 use std::ops::ControlFlow;
 
+use rustc_data_structures::fx::FxHashSet as HashSet;
 use rustc_hir::{BodyId, FnSig};
 use rustc_hir::def_id::DefId;
 use rustc_hir_analysis::astconv::AstConv;
@@ -27,7 +28,7 @@ pub struct SerializedTreeVisitor {
     pub nodes: IndexVec<ProofNodeIdx, String>,
     pub topology: TreeTopology<ProofNodeIdx>,
     pub error_leaves: Vec<ProofNodeIdx>,
-    pub unnecessary_roots: Vec<ProofNodeIdx>,
+    pub unnecessary_roots: HashSet<ProofNodeIdx>,
 }
 
 impl SerializedTreeVisitor {
@@ -39,7 +40,7 @@ impl SerializedTreeVisitor {
             nodes: IndexVec::default(),
             topology: TreeTopology::new(),
             error_leaves: Vec::default(),
-            unnecessary_roots: Vec::default(),
+            unnecessary_roots: HashSet::default(),
         }
     }
 
@@ -49,6 +50,7 @@ impl SerializedTreeVisitor {
             nodes,
             topology,
             error_leaves,
+            unnecessary_roots,
             ..
         } = self else {
             return None;
@@ -57,8 +59,9 @@ impl SerializedTreeVisitor {
         Some(SerializedTree {
             descr: TreeDescription { root, leaf: root, },
             nodes,
-            error_leaves,
             topology,
+            error_leaves,
+            unnecessary_roots,
         })
     }
 }
@@ -68,8 +71,32 @@ impl SerializedTreeVisitor {
     /// - it is not a `TraitPredicate`
     /// - it is `_: Sized` predicate.
     /// - ...
-    fn flag_if_unnecessary(&self, goal: &InspectGoal) {
-        // TODO
+    fn flag_if_unnecessary(&mut self, goal: &InspectGoal, n: ProofNodeIdx) {
+        use rustc_middle::ty::{TyCtxt, PredicateKind, ClauseKind};
+        use rustc_hir::lang_items::LangItem;
+
+        let infcx = goal.infcx();
+        let tcx = &infcx.tcx;
+
+        let tree_root = self.root.unwrap_or(n);
+        let to_root = self.topology.path_to_root(n);
+        if to_root.path.into_iter().any(|ancestor| {
+            self.unnecessary_roots.contains(&ancestor)
+        }) {
+            return;
+        }
+
+        let predicate = &goal.goal().predicate;
+        let kind = predicate.kind().skip_binder();
+
+        match kind {
+            PredicateKind::Clause(ClauseKind::Trait(trait_predicate)) if
+                trait_predicate.def_id() != tcx.require_lang_item(LangItem::Sized, None)
+             => (),
+            _ => {
+                self.unnecessary_roots.insert(n);
+            },
+        }
     }
 }
 
@@ -84,8 +111,6 @@ impl ProofTreeVisitor<'_> for SerializedTreeVisitor {
 
         let infcx = goal.infcx();
 
-        self.flag_if_unnecessary(goal);
-
         let here_string = goal.goal().predicate.pretty(infcx, self.def_id);
         let here_idx = self.nodes.push(here_string.clone());
 
@@ -96,6 +121,8 @@ impl ProofTreeVisitor<'_> for SerializedTreeVisitor {
         if let Some(prev) = self.previous {
             self.topology.add(prev, here_idx);
         }
+
+        self.flag_if_unnecessary(goal, here_idx);
 
         let prev = self.previous.clone();
 

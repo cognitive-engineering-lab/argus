@@ -8,7 +8,7 @@ interface Path<T, Direction> {
 
 type Direction = 'ToRoot' | 'FromRoot';
 
-export function toRoot(tree: SerializedTree, from: number): Path<number, 'ToRoot'> {
+export function pathToRoot(tree: SerializedTree, from: number): Path<number, 'ToRoot'> {
     let root = tree.descr.root;
     let topo = tree.topology;
     let path = [from];
@@ -24,8 +24,8 @@ export function toRoot(tree: SerializedTree, from: number): Path<number, 'ToRoot
     };
 }
 
-export function fromRoot(tree: SerializedTree, from: number): Path<number, 'FromRoot'> {
-    let { from: f, to, path } = toRoot(tree, from);
+export function pathFromRoot(tree: SerializedTree, from: number): Path<number, 'FromRoot'> {
+    let { from: f, to, path } = pathToRoot(tree, from);
     return {
         from: to, to: f, path: path.reverse()
     };

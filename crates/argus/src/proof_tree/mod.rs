@@ -3,6 +3,8 @@ pub mod ext;
 pub mod pretty;
 pub(super) mod serialize;
 
+use rustc_data_structures::fx::FxHashSet as HashSet;
+
 use topology::*;
 
 use index_vec::IndexVec;
@@ -25,6 +27,7 @@ pub struct TreeDescription {
 pub struct SerializedTree {
     pub descr: TreeDescription,
     pub nodes: IndexVec<ProofNodeIdx, String>,
-    pub error_leaves: Vec<ProofNodeIdx>,
     pub topology: TreeTopology<ProofNodeIdx>,
+    pub error_leaves: Vec<ProofNodeIdx>,
+    pub unnecessary_roots: HashSet<ProofNodeIdx>,
 }

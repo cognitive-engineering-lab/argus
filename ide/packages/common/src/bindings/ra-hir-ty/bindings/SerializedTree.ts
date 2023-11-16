@@ -2,4 +2,4 @@
 import { TreeDescription } from '../../../types';
 import { TreeTopology } from '../../../types';
 
-export interface SerializedTree { descr: TreeDescription, nodes: Array<string>, error_leaves: Array<number>, topology: TreeTopology<number>, }
+export interface SerializedTree { descr: TreeDescription, nodes: Array<string>, error_leaves: Array<number>, topology: TreeTopology<number>, unnecessary_roots: Array<number>, }
