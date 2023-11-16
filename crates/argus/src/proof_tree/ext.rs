@@ -1,4 +1,4 @@
-use rustc_data_structures::fx::FxHashMap as HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use rustc_hir::{BodyId, FnSig};
 use rustc_hir_analysis::astconv::AstConv;
 use rustc_hir_typeck::{FnCtxt, Inherited};

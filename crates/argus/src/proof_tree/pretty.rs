@@ -14,16 +14,40 @@ use rustc_hir::definitions::{DefKey, DefPathData, DefPathDataName, Disambiguated
 use rustc_hir::LangItem;
 use rustc_infer::infer::InferCtxt;
 
+use rustc_trait_selection::solve::inspect::InspectCandidate;
 use rustc_trait_selection::traits::{
     solve::{Certainty, MaybeCause},
     query::NoSolution,
 };
 
+/// Pretty printing for things that can already be printed.
+pub trait PrettyPrintExt<'a, 'tcx>: Print<'tcx, FmtPrinter<'a, 'tcx>> {
+    fn pretty(&self, infcx: &'a InferCtxt<'tcx>, def_id: DefId) -> String {
+        let tcx = infcx.tcx;
+        let namespace = guess_def_namespace(tcx, def_id);
+        let mut fmt = FmtPrinter::new(tcx, namespace);
+        self.print(&mut fmt);
+        fmt.into_buffer()
+    }
+}
+
+/// Pretty printing for results.
 pub trait PrettyResultExt {
     fn pretty(&self) -> String;
     fn is_yes(&self) -> bool;
 }
 
+/// Pretty printing for `Candidates`.
+pub trait PrettyCandidateExt {
+    fn pretty(&self, infcx: &InferCtxt, def_id: DefId) -> String;
+}
+
+// -----------------------------------------------
+// Impls
+
+impl<'a, 'tcx, T: Print<'tcx, FmtPrinter<'a, 'tcx>>> PrettyPrintExt<'a, 'tcx> for T {}
+
+/// Pretty printer for results
 impl PrettyResultExt for Result<Certainty, NoSolution> {
     fn is_yes(&self) -> bool {
         matches!(self, Ok(Certainty::Yes))
@@ -41,17 +65,28 @@ impl PrettyResultExt for Result<Certainty, NoSolution> {
     }
 }
 
-pub trait PrettyPrintExt<'a, 'tcx>: Print<'tcx, FmtPrinter<'a, 'tcx>> {
-    fn pretty(&self, infcx: &'a InferCtxt<'tcx>, def_id: DefId) -> String {
-        let tcx = infcx.tcx;
-        let namespace = guess_def_namespace(tcx, def_id);
-        let mut fmt = FmtPrinter::new(tcx, namespace);
-        self.print(&mut fmt);
-        fmt.into_buffer()
+impl PrettyCandidateExt for InspectCandidate<'_, '_> {
+    fn pretty(&self, infcx: &InferCtxt, def_id: DefId) -> String {
+        use rustc_trait_selection::traits::solve::{inspect::ProbeKind, CandidateSource};
+        use CandidateSource::*;
+
+        let ProbeKind::TraitCandidate { source, .. } = self.kind() else {
+            return "anon-candidate".to_string();
+        };
+
+        // TODO: gavinleroy
+
+        match source {
+            Impl(def_id) => "impl".to_string(),
+            BuiltinImpl(built_impl) => "builtin".to_string(),
+            ParamEnv(idx) => format!("param-env#{idx}"),
+            AliasBound => todo!(),
+        }
     }
 }
 
-impl<'a, 'tcx, T: Print<'tcx, FmtPrinter<'a, 'tcx>>> PrettyPrintExt<'a, 'tcx> for T {}
+// -----------------------------------------------
+// Helpers
 
 fn guess_def_namespace(tcx: TyCtxt<'_>, def_id: DefId) -> Namespace {
     match tcx.def_key(def_id).disambiguated_data.data {

@@ -1,5 +1,5 @@
 import { SerializedTree } from "@argus/common/types";
-import { TreeDescription, TreeTopology } from "@argus/common/types";
+import { TreeTopology } from "@argus/common/types";
 import _ from "lodash";
 import { observer } from "mobx-react";
 import React, {
@@ -14,6 +14,7 @@ import Tree, { TreeNodeDatum } from "react-d3-tree";
 import ReactDOM from "react-dom";
 
 import { ActiveContext, TreeContext } from "./Context";
+import { nodeContent } from "./utilities";
 import "./TreeArea.css";
 
 const useCenteredTree = (
@@ -56,7 +57,7 @@ const TreeNode = observer(
   }) => {
     const treeContext = useContext(TreeContext)!;
     const idx = nodeDatum.name as number;
-    const label = treeContext.nodes[idx];
+    const label = nodeContent(treeContext.nodes[idx]);
     const [width, height] = calculateTextSize(label);
 
     // x={x + width / 2}
@@ -111,9 +112,8 @@ const TreeArea = observer(({ tree }: { tree: SerializedTree }) => {
   const activeContext = useContext(ActiveContext)!;
   const [translate, containerRef] = useCenteredTree();
 
-  const descr = tree.descr;
   const topology = tree.topology;
-  const data = topologyToTreeData(topology, descr.root);
+  const data = topologyToTreeData(topology, tree.root);
 
   const handleNodeHover = (evnt: MouseEvent<SVGCircleElement>) => {
     let sid = evnt.currentTarget.dataset.sidx;

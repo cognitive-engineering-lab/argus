@@ -16,7 +16,7 @@ export let displayAll = async (extensionPath: vscode.Uri) => {
 
   // Call Argus and get the proof tree
   let res = await asyncWithProgress(async () => {
-    return await globals.backend<UnderlyingTree>([]);
+    return await globals.backend<UnderlyingTree>(["trees"]);
   });
 
   if (res.type === "AnalysisError" || res.type == "BuildError") {

@@ -7,7 +7,10 @@ resolver = "2"
 opt-level = 3
 
 [patch.crates-io]
-# rustc_plugin = { git = "https://github.com/gavinleroy/rustc-plugin.git" }
-# rustc_utils = { git = "https://github.com/gavinleroy/rustc-plugin.git" }
-rustc_plugin = { path = "../rustc-plugin/crates/rustc_plugin" }
-rustc_utils = { path = "../rustc-plugin/crates/rustc_utils" }
+rustc_plugin = { git = "https://github.com/gavinleroy/rustc-plugin.git" }
+rustc_utils = { git = "https://github.com/gavinleroy/rustc-plugin.git" }
+
+# rustc_plugin = { path = "../rustc-plugin/crates/rustc_plugin" }
+# rustc_utils = { path = "../rustc-plugin/crates/rustc_utils" }
+
+ts-rs = { git = "https://github.com/gavinleroy/ts-rs.git" }

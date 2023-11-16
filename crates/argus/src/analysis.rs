@@ -18,7 +18,7 @@ use rustc_utils::mir::body::BodyExt;
 use serde::Serialize;
 use index_vec::IndexVec;
 
-use crate::proof_tree::{ProofNodeIdx, SerializedTree, TreeDescription};
+use crate::proof_tree::{ProofNodeIdx, SerializedTree};
 use crate::proof_tree::ext::{CanonicalGoal, InspectGoalExt};
 use crate::proof_tree::serialize::serialize_proof_tree;
 use crate::proof_tree::topology::TreeTopology;

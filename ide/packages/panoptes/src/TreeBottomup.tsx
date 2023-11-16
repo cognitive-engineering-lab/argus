@@ -6,11 +6,11 @@ import { DirRecursive } from "./Directory";
 import { pathToRoot } from "./utilities";
 
 let TreeBottomUp = ({ tree }: { tree: SerializedTree }) => {
-  let allLeaves = _.map(tree.error_leaves, idx => tree.topology.parent[idx]!);
+  let allLeaves = _.map(tree.errorLeaves, idx => tree.topology.parent[idx]!);
   let leaves = _.filter(allLeaves, idx => {
     let ancestors = pathToRoot(tree, idx);
     // Filter out leaves that are decendents of unnecessary roots
-    return _.some(ancestors.path, idx => tree.unnecessary_roots.includes(idx));
+    return _.some(ancestors.path, idx => tree.unnecessaryRoots.includes(idx));
   });
 
   const getParent = (tree: SerializedTree, idx: number) => {

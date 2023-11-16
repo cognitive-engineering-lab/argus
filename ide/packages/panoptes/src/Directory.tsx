@@ -10,6 +10,7 @@ import React, {
 
 import { TreeContext } from "./Context";
 import "./Directory.css";
+import { nodeContent } from "./utilities";
 
 export const DirNode = ({
   idx,
@@ -26,11 +27,13 @@ export const DirNode = ({
     setIsOpen(!isOpen);
   };
 
+  const content = nodeContent(node);
+
   return (
     <>
       <div className="DirNode" onClick={toggleCollapse}>
         <span>{isOpen ? openIco : closedIco}</span>
-        <span className="information">{node}</span>
+        <span className="information">{content}</span>
       </div>
       <div id="Collapsible" className={isOpen ? "" : "collapsed"}>
         {children}

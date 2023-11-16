@@ -2,22 +2,25 @@
 
 use std::marker::PhantomData;
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use std::collections::{HashMap, HashSet};
+// use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+
 use smallvec::SmallVec;
 use std::{fmt::Debug, hash::Hash};
 
 use serde::Serialize;
+use ts_rs::TS;
 
-pub trait Idx = Copy + PartialEq + Eq + Hash + Serialize + Debug;
+pub trait Idx = Copy + PartialEq + Eq + Hash + Serialize + Debug + TS;
 
 /// Parent child relationships between structures.
-#[derive(Serialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(TS, Serialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct TreeTopology<I>
 where
     I: Idx,
 {
-    pub children: FxHashMap<I, FxHashSet<I>>,
-    pub parent: FxHashMap<I, I>,
+    pub children: HashMap<I, HashSet<I>>,
+    pub parent: HashMap<I, I>,
 }
 
 pub trait HasTopology<I>
@@ -36,8 +39,8 @@ impl<I: Idx> HasTopology<I> for TreeTopology<I> {
 impl<I: Idx> TreeTopology<I> {
     pub fn new() -> Self {
         Self {
-            children: FxHashMap::default(),
-            parent: FxHashMap::default(),
+            children: HashMap::default(),
+            parent: HashMap::default(),
         }
     }
 
@@ -84,23 +87,23 @@ impl<I: Idx> TreeTopology<I> {
                 let tos = tos
                     .into_iter()
                     .map(|to| cvt_to(to))
-                    .collect::<FxHashSet<I2>>();
+                    .collect::<HashSet<I2>>();
                 (cvt_from(from), tos)
             })
-            .collect::<FxHashMap<_, _>>();
+            .collect::<HashMap<_, _>>();
 
         let parent = self
             .parent
             .into_iter()
             .map(|(to, from)| (cvt_to(to), cvt_from(from)))
-            .collect::<FxHashMap<_, _>>();
+            .collect::<HashMap<_, _>>();
 
         TreeTopology { children, parent }
     }
 
     #[must_use]
     pub fn add_in(&mut self, rhs: Self) -> Option<()> {
-        let lhs_keys = self.children.keys().collect::<FxHashSet<_>>();
+        let lhs_keys = self.children.keys().collect::<HashSet<_>>();
         for key in rhs.children.keys() {
             if lhs_keys.contains(key) {
                 return None;

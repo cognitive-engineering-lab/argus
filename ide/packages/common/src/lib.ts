@@ -1,3 +1,3 @@
-import { SerializedTree, TracedTraitQuery } from "./types";
+import { SerializedTree } from "./types";
 
 export type UnderlyingTree = SerializedTree[];

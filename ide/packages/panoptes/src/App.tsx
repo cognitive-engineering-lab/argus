@@ -1,5 +1,5 @@
 import { UnderlyingTree } from "@argus/common";
-import { QueryAttempt, SerializedTree } from "@argus/common/types";
+import { SerializedTree } from "@argus/common/types";
 import _ from "lodash";
 import React from "react";
 import ReactJson from "react-json-view";
@@ -12,18 +12,7 @@ import TreeArea from "./TreeArea";
 import TreeTopDown from "./TreeTopDown";
 import TreeBottomUp from "./TreeBottomup";
 
-// HACK to get the topologies quickly :)
 function getAttempt(tree: UnderlyingTree) {
-  // const topos = _.map(tree, value => {
-  //   if ("Required" in value.kind) {
-  //     const secondToLast = value.kind.Required[value.kind.Required.length - 2];
-  //     const attempt = (secondToLast || _.last(value.kind.Required))!;
-  //     return attempt;
-  //   } else {
-  //     throw new Error("Not implemented");
-  //   }
-  // });
-
   return _.maxBy(tree, (attempt: SerializedTree) => {
     return attempt.nodes.length;
   })!;

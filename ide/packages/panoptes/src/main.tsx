@@ -15,8 +15,8 @@ declare global {
 window.addEventListener("load", () => {
   // Does this need to be ReactDOM.hydrate?
   ReactDOM.render(
-    <App tree={window.initialData} />,
-    // <App tree={testy as UnderlyingTree} />,
+    // <App tree={window.initialData} />,
+    <App tree={testy as UnderlyingTree} />,
     document.getElementById("root") as HTMLElement
   );
 });

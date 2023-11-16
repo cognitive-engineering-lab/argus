@@ -1,4 +1,4 @@
-import { QueryAttempt, SerializedTree } from "@argus/common/types";
+import { SerializedTree } from "@argus/common/types";
 import { trace } from "mobx";
 import { observer } from "mobx-react";
 import React, { createContext, useContext } from "react";
@@ -6,17 +6,18 @@ import React, { createContext, useContext } from "react";
 import ReactJson from "react-json-view";
 
 import { ActiveContext, TreeContext } from "./Context";
+import { nodeContent } from "./utilities";
 import "./Sidebar.css";
-
-const nodeJson = (idx: number, tree: SerializedTree) => {
-  return tree.nodes[idx]!;
-};
 
 const NodeInfo = observer(() => {
   trace(true);
   const currentNode = useContext(ActiveContext);
   const currentTree = useContext(TreeContext);
   const activeNode = currentNode?.getActiveNode();
+
+  const nodeJson = (idx: number, tree: SerializedTree) => {
+    return nodeContent(tree.nodes[idx]!);
+  };
 
   const innerJson =
     activeNode == null || currentTree == null ? (

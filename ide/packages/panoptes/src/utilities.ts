@@ -1,4 +1,4 @@
-import { SerializedTree, TreeTopology } from '@argus/common/types';
+import { SerializedTree, TreeTopology, Node } from '@argus/common/types';
 
 interface Path<T, Direction> {
     from: T,
@@ -9,7 +9,7 @@ interface Path<T, Direction> {
 type Direction = 'ToRoot' | 'FromRoot';
 
 export function pathToRoot(tree: SerializedTree, from: number): Path<number, 'ToRoot'> {
-    let root = tree.descr.root;
+    let root = tree.root;
     let topo = tree.topology;
     let path = [from];
     let current = from;
@@ -29,4 +29,15 @@ export function pathFromRoot(tree: SerializedTree, from: number): Path<number, '
     return {
         from: to, to: f, path: path.reverse()
     };
+}
+
+export function nodeContent(node: Node): string {
+    switch (node.type) {
+        case 'result':
+            return node.data;
+        case 'goal':
+            return node.data;
+        case 'candidate':
+            return node.data;
+    }
 }

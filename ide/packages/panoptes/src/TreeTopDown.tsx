@@ -7,10 +7,10 @@ import { DirRecursive } from "./Directory";
 let TreeTopDown = ({ tree }: { tree: SerializedTree }) => {
   const getChildren = (tree: SerializedTree, idx: number) => {
     return _.reject(tree.topology.children[idx] || [], idx =>
-      tree.unnecessary_roots.includes(idx)
+      tree.unnecessaryRoots.includes(idx)
     );
   };
-  return <DirRecursive level={[tree.descr.root]} getNext={getChildren} />;
+  return <DirRecursive level={[tree.root]} getNext={getChildren} />;
 };
 
 export default TreeTopDown;
