@@ -12,18 +12,10 @@ import { log } from "./logging";
 // FIXME: this file is a wreck...somewhere there is a hardcoded path to the
 // argus directory. Running the tool causes a recompile of argus (not sure why).
 
-// TODO: read the version from rust-toolchain.toml
 declare const VERSION: string;
-
-// TODO: read the version from rust-toolchain.toml
-// declare const TOOLCHAIN: {
-//   channel: string;
-//   components: string[];
-// };
-
-const TOOLCHAIN = {
-  channel: "stage1",
-  components: ["rust-std", "rustc-dev", "llvm-tools-preview"],
+declare const TOOLCHAIN: {
+  channel: string;
+  components: string[];
 };
 
 // serde-compatible type
@@ -135,8 +127,9 @@ export let cargoBin = () => {
 
 export let cargoCommand = (): [string, string[]] => {
   let cargo = "cargo";
-  let toolchain = `+${TOOLCHAIN.channel}`;
-  return [cargo, [toolchain]];
+  // let toolchain = `+${TOOLCHAIN.channel}`;
+  // return [cargo, [toolchain]];
+  return [cargo, []];
 };
 
 let findWorkspaceRoot = async (): Promise<string | null> => {
@@ -213,19 +206,26 @@ export async function setup(
         await editor.document.save();
       }
 
+      console.warn(`Running Argus, ignoring args ${args.join(" ")}`);
+
       // FIXME this assumes that the `cargo_cli` binary is installed, 
       // and that everything is just going to "work out".
       output = await execNotifyBinary(
-        cargo,
+        "argus_cli",
+        // cargo,
         [
-          ...cargoArgs,
-          "argus",
-          ...args,
+          // ...cargoArgs,
+          // "run",
+          // "--manifest-path",
+          // // FIXME: Why is this 'string | null'?
+          // dbgRoot as any,
+          workspaceRoot!,
+          // ...args,
         ],
         "Waiting for Argus...",
         {
           env: {
-            cwd: workspaceRoot,
+            RKT_FMT_ROOT: rktFmtRoot,
             ...process.env,
           },
         }

@@ -14,15 +14,13 @@ import { ViewLoader } from "./viewloader";
 export let displayAll = async (extensionPath: vscode.Uri) => {
   vscode.window.showInformationMessage("Hello World from Argus!");
 
-  // Call Argus and get all proof trees
-  // let res = await asyncWithProgress(async () => {
-  //   return await globals.backend<UnderlyingTree>(["trees"]);
-  // });
-  let res = { value: [], type: "output", };
+  // Call Argus and get the proof tree
+  let res = await asyncWithProgress(async () => {
+    return await globals.backend<UnderlyingTree>([]);
+  });
 
   if (res.type === "AnalysisError" || res.type == "BuildError") {
-    // TODO uncomment
-    // vscode.window.showErrorMessage(res.error);
+    vscode.window.showErrorMessage(res.error);
     return;
   }
 

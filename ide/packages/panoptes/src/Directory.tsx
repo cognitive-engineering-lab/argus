@@ -20,6 +20,7 @@ export const DirNode = ({
   const tree = useContext(TreeContext)!;
   const node = tree.nodes[idx];
 
+  const [openIco, closedIco] = ["▼", "▶"];
   const toggleCollapse = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
     setIsOpen(!isOpen);
@@ -28,7 +29,7 @@ export const DirNode = ({
   return (
     <>
       <div className="DirNode" onClick={toggleCollapse}>
-        <span>{isOpen ? "▼" : "▶"}</span>
+        <span>{isOpen ? openIco : closedIco}</span>
         <span className="information">{node}</span>
       </div>
       <div id="Collapsible" className={isOpen ? "" : "collapsed"}>

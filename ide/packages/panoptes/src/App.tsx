@@ -45,7 +45,6 @@ let App = ({ tree }: { tree: UnderlyingTree }) => {
       <ActiveContext.Provider value={new ActiveState()}>
         <div className="App">
           <Tabs components={tabs} />
-          <Sidebar />
         </div>
       </ActiveContext.Provider>
     </TreeContext.Provider>

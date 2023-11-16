@@ -13,7 +13,7 @@ import React, {
 import Tree, { TreeNodeDatum } from "react-d3-tree";
 import ReactDOM from "react-dom";
 
-import { ActiveContext } from "./Context";
+import { ActiveContext, TreeContext } from "./Context";
 import "./TreeArea.css";
 
 const useCenteredTree = (
@@ -31,6 +31,16 @@ const useCenteredTree = (
   return [translate, containerRef];
 };
 
+const calculateTextSize = (text: string): [number, number] => {
+  // You can adjust the padding as needed
+  const padding = 5;
+  const textLength = text.length;
+  const width = textLength * 8 + padding * 2;
+  const height = 40; // Set the desired height
+
+  return [width, height];
+};
+
 // --------------------
 // Components
 
@@ -41,19 +51,36 @@ const TreeNode = observer(
     hoverNode,
   }: {
     nodeDatum: TreeNodeDatum;
-    toggleNode: MouseEventHandler<SVGCircleElement>;
-    hoverNode: MouseEventHandler<SVGCircleElement>;
+    toggleNode: MouseEventHandler<SVGRectElement>;
+    hoverNode: MouseEventHandler<SVGRectElement>;
   }) => {
+    const treeContext = useContext(TreeContext)!;
+    const idx = nodeDatum.name as number;
+    const label = treeContext.nodes[idx];
+    const [width, height] = calculateTextSize(label);
+
+    // x={x + width / 2}
+    // y={y + height / 2}
     return (
       <g>
-        <circle
-          data-sidx={nodeDatum.name}
-          r="10"
+        <rect
+          data-sidx={idx}
+          x={-width / 2} y={-height / 2}
+          rx="5" ry="5"
+          width={width} height={height}
+          strokeWidth="0.5"
+          fill="#f3f3f3"
           onClick={toggleNode}
           onMouseEnter={hoverNode}
         />
-        <text fill="black" strokeWidth="1" x="20">
-          {nodeDatum.name}
+        <text
+          dominant-baseline="middle"
+          text-anchor="middle"
+          fontFamily="monospace"
+          fill="black"
+          strokeWidth="0.25"
+        >
+          {label}
         </text>
       </g>
     );
@@ -103,6 +130,8 @@ const TreeArea = observer(({ tree }: { tree: SerializedTree }) => {
     return <TreeNode hoverNode={handleNodeHover} {...rd3tProps} />;
   };
 
+  const nodeSize = { x: 250, y: 100 };
+
   return (
     <div className="TreeArea" ref={containerRef}>
       <Tree
@@ -110,6 +139,7 @@ const TreeArea = observer(({ tree }: { tree: SerializedTree }) => {
         renderCustomNodeElement={customRender}
         orientation="vertical"
         translate={translate}
+        nodeSize={nodeSize}
       />
     </div>
   );
