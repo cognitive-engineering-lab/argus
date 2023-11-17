@@ -10,7 +10,7 @@ let TreeTopDown = ({ tree }: { tree: SerializedTree }) => {
       tree.unnecessaryRoots.includes(idx)
     );
   };
-  return <DirRecursive level={[tree.root]} getNext={getChildren} />;
+  return <DirRecursive level={[tree.root]} getNext={getChildren} styleEdges={true} />;
 };
 
 export default TreeTopDown;

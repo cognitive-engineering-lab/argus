@@ -19,10 +19,8 @@ use serde::Serialize;
 use index_vec::IndexVec;
 
 use crate::proof_tree::{ProofNodeIdx, SerializedTree};
-use crate::proof_tree::ext::{CanonicalGoal, InspectGoalExt};
 use crate::proof_tree::serialize::serialize_proof_tree;
 use crate::proof_tree::topology::TreeTopology;
-// use crate::proof_tree::visitor::{ProofTreeInferCtxtExt, ProofTreeVisitor, InspectGoal};
 
 pub fn trees_in_body(tcx: TyCtxt, body_id: BodyId) -> Vec<SerializedTree> {
   let hir = tcx.hir();

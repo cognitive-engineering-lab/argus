@@ -1,5 +1,4 @@
 pub mod topology;
-pub mod ext;
 pub mod pretty;
 #[macro_use]
 mod macros;

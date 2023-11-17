@@ -4,3 +4,7 @@
     grid-area: tree-interact;
     border-right: solid 1px #ccc;
 }
+
+.edge__goal-to-candidate {
+    stroke-dasharray: 20,10,5,5,5,10;
+}

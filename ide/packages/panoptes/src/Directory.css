@@ -1,6 +1,14 @@
 .DirRecursive {
     line-height: 2;
-    margin-left: 0.25em;
+    padding-left: 0.5em;
+}
+
+.DirRecursive.is-candidate {
+    border-left: 1px dotted #ccc;
+}
+
+.DirRecursive.is-subgoal {
+    border-left: 1.5px solid #aaa;
 }
 
 #Collapsible {

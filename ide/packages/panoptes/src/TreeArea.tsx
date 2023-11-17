@@ -10,12 +10,12 @@ import React, {
   useState,
 } from "react";
 // @ts-ignore
-import Tree, { TreeNodeDatum } from "react-d3-tree";
+import Tree, { Orientation, TreeLinkDatum, TreeNodeDatum } from "react-d3-tree";
 import ReactDOM from "react-dom";
 
 import { ActiveContext, TreeContext } from "./Context";
-import { nodeContent } from "./utilities";
 import "./TreeArea.css";
+import { nodeContent } from "./utilities";
 
 const useCenteredTree = (
   defaultTranslate = { x: 0, y: 0 }
@@ -42,6 +42,19 @@ const calculateTextSize = (text: string): [number, number] => {
   return [width, height];
 };
 
+const getEdgeClass =
+  (tree: SerializedTree) => (link: TreeLinkDatum, orientation: Orientation) => {
+    const sourceIdx = link.source.data.name as number;
+    const node = tree.nodes[sourceIdx];
+
+    switch (node.type) {
+      case "goal":
+        return "edge__goal-to-candidate";
+      default:
+        return "edge__candidate-to-goal";
+    }
+  };
+
 // --------------------
 // Components
 
@@ -60,15 +73,16 @@ const TreeNode = observer(
     const label = nodeContent(treeContext.nodes[idx]);
     const [width, height] = calculateTextSize(label);
 
-    // x={x + width / 2}
-    // y={y + height / 2}
     return (
       <g>
         <rect
           data-sidx={idx}
-          x={-width / 2} y={-height / 2}
-          rx="5" ry="5"
-          width={width} height={height}
+          x={-width / 2}
+          y={-height / 2}
+          rx="5"
+          ry="5"
+          width={width}
+          height={height}
           strokeWidth="0.5"
           fill="#f3f3f3"
           onClick={toggleNode}
@@ -136,10 +150,11 @@ const TreeArea = observer(({ tree }: { tree: SerializedTree }) => {
     <div className="TreeArea" ref={containerRef}>
       <Tree
         data={data}
-        renderCustomNodeElement={customRender}
         orientation="vertical"
         translate={translate}
         nodeSize={nodeSize}
+        renderCustomNodeElement={customRender}
+        pathClassFunc={getEdgeClass(tree)}
       />
     </div>
   );
