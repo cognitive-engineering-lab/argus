@@ -10,12 +10,12 @@ export type ArgusError = {
   error: string;
 };
 
-export type ArgusResult<T> = ArgusOutput<T> | ArgusError | BuildError;
-
 export interface ArgusOutput<T> {
   type: "output";
   value: T;
 }
+
+export type ArgusResult<T> = ArgusOutput<T> | ArgusError | BuildError;
 
 export let showErrorDialog = async (err: string) => {
   let outcome = await vscode.window.showErrorMessage(
@@ -23,6 +23,4 @@ export let showErrorDialog = async (err: string) => {
     // 'Report bug',
     "Dismiss"
   );
-
-  // TODO allow bug reporting
 };

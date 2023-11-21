@@ -11,7 +11,7 @@ export default defineConfig(({mode}) => ({
       formats: ["iife"],
     },
     rollupOptions: {
-      external: Object.keys(manifest.dependencies || {})
+      external: Object.keys(manifest.dependencies || {}).concat( ["vscode"])
     }
   },
   define: {

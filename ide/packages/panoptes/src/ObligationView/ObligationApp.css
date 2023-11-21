@@ -1,0 +1,30 @@
+.Obligation {
+    font-family: monospace;
+    width: 100%;
+    margin-top: 1em;
+    margin-bottom: 2em;
+}
+
+/* .Obligation.success {
+    border-color: rgba(111, 194, 118, 0.25);
+} */
+
+/* .Obligation.failure {
+    border-color: rgba(244, 113, 116, 0.25);
+} */
+
+.ObligationCard {
+    display: flex;
+}
+
+.Obligation:hover, 
+.Obligation > *:hover
+/* taken from */
+:host([disabled]) .label, 
+:host([readonly]) .label {
+    cursor: default;
+}
+
+.ObligationButton {
+    cursor: pointer;
+}

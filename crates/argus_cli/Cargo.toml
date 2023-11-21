@@ -20,3 +20,5 @@ env_logger = {version = "0.9", default-features = false}
 clap = {version = "3.1", default-features = false, features = ["std", "derive"]}
 serde = { version = "1.0.192", features = ["derive"] }
 serde_json = "1"
+anyhow = "1.0.75"
+fluid-let = "1.0.0"

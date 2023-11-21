@@ -13,8 +13,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "argus.showAllTrees",
-        "title": "Show All Trees"
+        "command": "argus.launchArgus",
+        "title": "Argus: Launch"
       }
     ]
   },

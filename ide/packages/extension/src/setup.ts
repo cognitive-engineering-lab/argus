@@ -4,10 +4,13 @@ import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
 
+
+
 // // import { download } from "./download";
 import { ArgusError, ArgusResult, showErrorDialog } from "./errors";
 import { globals } from "./lib";
 import { log } from "./logging";
+
 
 // FIXME: this file is a wreck...somewhere there is a hardcoded path to the
 // argus directory. Running the tool causes a recompile of argus (not sure why).
@@ -29,20 +32,22 @@ const TOOLCHAIN = {
 // serde-compatible type
 type Result<T> = { Ok: T } | { Err: ArgusError };
 
-// Quick hack to avoid needing to figure out node.
-const HARD_PATH: string = "/Users/gavinleroy/dev/prj/argus";
-
 const LIBRARY_PATHS: Partial<Record<NodeJS.Platform, string>> = {
   darwin: "DYLD_LIBRARY_PATH",
   win32: "LIB",
 };
 
-export const getOpts = async (cwd: string) => {
+export const getArgusOpts = async (cwd: string) => {
+  log("Getting Argus options");
+
   const rustcPath = await execNotify(
     "rustup",
     ["which", "--toolchain", TOOLCHAIN.channel, "rustc"],
     "Waiting for rustc..."
   );
+
+  log("Rustc path:", rustcPath);
+
   const targetInfo = await execNotify(
     rustcPath,
     ["--print", "target-libdir", "--print", "sysroot"],
@@ -50,20 +55,31 @@ export const getOpts = async (cwd: string) => {
   );
 
   const [targetLibdir, sysroot] = targetInfo.split("\n");
+
   log("Target libdir:", targetLibdir);
   log("Sysroot: ", sysroot);
 
-  const library_path = LIBRARY_PATHS[process.platform] || "LD_LIBRARY_PATH";
+  const libraryPath = LIBRARY_PATHS[process.platform] || "LD_LIBRARY_PATH";
 
   const PATH = cargoBin() + ";" + process.env.PATH;
 
-  return {
+  // For each element in libraryPath, we need to add the targetLibdir as its value.
+  // This should then get added to the opts object.
+  const opts = {
     cwd,
-    [library_path]: targetLibdir,
-    SYSROOT: sysroot,
-    RUST_BACKTRACE: "1",
-    PATH,
+    env: {
+      [libraryPath]: targetLibdir,
+      LD_LIBRARY_PATH: targetLibdir,
+      SYSROOT: sysroot,
+      RUST_BACKTRACE: "1",
+      PATH,
+      ...process.env,
+    },
   };
+
+  log("Argus options:", opts);
+
+  return opts;
 };
 
 let execNotifyBinary = async (
@@ -72,8 +88,8 @@ let execNotifyBinary = async (
   _title: string,
   opts?: any
 ): Promise<Buffer> => {
-  log("Running command: ", [cmd, ...args].join(" "));
-  console.warn("Running command: ", [cmd, ...args].join(" "));
+
+  log("Running command: ", cmd, args, opts);
 
   let proc = cp.spawn(cmd, args, opts);
 
@@ -93,7 +109,6 @@ let execNotifyBinary = async (
 
   return new Promise<Buffer>((resolve, reject) => {
     proc.addListener("close", _ => {
-      // globals.status_bar.set_state("idle");
       if (proc.exitCode !== 0) {
         reject(stderrChunks.join(""));
       } else {
@@ -101,7 +116,6 @@ let execNotifyBinary = async (
       }
     });
     proc.addListener("error", e => {
-      // globals.status_bar.set_state("idle");
       reject(e.toString());
     });
   });
@@ -122,11 +136,6 @@ export type CallArgus = <T>(
   _args: string[],
   _no_output?: boolean
 ) => Promise<ArgusResult<T>>;
-
-export let debuggerManifest = (): string => {
-  let base = process.env.TDBG_PATH || HARD_PATH;
-  return `${base}/Cargo.toml`;
-};
 
 export let cargoBin = () => {
   let cargo_home = process.env.CARGO_HOME || path.join(os.homedir(), ".cargo");
@@ -187,14 +196,9 @@ let findWorkspaceRoot = async (): Promise<string | null> => {
 export async function setup(
   context: vscode.ExtensionContext
 ): Promise<CallArgus | null> {
-  let workspaceRoot = await findWorkspaceRoot();
-  let dbgRoot = debuggerManifest();
-  let rktFmtRoot = `${dbgRoot}/scripts/imgfmt.rkt`;
+  log("Getting workspace root");
 
-  if (dbgRoot == null) {
-    log("Failed to find debugger root!");
-    return null;
-  }
+  let workspaceRoot = await findWorkspaceRoot();
 
   if (workspaceRoot === null) {
     log("Failed to find workspace root!");
@@ -202,33 +206,28 @@ export async function setup(
   }
 
   log("Workspace root", workspaceRoot);
-  log("Trait Debugger", dbgRoot);
+
   let [cargo, cargoArgs] = cargoCommand();
 
+  let argusOpts = await getArgusOpts(workspaceRoot);
+
   return async <T>(args: string[], noOutput: boolean = false) => {
+
+    log("Backend with args", args);
+
     let output;
     try {
       let editor = vscode.window.activeTextEditor;
+
       if (editor) {
         await editor.document.save();
       }
 
-      // FIXME this assumes that the `cargo_cli` binary is installed, 
-      // and that everything is just going to "work out".
-      output = await execNotifyBinary(
+      output = await execNotify(
         cargo,
-        [
-          ...cargoArgs,
-          "argus",
-          ...args,
-        ],
+        [ ...cargoArgs, "argus", ...args],
         "Waiting for Argus...",
-        {
-          env: {
-            cwd: workspaceRoot,
-            ...process.env,
-          },
-        }
+        argusOpts
       );
     } catch (e: any) {
       context.workspaceState.update("err_log", e);
@@ -243,11 +242,11 @@ export async function setup(
         value: undefined as any,
       };
     }
+
     let outputTyped: Result<T>;
     try {
-      let outputBytes = Buffer.from(output.toString("utf8"), "base64");
-      let outputStr = output.toString("utf8"); // outputBytes.toString('utf8');
-      console.warn(outputStr);
+      let outputStr = output;
+      log("Command string output", outputStr);
       outputTyped = JSON.parse(outputStr);
     } catch (e: any) {
       return {
@@ -256,9 +255,16 @@ export async function setup(
       };
     }
 
+    if ("Err" in outputTyped) {
+      return {
+        type: "AnalysisError",
+        error: outputTyped.Err,
+      }
+    }
+
     return {
       type: "output",
-      value: outputTyped,
+      value: outputTyped.Ok,
     };
   };
 }

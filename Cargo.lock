@@ -18,6 +18,8 @@ checksum = "a4668cab20f66d8d020e1fbc0ebe47217433c1b6c8f2040faf858554e394ace6"
 name = "argus"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "fluid-let",
  "index_vec",
  "log",
  "rustc_utils",
@@ -30,9 +32,11 @@ dependencies = [
 name = "argus_cli"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "argus",
  "clap",
  "env_logger",
+ "fluid-let",
  "log",
  "rustc_plugin",
  "rustc_utils",
@@ -63,9 +67,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-platform"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12024c4645c97566567129c204f65d5815a8c9aecf30fcbe682b2fe034996d36"
+checksum = "e34637b3140142bdf929fb439e8aa4ebad7651ebf7b1080b3930aa16ac1459ff"
 dependencies = [
  "serde",
 ]
@@ -139,6 +143,12 @@ name = "equivalent"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
+
+[[package]]
+name = "fluid-let"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "749cff877dc1af878a0b31a41dd221a753634401ea0ef2f87b62d3171522485a"
 
 [[package]]
 name = "hashbrown"
@@ -277,7 +287,7 @@ checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 [[package]]
 name = "rustc_plugin"
 version = "0.7.3-nightly-2023-11-08"
-source = "git+https://github.com/gavinleroy/rustc-plugin.git#4a7ea2faa7439eaf4a434f72bf4e81e17aff97f0"
+source = "git+https://github.com/gavinleroy/rustc-plugin.git#8ab8fe8911f5efad7bde8785f199d0829def609b"
 dependencies = [
  "cargo_metadata",
  "log",
@@ -296,13 +306,14 @@ checksum = "b3c5a95edfa0c893236ae4778bb7c4752760e4c0d245e19b5eff33c5aa5eb9dc"
 [[package]]
 name = "rustc_utils"
 version = "0.7.3-nightly-2023-11-08"
-source = "git+https://github.com/gavinleroy/rustc-plugin.git#4a7ea2faa7439eaf4a434f72bf4e81e17aff97f0"
+source = "git+https://github.com/gavinleroy/rustc-plugin.git#8ab8fe8911f5efad7bde8785f199d0829def609b"
 dependencies = [
  "anyhow",
  "cfg-if",
  "intervaltree",
  "log",
  "serde",
+ "ts-rs",
 ]
 
 [[package]]

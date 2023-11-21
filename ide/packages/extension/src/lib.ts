@@ -5,7 +5,7 @@ import * as vscode from "vscode";
 import { showErrorDialog } from "./errors";
 import { log } from "./logging";
 import { CallArgus, setup } from "./setup";
-import { displayAll } from "./show";
+import { launchArgus } from "./viewloader";
 
 export let globals: {
   backend: CallArgus;
@@ -24,20 +24,23 @@ export async function activate(context: vscode.ExtensionContext) {
     };
 
     let b = await setup(context);
+
     if (b == null) {
       return;
     }
+
     globals.backend = b;
 
     // Note, list must match commands listed in package.json.
     let commands: [string, () => Promise<void>][] = [
-      ["showAllTrees", async () => displayAll(context.extensionUri)],
+      ["launchArgus", async () => launchArgus(context.extensionUri)],
     ];
 
     commands.forEach(([name, func]) => {
       let disposable = vscode.commands.registerCommand(`argus.${name}`, func);
       context.subscriptions.push(disposable);
     });
+
   } catch (e: any) {
     showErrorDialog(e);
   }
@@ -46,4 +49,5 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 // This method is called when your extension is deactivated
+// TODO cleanup resources
 export function deactivate() {}

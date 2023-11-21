@@ -1,61 +1,118 @@
 //! ProofTree analysis.
 
 use std::ops::ControlFlow;
+use std::cell::Cell;
 
 use rustc_hir::{BodyId, FnSig};
 use rustc_hir_analysis::astconv::AstConv;
-use rustc_hir_typeck::{FnCtxt, Inherited};
+use rustc_hir_typeck::{inspect_typeck, FnCtxt, Inherited};
 use rustc_infer::infer::InferCtxt;
+use rustc_infer::traits::FulfilledObligation;
 use rustc_middle::ty::{TyCtxt, Predicate};
-
 use rustc_trait_selection::solve::inspect::{ProofTreeVisitor, InspectGoal, ProofTreeInferCtxtExt};
 use rustc_trait_selection::traits::{ObligationCtxt, FulfillmentError};
 use rustc_trait_selection::traits::solve::{Goal, QueryInput};
 use rustc_type_ir::Canonical;
-
-use rustc_utils::mir::body::BodyExt;
+use rustc_span::{Span, DUMMY_SP};
+use rustc_utils::{
+  source_map::range::CharRange,
+  mir::body::BodyExt,
+};
 
 use serde::Serialize;
+use ts_rs::TS;
 use index_vec::IndexVec;
+use anyhow::{Result, Context, bail};
+use fluid_let::fluid_let;
 
-use crate::proof_tree::{ProofNodeIdx, SerializedTree};
+use crate::proof_tree::{ProofNodeIdx, SerializedTree, Obligation};
+use crate::proof_tree::pretty::{PrettyPrintExt, PrettyCandidateExt, PrettyResultExt};
 use crate::proof_tree::serialize::serialize_proof_tree;
 use crate::proof_tree::topology::TreeTopology;
 
-pub fn trees_in_body(tcx: TyCtxt, body_id: BodyId) -> Vec<SerializedTree> {
+fluid_let!(pub static OBLIGATION_TARGET_SPAN: Span);
+
+pub fn obligations(tcx: TyCtxt, body_id: BodyId) -> Result<Vec<Obligation>> {
+  use FulfilledObligation::*;
+
   let hir = tcx.hir();
-  let def_id = hir.body_owner_def_id(body_id);
-  let hir_id = hir.local_def_id_to_hir_id(def_id);
-  let body = hir.body(body_id);
+  let local_def_id = hir.body_owner_def_id(body_id);
+  let def_id = local_def_id.to_def_id();
 
-  if let Some(FnSig { decl, .. }) = hir.fn_sig_by_hir_id(hir_id) {
+  log::info!("Getting obligations");
 
-    let param_env = tcx.param_env(def_id);
+  let mut result = Vec::new();
 
-    let inh = Inherited::new(tcx, def_id);
-    let mut fcx = FnCtxt::new(&inh, param_env, def_id);
-    let fn_sig = tcx.fn_sig(def_id).instantiate_identity();
-    let fn_sig = tcx.liberate_late_bound_regions(def_id.to_def_id(), fn_sig);
-    let fn_sig = fcx.normalize(body.value.span, fn_sig);
+  inspect_typeck(tcx, local_def_id, |fncx| {
+    if let Some(infcx) = fncx.infcx() {
+      let source_map = infcx.tcx.sess.source_map();
 
-    let _ = rustc_hir_typeck::check_fn(
-      &mut fcx,
-      fn_sig,
-      decl,
-      def_id,
-      body,
-      None,
-      tcx.features().unsized_fn_params,
-    );
+      let fulfilled_obligations = infcx.fulfilled_obligations.borrow();
 
-    let errors = fcx.fulfillment_errors.borrow();
+      result.extend(
+        fulfilled_obligations.iter().filter_map(|obl| {
+          match obl {
+            Success(obligation) => {
+              None
+              // let range = CharRange::from_span(obligation.cause.span, source_map).unwrap();
+              // Some(Obligation::Success {
+              //   range,
+              //   data: obligation.predicate.pretty(infcx, def_id)
+              // })
+            },
+            Failure(error) => {
+              let range = CharRange::from_span(error.root_obligation.cause.span, source_map).unwrap();
+              Some(Obligation::Failure {
+                range,
+                data: error.obligation.predicate.pretty(infcx, def_id)
+              })
+            },
+          }
+        })
+      )
+    }
+  });
 
-    errors.iter().flat_map(|error| {
-      serialize_error_tree(error, &fcx)
-    }).collect::<Vec<_>>()
-  } else {
-      Vec::default()
-  }
+  Ok(result)
+}
+
+pub fn tree(tcx: TyCtxt, body_id: BodyId) -> Result<Vec<SerializedTree>> {
+  use FulfilledObligation::*;
+
+  let target_span = OBLIGATION_TARGET_SPAN.copied().unwrap_or(DUMMY_SP);
+
+  let hir = tcx.hir();
+  let local_def_id = hir.body_owner_def_id(body_id);
+  let def_id = local_def_id.to_def_id();
+
+  log::info!("Getting obligations");
+
+  let mut result = Vec::new();
+
+  inspect_typeck(tcx, local_def_id, |fncx| {
+    if let Some(infcx) = fncx.infcx() {
+      let fulfilled_obligations = infcx.fulfilled_obligations.borrow();
+
+      result.extend(
+        fulfilled_obligations.iter().filter_map(|obl| {
+          match obl {
+            Success(_) => None,
+            Failure(error) => {
+              let here_span = error.root_obligation.cause.span;
+
+              if !here_span.overlaps(target_span) {
+                return None;
+              }
+
+              serialize_error_tree(&error, fncx)
+            },
+          }
+        })
+      )
+    }
+  });
+
+  Ok(result)
 }
 
 fn serialize_error_tree<'tcx>(error: &FulfillmentError<'tcx>, fcx: &FnCtxt<'_, 'tcx>) -> Option<SerializedTree> {

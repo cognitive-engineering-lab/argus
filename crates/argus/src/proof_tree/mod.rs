@@ -5,7 +5,8 @@ mod macros;
 pub(super) mod serialize;
 
 use std::collections::HashSet;
-// use rustc_hash::FxHashSet as HashSet;
+use rustc_infer::traits::FulfilledObligation;
+use rustc_utils::source_map::range::CharRange;
 
 pub use topology::*;
 
@@ -33,4 +34,17 @@ pub struct SerializedTree {
     pub topology: TreeTopology<ProofNodeIdx>,
     pub error_leaves: Vec<ProofNodeIdx>,
     pub unnecessary_roots: HashSet<ProofNodeIdx>,
+}
+
+#[derive(TS, Serialize, Clone, Debug)]
+#[serde(tag = "type")]
+pub enum Obligation {
+  Success {
+    range: CharRange,
+    data: String,
+  },
+  Failure {
+    range: CharRange,
+    data: String,
+  },
 }

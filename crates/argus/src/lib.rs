@@ -12,6 +12,7 @@ extern crate rustc_hir_analysis;
 extern crate rustc_hir_typeck;
 extern crate rustc_infer;
 extern crate rustc_middle;
+extern crate rustc_span;
 extern crate rustc_trait_selection;
 extern crate rustc_type_ir;
 
@@ -22,6 +23,7 @@ pub mod proof_tree;
 mod tests {
     use ts_rs::TS;
     use crate::proof_tree;
+    use rustc_utils::source_map::{range, filename};
 
     macro_rules! ts {
       ($($ty:ty,)*) => {
@@ -37,7 +39,13 @@ mod tests {
         ts! {
           proof_tree::SerializedTree,
           proof_tree::Node,
+          proof_tree::Obligation,
           proof_tree::TreeTopology<proof_tree::ProofNodeIdx>,
+
+          // From rustc_utils
+          range::CharRange,
+          range::CharPos,
+          filename::FilenameIndex,
         }
     }
 }
