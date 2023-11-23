@@ -1,19 +1,11 @@
-import * as cp from "child_process";
-import * as _ from "lodash";
-import * as os from "os";
-import * as path from "path";
-import * as vscode from "vscode";
+import cp from "child_process";
+import os from "os";
+import path from "path";
+import vscode from "vscode";
+import _ from "lodash";
 
-
-
-// // import { download } from "./download";
-import { ArgusError, ArgusResult, showErrorDialog } from "./errors";
-import { globals } from "./lib";
+import { ArgusArgs, CallArgus, Result } from "@argus/common";
 import { log } from "./logging";
-
-
-// FIXME: this file is a wreck...somewhere there is a hardcoded path to the
-// argus directory. Running the tool causes a recompile of argus (not sure why).
 
 // TODO: read the version from rust-toolchain.toml
 declare const VERSION: string;
@@ -28,9 +20,6 @@ const TOOLCHAIN = {
   channel: "stage1",
   components: ["rust-std", "rustc-dev", "llvm-tools-preview"],
 };
-
-// serde-compatible type
-type Result<T> = { Ok: T } | { Err: ArgusError };
 
 const LIBRARY_PATHS: Partial<Record<NodeJS.Platform, string>> = {
   darwin: "DYLD_LIBRARY_PATH",
@@ -132,11 +121,6 @@ export let execNotify = async (
   return text.trimEnd();
 };
 
-export type CallArgus = <T>(
-  _args: string[],
-  _no_output?: boolean
-) => Promise<ArgusResult<T>>;
-
 export let cargoBin = () => {
   let cargo_home = process.env.CARGO_HOME || path.join(os.homedir(), ".cargo");
   return path.join(cargo_home, "bin");
@@ -211,9 +195,8 @@ export async function setup(
 
   let argusOpts = await getArgusOpts(workspaceRoot);
 
-  return async <T>(args: string[], noOutput: boolean = false) => {
-
-    log("Backend with args", args);
+  return async <T>(args: ArgusArgs, noOutput: boolean = false) => {
+    log("Calling backend with args", args);
 
     let output;
     try {
@@ -232,7 +215,7 @@ export async function setup(
     } catch (e: any) {
       context.workspaceState.update("err_log", e);
       return {
-        type: "BuildError",
+        type: "build-error",
         error: e,
       };
     }
@@ -246,18 +229,17 @@ export async function setup(
     let outputTyped: Result<T>;
     try {
       let outputStr = output;
-      log("Command string output", outputStr);
       outputTyped = JSON.parse(outputStr);
     } catch (e: any) {
       return {
-        type: "AnalysisError",
+        type: "analysis-error",
         error: e.toString(),
       };
     }
 
     if ("Err" in outputTyped) {
       return {
-        type: "AnalysisError",
+        type: "analysis-error",
         error: outputTyped.Err,
       }
     }

@@ -1,10 +1,9 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-import * as vscode from "vscode";
+import vscode from "vscode";
 
+import { CallArgus } from "@argus/common";
 import { showErrorDialog } from "./errors";
 import { log } from "./logging";
-import { CallArgus, setup } from "./setup";
+import { setup } from "./setup";
 import { launchArgus } from "./viewloader";
 
 export let globals: {
@@ -12,10 +11,10 @@ export let globals: {
 };
 
 // This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export async function activate(context: vscode.ExtensionContext) {
   log("Activating Argus ...");
 
+  // TODO: this needs to be a little more robust.
   try {
     globals = {
       backend: () => {
@@ -26,6 +25,7 @@ export async function activate(context: vscode.ExtensionContext) {
     let b = await setup(context);
 
     if (b == null) {
+      showErrorDialog("Failed to setup Argus");
       return;
     }
 
@@ -44,10 +44,9 @@ export async function activate(context: vscode.ExtensionContext) {
   } catch (e: any) {
     showErrorDialog(e);
   }
-
-  log("Activating Argus ...");
 }
 
 // This method is called when your extension is deactivated
-// TODO cleanup resources
-export function deactivate() {}
+export function deactivate() {
+  // TODO cleanup resources
+}

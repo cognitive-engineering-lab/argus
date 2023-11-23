@@ -53,12 +53,11 @@ pub fn obligations(tcx: TyCtxt, body_id: BodyId) -> Result<Vec<Obligation>> {
         fulfilled_obligations.iter().filter_map(|obl| {
           match obl {
             Success(obligation) => {
-              None
-              // let range = CharRange::from_span(obligation.cause.span, source_map).unwrap();
-              // Some(Obligation::Success {
-              //   range,
-              //   data: obligation.predicate.pretty(infcx, def_id)
-              // })
+              let range = CharRange::from_span(obligation.cause.span, source_map).unwrap();
+              Some(Obligation::Success {
+                range,
+                data: obligation.predicate.pretty(infcx, def_id)
+              })
             },
             Failure(error) => {
               let range = CharRange::from_span(error.root_obligation.cause.span, source_map).unwrap();
@@ -76,7 +75,7 @@ pub fn obligations(tcx: TyCtxt, body_id: BodyId) -> Result<Vec<Obligation>> {
   Ok(result)
 }
 
-pub fn tree(tcx: TyCtxt, body_id: BodyId) -> Result<Vec<SerializedTree>> {
+pub fn tree(tcx: TyCtxt, body_id: BodyId) -> Result<Option<SerializedTree>> {
   use FulfilledObligation::*;
 
   let target_span = OBLIGATION_TARGET_SPAN.copied().unwrap_or(DUMMY_SP);
@@ -87,27 +86,27 @@ pub fn tree(tcx: TyCtxt, body_id: BodyId) -> Result<Vec<SerializedTree>> {
 
   log::info!("Getting obligations");
 
-  let mut result = Vec::new();
+  let mut result = None;
 
   inspect_typeck(tcx, local_def_id, |fncx| {
     if let Some(infcx) = fncx.infcx() {
       let fulfilled_obligations = infcx.fulfilled_obligations.borrow();
-
-      result.extend(
-        fulfilled_obligations.iter().filter_map(|obl| {
+      fulfilled_obligations.iter().for_each(|obl| {
           match obl {
-            Success(_) => None,
+            Success(_) => (),
             Failure(error) => {
               let here_span = error.root_obligation.cause.span;
 
               if !here_span.overlaps(target_span) {
-                return None;
+                return;
               }
 
-              serialize_error_tree(&error, fncx)
+              if result.is_none() {
+                result = serialize_error_tree(&error, fncx)
+              }
             },
           }
-        })
+        }
       )
     }
   });

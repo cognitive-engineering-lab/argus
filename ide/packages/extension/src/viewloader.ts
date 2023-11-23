@@ -1,12 +1,18 @@
-import { WebViewToExtensionMsg } from "@argus/common";
-// FIXME: why is the 'dist/' necessary? Elsewhere I can just use '@argus/common/types'.
+import {
+  ExtensionToWebViewMsg,
+  Filename,
+  WebViewToExtensionMsg,
+} from "@argus/common";
+// FIXME: why is the 'dist/' necessary? Something is def wrong.
+// Elsewhere I can just use '@argus/common/types', but TS can't find the type decls.
 import { CharRange, Obligation } from "@argus/common/dist/types";
 import _ from "lodash";
-import * as path from "path";
-import * as vscode from "vscode";
+import path from "path";
+import vscode from "vscode";
 
+import { showErrorDialog } from "./errors";
 import { globals } from "./lib";
-import { asyncWithProgress, log } from "./logging";
+import { log } from "./logging";
 
 const outDir = "dist";
 const packageName = "panoptes";
@@ -19,28 +25,20 @@ export let launchArgus = async (extensionPath: vscode.Uri) => {
   ViewLoader.createOrShow(extensionPath);
 };
 
-// ---------------------------------------------------------------------------
-// TODO: lots of the highlight stuff is a major hack. This should really work 
-// on the `visibleTextEditors`, and just an active editor (bc it doesn't stay 
-// active).
-// ---------------------------------------------------------------------------
-
-// FIXME: these definitely need to change somehow.
+// Using the background selection color is sometimes a little too subtle.
 const rangeHighlight = vscode.window.createTextEditorDecorationType({
   backgroundColor: new vscode.ThemeColor("editor.selectionBackground"),
-  // color: new vscode.ThemeColor("editor.selectionForeground"),
   borderRadius: "2px",
 });
 
 export class ViewLoader {
   public static currentPanel: ViewLoader | undefined;
-  private static readonly viewType = "react";
-  private readonly _panel: vscode.WebviewPanel;
-  private readonly _extensionPath: vscode.Uri;
-  private _disposables: vscode.Disposable[] = [];
 
+  private readonly panel: vscode.WebviewPanel;
+  private readonly extensionPath: vscode.Uri;
+
+  private disposables: vscode.Disposable[] = [];
   private highlightRanges: CharRange[] = [];
-  private currentEditor: vscode.TextEditor | undefined;
 
   public static createOrShow(extensionPath: vscode.Uri) {
     const column = vscode.window.activeTextEditor
@@ -48,7 +46,7 @@ export class ViewLoader {
       : undefined;
 
     if (ViewLoader.currentPanel) {
-      ViewLoader.currentPanel._panel.reveal(column);
+      ViewLoader.currentPanel.panel.reveal(column);
     } else {
       ViewLoader.currentPanel = new ViewLoader(
         extensionPath,
@@ -58,37 +56,40 @@ export class ViewLoader {
   }
 
   private constructor(extensionPath: vscode.Uri, column: vscode.ViewColumn) {
-    this._extensionPath = extensionPath;
-    const root = rootUri(this._extensionPath);
+    this.extensionPath = extensionPath;
+    const root = rootUri(this.extensionPath);
 
-    log(root);
-
-    this._panel = vscode.window.createWebviewPanel("argus", "Argus", column, {
+    this.panel = vscode.window.createWebviewPanel("argus", "Argus", column, {
       enableScripts: true,
       localResourceRoots: [root],
     });
 
     // Set the webview's initial html content
-    this._panel.webview.html = this._getHtmlForWebview();
+    this.panel.webview.html = this.getHtmlForWebview();
 
     // Listen for when the panel is disposed
     // This happens when the user closes the panel or when the panel is closed programatically
-    this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
 
     // Handle messages from the webview
-    this._panel.webview.onDidReceiveMessage(
+    this.panel.webview.onDidReceiveMessage(
       async message => await this.handleMessage(message),
       null,
-      this._disposables
+      this.disposables
     );
+
+    // TODO: add / remove files when they are opened / closed. I'm unsure 
+    // how we actually want to do this. Someone can often have lots of open files, 
+    // which I'm sure we don't want to imitate, but only having visible files can also 
+    // get annoying if someone navigates away then wants to come back.
   }
 
   public dispose() {
     ViewLoader.currentPanel = undefined;
     // Clean up our resources
-    this._panel.dispose();
-    while (this._disposables.length) {
-      const x = this._disposables.pop();
+    this.panel.dispose();
+    while (this.disposables.length) {
+      const x = this.disposables.pop();
       if (x) {
         x.dispose();
       }
@@ -98,31 +99,21 @@ export class ViewLoader {
   // ---------------------------------------------------
 
   private async handleMessage(message: WebViewToExtensionMsg) {
-    const activeEditor = vscode.window.activeTextEditor;
-    const openEditor = activeEditor || this.currentEditor; 
-
-    if (openEditor === undefined) {
-      vscode.window.showErrorMessage("No active editor");
-      return;
-    }
-
-    this.currentEditor = openEditor;
-
     switch (message.command) {
       case "obligations": {
-        this.getObligations(openEditor);
+        this.getObligations(message.file);
         return;
       }
       case "tree": {
-        this.getTree(openEditor, message.line, message.column);
+        this.getTree(message.file, message.line, message.column);
         return;
       }
       case "add-highlight": {
-        this.addHighlightRange(openEditor, message.range);
+        this.addHighlightRange(message.file, message.range);
         return;
       }
       case "remove-highlight": {
-        this.removeHighlightRange(openEditor, message.range);
+        this.removeHighlightRange(message.file, message.range);
         return;
       }
       default: {
@@ -132,13 +123,10 @@ export class ViewLoader {
     }
   }
 
-  private async getObligations(editor: vscode.TextEditor) {
-    log("Fetching obligations for file", editor.document.fileName);
+  private async getObligations(host: Filename) {
+    log("Fetching obligations for file", host);
 
-    const res = await globals.backend<Obligation[][]>([
-      "obligations",
-      editor.document.fileName,
-    ]);
+    const res = await globals.backend<Obligation[][]>(["obligations", host]);
 
     log("Result", res);
 
@@ -151,41 +139,46 @@ export class ViewLoader {
 
     log("Returning obligations", obligations);
 
-    this._panel.webview.postMessage({
+    this.messageWebview({
       type: "FROM_EXTENSION",
+      file: host,
       command: "obligations",
       obligations: obligations,
     });
   }
 
-  private async getTree(editor: vscode.TextEditor, line: number, column: number) {
+  private async getTree(host: Filename, line: number, column: number) {
     throw new Error("Not implemented");
   }
 
-  private async addHighlightRange(editor: vscode.TextEditor, range: CharRange) {
-    // TODO: check the open file
-    
-    log("Adding highlight range", range);
+  private async addHighlightRange(host: Filename, range: CharRange) {
+    log("Adding highlight range", host, range);
 
-    this.highlightRanges.push(range);
-    await this.refreshHighlights(editor);
+    const editor = this.getEditorByName(host);
+    if (editor === undefined) {
+      showErrorDialog(`No editor for file ${host}`);
+    } else {
+      this.highlightRanges.push(range);
+      await this.refreshHighlights(editor);
+    }
   }
 
-  private async removeHighlightRange(editor: vscode.TextEditor, range: CharRange) {
-    // TODO: check the open file
+  private async removeHighlightRange(host: Filename, range: CharRange) {
+    log("Removing highlight range", host, range);
 
-    log("Removing highlight range", range);
-
-    this.highlightRanges = _.filter(
-      this.highlightRanges,
-      r => !_.isEqual(r, range)
-    );
-    await this.refreshHighlights(editor);
+    const editor = this.getEditorByName(host);
+    if (editor === undefined) {
+      showErrorDialog(`No editor for file ${host}`);
+    } else {
+      this.highlightRanges = _.filter(
+        this.highlightRanges,
+        r => !_.isEqual(r, range)
+      );
+      await this.refreshHighlights(editor);
+    }
   }
 
   private async refreshHighlights(editor: vscode.TextEditor) {
-    // TODO: check the open file
-
     editor.setDecorations(
       rangeHighlight,
       _.map(this.highlightRanges, (r: CharRange) => {
@@ -197,16 +190,35 @@ export class ViewLoader {
     );
   }
 
-  private _getHtmlForWebview() {
-    const root = rootUri(this._extensionPath);
+  // --------------------------------
+  // Utilities
+
+  private messageWebview(msg: ExtensionToWebViewMsg) {
+    this.panel.webview.postMessage(msg);
+  }
+
+  private getEditorByName(name: Filename): vscode.TextEditor | undefined {
+    return _.find(
+      vscode.window.visibleTextEditors,
+      e => e.document.fileName === name
+    );
+  }
+
+  private getHtmlForWebview() {
+    const root = rootUri(this.extensionPath);
     const buildDir = vscode.Uri.joinPath(root, packageName, outDir);
 
-    const scriptUri = this._panel.webview.asWebviewUri(
+    const scriptUri = this.panel.webview.asWebviewUri(
       vscode.Uri.joinPath(buildDir, "panoptes.iife.js")
     );
 
-    const styleUri = this._panel.webview.asWebviewUri(
+    const styleUri = this.panel.webview.asWebviewUri(
       vscode.Uri.joinPath(buildDir, "style.css")
+    );
+
+    let initialFiles: Filename[] = _.map(
+      vscode.window.visibleTextEditors,
+      e => e.document.fileName
     );
 
     return `
@@ -217,6 +229,7 @@ export class ViewLoader {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Config View</title>
           <link rel="stylesheet" type="text/css" href=${styleUri}>
+          <script>window.initialData = ${JSON.stringify(initialFiles)};</script>
       </head>
       <body>
           <div id="root"></div>

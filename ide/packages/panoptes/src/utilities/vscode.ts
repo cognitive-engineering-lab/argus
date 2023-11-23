@@ -1,4 +1,5 @@
 import type { WebviewApi } from "vscode-webview";
+import { WebViewToExtensionMsg } from "@argus/common";
 
 /**
  * A utility wrapper around the acquireVsCodeApi() function, which enables
@@ -78,4 +79,8 @@ class VSCodeAPIWrapper {
 }
 
 // Exports class singleton to prevent multiple invocations of acquireVsCodeApi.
-export const vscode = new VSCodeAPIWrapper();
+const vscode = new VSCodeAPIWrapper();
+
+export function messageExtension(msg: WebViewToExtensionMsg) {
+  vscode.postMessage(msg);
+}
