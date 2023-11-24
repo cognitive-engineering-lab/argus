@@ -29,6 +29,9 @@ export async function activate(context: vscode.ExtensionContext) {
       return;
     }
 
+    // Compile the workspace with the Argus version of rustc.
+    await b(["preload"], true);
+
     globals.backend = b;
 
     // Note, list must match commands listed in package.json.

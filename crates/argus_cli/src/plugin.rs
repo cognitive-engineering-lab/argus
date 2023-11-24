@@ -12,13 +12,17 @@ use rustc_utils::{
   source_map::{
     filename::Filename,
     find_bodies::{find_enclosing_bodies, find_bodies},
-    range::{CharPos, CharRange, FunctionIdentifier, ToSpan},
+    range::{CharPos, CharRange, FunctionIdentifier},
   },
   timer::elapsed,
 };
 use log::{debug, info};
 use serde::{self, Deserialize, Serialize};
 use fluid_let::fluid_set;
+use argus::{
+  proof_tree::Obligation,
+  Target, ToTarget,
+};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -31,16 +35,15 @@ pub struct ArgusPluginArgs {
 
 #[derive(Subcommand, Serialize, Deserialize)]
 enum ArgusCommand {
-  Tree {
-    file: String,
-    line: usize,
-    column: usize,
-  },
+  Preload,
+  RustcVersion,
   Obligations {
     file: String,
   },
-  Preload,
-  RustcVersion,
+  Tree {
+    file: String,
+    id: String,
+  },
 }
 
 trait ArgusAnalysis: Sized + Send + Sync {
@@ -59,7 +62,7 @@ where
   }
 }
 
-struct ArgusCallbacks<A: ArgusAnalysis, T: ToSpan, F: FnOnce() -> Option<T>> {
+struct ArgusCallbacks<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>> {
   analysis: Option<A>,
   compute_target: Option<F>,
   // FIXME: we're throwing away any failures.
@@ -135,26 +138,15 @@ impl RustcPlugin for ArgusPlugin {
   ) -> RustcResult<()> {
     use ArgusCommand::*;
     match plugin_args.command {
-      Tree { file, line, column } => {
-        todo!()
-        // let compute_target = || {
-        //   let cpos = CharPos {
-        //     line,
-        //     column,
-        //   };
-        //   let range = CharRange {
-        //     start: cpos,
-        //     end: cpos,
-        //     filename: Filename::intern(&file),
-        //   };
+      Tree { file, id } => {
+        let compute_target = move || {
+          Some(id)
+        };
 
-        //   FunctionIdentifier::Range(range)
-        // };
-
-        // postprocess(run(argus::analysis::tree, Some(compute_target), &compiler_args))
+        postprocess(run(argus::analysis::tree, compute_target, &compiler_args))
       }
       Obligations { .. } => {
-        let nothing = || -> Option<CharRange> { None };
+        let nothing = || { None::<String> };
         postprocess(run(argus::analysis::obligations, nothing, &compiler_args))
 
       }
@@ -163,7 +155,7 @@ impl RustcPlugin for ArgusPlugin {
   }
 }
 
-fn run<A: ArgusAnalysis, T: ToSpan>(
+fn run<A: ArgusAnalysis, T: ToTarget>(
   analysis: A,
   compute_target: impl FnOnce() -> Option<T> + Send,
   args: &[String],
@@ -180,11 +172,6 @@ fn run<A: ArgusAnalysis, T: ToSpan>(
   run_with_callbacks(args, &mut callbacks)?;
 
   Ok(callbacks.output)
-
-    // .unwrap()
-    // .map_err(|e| ArgusError::AnalysisError {
-    //   error: e.to_string(),
-    // })
 }
 
 pub fn run_with_callbacks(
@@ -192,10 +179,9 @@ pub fn run_with_callbacks(
   callbacks: &mut (dyn rustc_driver::Callbacks + Send),
 ) -> ArgusResult<()> {
   let mut args = args.to_vec();
+  // -Z identify-regions -Z track-diagnostics=yes
   args.extend(
-    // "-Z identify-regions -Z mir-opt-level=0 -Z track-diagnostics=yes -Z maximal-hir-to-mir-coverage -Z trait-solver=next -A warnings"
-    //
-    "-Z identify-regions -Z trait-solver=next -Z track-trait-obligations -A warnings"
+    "-Z trait-solver=next -Z track-trait-obligations -A warnings"
       .split(' ')
       .map(|s| s.to_owned()),
   );
@@ -204,7 +190,7 @@ pub fn run_with_callbacks(
 
   let compiler = rustc_driver::RunCompiler::new(&args, callbacks);
 
-  log::debug!("building compiler ...");
+  log::debug!("Building compiler ...");
 
   // Argus works even when the compiler exits with an error.
   let _ = compiler.run();
@@ -217,7 +203,7 @@ fn postprocess<T: Serialize>(result: T) -> RustcResult<()> {
   Ok(())
 }
 
-impl<A: ArgusAnalysis, T: ToSpan, F: FnOnce() -> Option<T>> rustc_driver::Callbacks for ArgusCallbacks<A, T, F> {
+impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>> rustc_driver::Callbacks for ArgusCallbacks<A, T, F> {
  fn config(&mut self, config: &mut rustc_interface::Config) {
     config.parse_sess_created = Some(Box::new(|sess| {
       // Create a new emitter writer which consumes *silently* all
@@ -240,7 +226,7 @@ impl<A: ArgusAnalysis, T: ToSpan, F: FnOnce() -> Option<T>> rustc_driver::Callba
       elapsed("global_ctxt", start);
       let mut analysis = self.analysis.take().unwrap();
 
-      let mut inner = |body| {
+      let mut inner = |(_, body)| {
         match analysis.analyze(tcx, body) {
           Ok(v) => Some(v),
           Err(_) => None,
@@ -249,17 +235,18 @@ impl<A: ArgusAnalysis, T: ToSpan, F: FnOnce() -> Option<T>> rustc_driver::Callba
 
       self.output = match (self.compute_target.take().unwrap())() {
         Some(target) => {
-          let target = target.to_span(tcx).expect("failed to turn target into span");
-          debug!("target span: {target:?}");
+          let target = target.to_target();
 
-          fluid_set!(argus::analysis::OBLIGATION_TARGET_SPAN, target);
+          debug!("target: {target:?}");
 
-          find_enclosing_bodies(tcx, target).filter_map(inner).collect::<Vec<_>>()
+          fluid_set!(argus::analysis::OBLIGATION_TARGET, target);
+
+          find_bodies(tcx).into_iter().filter_map(inner).collect::<Vec<_>>()
         },
         None => {
-          debug!("no target span");
+          debug!("no target");
 
-          find_bodies(tcx).into_iter().filter_map(|(_, body)| inner(body)).collect::<Vec<_>>()
+          find_bodies(tcx).into_iter().filter_map(inner).collect::<Vec<_>>()
         }
       }
     });

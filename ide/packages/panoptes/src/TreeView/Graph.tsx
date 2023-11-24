@@ -13,8 +13,8 @@ import React, {
 import Tree, { Orientation, TreeLinkDatum, TreeNodeDatum } from "react-d3-tree";
 import ReactDOM from "react-dom";
 
-import { ActiveContext, TreeContext } from "./Context";
-import "./TreeArea.css";
+import "./Graph.css";
+import { ActiveContext, TreeContext } from "./context";
 import { nodeContent } from "./utilities";
 
 const useCenteredTree = (

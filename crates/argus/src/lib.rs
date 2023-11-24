@@ -19,6 +19,23 @@ extern crate rustc_type_ir;
 pub mod analysis;
 pub mod proof_tree;
 
+#[derive(Debug)]
+pub struct Target {
+  data: String,
+}
+
+pub trait ToTarget {
+  fn to_target(self) -> Target;
+}
+
+impl ToTarget for String {
+  fn to_target(self) -> Target {
+    Target {
+      data: self,
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
     use ts_rs::TS;

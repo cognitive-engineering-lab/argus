@@ -11,7 +11,7 @@ import _ from "lodash";
 import React, { useEffect, useState } from "react";
 
 import "./App.css";
-import ObligationApp from "./ObligationView/ObligationApp";
+import ObligationManager from "./ObligationManager";
 import { messageExtension } from "./utilities/vscode";
 
 function basename(path: string) {
@@ -83,7 +83,7 @@ const OpenFile = ({ filename }: { filename: Filename }) => {
       {isLoading ? (
         <WaitingOnObligations />
       ) : (
-        <ObligationApp file={filename} obligations={obligations!} />
+        <ObligationManager file={filename} obligations={obligations!} />
       )}
     </div>
   );

@@ -1,30 +1,25 @@
 import { SerializedTree } from "@argus/common/types";
 import classNames from "classnames";
 import _ from "lodash";
-import { observer } from "mobx-react";
-import React, {
-  PropsWithChildren,
-  createContext,
-  useContext,
-  useState,
-} from "react";
+import React, { PropsWithChildren, useContext, useState } from "react";
 
-import { TreeContext } from "./Context";
+import { IcoDot, IcoTriangleDown, IcoTriangleRight } from "../utilities/icons";
 import "./Directory.css";
+import { TreeContext } from "./context";
 import { nodeContent } from "./utilities";
 
 export const DirNode = ({
   idx,
   styleEdge,
   children,
-}: PropsWithChildren<{ idx: number, styleEdge: boolean }>) => {
+}: PropsWithChildren<{ idx: number; styleEdge: boolean }>) => {
   const [isOpen, setIsOpen] = useState(false);
   const tree = useContext(TreeContext)!;
   const node = tree.nodes[idx];
 
-  const arrows = ["▼", "▶"];
-  const dots = ["•", "•"];
-  const [openIco, closedIco] = node.type === 'result' ? dots : arrows;;
+  const arrows = [<IcoTriangleDown />, <IcoTriangleRight />];
+  const dots = [<IcoDot />, <IcoDot />];
+  const [openIco, closedIco] = node.type === "result" ? dots : arrows;
 
   const toggleCollapse = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
@@ -36,7 +31,7 @@ export const DirNode = ({
   return (
     <>
       <div className="DirNode" onClick={toggleCollapse}>
-        <span>{isOpen ? openIco : closedIco}</span>
+        {isOpen ? openIco : closedIco}
         <span className="information">{content}</span>
       </div>
       <div id="Collapsible" className={isOpen ? "" : "collapsed"}>
@@ -64,19 +59,19 @@ export const DirRecursive = ({
   });
 
   return (
-      <div className={className}>
-        {_.map(level, (current, i) => {
-          const next = getNext(tree, current);
-          return (
-            <DirNode key={i} idx={current} styleEdge={styleEdges}>
-              <DirRecursive
-                level={next}
-                getNext={getNext}
-                styleEdges={styleEdges}
-              />
-            </DirNode>
-          );
-        })}
-      </div>
+    <div className={className}>
+      {_.map(level, (current, i) => {
+        const next = getNext(tree, current);
+        return (
+          <DirNode key={i} idx={current} styleEdge={styleEdges}>
+            <DirRecursive
+              level={next}
+              getNext={getNext}
+              styleEdges={styleEdges}
+            />
+          </DirNode>
+        );
+      })}
+    </div>
   );
 };

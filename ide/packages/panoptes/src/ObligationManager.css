@@ -1,0 +1,21 @@
+.ObligationCard {
+    display: block;
+    width: 100%;
+    margin-top: 1em;
+    margin-bottom: 2em;
+}
+
+.ObligationCard > vscode-text-area {
+    font-family: monospace;
+    display: block;
+}
+
+.ObligationButton {
+    display: block;
+    cursor: pointer;
+}
+
+/* yeah...this still doesn't work */
+:host([readonly]) .control {
+    cursor: default;
+}

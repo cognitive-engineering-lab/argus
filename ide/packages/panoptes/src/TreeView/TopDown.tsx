@@ -4,13 +4,15 @@ import React from "react";
 
 import { DirRecursive } from "./Directory";
 
-let TreeTopDown = ({ tree }: { tree: SerializedTree }) => {
+let TopDown = ({ tree }: { tree: SerializedTree }) => {
   const getChildren = (tree: SerializedTree, idx: number) => {
     return _.reject(tree.topology.children[idx] || [], idx =>
       tree.unnecessaryRoots.includes(idx)
     );
   };
-  return <DirRecursive level={[tree.root]} getNext={getChildren} styleEdges={true} />;
+  return (
+    <DirRecursive level={[tree.root]} getNext={getChildren} styleEdges={true} />
+  );
 };
 
-export default TreeTopDown;
+export default TopDown;

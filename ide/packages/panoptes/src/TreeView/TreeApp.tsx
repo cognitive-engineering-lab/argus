@@ -1,14 +1,18 @@
 import { SerializedTree } from "@argus/common/types";
+import {
+  VSCodePanelTab,
+  VSCodePanelView,
+  VSCodePanels,
+} from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import React from "react";
 import ReactJson from "react-json-view";
 
-import { ActiveContext, ActiveState, TreeContext } from "./Context";
-import Tabs from "./Tabs";
+import BottomUp from "./BottomUp";
+import TreeArea from "./Graph";
+import TopDown from "./TopDown";
 import "./TreeApp.css";
-import TreeArea from "./TreeArea";
-import TreeBottomUp from "./TreeBottomup";
-import TreeTopDown from "./TreeTopDown";
+import { ActiveContext, ActiveState, TreeContext } from "./context";
 
 // TODO: don't really need this.
 type UnderlyingTree = SerializedTree[];
@@ -25,8 +29,8 @@ let TreeApp = ({ tree }: { tree: UnderlyingTree }) => {
 
   let tabs: [string, React.ReactNode][] = [
     ["Graph", <TreeArea tree={attempt} />],
-    ["TopDown", <TreeTopDown tree={attempt} />],
-    ["BottomUp", <TreeBottomUp tree={attempt} />],
+    ["TopDown", <TopDown tree={attempt} />],
+    ["BottomUp", <BottomUp tree={attempt} />],
     ["JSON", <ReactJson src={attempt} />],
   ];
 
@@ -34,7 +38,22 @@ let TreeApp = ({ tree }: { tree: UnderlyingTree }) => {
     <TreeContext.Provider value={attempt}>
       <ActiveContext.Provider value={new ActiveState()}>
         <div className="App">
-          <Tabs components={tabs} />
+          <VSCodePanels>
+            {_.map(tabs, ([name, _], idx) => {
+              return (
+                <VSCodePanelTab key={idx} id={`tab-${idx}`}>
+                  {name}
+                </VSCodePanelTab>
+              );
+            })}
+            {_.map(tabs, ([_, component], idx) => {
+              return (
+                <VSCodePanelView key={idx} id={`tab-${idx}`}>
+                  {component}
+                </VSCodePanelView>
+              );
+            })}
+          </VSCodePanels>
         </div>
       </ActiveContext.Provider>
     </TreeContext.Provider>

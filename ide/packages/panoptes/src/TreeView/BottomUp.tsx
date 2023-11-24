@@ -4,7 +4,7 @@ import React from "react";
 
 import { DirRecursive } from "./Directory";
 
-let TreeBottomUp = ({ tree }: { tree: SerializedTree }) => {
+let BottomUp = ({ tree }: { tree: SerializedTree }) => {
   let allLeaves = _.map(tree.errorLeaves, idx => tree.topology.parent[idx]!);
   // let leaves = _.filter(allLeaves, idx => {
   //   let ancestors = pathToRoot(tree, idx);
@@ -22,10 +22,17 @@ let TreeBottomUp = ({ tree }: { tree: SerializedTree }) => {
   return (
     <>
       {_.map(leaves, (leaf, i) => {
-        return <DirRecursive key={i} level={[leaf]} getNext={getParent} styleEdges={false} />;
+        return (
+          <DirRecursive
+            key={i}
+            level={[leaf]}
+            getNext={getParent}
+            styleEdges={false}
+          />
+        );
       })}
     </>
   );
 };
 
-export default TreeBottomUp;
+export default BottomUp;

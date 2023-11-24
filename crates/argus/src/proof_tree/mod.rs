@@ -12,7 +12,7 @@ pub use topology::*;
 
 use index_vec::IndexVec;
 use ts_rs::TS;
-use serde::Serialize;
+use serde::{Serialize};
 
 crate::define_usize_idx! {
     ProofNodeIdx

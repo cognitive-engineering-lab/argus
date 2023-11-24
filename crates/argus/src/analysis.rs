@@ -25,12 +25,13 @@ use index_vec::IndexVec;
 use anyhow::{Result, Context, bail};
 use fluid_let::fluid_let;
 
+use crate::Target;
 use crate::proof_tree::{ProofNodeIdx, SerializedTree, Obligation};
 use crate::proof_tree::pretty::{PrettyPrintExt, PrettyCandidateExt, PrettyResultExt};
 use crate::proof_tree::serialize::serialize_proof_tree;
 use crate::proof_tree::topology::TreeTopology;
 
-fluid_let!(pub static OBLIGATION_TARGET_SPAN: Span);
+fluid_let!(pub static OBLIGATION_TARGET: Target);
 
 pub fn obligations(tcx: TyCtxt, body_id: BodyId) -> Result<Vec<Obligation>> {
   use FulfilledObligation::*;
@@ -75,48 +76,59 @@ pub fn obligations(tcx: TyCtxt, body_id: BodyId) -> Result<Vec<Obligation>> {
   Ok(result)
 }
 
+
 pub fn tree(tcx: TyCtxt, body_id: BodyId) -> Result<Option<SerializedTree>> {
   use FulfilledObligation::*;
 
-  let target_span = OBLIGATION_TARGET_SPAN.copied().unwrap_or(DUMMY_SP);
+  OBLIGATION_TARGET.get(|target| {
+    let target = target.unwrap();
 
-  let hir = tcx.hir();
-  let local_def_id = hir.body_owner_def_id(body_id);
-  let def_id = local_def_id.to_def_id();
+    let hir = tcx.hir();
+    let local_def_id = hir.body_owner_def_id(body_id);
+    let def_id = local_def_id.to_def_id();
 
-  log::info!("Getting obligations");
+    log::info!("Getting obligations");
 
-  let mut result = None;
+    let mut result = None;
 
-  inspect_typeck(tcx, local_def_id, |fncx| {
-    if let Some(infcx) = fncx.infcx() {
-      let fulfilled_obligations = infcx.fulfilled_obligations.borrow();
-      fulfilled_obligations.iter().for_each(|obl| {
-          match obl {
-            Success(_) => (),
-            Failure(error) => {
-              let here_span = error.root_obligation.cause.span;
+    inspect_typeck(tcx, local_def_id, |fncx| {
+      if let Some(infcx) = fncx.infcx() {
+        let fulfilled_obligations = infcx.fulfilled_obligations.borrow();
 
-              if !here_span.overlaps(target_span) {
-                return;
-              }
+        result = fulfilled_obligations.iter().find_map(|obl| {
+          let (pretty, goal) = match obl {
+            Success(obligation) => (
+              obligation.predicate.pretty(infcx, def_id),
+              Goal { predicate: obligation.predicate, param_env: obligation.param_env }
+            ),
+            Failure(error) => (
+              error.obligation.predicate.pretty(infcx, def_id),
+              Goal { predicate: error.root_obligation.predicate, param_env: error.root_obligation.param_env }
+            ),
+          };
 
-              if result.is_none() {
-                result = serialize_error_tree(&error, fncx)
-              }
-            },
+          if &pretty != &target.data {
+            return None;
           }
-        }
-      )
-    }
-  });
 
-  Ok(result)
+          serialize_tree(goal, fncx)
+        })
+      }
+    });
+
+    Ok(result)
+
+  })
 }
+
 
 fn serialize_error_tree<'tcx>(error: &FulfillmentError<'tcx>, fcx: &FnCtxt<'_, 'tcx>) -> Option<SerializedTree> {
   let o = &error.root_obligation;
   let goal = Goal { predicate: o.predicate, param_env: o.param_env };
+  serialize_tree(goal, fcx)
+}
+
+fn serialize_tree<'tcx>(goal: Goal<'tcx, Predicate<'tcx>>, fcx: &FnCtxt<'_, 'tcx>) -> Option<SerializedTree> {
   let def_id = fcx.item_def_id();
   let infcx = fcx.infcx().expect("`FnCtxt` missing a `InferCtxt`.");
 

@@ -8,9 +8,7 @@ export type Filename = string;
 type FROM_EXT = "FROM_EXTENSION";
 type FROM_WV = "FROM_WEBVIEW";
 
-export type CommunicationDirection =  
-  | FROM_EXT 
-  | FROM_WV;
+export type CommunicationDirection = FROM_EXT | FROM_WV;
 
 export type CommonData = {
   // Data is specific to a single file.
@@ -26,7 +24,7 @@ export type ExtensionToWebViewMsg = CommonData & { type: FROM_EXT } & (
 
 export type WebViewToExtensionMsg = CommonData & { type: FROM_WV } & (
     | { command: "obligations" }
-    | { command: "tree"; line: number; column: number }
+    | { command: "tree"; predicate: Obligation }
     | { command: "add-highlight"; range: CharRange }
     | { command: "remove-highlight"; range: CharRange }
   );
@@ -61,5 +59,7 @@ export type CallArgus = <T>(
   _no_output?: boolean
 ) => Promise<ArgusResult<T>>;
 
-  export type ArgusArgs = 
-    | ["obligations", Filename] // => Obligation[][]
+export type ArgusArgs =
+  | ["preload"] // => Obligation[][]
+  | ["obligations", Filename] // => Obligation[][]
+  | ["tree", Filename, string]; // => SerializedTree[]

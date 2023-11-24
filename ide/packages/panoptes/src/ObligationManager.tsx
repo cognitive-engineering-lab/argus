@@ -9,13 +9,14 @@ import {
 import _ from "lodash";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-import TreeApp from "../TreeView/TreeApp";
-import { messageExtension } from "../utilities/vscode";
-import "./ObligationApp.css";
+import "./ObligationManager.css";
+import TreeApp from "./TreeView/TreeApp";
+import { testTree } from "./utilities/tree";
+import { messageExtension } from "./utilities/vscode";
 
 const FileContext = createContext<Filename | undefined>(undefined);
 
-const ObligationProofTreeWrapper = () => {
+const ObligationTreeWrapper = ({ obligation }: { obligation: Obligation }) => {
   const [isTreeLoaded, setIsTreeLoaded] = useState(false);
   const [tree, setTree] = useState<SerializedTree[] | undefined>(undefined);
   const file = useContext(FileContext)!;
@@ -43,29 +44,29 @@ const ObligationProofTreeWrapper = () => {
     }
   };
 
-  useEffect(() => {
-    window.addEventListener("message", listener);
-    return () => window.removeEventListener("message", listener);
-  }, []);
+  // useEffect(() => {
+  //   window.addEventListener("message", listener);
+  //   return () => window.removeEventListener("message", listener);
+  // }, []);
 
   // Load the tree once;
   // FIXME: this isn't going to work, come back and fix.
   if (!isTreeLoaded) {
-    messageExtension({
-      type: "FROM_WEBVIEW",
-      file: file,
-      command: "tree",
-      line: 0,
-      column: 0,
-    });
+    // messageExtension({
+    //   type: "FROM_WEBVIEW",
+    //   file: file,
+    //   command: "tree",
+    //   predicate: obligation,
+    // });
+    setTree(testTree);
     setIsTreeLoaded(true);
   }
 
   const content =
     tree === undefined ? (
       <>
-        <VSCodeProgressRing />
         <p>Loading tree...</p>
+        <VSCodeProgressRing />
       </>
     ) : (
       <TreeApp tree={tree} />
@@ -107,20 +108,23 @@ const ObligationCard = ({ obligation }: { obligation: Obligation }) => {
   return (
     <div
       className="ObligationCard"
-      onClick={handleClick}
       onMouseEnter={addHighlight}
       onMouseLeave={removeHighlight}
     >
-      <VSCodeButton className="ObligationButton" appearance="icon">
+      <VSCodeTextArea value={obligation.data} readOnly />
+      <VSCodeButton
+        className="ObligationButton"
+        appearance="secondary"
+        onClick={handleClick}
+      >
         <i className="codicon codicon-add" />
       </VSCodeButton>
-      <VSCodeTextArea value={obligation.data} readOnly />
-      {isInfoVisible && <ObligationProofTreeWrapper />}
+      {isInfoVisible && <ObligationTreeWrapper obligation={obligation} />}
     </div>
   );
 };
 
-const ObligationApp = ({
+const ObligationManager = ({
   file,
   obligations,
 }: {
@@ -159,4 +163,4 @@ const ObligationApp = ({
   );
 };
 
-export default ObligationApp;
+export default ObligationManager;

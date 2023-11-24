@@ -5,7 +5,11 @@ import {
 } from "@argus/common";
 // FIXME: why is the 'dist/' necessary? Something is def wrong.
 // Elsewhere I can just use '@argus/common/types', but TS can't find the type decls.
-import { CharRange, Obligation } from "@argus/common/dist/types";
+import {
+  CharRange,
+  Obligation,
+  SerializedTree,
+} from "@argus/common/dist/types";
 import _ from "lodash";
 import path from "path";
 import vscode from "vscode";
@@ -78,9 +82,9 @@ export class ViewLoader {
       this.disposables
     );
 
-    // TODO: add / remove files when they are opened / closed. I'm unsure 
-    // how we actually want to do this. Someone can often have lots of open files, 
-    // which I'm sure we don't want to imitate, but only having visible files can also 
+    // TODO: add / remove files when they are opened / closed. I'm unsure
+    // how we actually want to do this. Someone can often have lots of open files,
+    // which I'm sure we don't want to imitate, but only having visible files can also
     // get annoying if someone navigates away then wants to come back.
   }
 
@@ -105,7 +109,7 @@ export class ViewLoader {
         return;
       }
       case "tree": {
-        this.getTree(message.file, message.line, message.column);
+        this.getTree(message.file, message.predicate);
         return;
       }
       case "add-highlight": {
@@ -147,8 +151,24 @@ export class ViewLoader {
     });
   }
 
-  private async getTree(host: Filename, line: number, column: number) {
-    throw new Error("Not implemented");
+  private async getTree(host: Filename, predicate: Obligation) {
+    const res = await globals.backend<SerializedTree[]>([
+      "tree",
+      host,
+      predicate.data,
+    ]);
+    if (res.type !== "output") {
+      vscode.window.showErrorMessage(res.error);
+      return;
+    }
+
+    const tree = res.value;
+    this.messageWebview({
+      type: "FROM_EXTENSION",
+      file: host,
+      command: "tree",
+      tree: tree,
+    });
   }
 
   private async addHighlightRange(host: Filename, range: CharRange) {
@@ -216,6 +236,17 @@ export class ViewLoader {
       vscode.Uri.joinPath(buildDir, "style.css")
     );
 
+    const codiconsUri = this.panel.webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        root,
+        packageName,
+        "node_modules",
+        "@vscode/codicons",
+        "dist",
+        "codicon.css"
+      )
+    );
+
     let initialFiles: Filename[] = _.map(
       vscode.window.visibleTextEditors,
       e => e.document.fileName
@@ -229,6 +260,7 @@ export class ViewLoader {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Config View</title>
           <link rel="stylesheet" type="text/css" href=${styleUri}>
+          <link rel="stylesheet" type="text/css" href=${codiconsUri}>
           <script>window.initialData = ${JSON.stringify(initialFiles)};</script>
       </head>
       <body>
