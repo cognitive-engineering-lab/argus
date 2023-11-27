@@ -5,6 +5,7 @@ use rustc_errors::Handler;
 use rustc_interface::interface::Result as RustcResult;
 use rustc_middle::ty::{TyCtxt};
 use rustc_hir::{BodyId, FnSig};
+use rustc_span::{FileName, RealFileName};
 use rustc_plugin::{CrateFilter, RustcPlugin, RustcPluginArgs, Utf8Path};
 use rustc_utils::{
   mir::borrowck_facts,
@@ -63,6 +64,7 @@ where
 }
 
 struct ArgusCallbacks<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>> {
+  file: PathBuf,
   analysis: Option<A>,
   compute_target: Option<F>,
   // FIXME: we're throwing away any failures.
@@ -143,11 +145,11 @@ impl RustcPlugin for ArgusPlugin {
           Some(id)
         };
 
-        postprocess(run(argus::analysis::tree, compute_target, &compiler_args))
+        postprocess(run(PathBuf::from(file), argus::analysis::tree, compute_target, &compiler_args))
       }
-      Obligations { .. } => {
+      Obligations { file, .. } => {
         let nothing = || { None::<String> };
-        postprocess(run(argus::analysis::obligations, nothing, &compiler_args))
+        postprocess(run(PathBuf::from(file), argus::analysis::obligations, nothing, &compiler_args))
 
       }
       _ => unreachable!(),
@@ -156,11 +158,13 @@ impl RustcPlugin for ArgusPlugin {
 }
 
 fn run<A: ArgusAnalysis, T: ToTarget>(
+  file: PathBuf,
   analysis: A,
   compute_target: impl FnOnce() -> Option<T> + Send,
   args: &[String],
 ) -> ArgusResult<Vec<A::Output>> {
   let mut callbacks = ArgusCallbacks {
+    file,
     analysis: Some(analysis),
     compute_target: Some(compute_target),
     output: Vec::new(),
@@ -227,9 +231,18 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>> rustc_driver::Call
       let mut analysis = self.analysis.take().unwrap();
 
       let mut inner = |(_, body)| {
-        match analysis.analyze(tcx, body) {
-          Ok(v) => Some(v),
-          Err(_) => None,
+        if let FileName::Real(RealFileName::LocalPath(p)) = get_file_of_body(tcx, body) {
+          if p == self.file {
+            match analysis.analyze(tcx, body) {
+              Ok(v) => Some(v),
+              Err(_) => None,
+            }
+          } else {
+            log::info!("Skipping file {:?} as it isn't {:?}", p, self.file);
+            None
+          }
+        } else {
+          None
         }
       };
 
@@ -253,4 +266,11 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>> rustc_driver::Call
 
     rustc_driver::Compilation::Stop
   }
+}
+
+fn get_file_of_body(tcx: TyCtxt<'_>, body_id: rustc_hir::BodyId) -> FileName {
+    let hir = tcx.hir();
+    let body_span = hir.body(body_id).value.span;
+    let source_map = tcx.sess.source_map();
+    source_map.span_to_filename(body_span)
 }

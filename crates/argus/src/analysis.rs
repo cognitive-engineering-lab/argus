@@ -7,13 +7,13 @@ use rustc_hir::{BodyId, FnSig};
 use rustc_hir_analysis::astconv::AstConv;
 use rustc_hir_typeck::{inspect_typeck, FnCtxt, Inherited};
 use rustc_infer::infer::InferCtxt;
-use rustc_infer::traits::FulfilledObligation;
+use rustc_infer::traits::{FulfilledObligation, FulfillErrorLocation};
 use rustc_middle::ty::{TyCtxt, Predicate};
 use rustc_trait_selection::solve::inspect::{ProofTreeVisitor, InspectGoal, ProofTreeInferCtxtExt};
 use rustc_trait_selection::traits::{ObligationCtxt, FulfillmentError};
 use rustc_trait_selection::traits::solve::{Goal, QueryInput};
 use rustc_type_ir::Canonical;
-use rustc_span::{Span, DUMMY_SP};
+use rustc_span::{Span, FileName, DUMMY_SP};
 use rustc_utils::{
   source_map::range::CharRange,
   mir::body::BodyExt,
@@ -40,7 +40,10 @@ pub fn obligations(tcx: TyCtxt, body_id: BodyId) -> Result<Vec<Obligation>> {
   let local_def_id = hir.body_owner_def_id(body_id);
   let def_id = local_def_id.to_def_id();
 
-  log::info!("Getting obligations");
+  log::info!("Getting obligations in body {}", {
+    let owner = hir.body_owner(body_id);
+    hir.opt_name(owner).map(|s| s.to_string()).unwrap_or("<anon>".to_string())
+  });
 
   let mut result = Vec::new();
 
@@ -53,20 +56,25 @@ pub fn obligations(tcx: TyCtxt, body_id: BodyId) -> Result<Vec<Obligation>> {
       result.extend(
         fulfilled_obligations.iter().filter_map(|obl| {
           match obl {
-            Success(obligation) => {
-              let range = CharRange::from_span(obligation.cause.span, source_map).unwrap();
-              Some(Obligation::Success {
-                range,
-                data: obligation.predicate.pretty(infcx, def_id)
-              })
-            },
-            Failure(error) => {
+            Failure {
+              error,
+              location: FulfillErrorLocation::Remaining,
+            } => {
               let range = CharRange::from_span(error.root_obligation.cause.span, source_map).unwrap();
               Some(Obligation::Failure {
                 range,
                 data: error.obligation.predicate.pretty(infcx, def_id)
               })
             },
+            _ => None,
+            // Success(obligation) => {
+            //   None
+            //   // let range = CharRange::from_span(obligation.cause.span, source_map).unwrap();
+            //   // Some(Obligation::Success {
+            //   //   range,
+            //   //   data: obligation.predicate.pretty(infcx, def_id)
+            //   // })
+            // }
           }
         })
       )
@@ -97,19 +105,20 @@ pub fn tree(tcx: TyCtxt, body_id: BodyId) -> Result<Option<SerializedTree>> {
 
         result = fulfilled_obligations.iter().find_map(|obl| {
           let (pretty, goal) = match obl {
-            Success(obligation) => (
-              obligation.predicate.pretty(infcx, def_id),
-              Goal { predicate: obligation.predicate, param_env: obligation.param_env }
-            ),
-            Failure(error) => (
+
+            Failure {
+              error,
+              location: FulfillErrorLocation::Remaining,
+            } => (
               error.obligation.predicate.pretty(infcx, def_id),
               Goal { predicate: error.root_obligation.predicate, param_env: error.root_obligation.param_env }
             ),
+            _ => return None,
           };
 
-          if &pretty != &target.data {
-            return None;
-          }
+          // if &pretty != &target.data {
+          //   return None;
+          // }
 
           serialize_tree(goal, fncx)
         })
