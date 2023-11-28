@@ -232,7 +232,7 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>> rustc_driver::Call
 
       let mut inner = |(_, body)| {
         if let FileName::Real(RealFileName::LocalPath(p)) = get_file_of_body(tcx, body) {
-          if p == self.file {
+          if self.file.ends_with(&p) {
             match analysis.analyze(tcx, body) {
               Ok(v) => Some(v),
               Err(_) => None,

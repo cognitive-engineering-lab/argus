@@ -58,7 +58,7 @@ pub fn obligations(tcx: TyCtxt, body_id: BodyId) -> Result<Vec<Obligation>> {
           match obl {
             Failure {
               error,
-              location: FulfillErrorLocation::Remaining,
+              .. // location: FulfillErrorLocation::Remaining,
             } => {
               let range = CharRange::from_span(error.root_obligation.cause.span, source_map).unwrap();
               Some(Obligation::Failure {
@@ -66,6 +66,14 @@ pub fn obligations(tcx: TyCtxt, body_id: BodyId) -> Result<Vec<Obligation>> {
                 data: error.obligation.predicate.pretty(infcx, def_id)
               })
             },
+            Failure {
+              error,
+              ..
+            } => {
+              log::debug!("Skipping error {error:?}");
+              None
+            },
+
             _ => None,
             // Success(obligation) => {
             //   None
@@ -104,21 +112,27 @@ pub fn tree(tcx: TyCtxt, body_id: BodyId) -> Result<Option<SerializedTree>> {
         let fulfilled_obligations = infcx.fulfilled_obligations.borrow();
 
         result = fulfilled_obligations.iter().find_map(|obl| {
+          let mut when = None;
           let (pretty, goal) = match obl {
 
             Failure {
               error,
-              location: FulfillErrorLocation::Remaining,
-            } => (
-              error.obligation.predicate.pretty(infcx, def_id),
-              Goal { predicate: error.root_obligation.predicate, param_env: error.root_obligation.param_env }
-            ),
+              location // location: FulfillErrorLocation::Remaining,
+            } => {
+              when = Some(location);
+              (
+                error.root_obligation.predicate.pretty(infcx, def_id),
+                Goal { predicate: error.obligation.predicate, param_env: error.obligation.param_env }
+              )
+            },
             _ => return None,
           };
 
-          // if &pretty != &target.data {
-          //   return None;
-          // }
+          if &pretty != &target.data {
+            return None;
+          }
+
+          log::debug!("Serializing tree for {} {:?} {:?}", pretty, when, goal);
 
           serialize_tree(goal, fncx)
         })

@@ -3,7 +3,7 @@ import {
   Filename,
   WebViewToExtensionMsg,
 } from "@argus/common";
-// FIXME: why is the 'dist/' necessary? Something is def wrong.
+// FIXME: some build thingy is wrong. The 'dist/' should not be necessary?
 // Elsewhere I can just use '@argus/common/types', but TS can't find the type decls.
 import {
   CharRange,
@@ -152,7 +152,7 @@ export class ViewLoader {
   }
 
   private async getTree(host: Filename, predicate: Obligation) {
-    const res = await globals.backend<SerializedTree[]>([
+    const res = await globals.backend<Array<SerializedTree | null>>([
       "tree",
       host,
       predicate.data,
@@ -162,7 +162,10 @@ export class ViewLoader {
       return;
     }
 
-    const tree = res.value;
+    // FIXME: there shouldn't be 'null' values in the array, in fact, it shouldn't 
+    // even *be* an array. It shoudld be an optional tree returned from the backend.
+    const tree = _.filter(res.value, t => t !== null) as SerializedTree[];
+
     this.messageWebview({
       type: "FROM_EXTENSION",
       file: host,

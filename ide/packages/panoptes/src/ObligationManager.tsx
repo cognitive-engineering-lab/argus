@@ -13,6 +13,7 @@ import "./ObligationManager.css";
 import TreeApp from "./TreeView/TreeApp";
 import { testTree } from "./utilities/tree";
 import { messageExtension } from "./utilities/vscode";
+import { IcoChevronDown, IcoChevronUp } from "./utilities/icons";
 
 const FileContext = createContext<Filename | undefined>(undefined);
 
@@ -33,6 +34,7 @@ const ObligationTreeWrapper = ({ obligation }: { obligation: Obligation }) => {
     switch (msg.command) {
       case "tree": {
         if (tree === undefined) {
+          console.log("Received tree from extension", msg.tree);
           setTree(msg.tree);
         }
         return;
@@ -44,21 +46,22 @@ const ObligationTreeWrapper = ({ obligation }: { obligation: Obligation }) => {
     }
   };
 
-  // useEffect(() => {
-  //   window.addEventListener("message", listener);
-  //   return () => window.removeEventListener("message", listener);
-  // }, []);
+  useEffect(() => {
+    window.addEventListener("message", listener);
+    return () => window.removeEventListener("message", listener);
+  }, []);
 
   // Load the tree once;
   // FIXME: this isn't going to work, come back and fix.
   if (!isTreeLoaded) {
-    // messageExtension({
-    //   type: "FROM_WEBVIEW",
-    //   file: file,
-    //   command: "tree",
-    //   predicate: obligation,
-    // });
-    setTree(testTree);
+    messageExtension({
+      type: "FROM_WEBVIEW",
+      file: file,
+      command: "tree",
+      predicate: obligation,
+    });
+
+    // setTree(testTree);
     setIsTreeLoaded(true);
   }
 
@@ -117,7 +120,7 @@ const ObligationCard = ({ obligation }: { obligation: Obligation }) => {
         appearance="secondary"
         onClick={handleClick}
       >
-        <i className="codicon codicon-add" />
+        {isInfoVisible ? <IcoChevronUp /> : <IcoChevronDown />}
       </VSCodeButton>
       {isInfoVisible && <ObligationTreeWrapper obligation={obligation} />}
     </div>

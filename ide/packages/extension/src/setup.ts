@@ -60,6 +60,7 @@ export const getArgusOpts = async (cwd: string) => {
       [libraryPath]: targetLibdir,
       LD_LIBRARY_PATH: targetLibdir,
       SYSROOT: sysroot,
+      RUST_LOG: "debug", // TODO: remove this, turn this into a debugging option
       RUST_BACKTRACE: "1",
       PATH,
       ...process.env,

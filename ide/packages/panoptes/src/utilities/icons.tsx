@@ -15,3 +15,11 @@ export const IcoTriangleRight = () => {
 export const IcoTriangleDown = () => {
   return <i className="codicon codicon-triangle-down" />;
 };
+
+export const IcoChevronDown = () => {
+  return <i className="codicon codicon-chevron-down" />;
+};
+
+export const IcoChevronUp = () => {
+  return <i className="codicon codicon-chevron-up" />;
+};
