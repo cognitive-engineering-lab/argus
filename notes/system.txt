@@ -55,8 +55,28 @@ struct DurationDef {
 
 You use the #[serde(skip)] attribute to tell serde that this field is not needed for serialization. All non-public fields should use the skip attribute.
 
+This process even works when structs are parameterized by lifetimes. Consider the updated external type definitions from the remote_time crate:
+
+```
+pub struct Duration<'a> {
+    pub secs: i64,
+    pub descr: &'a str,
+}
+```
+
+The necessary local type definitions are easy to make, especially because the type `&str` already implemnts serde Serialize. Here are the local type definitions:
+
+```
+#[derive(Serialize)]
+#[serde(remote = "Duration")]
+pub struct DurationDef<'a> {
+    pub secs: i64,
+    pub descr: &'a str,
+}
+```
+
 Now that you've seen a small example, and a more complex one, let's go through a realistic
-example. Consider the following new external type definitions in the remote_time crate:
+example. Consider the following updated external type definitions in the remote_time crate:
 
 ```
 pub trait TimeTrait {
@@ -85,6 +105,60 @@ pub struct Duration {
     pub secs: TimeWrapper,
 }
 ```
+
+The correct local type definitions would be the following:
+
+```
+#[derive(Serialize)]
+#[serde(remote = "Duration")]
+pub struct DurationDef {
+    #[serde(with = "TimeWrapperDef")]
+    pub secs: TimeWrapper,
+}
+
+#[derive(Serialize)]
+#[serde(remote = "TimeWrapper")]
+pub struct TimeWrapperDef {
+    #[serde(serialize_with = "time__simple_time")]
+    pub t: Time<SimpleTime>,
+    #[serde(skip)]
+    locale: String,
+}
+
+#[derive(Serialize)]
+enum Time__SimpleTime {
+    Seconds(#[serde(with = "SecondsDef")] <SimpleTime as TimeTrait>::Seconds),
+}
+
+impl From<&Time<SimpleTime>> for Time__SimpleTime {
+    fn from(value: &Time<SimpleTime>) -> Time__SimpleTime {
+        match value {
+            Time::Seconds(s) => Time__SimpleTime::Seconds(s.clone()),
+        }
+    }
+}
+
+fn time__simple_time<S>(value: &Time<SimpleTime>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    Time__SimpleTime::from(value).serialize(s)
+}
+
+#[derive(Serialize)]
+#[serde(remote = "Time")]
+pub enum TimeDef<I: TimeTrait> {
+    Seconds(I::Seconds),
+}
+
+#[derive(Serialize)]
+#[serde(remote = "Seconds")]
+pub struct SecondsDef(pub i32);
+```
+
+This answer shows a few additional tricks needed to handle definitions with type parameters and trait bounds.
+
+// !!!! Below is the rest of the original system description, it's prbably too verbose. FIXME:
 
 In order to derive Serialize for these types we will use the serde remote
 derivation feature. To do this we create structurally identical type definitions
