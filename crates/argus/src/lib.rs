@@ -1,7 +1,8 @@
 #![feature(
     rustc_private,
     trait_alias,
-    never_type,
+    never_type, // proof tree visitor
+    min_specialization, // for rustc_index
     let_chains
 )]
 
@@ -11,13 +12,17 @@ extern crate rustc_hir;
 extern crate rustc_hir_analysis;
 extern crate rustc_hir_typeck;
 extern crate rustc_infer;
+extern crate rustc_macros;
 extern crate rustc_middle;
+extern crate rustc_serialize;
 extern crate rustc_span;
 extern crate rustc_trait_selection;
 extern crate rustc_type_ir;
 
 pub mod analysis;
 pub mod proof_tree;
+pub mod serialize;
+// pub mod ty;
 
 #[derive(Debug)]
 pub struct Target {

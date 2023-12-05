@@ -1,0 +1,308 @@
+You are a highly experienced Rust developer currently working with the rustc_private API. You know what you are doing and will work with the unsafe and context specific compiler types. However, you have a problem, some of the types in the compiler do not derive the serde Serialize trait, so you need to recreate these types locally such that they do derive the Serialize trait and you will do so using the serde feature called: "remote derivation". Which means that you can easily mirror the types. Let's walk through a simple example so you properly understand the task.
+
+In this example we will be using the external crate: remote_time, and it contains the
+following type definitions:
+
+```
+pub struct Duration {
+    pub secs: i64,
+    pub nanos: i32,
+}
+```
+
+In our local crate we would write the following type definition:
+
+```
+#[derive(Serialize)]
+#[serde(remote = "Duration")]
+struct DurationDef {
+    pub secs: i64,
+    pub nanos: i32,
+}
+```
+
+This follows a few conventions, the first is that the local name is the same as
+the external definition but we use the suffix Def. Thus, the external Duration
+becomes the local DurationDef. First, locally we use #[derive(Serialize)] to make the
+local type implement the Serialize trait. Second, we use the #[serde(remote =
+"Duration")] attribute, this tells serde that our local definition DurationDef
+corresponds to the external definition Duration. The struct has two public
+fields, `secs` of type i64, and `nanos` of type i32. The types i64 and i32
+already implement Serialize so we don't need to do anything special with the
+fields. And this concludes the first small example.
+
+
+Now that you've seena small example, let's expand this process to be a little more complex. Now consider this alternative external type definitions in the remote_time crate:
+
+```
+pub struct Duration {
+    pub secs: i64,
+    nanos: i32,
+}
+```
+
+The difference is that the fields `nanos` is *private*, this means that we cannot serialize it. Therefore, the local types for this external definitions would be:
+
+```
+#[derive(Serialize)]
+#[serde(remote = "Duration")]
+struct DurationDef {
+    pub secs: i64,
+    #[serde(skip)]
+    nanos: i32,
+}
+```
+
+You use the #[serde(skip)] attribute to tell serde that this field is not needed for serialization. All non-public fields should use the skip attribute.
+
+Now that you've seen a small example, and a more complex one, let's go through a realistic
+example. Consider the following new external type definitions in the remote_time crate:
+
+```
+pub trait TimeTrait {
+    type Seconds;
+}
+
+pub struct SimpleTime {}
+
+#[derive(Clone)]
+pub struct Seconds(pub i32);
+
+impl TimeTrait for SimpleTime {
+    type Seconds = Seconds;
+}
+
+pub enum Time<I: TimeTrait> {
+    Seconds(I::Seconds),
+}
+
+pub struct TimeWrapper {
+    pub t: Time<SimpleTime>,
+    locale: String,
+}
+
+pub struct Duration {
+    pub secs: TimeWrapper,
+}
+```
+
+In order to derive Serialize for these types we will use the serde remote
+derivation feature. To do this we create structurally identical type definitions
+and tell serde to which external definitions they correspond. Let's start
+creating our local definitions for the previous code. Recal the definition for Duration:
+
+```
+pub struct Duration {
+    pub secs: TimeWrapper,
+}
+```
+
+We can use the serde remote derive feature in our local crate as follows:
+
+```
+#[derive(Serialize)]
+#[serde(remote = "Duration")]
+pub struct DurationDef {
+    #[serde(with = "TimeWrapperDef")]
+    pub secs: TimeWrapper,
+}
+```
+
+There are a few  conventions that we follow. The name of the local type is
+always the same as that of the external type, but with the suffix "Def". This means that
+the external type Duration becomes the local type DurationDef. The local type must derive the
+serde Serialize trait, we do this with #[derive(Serialize)]. We use the syntax #[serde(remote = "Duration")] to
+instruct serde that our local DurationDef type corresponds to the external
+Duration type. Furthermore, because Duration is a struct, we need to tell serde
+how to serialize each of its fields. In the case of Duration, there is a single
+field: TimeWrapper, and we use the syntax #[serde(with = "TimeWrapperDef")]
+which tells serde that we want to serialize a TimeWrapper as a TimeWrapperDef.
+We haven't yet declared a TimeWrapperDef so let's do that now!
+
+Recall the external definition of a TimeWrapper:
+
+```
+pub struct TimeWrapper {
+    pub t: Time<SimpleTime>,
+    locale: String,
+}
+```
+
+We can create the local definition TimeWrapperDef as follows:
+
+```
+#[derive(Serialize)]
+#[serde(remote = "TimeWrapper")]
+pub struct TimeWrapperDef {
+    #[serde(serialize_with = "time__simple_time")]
+    pub t: Time<SimpleTime>,
+    #[serde(skip)]
+    locale: String,
+}
+```
+
+Notice that this follows the same pattern that we used for the previous struct.
+The external name TimeWrapper becomes TimeWrapperDef. We use
+#[derive(Serialize)] to derive the Serialize trait, and the #[serde(remote =
+"TimeWrapper")] tells serde that our local TimeWrapperDef corresponds to the
+external type definition TimeWrapper. However, for the struct fields we have to
+do two slightly different things. Note that the `locale` field in the
+TimeWrapper struct is *private*, because of this, in our local struct
+TimeWrapperDef we use the #[serde(skip)] attribute. All private fields of
+external structs must be skipped locally, because they can't be serialized. The
+next difference is with the struct field `t`, which has an external type
+Time<SimpleTime>. We **can't** use the #[serde(with = ...)] attribute here because
+we need to deal with the type parameter SimpleTime. To understand this, let's
+look at the external definitions for Time and SimpleTime:
+
+```
+pub trait TimeTrait {
+    type Seconds;
+}
+
+pub struct SimpleTime {}
+
+impl TimeTrait for SimpleTime {
+    type Seconds = Seconds;
+}
+
+pub enum Time<I: TimeTrait> {
+    Seconds(I::Seconds),
+}
+```
+
+We see that the external definition for Time as a type parameter `I`, and that
+parameter is bounded by the `TimeTrait` trait. Therefore, in order to serialize
+the field `t: Time<SimpleTime>` from the TimeWrapper struct we will create the
+following local definitions, the entry point of which is the function `time__simple_time`:
+
+```
+#[derive(Serialize)]
+enum Time__SimpleTime {
+    Seconds(#[serde(with = "SecondsDef")] <SimpleTime as TimeTrait>::Seconds),
+}
+
+impl From<&Time<SimpleTime>> for Time__SimpleTime {
+    fn from(value: &Time<SimpleTime>) -> Time__SimpleTime {
+        match value {
+            Time::Seconds(s) => Time__SimpleTime::Seconds(s.clone()),
+        }
+    }
+}
+
+fn time__simple_time<S>(value: &Time<SimpleTime>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    Time__SimpleTime::from(value).serialize(s)
+}
+
+#[derive(Serialize)]
+#[serde(remote = "Time")]
+pub enum TimeDef<I: TimeTrait> {
+    Seconds(I::Seconds),
+}
+```
+
+The local TimeDef wrapper is simple, it follows the same rules that we've
+previously seen and corresponds to the external Time definition. The new
+addition is the enum Time__SimpleTime. This represents the type Time<SimpleTime>
+but instead of using the type parameter, we instantiate it with the given type
+SimpleTime. Because this local type does not correspond with an external type,
+we simply use #[derive(Serialize)] to derive the serialize trait, but we don't
+associate it with an external type. We also need to provide a way to transform a
+type of Time<SimpleTime> into a Time__SimpleTime, and we do that with the From
+trait. Because the types are structurally equivalent, we simply use a match
+expression and create the enumeration with the corresponding variants.
+Therefore, the variant Time::Seconds becomes a Time__SimpleTime::Seconds, and we
+have to clone the value `s` as it's behind a reference. The last thing to do is
+write the function `time__simple_time` function that takes a reference to a
+Time<SimpleTime> value, and a serde Serializer `s`, it then converts the
+Time<SimpleTime> to a Time__SimpleTime using the from trait method, then it
+invokes serialize on that. Lastly, because we are using a function to serialize
+the field `t` on the TimeWrapper struct, we use the attribute
+#[serde(serialize_with = "time__simple_time")].
+
+This was a fairly complex example, let's recap. Given the external type definitions:
+
+```
+pub trait TimeTrait {
+    type Seconds;
+}
+
+pub struct SimpleTime {}
+
+#[derive(Clone)]
+pub struct Seconds(pub i32);
+
+impl TimeTrait for SimpleTime {
+    type Seconds = Seconds;
+}
+
+pub enum Time<I: TimeTrait> {
+    Seconds(I::Seconds),
+}
+
+pub struct TimeWrapper {
+    pub t: Time<SimpleTime>,
+    locale: String,
+}
+
+pub struct Duration {
+    pub secs: TimeWrapper,
+}
+```
+
+We would generate the following local type definitions that derive the serde
+Serialize trait.
+
+```
+use remote_crate::*;
+use serde::Serialize;
+
+#[derive(Serialize)]
+#[serde(remote = "Duration")]
+pub struct DurationDef {
+    #[serde(with = "TimeWrapperDef")]
+    pub secs: TimeWrapper,
+}
+
+#[derive(Serialize)]
+#[serde(remote = "TimeWrapper")]
+pub struct TimeWrapperDef {
+    #[serde(serialize_with = "time__simple_time")]
+    pub t: Time<SimpleTime>,
+    #[serde(skip)]
+    locale: String,
+}
+
+#[derive(Serialize)]
+enum Time__SimpleTime {
+    Seconds(#[serde(with = "SecondsDef")] <SimpleTime as TimeTrait>::Seconds),
+}
+
+impl From<&Time<SimpleTime>> for Time__SimpleTime {
+    fn from(value: &Time<SimpleTime>) -> Time__SimpleTime {
+        match value {
+            Time::Seconds(s) => Time__SimpleTime::Seconds(s.clone()),
+        }
+    }
+}
+
+fn time__simple_time<S>(value: &Time<SimpleTime>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    Time__SimpleTime::from(value).serialize(s)
+}
+
+#[derive(Serialize)]
+#[serde(remote = "Time")]
+pub enum TimeDef<I: TimeTrait> {
+    Seconds(I::Seconds),
+}
+
+#[derive(Serialize)]
+#[serde(remote = "Seconds")]
+pub struct SecondsDef(pub i32);
+```

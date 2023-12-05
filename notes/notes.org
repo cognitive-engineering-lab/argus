@@ -1,0 +1,25 @@
+#+title: Notes
+
+* How does /rustc/ report obligations?
+
+There's two ways to report a "selection error":
+- ~report_fulfillment_error~ (this is kind of the entry, /it can call the below/) [[file:~/dev/prj/rust/compiler/rustc_trait_selection/src/traits/error_reporting/type_err_ctxt_ext.rs::1291]]
+
+- ~report_selection_error~ : [[file:~/dev/prj/rust/compiler/rustc_trait_selection/src/traits/error_reporting/type_err_ctxt_ext.rs::351]]
+
+The function ~report_fulfillment_errors~ is where we actually see the selection of
+errors reported.  There's even a struct field ~reported_trait_errors~ to remember
+what's been reported. One of the things they do is sort by "importance". ~T:
+Sized~ and ~T: WF~ predicates are /least important/, as are coercion errors. [[file:~/dev/prj/rust/compiler/rustc_trait_selection/src/traits/error_reporting/type_err_ctxt_ext.rs::111]]
+
+Two passes are used to filter errors before reporting. Ties are broken by
+ordering, and rustc orders by "when the error was logged."
+1. Errors are suppressed if they (a) have the same span, or (b) one implies the
+   other (the "other" is then suppressed).
+2. All errors that were not suppressed, and errors that aren't a result of
+   desugaring, are then reported.
+
+This process currently happens all within the same function, I wonder if we
+could separate it into two functions: one that orders, filters, and fixes
+errors, the second actually reporting them. This way, we could use the same
+preprocess step to better match the compiler.

@@ -18,3 +18,4 @@ ts-rs = { version = "6.2.0", features = [
 ] }
 anyhow = "1.0.75"
 fluid-let = "1.0.0"
+itertools = "0.12.0"

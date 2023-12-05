@@ -8,10 +8,11 @@ use std::collections::{HashMap, HashSet};
 use smallvec::SmallVec;
 use std::{fmt::Debug, hash::Hash};
 
+use rustc_macros::Encodable;
 use serde::Serialize;
 use ts_rs::TS;
 
-pub trait Idx = Copy + PartialEq + Eq + Hash + Serialize + Debug + TS;
+pub trait Idx = Copy + PartialEq + Eq + Hash + Debug + Serialize + TS;
 
 /// Parent child relationships between structures.
 #[derive(TS, Serialize, Clone, Debug, Default, PartialEq, Eq)]

@@ -22,7 +22,7 @@ use serde::Serialize;
 use index_vec::IndexVec;
 
 
-use pretty::{PrettyPrintExt, PrettyCandidateExt, PrettyResultExt};
+use ext::*;
 use super::*;
 
 pub struct SerializedTreeVisitor {
@@ -70,43 +70,7 @@ impl SerializedTreeVisitor {
     }
 }
 
-impl SerializedTreeVisitor {
-    /// Flag a goal as unnecessary iff:
-    /// - it is not a `TraitPredicate`
-    /// - it is `_: Sized` predicate.
-    /// - ...
-    fn is_unnecessary(&self, goal: &InspectGoal
-                      // , n: ProofNodeIdx
-    ) -> bool {
-        use rustc_middle::ty::{TyCtxt, PredicateKind, ClauseKind};
-        use rustc_hir::lang_items::LangItem;
-
-        let tcx = &goal.infcx().tcx;
-
-        // TODO: check the ancestors of the given node, if any
-        // of them are unnecessary, then so are we.
-        //
-        // let tree_root = self.root.unwrap_or(n);
-        // let to_root = self.topology.path_to_root(n);
-        // if to_root.path.into_iter().any(|ancestor| {
-        //     self.unnecessary_roots.contains(&ancestor)
-        // }) {
-        //     return true;
-        // }
-
-        let predicate = &goal.goal().predicate;
-        let kind = predicate.kind().skip_binder();
-
-        match kind {
-            PredicateKind::Clause(ClauseKind::Trait(trait_predicate)) if
-                trait_predicate.def_id() != tcx.require_lang_item(LangItem::Sized, None)
-             => false,
-            _ => {
-                true
-            },
-        }
-    }
-}
+impl SerializedTreeVisitor {}
 
 impl Node {
     fn from_goal(goal: &InspectGoal, def_id: DefId) -> Self {
@@ -139,7 +103,7 @@ impl ProofTreeVisitor<'_> for SerializedTreeVisitor {
         // The frontend doesn't use them, but eventually we will!
         // self.unnecessary_roots.insert(n);
 
-        if self.is_unnecessary(goal) {
+        if !goal.goal().predicate.is_necessary(&infcx.tcx) {
             return ControlFlow::Continue(());
         }
 
@@ -156,19 +120,28 @@ impl ProofTreeVisitor<'_> for SerializedTreeVisitor {
         }
 
         let prev = self.previous.clone();
+        self.previous = Some(here_idx);
 
         for c in goal.candidates() {
+
             let here_candidate = Node::from_candidate(&c, self.def_id);
             let candidate_idx = self.nodes.push(here_candidate);
-            self.topology.add(here_idx, candidate_idx);
-            self.previous = Some(candidate_idx);
+
+            let prev_idx = if c.is_informative_probe() {
+                self.topology.add(here_idx, candidate_idx);
+                self.previous = Some(candidate_idx);
+                candidate_idx
+            } else {
+                here_idx
+            };
+
             c.visit_nested(self)?;
 
-            if self.topology.is_leaf(candidate_idx) {
+            if self.topology.is_leaf(prev_idx) {
                 let result = goal.result();
                 let leaf = Node::from_result(&result);
                 let leaf_idx = self.nodes.push(leaf);
-                self.topology.add(candidate_idx, leaf_idx);
+                self.topology.add(prev_idx, leaf_idx);
                 if !result.is_yes() {
                     self.error_leaves.push(leaf_idx);
                 }

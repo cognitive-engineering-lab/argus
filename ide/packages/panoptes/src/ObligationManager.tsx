@@ -143,9 +143,10 @@ const ObligationManager = ({
     obligation => obligation.type === "Success"
   );
 
+  // NOTE: the backend sorts the obligations by some metric, this usually involving what was
+  // "most likely" to cause the root obligation. All this to say, don't resort the obligations.
   const doList = (obligations: Obligation[]) => {
-    const os = _.sortBy(obligations, obligation => obligation.range.start.line);
-    const uqs = _.uniqBy(os, obligation => obligation.data);
+    const uqs = _.uniqBy(obligations, obligation => obligation.data);
     return (
       <>
         {_.map(uqs, (obligation, idx) => {
@@ -160,8 +161,8 @@ const ObligationManager = ({
       <h2>Failed obligations</h2>
       {doList(failures)}
       <VSCodeDivider />
-      <h2>Successful obligations</h2>
-      {doList(successes)}
+      {/* <h2>Successful obligations</h2>
+      {doList(successes)} */}
     </FileContext.Provider>
   );
 };

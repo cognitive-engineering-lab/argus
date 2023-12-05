@@ -3,6 +3,7 @@ use std::{borrow::Cow, env, process::{exit, Command}, time::Instant, path::PathB
 use clap::{Parser, Subcommand};
 use rustc_errors::Handler;
 use rustc_interface::interface::Result as RustcResult;
+use rustc_macros::Encodable;
 use rustc_middle::ty::{TyCtxt};
 use rustc_hir::{BodyId, FnSig};
 use rustc_span::{FileName, RealFileName};
@@ -27,6 +28,9 @@ use argus::{
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+trait OutSerialize = Serialize;
+// trait OutSerialize = for<'a, 'tcx> rustc_serialize::Encodable<argus::serialize::json::Encoder<'a, 'tcx>>;
+
 #[derive(Parser, Serialize, Deserialize)]
 #[clap(version = VERSION)]
 pub struct ArgusPluginArgs {
@@ -48,14 +52,14 @@ enum ArgusCommand {
 }
 
 trait ArgusAnalysis: Sized + Send + Sync {
-  type Output: Serialize + Send + Sync;
+  type Output: OutSerialize + Send + Sync;
   fn analyze(&mut self, tcx: TyCtxt, id: BodyId) -> anyhow::Result<Self::Output>;
 }
 
 impl<F, O> ArgusAnalysis for F
 where
   F: for<'tcx> Fn(TyCtxt<'tcx>, BodyId) -> anyhow::Result<O> + Send + Sync,
-  O: Serialize + Send + Sync,
+  O: OutSerialize + Send + Sync,
 {
   type Output = O;
   fn analyze(&mut self, tcx: TyCtxt, id: BodyId) -> anyhow::Result<Self::Output> {
@@ -202,8 +206,10 @@ pub fn run_with_callbacks(
   Ok(())
 }
 
-fn postprocess<T: Serialize>(result: T) -> RustcResult<()> {
+fn postprocess<T: OutSerialize>(result: T) -> RustcResult<()> {
+  use argus::serialize::json;
   println!("{}", serde_json::to_string(&result).unwrap());
+  // println!("{}", json::encode(&result).unwrap());
   Ok(())
 }
 

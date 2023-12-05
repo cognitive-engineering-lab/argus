@@ -4,7 +4,7 @@ macro_rules! define_usize_idx {
       crate::define_tsrs_alias!($($ty,)* => "number");
       $(
         index_vec::define_index_type! {
-            pub struct $ty = usize;
+          pub struct $ty = usize;
         }
       )*
   }

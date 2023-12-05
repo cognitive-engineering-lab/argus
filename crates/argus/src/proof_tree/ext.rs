@@ -15,10 +15,13 @@ use rustc_hir::LangItem;
 use rustc_infer::infer::InferCtxt;
 
 use rustc_trait_selection::solve::inspect::InspectCandidate;
-use rustc_trait_selection::traits::{
-    solve::{Certainty, MaybeCause},
-    query::NoSolution,
-};
+use rustc_trait_selection::traits::solve::{Certainty, MaybeCause};
+use rustc_trait_selection::traits::query::NoSolution;
+use rustc_trait_selection::traits::solve::{inspect::ProbeKind, CandidateSource};
+
+pub trait PredicateExt<'tcx> {
+    fn is_necessary(&self, tcx: &TyCtxt<'tcx>) -> bool;
+}
 
 /// Pretty printing for things that can already be printed.
 pub trait PrettyPrintExt<'a, 'tcx>: Print<'tcx, FmtPrinter<'a, 'tcx>> {
@@ -38,12 +41,22 @@ pub trait PrettyResultExt {
 }
 
 /// Pretty printing for `Candidates`.
-pub trait PrettyCandidateExt {
+pub trait CandidateExt {
     fn pretty(&self, infcx: &InferCtxt, def_id: DefId) -> String;
+
+    fn is_informative_probe(&self) -> bool;
 }
 
 // -----------------------------------------------
 // Impls
+
+
+impl<'tcx> PredicateExt<'tcx> for ty::Predicate<'tcx> {
+    fn is_necessary(&self, tcx: &TyCtxt<'tcx>) -> bool {
+        matches!(self.kind().skip_binder(), ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if
+                 trait_predicate.def_id() != tcx.require_lang_item(LangItem::Sized, None))
+    }
+}
 
 impl<'a, 'tcx, T: Print<'tcx, FmtPrinter<'a, 'tcx>>> PrettyPrintExt<'a, 'tcx> for T {}
 
@@ -65,23 +78,41 @@ impl PrettyResultExt for Result<Certainty, NoSolution> {
     }
 }
 
-impl PrettyCandidateExt for InspectCandidate<'_, '_> {
+impl CandidateExt for InspectCandidate<'_, '_> {
     fn pretty(&self, infcx: &InferCtxt, def_id: DefId) -> String {
-        use rustc_trait_selection::traits::solve::{inspect::ProbeKind, CandidateSource};
-        use CandidateSource::*;
-
-        let ProbeKind::TraitCandidate { source, .. } = self.kind() else {
-            return "anon-candidate".to_string();
-        };
-
         // TODO: gavinleroy
+        match self.kind() {
+            ProbeKind::Root { .. } => "root".to_string(),
+            ProbeKind::NormalizedSelfTyAssembly => "normalized-self-ty-asm".to_string(),
+            ProbeKind::UnsizeAssembly => "unsize-asm".to_string(),
+            ProbeKind::CommitIfOk => "commit-if-ok".to_string(),
+            ProbeKind::UpcastProjectionCompatibility => "upcase-proj-compat".to_string(),
+            ProbeKind::MiscCandidate {
+                name,
+                ..
+            } => format!("misc-{}", name),
+            ProbeKind::TraitCandidate {
+                source,
+                ..
+            } => match source {
+                CandidateSource::BuiltinImpl(built_impl) => "builtin".to_string(),
+                CandidateSource::AliasBound => "alias-bound".to_string(),
 
-        match source {
-            Impl(def_id) => "impl".to_string(),
-            BuiltinImpl(built_impl) => "builtin".to_string(),
-            ParamEnv(idx) => format!("param-env#{idx}"),
-            AliasBound => todo!(),
+                // The only two we really care about.
+                CandidateSource::ParamEnv(idx) => format!("param-env#{idx}"),
+                CandidateSource::Impl(def_id) => "impl".to_string(),
+            },
         }
+    }
+
+    fn is_informative_probe(&self) -> bool {
+        matches!(self.kind(), ProbeKind::TraitCandidate {
+            source: CandidateSource::Impl(_),
+            ..
+        } | ProbeKind::TraitCandidate {
+            source: CandidateSource::BuiltinImpl(_),
+            ..
+        })
     }
 }
 

@@ -1,21 +1,25 @@
 pub mod topology;
-pub mod pretty;
+pub mod ext;
 #[macro_use]
 mod macros;
 pub(super) mod serialize;
 
 use std::collections::HashSet;
+
+use index_vec::IndexVec;
 use rustc_infer::traits::FulfilledObligation;
+// use rustc_macros::RustcEncodable;
+use rustc_middle::ty::Predicate;
 use rustc_utils::source_map::range::CharRange;
 
 pub use topology::*;
+use crate::serialize::json;
 
-use index_vec::IndexVec;
 use ts_rs::TS;
-use serde::{Serialize};
+use serde::Serialize;
 
 crate::define_usize_idx! {
-    ProofNodeIdx
+  ProofNodeIdx
 }
 
 #[derive(TS, Serialize, Debug, Clone, PartialEq, Eq)]
@@ -38,13 +42,15 @@ pub struct SerializedTree {
 
 #[derive(TS, Serialize, Clone, Debug)]
 #[serde(tag = "type")]
-pub enum Obligation {
-  Success {
-    range: CharRange,
-    data: String,
-  },
-  Failure {
-    range: CharRange,
-    data: String,
-  },
+pub struct Obligation {
+  pub data: String, // Predicate<'tcx>,
+  pub range: CharRange,
+  pub kind: ObligationKind,
+}
+
+#[derive(TS, Serialize, Clone, Debug)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum ObligationKind {
+  Success,
+  Failure,
 }
