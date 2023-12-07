@@ -22,7 +22,7 @@ extern crate rustc_type_ir;
 pub mod analysis;
 pub mod proof_tree;
 pub mod serialize;
-// pub mod ty;
+pub mod ty;
 
 #[derive(Debug)]
 pub struct Target {
