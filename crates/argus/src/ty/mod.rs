@@ -1,18 +1,35 @@
 //! Remote serde::Serialize derives for Rustc types
+#![allow(
+    non_camel_case_types,
+    non_snake_case,
+    suspicious_double_ref_op // FIXME: get rid of this eventually
+)]
 
 use std::num::*;
 
 use rustc_type_ir as ir;
 use rustc_middle::{ty::{*, abstract_const::CastKind}, mir::{BinOp, UnOp}};
 use rustc_hir::def_id::{DefId, DefIndex, CrateNum};
-use rustc_span::{symbol::{sym, Symbol}};
+use rustc_span::symbol::Symbol;
+use rustc_target::spec::abi::Abi;
+use rustc_hir::Unsafety;
 
 use serde::{Serialize, ser::SerializeSeq};
 
-pub struct PredicateDef;
+// TODO: we could also generate the functions
+macro_rules! serialize_custom_seq {
+    ($wrap:ident, $serializer:expr, $value:expr) => {{
+        let mut seq = $serializer.serialize_seq(Some($value.len()))?;
+        for e in $value.iter() {
+            seq.serialize_element(&$wrap(e))?;
+        }
+        seq.end()
+    }}
+}
 
+pub struct PredicateDef;
 impl PredicateDef {
-    fn serialize<'tcx, S>(value: &Predicate<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &Predicate<'tcx>, s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -25,28 +42,16 @@ pub struct Binder__PredicateKind<'tcx> {
     #[serde(serialize_with = "vec__bound_variable_kind")]
     pub bound_vars: Vec<BoundVariableKind>,
     #[serde(with = "PredicateKindDef")]
-    pub value: PredicateKind<'tcx>,
+    pub value: ir::PredicateKind<TyCtxt<'tcx>>,
 }
 
 impl<'tcx> From<&Binder<'tcx, ir::PredicateKind<TyCtxt<'tcx>>>> for Binder__PredicateKind<'tcx> {
     fn from(value: &Binder<'tcx, ir::PredicateKind<TyCtxt<'tcx>>>) -> Self {
-        todo!()
-        // Binder__PredicateKind {
-        //     bound_vars: value.bound_vars().to_vec(),
-        //     value: value.skip_binder().clone(),
-        // }
-    }
-}
-
-// TODO: we could also generate the functions
-macro_rules! serialize_custom_seq {
-    ($wrap:ident, $serializer:expr, $value:expr) => {{
-        let mut seq = $serializer.serialize_seq(Some($value.len()))?;
-        for e in $value.iter() {
-            seq.serialize_element(&$wrap(e))?;
+        Binder__PredicateKind {
+            bound_vars: value.bound_vars().to_vec(),
+            value: value.skip_binder().clone(),
         }
-        seq.end()
-    }}
+    }
 }
 
 fn vec__bound_variable_kind<S>(value: &Vec<BoundVariableKind>, s: S) -> Result<S::Ok, S::Error>
@@ -60,12 +65,66 @@ fn vec__bound_variable_kind<S>(value: &Vec<BoundVariableKind>, s: S) -> Result<S
 
 pub struct BoundExistentialPredicatesDef;
 impl BoundExistentialPredicatesDef {
-    fn serialize<'tcx, S>(value: &List<Binder<'tcx, ExistentialPredicate<'tcx>>>, s: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
+    pub fn serialize<'tcx, S>(value: &List<Binder<'tcx, ExistentialPredicate<'tcx>>>, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
     {
-        todo!()
+        #[derive(Serialize)]
+        struct Wrapper<'tcx>(#[serde(serialize_with = "binder__existential_predicate")] Binder<'tcx, ExistentialPredicate<'tcx>>);
+        serialize_custom_seq! { Wrapper, s, value }
     }
+}
+
+fn binder__existential_predicate<'tcx, S>(value: &Binder<'tcx, ExistentialPredicate<'tcx>>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    Binder__ExistentialPredicate::from(value).serialize(s)
+}
+
+#[derive(Serialize)]
+pub struct Binder__ExistentialPredicate<'tcx> {
+    #[serde(serialize_with = "vec__bound_variable_kind")]
+    pub bound_vars: Vec<BoundVariableKind>,
+    #[serde(with = "ExistentialPredicateDef")]
+    pub value: ExistentialPredicate<'tcx>,
+}
+
+impl<'tcx> From<&Binder<'tcx, ExistentialPredicate<'tcx>>> for Binder__ExistentialPredicate<'tcx> {
+    fn from(value: &Binder<'tcx, ExistentialPredicate<'tcx>>) -> Self {
+        Binder__ExistentialPredicate {
+            bound_vars: value.bound_vars().to_vec(),
+            value: value.skip_binder().clone(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(remote = "ExistentialPredicate")]
+pub enum ExistentialPredicateDef<'tcx> {
+    Trait(#[serde(with = "ExistentialTraitRefDef")] ExistentialTraitRef<'tcx>),
+    Projection(#[serde(with = "ExistentialProjectionDef")] ExistentialProjection<'tcx>),
+    AutoTrait(#[serde(with = "DefIdDef")] DefId),
+}
+
+#[derive(Serialize)]
+#[serde(remote = "ExistentialTraitRef")]
+pub struct ExistentialTraitRefDef<'tcx> {
+    #[serde(with = "DefIdDef")]
+    pub def_id: DefId,
+    #[serde(with = "GenericArgsDef")]
+    pub args: GenericArgsRef<'tcx>,
+}
+
+#[derive(Serialize)]
+#[serde(remote = "ExistentialProjection")]
+pub struct ExistentialProjectionDef<'tcx> {
+    #[serde(with = "DefIdDef")]
+    pub def_id: DefId,
+    #[serde(with = "GenericArgsDef")]
+    pub args: GenericArgsRef<'tcx>,
+    #[serde(with = "TermDef")]
+    pub term: Term<'tcx>,
 }
 
 #[derive(Serialize)]
@@ -93,11 +152,13 @@ pub enum AliasKindDef {
 
 pub struct TysDef;
 impl TysDef {
-    fn serialize<'tcx, S>(value: &List<Ty<'tcx>>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &List<Ty<'tcx>>, s: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
     {
-        todo!()
+        #[derive(Serialize)]
+        struct Wrapper<'tcx>(#[serde(with = "TyDef")] Ty<'tcx>);
+        serialize_custom_seq! { Wrapper, s, value }
     }
 }
 
@@ -209,7 +270,7 @@ pub struct SubtypePredicateDef<'tcx> {
 
 pub struct TyDef;
 impl TyDef {
-    fn serialize<'tcx, S>(value: &Ty<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &Ty<'tcx>, s: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {
@@ -219,7 +280,7 @@ impl TyDef {
 
 pub struct TyKindDef;
 impl TyKindDef {
-    fn serialize<'tcx, S>(value: &TyKind<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &TyKind<'tcx>, s: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {
@@ -259,28 +320,178 @@ pub enum TyKind__TyCtxt<'tcx> {
 
 impl<'tcx> From<&ir::TyKind<TyCtxt<'tcx>>> for TyKind__TyCtxt<'tcx> {
     fn from(value: &ir::TyKind<TyCtxt<'tcx>>) -> Self {
-        todo!()
+        match value {
+           TyKind::Bool =>                               TyKind__TyCtxt::Bool,
+           TyKind::Char =>                               TyKind__TyCtxt::Char,
+           TyKind::Int(v) =>                             TyKind__TyCtxt::Int(v.clone()),
+           TyKind::Uint(v) =>                            TyKind__TyCtxt::Uint(v.clone()),
+           TyKind::Float(v) =>                           TyKind__TyCtxt::Float(v.clone()),
+           TyKind::Adt(v1,  v2) =>                       TyKind__TyCtxt::Adt(v1.clone(), v2.clone()),
+           TyKind::Foreign(v) =>                         TyKind__TyCtxt::Foreign(v.clone()),
+           TyKind::Str =>                                TyKind__TyCtxt::Str,
+           TyKind::Array(v1,  v2) =>                     TyKind__TyCtxt::Array(v1.clone(), v2.clone()),
+           TyKind::Slice(v) =>                           TyKind__TyCtxt::Slice(v.clone()),
+           TyKind::RawPtr(v) =>                          TyKind__TyCtxt::RawPtr(v.clone()),
+           TyKind::Ref(v1, v2, v3) =>                    TyKind__TyCtxt::Ref(v1.clone(), v2.clone(), v3.clone()),
+           TyKind::FnDef(v1,  v2) =>                     TyKind__TyCtxt::FnDef(v1.clone(), v2.clone()),
+           TyKind::FnPtr(v) =>                           TyKind__TyCtxt::FnPtr(v.clone()),
+           TyKind::Dynamic(v1,  v2, v3) =>               TyKind__TyCtxt::Dynamic(v1.clone(), v2.clone(), v3.clone()),
+           TyKind::Closure(v1,  v2) =>                   TyKind__TyCtxt::Closure(v1.clone(), v2.clone()),
+           TyKind::Coroutine(v1,  v2, v3) =>             TyKind__TyCtxt::Coroutine(v1.clone(), v2.clone(), v3.clone()),
+           TyKind::CoroutineWitness(v1,  v2) =>          TyKind__TyCtxt::CoroutineWitness(v1.clone(), v2.clone()),
+           TyKind::Never =>                              TyKind__TyCtxt::Never,
+           TyKind::Tuple(v) =>                           TyKind__TyCtxt::Tuple(v.clone()),
+           TyKind::Alias(v1,  v2) =>                     TyKind__TyCtxt::Alias(v1.clone(), v2.clone()),
+           TyKind::Param(v) =>                           TyKind__TyCtxt::Param(v.clone()),
+           TyKind::Bound(v1,  v2) =>                     TyKind__TyCtxt::Bound(v1.clone(), v2.clone()),
+           TyKind::Placeholder(v) =>                     TyKind__TyCtxt::Placeholder(v.clone()),
+           TyKind::Infer(v) =>                           TyKind__TyCtxt::Infer(v.clone()),
+           TyKind::Error(v) =>                           TyKind__TyCtxt::Error(v.clone()),
+        }
     }
 }
 
 pub struct PlaceholderTyDef;
 impl PlaceholderTyDef {
-    fn serialize<'tcx, S>(value: &Placeholder<BoundTy>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &Placeholder<BoundTy>, s: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
     {
-        todo!()
+        Placeholder__BoundTy::from(value).serialize(s)
+    }
+}
+
+#[derive(Serialize)]
+pub struct Placeholder__BoundTy {
+    #[serde(with = "UniverseIndexDef")]
+    pub universe: UniverseIndex,
+    #[serde(with = "BoundTyDef")]
+    pub bound: BoundTy,
+}
+
+impl From<&Placeholder<BoundTy>> for Placeholder__BoundTy {
+    fn from(value: &Placeholder<BoundTy> ) -> Self {
+        Placeholder__BoundTy {
+            universe: value.universe.clone(),
+            bound: value.bound.clone(),
+        }
+    }
+}
+
+
+#[derive(Serialize)]
+pub struct Placeholder__BoundRegion {
+    #[serde(with = "UniverseIndexDef")]
+    pub universe: UniverseIndex,
+    #[serde(with = "BoundRegionDef")]
+    pub bound: BoundRegion,
+}
+
+impl From<&Placeholder<BoundRegion>> for Placeholder__BoundRegion {
+    fn from(value: &Placeholder<BoundRegion> ) -> Self {
+        Placeholder__BoundRegion {
+            universe: value.universe.clone(),
+            bound: value.bound.clone(),
+        }
     }
 }
 
 pub struct PolyFnSigDef;
 impl PolyFnSigDef {
-    fn serialize<'tcx, S>(value: &Binder<'tcx, FnSig<'tcx>>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &Binder<'tcx, FnSig<'tcx>>, s: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
     {
-        todo!()
+        Binder__FnSig::from(value).serialize(s)
     }
+}
+
+#[derive(Serialize)]
+pub struct Binder__FnSig<'tcx> {
+    #[serde(serialize_with = "vec__bound_variable_kind")]
+    pub bound_vars: Vec<BoundVariableKind>,
+    #[serde(with = "FnSigDef")]
+    pub value: FnSig<'tcx>,
+}
+
+impl<'tcx> From<&Binder<'tcx, FnSig<'tcx>>> for Binder__FnSig<'tcx> {
+    fn from(value: &Binder<'tcx, FnSig<'tcx>>) -> Self {
+        Binder__FnSig {
+            bound_vars: value.bound_vars().to_vec().clone(),
+            value: value.skip_binder().clone(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(remote = "FnSig")]
+pub struct FnSigDef<'tcx> {
+    #[serde(with = "TysDef")]
+    pub inputs_and_output: &'tcx List<Ty<'tcx>>,
+    pub c_variadic: bool,
+    #[serde(with = "UnsafetyDef")]
+    pub unsafety: Unsafety,
+    #[serde(with = "AbiDef")]
+    pub abi: Abi,
+}
+
+#[derive(Serialize)]
+#[serde(remote = "Unsafety")]
+pub enum UnsafetyDef {
+    Unsafe,
+    Normal,
+}
+
+#[derive(Serialize)]
+#[serde(remote = "Abi")]
+pub enum AbiDef {
+    Rust,
+    C {
+        unwind: bool,
+    },
+    Cdecl {
+        unwind: bool,
+    },
+    Stdcall {
+        unwind: bool,
+    },
+    Fastcall {
+        unwind: bool,
+    },
+    Vectorcall {
+        unwind: bool,
+    },
+    Thiscall {
+        unwind: bool,
+    },
+    Aapcs {
+        unwind: bool,
+    },
+    Win64 {
+        unwind: bool,
+    },
+    SysV64 {
+        unwind: bool,
+    },
+    PtxKernel,
+    Msp430Interrupt,
+    X86Interrupt,
+    AmdGpuKernel,
+    EfiApi,
+    AvrInterrupt,
+    AvrNonBlockingInterrupt,
+    CCmseNonSecureCall,
+    Wasm,
+    System {
+        unwind: bool,
+    },
+    RustIntrinsic,
+    RustCall,
+    PlatformIntrinsic,
+    Unadjusted,
+    RustCold,
+    RiscvInterruptM,
+    RiscvInterruptS,
 }
 
 #[derive(Serialize)]
@@ -305,7 +516,7 @@ pub struct TraitRefDef<'tcx> {
 
 pub struct GenericArgsDef;
 impl  GenericArgsDef {
-    fn serialize<'tcx, S>(value: &GenericArgs<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &GenericArgs<'tcx>, s: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {
@@ -353,11 +564,11 @@ pub enum FloatTyDef {
 
 pub struct AdtDefDef;
 impl AdtDefDef {
-    fn serialize<'tcx, S>(value: &AdtDef<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &AdtDef<'tcx>, s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        todo!()
+        "TODO: AdtDef".serialize(s)
     }
 }
 
@@ -387,7 +598,7 @@ pub enum ImplPolarityDef {
 
 pub struct RegionOutlivesPredicateDef;
 impl RegionOutlivesPredicateDef {
-    fn serialize<'tcx, S>(value: &OutlivesPredicate<Region<'tcx>, Region<'tcx>>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &OutlivesPredicate<Region<'tcx>, Region<'tcx>>, s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -414,7 +625,7 @@ impl<'tcx> From<&OutlivesPredicate<Region<'tcx>, Region<'tcx>>> for OutlivesPred
 
 pub struct TypeOutlivesPredicateDef;
 impl TypeOutlivesPredicateDef {
-    fn serialize<'tcx, S>(value: &OutlivesPredicate<Ty<'tcx>, Region<'tcx>>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &OutlivesPredicate<Ty<'tcx>, Region<'tcx>>, s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -441,7 +652,7 @@ impl<'tcx> From<&OutlivesPredicate<Ty<'tcx>, Region<'tcx>>> for OutlivesPredicat
 
 pub struct RegionDef;
 impl RegionDef {
-    fn serialize<'tcx, S>(value: &Region<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &Region<'tcx>, s: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {
@@ -496,7 +707,7 @@ pub struct ProjectionPredicateDef<'tcx> {
 
 pub struct ConstDef;
 impl ConstDef {
-    fn serialize<'tcx, S>(value: &Const<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &Const<'tcx>, s: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {
@@ -556,7 +767,7 @@ pub struct UniverseIndexDef {
 
 pub struct GenericArgDef;
 impl GenericArgDef {
-    fn serialize<'tcx, S>(value: &GenericArg<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &GenericArg<'tcx>, s: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {
@@ -635,7 +846,7 @@ pub struct UnevaluatedConstDef<'tcx> {
 
 pub struct AliasConstDef;
 impl AliasConstDef {
-    fn serialize<'tcx, S>(value: &UnevaluatedConst<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &UnevaluatedConst<'tcx>, s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer
     {
@@ -703,7 +914,7 @@ pub struct LateParamRegionDef {
 
 pub struct BoundConstDef;
 impl BoundConstDef {
-    fn serialize<'tcx, S>(value: &BoundVar, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &BoundVar, s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer
     {
@@ -713,27 +924,34 @@ impl BoundConstDef {
 
 pub struct InferRegionDef;
 impl InferRegionDef {
-    fn serialize<'tcx, S>(value: &RegionVid, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &RegionVid, s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer
     {
-        todo!()
+        RegionVidDef::serialize(value, s)
     }
+}
+
+#[derive(Serialize)]
+#[serde(remote = "RegionVid")]
+pub struct RegionVidDef {
+    #[serde(skip)]
+    private: u32,
 }
 
 pub struct PlaceholderRegionDef;
 impl PlaceholderRegionDef {
-    fn serialize<'tcx, S>(value: &Placeholder<BoundRegion>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &Placeholder<BoundRegion>, s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer
     {
-        todo!()
+        Placeholder__BoundRegion::from(value).serialize(s)
     }
 }
 
 pub struct ValueConstDef;
 impl ValueConstDef {
-    fn serialize<'tcx, S>(value: &ValTree<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &ValTree<'tcx>, s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer
     {
@@ -762,7 +980,7 @@ pub struct ScalarIntDef {
 
 pub struct ExprConstDef;
 impl ExprConstDef {
-    fn serialize<'tcx, S>(value: &Expr<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &Expr<'tcx>, s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer
     {
@@ -852,7 +1070,7 @@ pub struct ParamTyDef {
 
 pub struct SymbolDef;
 impl SymbolDef {
-    fn serialize<'tcx, S>(value: &Symbol, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &Symbol, s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -862,7 +1080,7 @@ impl SymbolDef {
 
 pub struct TermDef;
 impl TermDef {
-    fn serialize<'tcx, S>(value: &Term<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<'tcx, S>(value: &Term<'tcx>, s: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {

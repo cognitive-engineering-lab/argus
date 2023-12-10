@@ -1,4 +1,10 @@
 #+title: Notes
+#+author: Gavin Gray
+
+* Ad-hoc Polymorphism at large
+***** [ ] TODO insert your research from Haskell / Scala.
+***** [ ] TODO continue Will's dabbling with Java to compare diagnostics
+
 
 * How does /rustc/ report obligations?
 
@@ -23,3 +29,41 @@ This process currently happens all within the same function, I wonder if we
 could separate it into two functions: one that orders, filters, and fixes
 errors, the second actually reporting them. This way, we could use the same
 preprocess step to better match the compiler.
+
+***** [ ] TODO talk with the diagnostics team
+
+***** [ ] TODO investigate ambiguity errors and where to siphon obligations.
+
+
+* Thinking about
+***** [ ] TODO we need an understanding of how people debug trait errors. (all categories)
+***** [ ] TODO what is our set of /metric problems/.
+
+
+* Checklist α-release
+** IDE
+***** [ ] TODO display the now serialized types.
+***** [ ] TODO clean up the "obligations manager." The interactions are a little wierd currently.
+
+
+** RUSTC (thins to upstream)
+***** [ ] TODO why did the serde code not trigger anything in ARGUS? Investigate this a little further, it's possible there's one more route that would make catching these obligations more robust. (Or it's possible that the expansion uses the old trait solver.)
+***** [ ] TODO ~inspect_typeck~ (or another entry point).
+***** [ ] TODO exposing obligations on the ~FnCtxt~.
+- [ ] I'm currently catching all fulfilled obligations, which is a bit messy.
+  There are /lots/, many of which are unimportant. Is this what we want?
+- [ ] I also have Will's net in the ~TypeErrCtxt~, which is great for getting the
+  errors that were reported, but does having both make the changes a harder
+  sell? Additionally, this net needs to be behind the same unstable flag as all obligations.
+
+***** [ ] TODO ^ use the ~CandidateSource::ParamEnv~, there doesn't seem to be a clear path to its inclusion, but this is the second most important candidate probe kind.
+
+
+** ARGUS
+***** [ ] TODO filter root obligations that are extraneous.
+- [ ] we discussed these as being obligations of the form ~_: TRAIT~ or ~(): TRAIT~.
+- [ ] but how does rustc pick the ambiguity error to talk about? (I have a loose
+  idea; it's a good idea to try and nab Michael Goulet's attention.)
+
+***** [ ] TODO test on the set of example programs, and a few others to try and catch possible bugs.
+***** [ ] TODO tests???

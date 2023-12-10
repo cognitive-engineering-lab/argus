@@ -13,7 +13,7 @@ use rustc_middle::ty::Predicate;
 use rustc_utils::source_map::range::CharRange;
 
 pub use topology::*;
-use crate::serialize::json;
+use crate::ty::PredicateDef;
 
 use ts_rs::TS;
 use serde::Serialize;
@@ -40,10 +40,13 @@ pub struct SerializedTree {
     pub unnecessary_roots: HashSet<ProofNodeIdx>,
 }
 
-#[derive(TS, Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
+// TS,
 #[serde(tag = "type")]
-pub struct Obligation {
-  pub data: String, // Predicate<'tcx>,
+pub struct Obligation<'tcx> {
+  // #[ts(rename = "any")]
+  #[serde(with = "PredicateDef")]
+  pub data: Predicate<'tcx>,
   pub range: CharRange,
   pub kind: ObligationKind,
 }

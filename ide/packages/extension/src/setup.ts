@@ -229,6 +229,9 @@ export async function setup(
 
     let outputTyped: Result<T>;
     try {
+
+      log("output", output);
+
       let outputStr = output;
       outputTyped = JSON.parse(outputStr);
     } catch (e: any) {

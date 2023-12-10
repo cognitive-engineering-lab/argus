@@ -114,7 +114,7 @@ const ObligationCard = ({ obligation }: { obligation: Obligation }) => {
       onMouseEnter={addHighlight}
       onMouseLeave={removeHighlight}
     >
-      <VSCodeTextArea value={obligation.data} readOnly />
+      <VSCodeTextArea value={JSON.stringify(obligation.data)} readOnly />
       <VSCodeButton
         className="ObligationButton"
         appearance="secondary"

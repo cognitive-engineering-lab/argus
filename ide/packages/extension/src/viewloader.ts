@@ -9,6 +9,8 @@ import {
   CharRange,
   Obligation,
   SerializedTree,
+  TreeOutput,
+  ObligationOutput,
 } from "@argus/common/dist/types";
 import _ from "lodash";
 import path from "path";
@@ -130,7 +132,7 @@ export class ViewLoader {
   private async getObligations(host: Filename) {
     log("Fetching obligations for file", host);
 
-    const res = await globals.backend<Obligation[][]>(["obligations", host]);
+    const res = await globals.backend<ObligationOutput[]>(["obligations", host]);
 
     log("Result", res);
 
@@ -139,7 +141,7 @@ export class ViewLoader {
       return;
     }
 
-    const obligations = res.value;
+    const obligations = _.map(res.value, o => o.data);
 
     log("Returning obligations", obligations);
 
@@ -152,7 +154,7 @@ export class ViewLoader {
   }
 
   private async getTree(host: Filename, predicate: Obligation) {
-    const res = await globals.backend<Array<SerializedTree | null>>([
+    const res = await globals.backend<TreeOutput[]>([
       "tree",
       host,
       predicate.data,
@@ -164,7 +166,7 @@ export class ViewLoader {
 
     // FIXME: there shouldn't be 'null' values in the array, in fact, it shouldn't 
     // even *be* an array. It shoudld be an optional tree returned from the backend.
-    const tree = _.filter(res.value, t => t !== null) as SerializedTree[];
+    const tree = _.filter(_.map(res.value, o => o.data), t => t !== null) as SerializedTree[];
 
     this.messageWebview({
       type: "FROM_EXTENSION",

@@ -1,47 +1,48 @@
 //! ProofTree analysis.
 
-use std::ops::ControlFlow;
-use std::cell::Cell;
-use std::iter;
-
-use rustc_data_structures::fx::{FxIndexSet, FxIndexMap};
-use rustc_hir::{BodyId, FnSig};
+use rustc_data_structures::fx::FxIndexSet;
+use rustc_hir::BodyId;
 use rustc_hir::def_id::DefId;
 use rustc_hir_analysis::astconv::AstConv;
-use rustc_hir_typeck::{inspect_typeck, FnCtxt, Inherited};
-use rustc_infer::infer::InferCtxt;
+use rustc_hir_typeck::{inspect_typeck, FnCtxt};
 use rustc_infer::infer::error_reporting::TypeErrCtxt;
-use rustc_infer::traits::{FulfilledObligation, FulfillErrorLocation};
+use rustc_infer::traits::FulfilledObligation;
 use rustc_infer::traits::util::elaborate;
 use rustc_middle::ty::{self, TyCtxt, ToPolyTraitRef};
-use rustc_span::{Span, FileName, DUMMY_SP};
-use rustc_span::hygiene::ExpnKind;
-use rustc_trait_selection::solve::inspect::{ProofTreeVisitor, InspectGoal, ProofTreeInferCtxtExt};
-use rustc_trait_selection::traits::{ObligationCtxt, FulfillmentError};
-use rustc_trait_selection::traits::solve::{Goal, QueryInput};
-use rustc_type_ir::Canonical;
+use rustc_trait_selection::traits::FulfillmentError;
+use rustc_trait_selection::traits::solve::Goal;
 
-use anyhow::{Result, Context, bail, anyhow};
+use anyhow::{Result, anyhow};
 use fluid_let::fluid_let;
-use index_vec::IndexVec;
-use log::info;
 use rustc_utils::source_map::range::CharRange;
-use rustc_utils::mir::body::BodyExt;
 use serde::Serialize;
-use ts_rs::TS;
 
 use crate::Target;
-use crate::proof_tree::{ProofNodeIdx, SerializedTree, Obligation, ObligationKind};
+use crate::proof_tree::{SerializedTree, Obligation, ObligationKind};
 use crate::proof_tree::ext::*;
 use crate::proof_tree::serialize::serialize_proof_tree;
-use crate::proof_tree::topology::TreeTopology;
 
 fluid_let!(pub static OBLIGATION_TARGET: Target);
 
-pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<Vec<Obligation>>
-{
-  use FulfilledObligation::*;
+// TODO: figure out the trait bounds you dummy
+#[derive(Serialize)]
+#[serde(tag = "type")]
+pub enum ArgusOutputs<'tcx> {
+  Obligations {
+    data: Vec<Obligation<'tcx>>,
+  },
+  Tree {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data: Option<SerializedTree>,
+  },
+}
 
+impl
+
+
+// pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<Vec<Obligation<'tcx>>>
+pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<ArgusOutputs<'tcx>>
+{
   let hir = tcx.hir();
   let local_def_id = hir.body_owner_def_id(body_id);
   let def_id = local_def_id.to_def_id();
@@ -56,17 +57,17 @@ pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<Vec<Oblig
   inspect_typeck(tcx, local_def_id, |fncx| {
     let mut errors = fncx.get_fulfillment_errors();
     fncx.adjust_fulfillment_errors_for_expr_obligation(&mut errors);
-    result = Ok(fncx.report_fulfillment_errors(def_id, errors));
+    result = Ok(ArgusOutputs::Obligations {
+      data: fncx.report_fulfillment_errors(def_id, errors),
+    });
   });
 
   result
 }
 
 
-pub fn tree(tcx: TyCtxt, body_id: BodyId) -> Result<Option<SerializedTree>>
+pub fn tree<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<ArgusOutputs<'tcx>>
 {
-  use FulfilledObligation::*;
-
   OBLIGATION_TARGET.get(|target| {
     let target = target.unwrap();
 
@@ -99,16 +100,18 @@ pub fn tree(tcx: TyCtxt, body_id: BodyId) -> Result<Option<SerializedTree>>
       })
     });
 
-    Ok(result)
+    Ok(ArgusOutputs::Tree {
+      data: result,
+    })
 
   })
 }
 
-fn serialize_error_tree<'tcx>(error: &FulfillmentError<'tcx>, fcx: &FnCtxt<'_, 'tcx>) -> Option<SerializedTree> {
-  let o = &error.root_obligation;
-  let goal = Goal { predicate: o.predicate, param_env: o.param_env };
-  serialize_tree(goal, fcx)
-}
+// fn serialize_error_tree<'tcx>(error: &FulfillmentError<'tcx>, fcx: &FnCtxt<'_, 'tcx>) -> Option<SerializedTree> {
+//   let o = &error.root_obligation;
+//   let goal = Goal { predicate: o.predicate, param_env: o.param_env };
+//   serialize_tree(goal, fcx)
+// }
 
 fn serialize_tree<'tcx>(goal: Goal<'tcx, ty::Predicate<'tcx>>, fcx: &FnCtxt<'_, 'tcx>) -> Option<SerializedTree> {
   let def_id = fcx.item_def_id();
@@ -122,7 +125,7 @@ fn serialize_tree<'tcx>(goal: Goal<'tcx, ty::Predicate<'tcx>>, fcx: &FnCtxt<'_, 
 trait FnCtxtExt<'tcx> {
   fn get_fulfillment_errors(&self) -> Vec<FulfillmentError<'tcx>>;
   fn adjust_fulfillment_errors_for_expr_obligation(&self, errors: &mut Vec<FulfillmentError<'tcx>>);
-  fn report_fulfillment_errors(&self, def_id: DefId, errors: Vec<FulfillmentError<'tcx>>) -> Vec<Obligation>;
+  fn report_fulfillment_errors(&self, def_id: DefId, errors: Vec<FulfillmentError<'tcx>>) -> Vec<Obligation<'tcx>>;
 }
 
 trait InferPrivateExt<'tcx> {
@@ -237,7 +240,7 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
     }
   }
 
-  fn report_fulfillment_errors(&self, def_id: DefId, mut errors: Vec<FulfillmentError<'tcx>>) -> Vec<Obligation> {
+  fn report_fulfillment_errors(&self, def_id: DefId, mut errors: Vec<FulfillmentError<'tcx>>) -> Vec<Obligation<'tcx>> {
     if errors.is_empty() {
       return Vec::new();
     }
@@ -267,7 +270,7 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
       let range = CharRange::from_span(error.obligation.cause.span, source_map).unwrap();
 
       Obligation {
-        data: error.root_obligation.predicate.pretty(infcx, def_id),
+        data: error.root_obligation.predicate, // pretty(infcx, def_id),
         range,
         kind: ObligationKind::Failure
       }

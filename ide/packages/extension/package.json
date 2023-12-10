@@ -9,12 +9,14 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:rust"
+  ],
   "contributes": {
     "commands": [
       {
         "command": "argus.launchArgus",
-        "title": "Argus: Launch"
+        "title": "Argus: Obligation dashboard"
       }
     ]
   },
