@@ -37,9 +37,6 @@ pub enum ArgusOutputs<'tcx> {
   },
 }
 
-impl
-
-
 // pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<Vec<Obligation<'tcx>>>
 pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<ArgusOutputs<'tcx>>
 {
