@@ -5,16 +5,39 @@
     suspicious_double_ref_op // FIXME: get rid of this eventually
 )]
 
+// pub mod path;
+
 use std::num::*;
 
 use rustc_type_ir as ir;
-use rustc_middle::{ty::{*, abstract_const::CastKind}, mir::{BinOp, UnOp}};
+use rustc_middle::{ty::{self, *, abstract_const::CastKind}, mir::{BinOp, UnOp}};
 use rustc_hir::def_id::{DefId, DefIndex, CrateNum};
+use rustc_hir::definitions::{DefPathData, DisambiguatedDefPathData, DefPath};
 use rustc_span::symbol::Symbol;
 use rustc_target::spec::abi::Abi;
 use rustc_hir::Unsafety;
 
 use serde::{Serialize, ser::SerializeSeq};
+
+// NOTE: setting the dynamic TCX should *only* happen
+// before calling the serialize function, it must guarantee
+// that the 'tcx lifetime is the same as that of the serialized item.
+fluid_let::fluid_let!{static TCX: TyCtxt<'static>}
+
+pub fn run_with_dynamic_tcx<'tcx>(tcx: TyCtxt<'tcx>, f: impl FnOnce()) {
+    let stcx: TyCtxt<'static> = unsafe { std::mem::transmute(tcx) };
+    TCX.set(stcx, f)
+}
+
+fn get_dynamic_tcx<'tcx>() -> TyCtxt<'tcx> {
+    let tcx = TCX.copied().unwrap();
+    unsafe {
+        std::mem::transmute::<
+          TyCtxt<'static>,
+          TyCtxt<'tcx>
+        >(tcx)
+    }
+}
 
 // TODO: we could also generate the functions
 macro_rules! serialize_custom_seq {
@@ -503,16 +526,104 @@ pub struct TraitPredicateDef<'tcx> {
     pub polarity: ImplPolarity,
 }
 
-#[derive(Serialize)]
-#[serde(remote = "TraitRef")]
-pub struct TraitRefDef<'tcx> {
-    #[serde(with = "DefIdDef")]
-    pub def_id: DefId,
-    #[serde(with = "GenericArgsDef")]
-    pub args: GenericArgsRef<'tcx>,
-    #[serde(skip)]
-    _use_trait_ref_new_instead: (),
+pub struct TraitRefDef;
+impl TraitRefDef {
+    pub fn serialize<'tcx, S>(value: &TraitRef<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        struct Wrapper<'a, 'tcx: 'a> {
+            #[serde(with = "TyDef")]
+            pub self_ty: Ty<'tcx>,
+            #[serde(with = "TraitRefPrintOnlyTraitPathDef")]
+            // NOTE: we can't use the actual TraitRefPrintOnlyTraitPath because
+            // the newtype wrapper makes the .0 field private. However, all it
+            // does is wrap a TraitRef to print differently which we can manage
+            // to do in the TraitRefPrintOnlyTraitPathDef::serialize function.
+            pub trait_path: &'a TraitRef<'tcx>,
+        }
+
+        Wrapper {
+            self_ty: value.self_ty(),
+            trait_path: value,
+        }.serialize(s)
+    }
 }
+
+pub struct TraitRefPrintOnlyTraitPathDef;
+impl TraitRefPrintOnlyTraitPathDef {
+    pub fn serialize<'tcx, S>(value: &TraitRef<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let tcx = get_dynamic_tcx();
+        DefPathDef::serialize(&tcx.def_path(value.def_id), s)
+    }
+}
+
+#[derive(Serialize)]
+#[serde(remote = "DefPath")]
+pub struct DefPathDef {
+    #[serde(serialize_with = "vec__disambiguated_def_path_data")]
+    pub data: Vec<DisambiguatedDefPathData>,
+    #[serde(with = "CrateNumDef")]
+    pub krate: CrateNum,
+}
+
+#[derive(Serialize)]
+#[serde(remote = "DisambiguatedDefPathData")]
+pub struct DisambiguatedDefPathDataDef {
+    #[serde(with = "DefPathDataDef")]
+    pub data: DefPathData,
+    pub disambiguator: u32,
+}
+
+#[derive(Serialize)]
+#[serde(remote = "DefPathData")]
+pub enum DefPathDataDef {
+    CrateRoot,
+    Impl,
+    ForeignMod,
+    Use,
+    GlobalAsm,
+    TypeNs(#[serde(with = "SymbolDef")] Symbol),
+    ValueNs(#[serde(with = "SymbolDef")] Symbol),
+    MacroNs(#[serde(with = "SymbolDef")] Symbol),
+    LifetimeNs(#[serde(with = "SymbolDef")] Symbol),
+    // Closure,
+    Ctor,
+    AnonConst,
+    // OpaqueTy,
+
+    // NOTE: in newer versions it seems these were changed.
+    ClosureExpr, 
+    ImplTrait, 
+    ImplTraitAssocTy,
+}
+
+fn vec__disambiguated_def_path_data<S>(value: &Vec<DisambiguatedDefPathData>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    #[derive(Serialize)]
+    struct Wrapper<'a>(#[serde(with = "DisambiguatedDefPathDataDef")] &'a DisambiguatedDefPathData);
+    serialize_custom_seq! { Wrapper, s, value }
+}
+
+pub struct CrateNumDef;
+impl CrateNumDef {
+    pub fn serialize<S>(value: &CrateNum, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let tcx = get_dynamic_tcx();
+        SymbolDef::serialize(&tcx.crate_name(*value), s)
+    }
+
+}
+
+
 
 pub struct GenericArgsDef;
 impl  GenericArgsDef {

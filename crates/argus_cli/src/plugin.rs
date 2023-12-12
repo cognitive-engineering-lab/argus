@@ -275,7 +275,11 @@ impl<
         }
       };
 
-      postprocess(Ok(output));
+      // NOTE: we need to set the TyCtxt for the serializer to work.
+      argus::ty::run_with_dynamic_tcx(tcx, || {
+        postprocess(Ok(output));
+      });
+
     });
 
     rustc_driver::Compilation::Stop
