@@ -5,7 +5,7 @@
     suspicious_double_ref_op // FIXME: get rid of this eventually
 )]
 
-// pub mod path;
+pub mod path;
 
 use std::num::*;
 
@@ -13,7 +13,6 @@ use rustc_type_ir as ir;
 use rustc_infer::infer::{InferCtxt, type_variable::TypeVariableOriginKind};
 use rustc_middle::{ty::{self, *, abstract_const::CastKind}, mir::{BinOp, UnOp}};
 use rustc_hir::def_id::{DefId, DefIndex, CrateNum};
-use rustc_hir::definitions::{DefPathData, DisambiguatedDefPathData, DefPath};
 use rustc_span::symbol::{Symbol, kw};
 use rustc_target::spec::abi::Abi;
 use rustc_hir::Unsafety;
@@ -322,26 +321,26 @@ pub enum TyKind__TyCtxt<'tcx> {
     Uint(#[serde(with = "UintTyDef")] UintTy),
     Float(#[serde(with = "FloatTyDef")] FloatTy),
     Adt(#[serde(with = "DefIdDef")] DefId),
-    // TODO: Foreign(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId),
     Str,
     Array(#[serde(with = "TyDef")] <TyCtxt<'tcx> as Interner>::Ty, #[serde(with = "ConstDef")] <TyCtxt<'tcx> as Interner>::Const),
     Slice(#[serde(with = "TyDef")] <TyCtxt<'tcx> as Interner>::Ty),
     RawPtr(#[serde(with = "TypeAndMutDef")] <TyCtxt<'tcx> as Interner>::TypeAndMut),
     Ref(#[serde(with = "RegionDef")] <TyCtxt<'tcx> as Interner>::Region, #[serde(with = "TyDef")] <TyCtxt<'tcx> as Interner>::Ty, #[serde(with = "MutabilityDef")] Mutability),
     FnDef(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId /*, TODO: signature */),
+    Never,
+    Tuple(#[serde(with = "TysDef")] <TyCtxt<'tcx> as Interner>::Tys),
+    Placeholder(#[serde(with = "PlaceholderTyDef")] <TyCtxt<'tcx> as Interner>::PlaceholderTy),
+    Infer(#[serde(with = "InferTyDef")] InferTy),
+    Error(#[serde(skip)] <TyCtxt<'tcx> as Interner>::ErrorGuaranteed),
+    // TODO: Foreign(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId),
     // TODO: FnPtr(#[serde(with = "PolyFnSigDef")] <TyCtxt<'tcx> as Interner>::PolyFnSig),
     // TODO: Dynamic(#[serde(with = "BoundExistentialPredicatesDef")] <TyCtxt<'tcx> as Interner>::BoundExistentialPredicates, #[serde(with = "RegionDef")] <TyCtxt<'tcx> as Interner>::Region, #[serde(with = "DynKindDef")] DynKind),
     // TODO: Closure(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs),
     // TODO: Coroutine(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs, #[serde(with = "MovabilityDef")] Movability),
-    // CoroutineWitness(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs),
-    Never,
-    Tuple(#[serde(with = "TysDef")] <TyCtxt<'tcx> as Interner>::Tys),
+    // TODO: CoroutineWitness(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs),
     // TODO: Alias(#[serde(with = "AliasKindDef")] AliasKind, #[serde(with = "AliasTyDef")] <TyCtxt<'tcx> as Interner>::AliasTy),
     // TODO: Param(#[serde(with = "ParamTyDef")] <TyCtxt<'tcx> as Interner>::ParamTy),
     // TODO: Bound(#[serde(skip)] DebruijnIndex, #[serde(with = "BoundTyDef")] <TyCtxt<'tcx> as Interner>::BoundTy),
-    Placeholder(#[serde(with = "PlaceholderTyDef")] <TyCtxt<'tcx> as Interner>::PlaceholderTy),
-    Infer(#[serde(with = "InferTyDef")] InferTy),
-    Error(#[serde(skip)] <TyCtxt<'tcx> as Interner>::ErrorGuaranteed),
 }
 
 impl<'tcx> From<&ir::TyKind<TyCtxt<'tcx>>> for TyKind__TyCtxt<'tcx> {
@@ -549,8 +548,8 @@ impl TraitRefDef {
             #[serde(with = "TraitRefPrintOnlyTraitPathDef")]
             // NOTE: we can't use the actual TraitRefPrintOnlyTraitPath because
             // the newtype wrapper makes the .0 field private. However, all it
-            // does is wrap a TraitRef to print differently which we can manage
-            // to do in the TraitRefPrintOnlyTraitPathDef::serialize function.
+            // does is wrap a TraitRef to print differently which we
+            // do in the TraitRefPrintOnlyTraitPathDef::serialize function.
             pub trait_path: &'a TraitRef<'tcx>,
         }
 
@@ -567,73 +566,71 @@ impl TraitRefPrintOnlyTraitPathDef {
     where
         S: serde::Serializer,
     {
-        let infcx = get_dynamic_ctx();
-        let tcx = infcx.tcx;
-        DefPathDef::serialize(&tcx.def_path(value.def_id), s)
+        path::PathDefWithArgs::new(value.def_id, value.args).serialize(s)
     }
 }
 
-#[derive(Serialize)]
-#[serde(remote = "DefPath")]
-pub struct DefPathDef {
-    #[serde(serialize_with = "vec__disambiguated_def_path_data")]
-    pub data: Vec<DisambiguatedDefPathData>,
-    #[serde(with = "CrateNumDef")]
-    pub krate: CrateNum,
-}
+// #[derive(Serialize)]
+// #[serde(remote = "DefPath")]
+// pub struct DefPathDef {
+//     #[serde(serialize_with = "vec__disambiguated_def_path_data")]
+//     pub data: Vec<DisambiguatedDefPathData>,
+//     #[serde(with = "CrateNumDef")]
+//     pub krate: CrateNum,
+// }
 
-#[derive(Serialize)]
-#[serde(remote = "DisambiguatedDefPathData")]
-pub struct DisambiguatedDefPathDataDef {
-    #[serde(with = "DefPathDataDef")]
-    pub data: DefPathData,
-    pub disambiguator: u32,
-}
+// #[derive(Serialize)]
+// #[serde(remote = "DisambiguatedDefPathData")]
+// pub struct DisambiguatedDefPathDataDef {
+//     #[serde(with = "DefPathDataDef")]
+//     pub data: DefPathData,
+//     pub disambiguator: u32,
+// }
 
-#[derive(Serialize)]
-#[serde(remote = "DefPathData")]
-pub enum DefPathDataDef {
-    CrateRoot,
-    Impl,
-    ForeignMod,
-    Use,
-    GlobalAsm,
-    TypeNs(#[serde(with = "SymbolDef")] Symbol),
-    ValueNs(#[serde(with = "SymbolDef")] Symbol),
-    MacroNs(#[serde(with = "SymbolDef")] Symbol),
-    LifetimeNs(#[serde(with = "SymbolDef")] Symbol),
-    // Closure,
-    Ctor,
-    AnonConst,
-    // OpaqueTy,
+// #[derive(Serialize)]
+// #[serde(remote = "DefPathData")]
+// pub enum DefPathDataDef {
+//     CrateRoot,
+//     Impl,
+//     ForeignMod,
+//     Use,
+//     GlobalAsm,
+//     TypeNs(#[serde(with = "SymbolDef")] Symbol),
+//     ValueNs(#[serde(with = "SymbolDef")] Symbol),
+//     MacroNs(#[serde(with = "SymbolDef")] Symbol),
+//     LifetimeNs(#[serde(with = "SymbolDef")] Symbol),
+//     // Closure,
+//     Ctor,
+//     AnonConst,
+//     // OpaqueTy,
 
-    // NOTE: in newer versions it seems these were changed.
-    ClosureExpr, 
-    ImplTrait, 
-    ImplTraitAssocTy,
-}
+//     // NOTE: in newer versions it seems these were changed.
+//     ClosureExpr,
+//     ImplTrait,
+//     ImplTraitAssocTy,
+// }
 
-fn vec__disambiguated_def_path_data<S>(value: &Vec<DisambiguatedDefPathData>, s: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    #[derive(Serialize)]
-    struct Wrapper<'a>(#[serde(with = "DisambiguatedDefPathDataDef")] &'a DisambiguatedDefPathData);
-    serialize_custom_seq! { Wrapper, s, value }
-}
+// fn vec__disambiguated_def_path_data<S>(value: &Vec<DisambiguatedDefPathData>, s: S) -> Result<S::Ok, S::Error>
+// where
+//     S: serde::Serializer,
+// {
+//     #[derive(Serialize)]
+//     struct Wrapper<'a>(#[serde(with = "DisambiguatedDefPathDataDef")] &'a DisambiguatedDefPathData);
+//     serialize_custom_seq! { Wrapper, s, value }
+// }
 
-pub struct CrateNumDef;
-impl CrateNumDef {
-    pub fn serialize<S>(value: &CrateNum, s: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let infcx = get_dynamic_ctx();
-        let tcx = infcx.tcx;
-        SymbolDef::serialize(&tcx.crate_name(*value), s)
-    }
+// pub struct CrateNumDef;
+// impl CrateNumDef {
+//     pub fn serialize<S>(value: &CrateNum, s: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: serde::Serializer,
+//     {
+//         let infcx = get_dynamic_ctx();
+//         let tcx = infcx.tcx;
+//         SymbolDef::serialize(&tcx.crate_name(*value), s)
+//     }
 
-}
+// }
 
 
 
@@ -913,9 +910,8 @@ impl DefIdDef {
     where
         S: serde::Serializer
     {
-        let infcx = get_dynamic_ctx();
-        let tcx = infcx.tcx;
-        DefPathDef::serialize(&tcx.def_path(*value), s)
+        log::warn!("Printing raw DefId without args. Did you use to mean `path::PathDefWithArgs`?");
+        path::PathDefWithArgs::new(*value, &[]).serialize(s)
     }
 }
 
@@ -962,14 +958,16 @@ pub struct EffectVidDef {
     private: u32,
 }
 
-#[derive(Serialize)]
-#[serde(remote = "UnevaluatedConst")]
-pub struct UnevaluatedConstDef<'tcx> {
-    #[serde(with = "DefIdDef")]
-    pub def: DefId,
-    #[serde(with = "GenericArgsDef")]
-    pub args: GenericArgsRef<'tcx>,
+pub struct UnevaluatedConstDef;
+impl UnevaluatedConstDef {
+    pub fn serialize<'tcx, S>(value: &UnevaluatedConst<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer
+    {
+        path::PathDefWithArgs::new(value.def, value.args).serialize(s)
+    }
 }
+
 
 pub struct AliasConstDef;
 impl AliasConstDef {
@@ -1004,14 +1002,23 @@ impl InferTyDef {
     where
         S: serde::Serializer
     {
+        #[derive(Serialize)]
+        struct InferTyVar {
+            #[serde(with = "TyVidDef")]
+            ty_var: TyVid,
+        }
+        #[derive(Serialize)]
+        struct InferVar {
+            infer_var: String,
+        }
         // For TyVars we need to look up the type in the dynamic inference context.
         // I've let that dispatch to the TyVidDef to keep it in one place, all other
         // inference variables can be serialized with their `ToString` impl.
         if let InferTy::TyVar(ty_var) = value {
             log::debug!("Serializing infer var {:?}", value);
-            TyVidDef::serialize(ty_var, s)
+            InferTyVar { ty_var: *ty_var }.serialize(s)
         } else {
-            value.to_string().serialize(s)
+            InferVar { infer_var: value.to_string() }.serialize(s)
         }
     }
 }

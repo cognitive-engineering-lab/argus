@@ -141,7 +141,7 @@ export class ViewLoader {
       return;
     }
 
-    const obligations = _.map(res.value, o => o.data);
+    const obligations = res.value;
 
     log("Returning obligations", obligations);
 
@@ -166,7 +166,7 @@ export class ViewLoader {
 
     // FIXME: there shouldn't be 'null' values in the array, in fact, it shouldn't 
     // even *be* an array. It shoudld be an optional tree returned from the backend.
-    const tree = _.filter(_.map(res.value, o => o.data), t => t !== null) as SerializedTree[];
+    const tree = _.filter(res.value, t => t !== null) as SerializedTree[];
 
     this.messageWebview({
       type: "FROM_EXTENSION",

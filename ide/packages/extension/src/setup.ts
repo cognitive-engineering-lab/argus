@@ -241,6 +241,8 @@ export async function setup(
       };
     }
 
+    log("Parsed output", outputTyped);
+
     if ("Err" in outputTyped) {
       return {
         type: "analysis-error",

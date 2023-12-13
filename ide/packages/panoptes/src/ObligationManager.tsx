@@ -11,11 +11,11 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 
 import "./ObligationManager.css";
 import TreeApp from "./TreeView/TreeApp";
+// @ts-ignore
+import { PrettyObligation } from "./Ty/print";
+import { IcoChevronDown, IcoChevronUp } from "./utilities/icons";
 import { testTree } from "./utilities/tree";
 import { messageExtension } from "./utilities/vscode";
-import { IcoChevronDown, IcoChevronUp } from "./utilities/icons";
-// @ts-ignore
-import { printObligation } from "./Ty/print";
 
 const FileContext = createContext<Filename | undefined>(undefined);
 
@@ -110,14 +110,19 @@ const ObligationCard = ({ obligation }: { obligation: Obligation }) => {
     setIsInfoVisible(!isInfoVisible);
   };
 
+  // <VSCodeTextArea value={JSON.stringify(obligation.data)} readOnly />
+  // TODO: work on the styling of printed obligations. They should go in a
+  // text area like thing. Or at least styled the same.
+  // <VSCodeTextArea value= readOnly />
   return (
     <div
       className="ObligationCard"
       onMouseEnter={addHighlight}
       onMouseLeave={removeHighlight}
     >
-      // <VSCodeTextArea value={JSON.stringify(obligation.data)} readOnly />
-      <VSCodeTextArea value={printObligation(obligation)} readOnly />
+      <div>
+        <PrettyObligation obligation={obligation} />
+      </div>
       <VSCodeButton
         className="ObligationButton"
         appearance="secondary"

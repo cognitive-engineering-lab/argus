@@ -9,6 +9,6 @@ import { TreeTopology } from "./bindings/TreeTopology";
 
 export { SerializedTree, Node, TreeTopology, Obligation, CharPos, CharRange, FilenameIndex };
 
-export type ObligationOutput = { type: "Obligations"; data: Obligation[] };
-export type TreeOutput = { type: "Tree"; data: SerializedTree | undefined };
+export type ObligationOutput = Obligation[];
+export type TreeOutput = SerializedTree | undefined;
 export type ArgusOutputs = ObligationOutput | TreeOutput;
