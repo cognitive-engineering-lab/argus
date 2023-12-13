@@ -25,6 +25,7 @@ dependencies = [
  "log",
  "rustc_utils",
  "serde",
+ "serde_json",
  "smallvec",
  "ts-rs",
 ]

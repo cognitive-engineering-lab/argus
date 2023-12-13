@@ -1,0 +1,1 @@
+export type ObligationKind = { type: "success" | "failure" };

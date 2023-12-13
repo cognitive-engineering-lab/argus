@@ -53,8 +53,14 @@ pub trait CandidateExt {
 
 impl<'tcx> PredicateExt<'tcx> for ty::Predicate<'tcx> {
     fn is_necessary(&self, tcx: &TyCtxt<'tcx>) -> bool {
-        matches!(self.kind().skip_binder(), ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if
-                 trait_predicate.def_id() != tcx.require_lang_item(LangItem::Sized, None))
+        matches!(self.kind().skip_binder(), ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
+            // NOTE: predicates of the form `_: TRAIT` and `(): TRAIT` are useless. The first doesn't have
+            // any information about the type of the Self var, and I've never understood why the latter
+            // occurs so frequently.
+            !trait_predicate.self_ty().is_ty_var() &&
+            !trait_predicate.self_ty().is_unit() &&
+                trait_predicate.def_id() != tcx.require_lang_item(LangItem::Sized, None)
+        })
     }
 }
 

@@ -20,7 +20,7 @@ use clap::{Parser, Subcommand};
 use log::{debug, info};
 use serde::{self, Deserialize, Serialize};
 use fluid_let::fluid_set;
-use argus::{ToTarget, analysis::ArgusOutputs};
+use argus::ToTarget;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -45,30 +45,26 @@ enum ArgusCommand {
 }
 
 trait ArgusAnalysis: Sized + Send + Sync {
-  type Output<'tcx>: Serialize + Send + Sync + 'tcx;
-  fn analyze<'tcx>(&mut self, tcx: TyCtxt<'tcx>, id: BodyId) -> anyhow::Result<Self::Output<'tcx>>;
+  type Output: Serialize + Send + Sync;
+  fn analyze(&mut self, tcx: TyCtxt, id: BodyId) -> anyhow::Result<Self::Output>;
 }
 
-impl<F> ArgusAnalysis for F
+impl<O, F> ArgusAnalysis for F
 where
-  for<'tcx> F: Fn(TyCtxt<'tcx>, BodyId) -> anyhow::Result<ArgusOutputs<'tcx>> + Send + Sync,
+  for<'tcx> F: Fn(TyCtxt<'tcx>, BodyId) -> anyhow::Result<O> + Send + Sync,
+  O: Serialize + Send + Sync,
 {
-  type Output<'tcx> = ArgusOutputs<'tcx>;
-  fn analyze<'tcx>(&mut self, tcx: TyCtxt<'tcx>, id: BodyId) -> anyhow::Result<Self::Output<'tcx>> {
+  type Output = O;
+  fn analyze<'tcx>(&mut self, tcx: TyCtxt<'tcx>, id: BodyId) -> anyhow::Result<Self::Output> {
     (self)(tcx, id)
   }
 }
 
-struct ArgusCallbacks<
-  A: ArgusAnalysis,
-  T: ToTarget,
-  F: FnOnce() -> Option<T>,
-  P: FnOnce(ArgusResult<Vec<A::Output<'_>>>,)
-> {
+struct ArgusCallbacks<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>> {
   file: PathBuf,
   analysis: Option<A>,
   compute_target: Option<F>,
-  postprocess: Option<P>,
+  result: Vec<A::Output>,
   rustc_start: Instant,
 }
 
@@ -141,19 +137,12 @@ impl RustcPlugin for ArgusPlugin {
     use ArgusCommand::*;
     match plugin_args.command {
       Tree { file, id } => {
-        let compute_target = move || {
-          Some(id)
-        };
-        let analysis: for<'tcx> fn(TyCtxt<'tcx>, BodyId) -> anyhow::Result<ArgusOutputs<'tcx>>
-          = argus::analysis::tree;
-
-        run(analysis, PathBuf::from(file), compute_target, &compiler_args)
+        let compute_target = move || { Some(id) };
+        postprocess(run(argus::analysis::tree, PathBuf::from(file), compute_target, &compiler_args))
       }
       Obligations { file, .. } => {
         let nothing = || { None::<String> };
-        let analysis : for<'tcx> fn(TyCtxt<'tcx>, BodyId) -> anyhow::Result<ArgusOutputs<'tcx>>
-          = argus::analysis::obligations;
-        run(analysis, PathBuf::from(file), nothing, &compiler_args)
+        postprocess(run(argus::analysis::obligations, PathBuf::from(file), nothing, &compiler_args))
       }
       _ => unreachable!(),
     }
@@ -165,27 +154,26 @@ fn run<A: ArgusAnalysis, T: ToTarget>(
   file: PathBuf,
   compute_target: impl FnOnce() -> Option<T> + Send,
   args: &[String],
-) -> RustcResult<()> {
-  let pp: for<'a> fn(ArgusResult<Vec<A::Output<'a>>>)
-    = |v| postprocess(v);
-
+) -> ArgusResult<Vec<A::Output>> {
   let mut callbacks = ArgusCallbacks {
     file,
     analysis: Some(analysis),
     compute_target: Some(compute_target),
-    postprocess: Some(pp),
+    result: Vec::default(),
     rustc_start: Instant::now(),
   };
 
   info!("Starting rustc analysis...");
 
-  run_with_callbacks(args, &mut callbacks)
+  run_with_callbacks(args, &mut callbacks);
+
+  Ok(callbacks.result)
 }
 
 pub fn run_with_callbacks(
   args: &[String],
   callbacks: &mut (dyn rustc_driver::Callbacks + Send),
-) -> RustcResult<()> {
+) -> ArgusResult<()> {
   let mut args = args.to_vec();
   // -Z identify-regions -Z track-diagnostics=yes
   args.extend(
@@ -202,22 +190,22 @@ pub fn run_with_callbacks(
 
   // Argus works even when the compiler exits with an error.
   #[allow(unused_must_use)]
-  let _ = compiler.run();
+  compiler.run().map_err(|_| ArgusError::BuildError { range: None });
 
   Ok(())
 }
 
-fn postprocess<T: Serialize>(result: T) {
+fn postprocess<T: Serialize>(result: T) -> RustcResult<()> {
   let s = serde_json::to_string(&result).unwrap();
   println!("{}", s);
+  Ok(())
 }
 
 impl<
   A: ArgusAnalysis,
   T: ToTarget,
   F: FnOnce() -> Option<T>,
-  P: FnOnce(ArgusResult<Vec<A::Output<'_>>>)
-> rustc_driver::Callbacks for ArgusCallbacks<A, T, F, P> {
+> rustc_driver::Callbacks for ArgusCallbacks<A, T, F> {
  fn config(&mut self, config: &mut rustc_interface::Config) {
     config.parse_sess_created = Some(Box::new(|sess| {
       // Create a new emitter writer which consumes *silently* all
@@ -235,8 +223,6 @@ impl<
   ) -> rustc_driver::Compilation {
     elapsed("rustc", self.rustc_start);
     let start = Instant::now();
-
-    let postprocess = self.postprocess.take().unwrap();
 
     queries.global_ctxt().unwrap().enter(|tcx| {
       elapsed("global_ctxt", start);
@@ -258,7 +244,7 @@ impl<
         }
       };
 
-      let output = match (self.compute_target.take().unwrap())() {
+      self.result = match (self.compute_target.take().unwrap())() {
         Some(target) => {
           let target = target.to_target();
 
@@ -274,12 +260,6 @@ impl<
           find_bodies(tcx).into_iter().filter_map(inner).collect::<Vec<_>>()
         }
       };
-
-      // NOTE: we need to set the TyCtxt for the serializer to work.
-      argus::ty::run_with_dynamic_tcx(tcx, || {
-        postprocess(Ok(output));
-      });
-
     });
 
     rustc_driver::Compilation::Stop

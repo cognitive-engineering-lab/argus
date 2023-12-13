@@ -14,6 +14,8 @@ import TreeApp from "./TreeView/TreeApp";
 import { testTree } from "./utilities/tree";
 import { messageExtension } from "./utilities/vscode";
 import { IcoChevronDown, IcoChevronUp } from "./utilities/icons";
+// @ts-ignore
+import { printObligation } from "./Ty/print";
 
 const FileContext = createContext<Filename | undefined>(undefined);
 
@@ -114,7 +116,8 @@ const ObligationCard = ({ obligation }: { obligation: Obligation }) => {
       onMouseEnter={addHighlight}
       onMouseLeave={removeHighlight}
     >
-      <VSCodeTextArea value={JSON.stringify(obligation.data)} readOnly />
+      // <VSCodeTextArea value={JSON.stringify(obligation.data)} readOnly />
+      <VSCodeTextArea value={printObligation(obligation)} readOnly />
       <VSCodeButton
         className="ObligationButton"
         appearance="secondary"
@@ -140,7 +143,7 @@ const ObligationManager = ({
 
   const [successes, failures] = _.partition(
     obligations,
-    obligation => obligation.type === "Success"
+    obligation => obligation.kind.type === "success"
   );
 
   // NOTE: the backend sorts the obligations by some metric, this usually involving what was

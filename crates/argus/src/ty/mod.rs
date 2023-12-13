@@ -10,10 +10,11 @@
 use std::num::*;
 
 use rustc_type_ir as ir;
+use rustc_infer::infer::{InferCtxt, type_variable::TypeVariableOriginKind};
 use rustc_middle::{ty::{self, *, abstract_const::CastKind}, mir::{BinOp, UnOp}};
 use rustc_hir::def_id::{DefId, DefIndex, CrateNum};
 use rustc_hir::definitions::{DefPathData, DisambiguatedDefPathData, DefPath};
-use rustc_span::symbol::Symbol;
+use rustc_span::symbol::{Symbol, kw};
 use rustc_target::spec::abi::Abi;
 use rustc_hir::Unsafety;
 
@@ -22,21 +23,19 @@ use serde::{Serialize, ser::SerializeSeq};
 // NOTE: setting the dynamic TCX should *only* happen
 // before calling the serialize function, it must guarantee
 // that the 'tcx lifetime is the same as that of the serialized item.
-fluid_let::fluid_let!{static TCX: TyCtxt<'static>}
+fluid_let::fluid_let!{static INFCX: &'static InferCtxt<'static>}
 
-pub fn run_with_dynamic_tcx<'tcx>(tcx: TyCtxt<'tcx>, f: impl FnOnce()) {
-    let stcx: TyCtxt<'static> = unsafe { std::mem::transmute(tcx) };
-    TCX.set(stcx, f)
+pub fn in_dynamic_ctx<'tcx, T>(infcx: &InferCtxt<'tcx>, f: impl FnOnce() -> T) -> T {
+    let infcx: &'static InferCtxt<'static> = unsafe { std::mem::transmute(infcx) };
+    INFCX.set(infcx, f)
 }
 
-fn get_dynamic_tcx<'tcx>() -> TyCtxt<'tcx> {
-    let tcx = TCX.copied().unwrap();
-    unsafe {
-        std::mem::transmute::<
-          TyCtxt<'static>,
-          TyCtxt<'tcx>
-        >(tcx)
-    }
+fn get_dynamic_ctx<'a, 'tcx: 'a>() -> &'a InferCtxt<'tcx> {
+    let infcx: &'static InferCtxt<'static> = INFCX.copied().unwrap();
+    unsafe { std::mem::transmute::<
+            &'static InferCtxt<'static>,
+            &'a InferCtxt<'tcx>
+        >(infcx) }
 }
 
 // TODO: we could also generate the functions
@@ -56,6 +55,7 @@ impl PredicateDef {
     where
         S: serde::Serializer,
     {
+        log::debug!("Serializing predicate {:#?}", value);
         Binder__PredicateKind::from(&value.kind()).serialize(s)
     }
 }
@@ -304,13 +304,16 @@ impl TyDef {
 pub struct TyKindDef;
 impl TyKindDef {
     pub fn serialize<'tcx, S>(value: &TyKind<'tcx>, s: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            TyKind__TyCtxt::from(value).serialize(s)
-        }
+    where
+        S: serde::Serializer,
+    {
+        TyKind__TyCtxt::from(value).serialize(s)
+    }
 }
 
+// NOTE: these types are modified from the original enum. They only store the information
+// necessary for us to serialize the types, and the exchange is taken care of in the From impl.
+// Everyting commented out is a TODO!
 #[derive(Serialize)]
 pub enum TyKind__TyCtxt<'tcx> {
     Bool,
@@ -318,24 +321,24 @@ pub enum TyKind__TyCtxt<'tcx> {
     Int(#[serde(with = "IntTyDef")] IntTy),
     Uint(#[serde(with = "UintTyDef")] UintTy),
     Float(#[serde(with = "FloatTyDef")] FloatTy),
-    Adt(#[serde(with = "AdtDefDef")] <TyCtxt<'tcx> as Interner>::AdtDef, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs),
-    Foreign(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId),
+    Adt(#[serde(with = "DefIdDef")] DefId),
+    // TODO: Foreign(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId),
     Str,
     Array(#[serde(with = "TyDef")] <TyCtxt<'tcx> as Interner>::Ty, #[serde(with = "ConstDef")] <TyCtxt<'tcx> as Interner>::Const),
     Slice(#[serde(with = "TyDef")] <TyCtxt<'tcx> as Interner>::Ty),
     RawPtr(#[serde(with = "TypeAndMutDef")] <TyCtxt<'tcx> as Interner>::TypeAndMut),
     Ref(#[serde(with = "RegionDef")] <TyCtxt<'tcx> as Interner>::Region, #[serde(with = "TyDef")] <TyCtxt<'tcx> as Interner>::Ty, #[serde(with = "MutabilityDef")] Mutability),
-    FnDef(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs),
-    FnPtr(#[serde(with = "PolyFnSigDef")] <TyCtxt<'tcx> as Interner>::PolyFnSig),
-    Dynamic(#[serde(with = "BoundExistentialPredicatesDef")] <TyCtxt<'tcx> as Interner>::BoundExistentialPredicates, #[serde(with = "RegionDef")] <TyCtxt<'tcx> as Interner>::Region, #[serde(with = "DynKindDef")] DynKind),
-    Closure(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs),
-    Coroutine(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs, #[serde(with = "MovabilityDef")] Movability),
-    CoroutineWitness(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs),
+    FnDef(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId /*, TODO: signature */),
+    // TODO: FnPtr(#[serde(with = "PolyFnSigDef")] <TyCtxt<'tcx> as Interner>::PolyFnSig),
+    // TODO: Dynamic(#[serde(with = "BoundExistentialPredicatesDef")] <TyCtxt<'tcx> as Interner>::BoundExistentialPredicates, #[serde(with = "RegionDef")] <TyCtxt<'tcx> as Interner>::Region, #[serde(with = "DynKindDef")] DynKind),
+    // TODO: Closure(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs),
+    // TODO: Coroutine(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs, #[serde(with = "MovabilityDef")] Movability),
+    // CoroutineWitness(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs),
     Never,
     Tuple(#[serde(with = "TysDef")] <TyCtxt<'tcx> as Interner>::Tys),
-    Alias(#[serde(with = "AliasKindDef")] AliasKind, #[serde(with = "AliasTyDef")] <TyCtxt<'tcx> as Interner>::AliasTy),
-    Param(#[serde(with = "ParamTyDef")] <TyCtxt<'tcx> as Interner>::ParamTy),
-    Bound(#[serde(skip)] DebruijnIndex, #[serde(with = "BoundTyDef")] <TyCtxt<'tcx> as Interner>::BoundTy),
+    // TODO: Alias(#[serde(with = "AliasKindDef")] AliasKind, #[serde(with = "AliasTyDef")] <TyCtxt<'tcx> as Interner>::AliasTy),
+    // TODO: Param(#[serde(with = "ParamTyDef")] <TyCtxt<'tcx> as Interner>::ParamTy),
+    // TODO: Bound(#[serde(skip)] DebruijnIndex, #[serde(with = "BoundTyDef")] <TyCtxt<'tcx> as Interner>::BoundTy),
     Placeholder(#[serde(with = "PlaceholderTyDef")] <TyCtxt<'tcx> as Interner>::PlaceholderTy),
     Infer(#[serde(with = "InferTyDef")] InferTy),
     Error(#[serde(skip)] <TyCtxt<'tcx> as Interner>::ErrorGuaranteed),
@@ -344,32 +347,39 @@ pub enum TyKind__TyCtxt<'tcx> {
 impl<'tcx> From<&ir::TyKind<TyCtxt<'tcx>>> for TyKind__TyCtxt<'tcx> {
     fn from(value: &ir::TyKind<TyCtxt<'tcx>>) -> Self {
         match value {
-           TyKind::Bool =>                               TyKind__TyCtxt::Bool,
-           TyKind::Char =>                               TyKind__TyCtxt::Char,
-           TyKind::Int(v) =>                             TyKind__TyCtxt::Int(v.clone()),
-           TyKind::Uint(v) =>                            TyKind__TyCtxt::Uint(v.clone()),
-           TyKind::Float(v) =>                           TyKind__TyCtxt::Float(v.clone()),
-           TyKind::Adt(v1,  v2) =>                       TyKind__TyCtxt::Adt(v1.clone(), v2.clone()),
-           TyKind::Foreign(v) =>                         TyKind__TyCtxt::Foreign(v.clone()),
-           TyKind::Str =>                                TyKind__TyCtxt::Str,
-           TyKind::Array(v1,  v2) =>                     TyKind__TyCtxt::Array(v1.clone(), v2.clone()),
-           TyKind::Slice(v) =>                           TyKind__TyCtxt::Slice(v.clone()),
-           TyKind::RawPtr(v) =>                          TyKind__TyCtxt::RawPtr(v.clone()),
-           TyKind::Ref(v1, v2, v3) =>                    TyKind__TyCtxt::Ref(v1.clone(), v2.clone(), v3.clone()),
-           TyKind::FnDef(v1,  v2) =>                     TyKind__TyCtxt::FnDef(v1.clone(), v2.clone()),
-           TyKind::FnPtr(v) =>                           TyKind__TyCtxt::FnPtr(v.clone()),
-           TyKind::Dynamic(v1,  v2, v3) =>               TyKind__TyCtxt::Dynamic(v1.clone(), v2.clone(), v3.clone()),
-           TyKind::Closure(v1,  v2) =>                   TyKind__TyCtxt::Closure(v1.clone(), v2.clone()),
-           TyKind::Coroutine(v1,  v2, v3) =>             TyKind__TyCtxt::Coroutine(v1.clone(), v2.clone(), v3.clone()),
-           TyKind::CoroutineWitness(v1,  v2) =>          TyKind__TyCtxt::CoroutineWitness(v1.clone(), v2.clone()),
-           TyKind::Never =>                              TyKind__TyCtxt::Never,
-           TyKind::Tuple(v) =>                           TyKind__TyCtxt::Tuple(v.clone()),
-           TyKind::Alias(v1,  v2) =>                     TyKind__TyCtxt::Alias(v1.clone(), v2.clone()),
-           TyKind::Param(v) =>                           TyKind__TyCtxt::Param(v.clone()),
-           TyKind::Bound(v1,  v2) =>                     TyKind__TyCtxt::Bound(v1.clone(), v2.clone()),
-           TyKind::Placeholder(v) =>                     TyKind__TyCtxt::Placeholder(v.clone()),
-           TyKind::Infer(v) =>                           TyKind__TyCtxt::Infer(v.clone()),
-           TyKind::Error(v) =>                           TyKind__TyCtxt::Error(v.clone()),
+            ir::TyKind::Bool => TyKind__TyCtxt::Bool,
+            ir::TyKind::Char => TyKind__TyCtxt::Char,
+            ir::TyKind::Int(v) => TyKind__TyCtxt::Int(*v),
+            ir::TyKind::Uint(v) =>  TyKind__TyCtxt::Uint(*v),
+            ir::TyKind::Float(v) => TyKind__TyCtxt::Float(*v),
+            ir::TyKind::Str => TyKind__TyCtxt::Str,
+            ir::TyKind::Adt(def, args) => TyKind__TyCtxt::Adt(def.did()),
+            ir::TyKind::Array(ty, sz) => TyKind__TyCtxt::Array(*ty, *sz),
+            ir::TyKind::Slice(ty) => TyKind__TyCtxt::Slice(*ty),
+            ir::TyKind::Ref(r, ty, mutbl) => TyKind__TyCtxt::Ref(*r, *ty, *mutbl),
+            ir::TyKind::FnDef(def_id, args) => TyKind__TyCtxt::FnDef(*def_id),
+            ir::TyKind::Never => TyKind__TyCtxt::Never,
+            ir::TyKind::Tuple(tys) => TyKind__TyCtxt::Tuple(tys.clone()),
+            ir::TyKind::Placeholder(v) => TyKind__TyCtxt::Placeholder(*v),
+            ir::TyKind::Error(e) => TyKind__TyCtxt::Error(*e),
+            ir::TyKind::Infer(v) => TyKind__TyCtxt::Infer(*v),
+
+    // TODO: ir::TyKind::Alias(..) => TyKind__TyCtxt::Alias(..),
+            // TODO: RawPtr(#[serde(with = "TypeAndMutDef")] <TyCtxt<'tcx> as Interner>::TypeAndMut),
+            // TODO: Foreign(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId),
+            // TODO: FnPtr(#[serde(with = "PolyFnSigDef")] <TyCtxt<'tcx> as Interner>::PolyFnSig),
+            // TODO: Dynamic(#[serde(with = "BoundExistentialPredicatesDef")] <TyCtxt<'tcx> as Interner>::BoundExistentialPredicates, #[serde(with = "RegionDef")] <TyCtxt<'tcx> as Interner>::Region, #[serde(with = "DynKindDef")] DynKind),
+            // TODO: Closure(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs),
+            // TODO: Coroutine(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs, #[serde(with = "MovabilityDef")] Movability),
+            // TODO: CoroutineWitness(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs),
+            // TODO: Param(#[serde(with = "ParamTyDef")] <TyCtxt<'tcx> as Interner>::ParamTy),
+            // TODO: Bound(#[serde(skip)] DebruijnIndex, #[serde(with = "BoundTyDef")] <TyCtxt<'tcx> as Interner>::BoundTy),
+
+            // FIXME: remove this as sooon as possible
+            _ => {
+                log::debug!("NYI {:#?}", value);
+                todo!()
+            }
         }
     }
 }
@@ -557,7 +567,8 @@ impl TraitRefPrintOnlyTraitPathDef {
     where
         S: serde::Serializer,
     {
-        let tcx = get_dynamic_tcx();
+        let infcx = get_dynamic_ctx();
+        let tcx = infcx.tcx;
         DefPathDef::serialize(&tcx.def_path(value.def_id), s)
     }
 }
@@ -617,7 +628,8 @@ impl CrateNumDef {
     where
         S: serde::Serializer,
     {
-        let tcx = get_dynamic_tcx();
+        let infcx = get_dynamic_ctx();
+        let tcx = infcx.tcx;
         SymbolDef::serialize(&tcx.crate_name(*value), s)
     }
 
@@ -894,13 +906,17 @@ pub enum GenericArgKindDef<'tcx> {
     Const(#[serde(with = "ConstDef")] Const<'tcx>),
 }
 
-#[derive(Serialize)]
-#[serde(remote = "DefId")]
-pub struct DefIdDef {
-    #[serde(skip)]
-    pub index: DefIndex,
-    #[serde(skip)]
-    pub krate: CrateNum,
+// NOTE: all DefIds are serialized as their path.
+pub struct DefIdDef;
+impl DefIdDef {
+    pub fn serialize<'tcx, S>(value: &DefId, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer
+    {
+        let infcx = get_dynamic_ctx();
+        let tcx = infcx.tcx;
+        DefPathDef::serialize(&tcx.def_path(*value), s)
+    }
 }
 
 #[derive(Serialize)]
@@ -982,36 +998,62 @@ pub struct EarlyParamRegionDef {
     pub name: Symbol,
 }
 
-#[derive(Serialize)]
-#[serde(remote = "InferTy")]
-pub enum InferTyDef {
-    TyVar(#[serde(with = "TyVidDef")] TyVid),
-    IntVar(#[serde(with = "IntVidDef")] IntVid),
-    FloatVar(#[serde(with = "FloatVidDef")] FloatVid),
-    FreshTy(u32),
-    FreshIntTy(u32),
-    FreshFloatTy(u32),
+pub struct InferTyDef;
+impl InferTyDef {
+    pub fn serialize<'tcx, S>(value: &InferTy, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer
+    {
+        // For TyVars we need to look up the type in the dynamic inference context.
+        // I've let that dispatch to the TyVidDef to keep it in one place, all other
+        // inference variables can be serialized with their `ToString` impl.
+        if let InferTy::TyVar(ty_var) = value {
+            log::debug!("Serializing infer var {:?}", value);
+            TyVidDef::serialize(ty_var, s)
+        } else {
+            value.to_string().serialize(s)
+        }
+    }
 }
 
-#[derive(Serialize)]
-#[serde(remote = "TyVid")]
-pub struct TyVidDef {
-    #[serde(skip)]
-    private: u32,
-}
+pub struct TyVidDef;
+impl TyVidDef {
+    pub fn serialize<'a, 'tcx: 'a, S>(value: &TyVid, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer
+    {
+        let infcx = get_dynamic_ctx();
+        let ty_vid = *value;
 
-#[derive(Serialize)]
-#[serde(remote = "IntVid")]
-pub struct IntVidDef {
-    #[serde(skip)]
-    private: u32,
-}
+        let Ok(ty) =  infcx.probe_ty_var(ty_vid) else {
+            // If the type variable isn't resolved, what to do?
+            log::debug!("ERROR UniverseIdx probe_ty_var {ty_vid:?}");
+            todo!();
+        };
 
-#[derive(Serialize)]
-#[serde(remote = "FloatVid")]
-pub struct FloatVidDef {
-    #[serde(skip)]
-    private: u32,
+        let Some(var_origin) = infcx.type_var_origin(ty) else {
+            // If the type is not a type variable, None is returned.
+            // In this case we can just serialize the type.
+            log::debug!("ERR no var_origin {ty:?}");
+            return TyDef::serialize(&ty, s);
+        };
+
+        if let TypeVariableOriginKind::TypeParameterDefinition(name, def_id) = var_origin.kind
+            && name != kw::SelfUpper
+            && !var_origin.span.from_expansion()
+        {
+            let generics = infcx.tcx.generics_of(infcx.tcx.parent(def_id));
+            let idx = generics.param_def_id_to_index(infcx.tcx, def_id).unwrap();
+            let generic_param_def = generics.param_at(idx as usize, infcx.tcx);
+            if let ty::GenericParamDefKind::Type { synthetic: true, .. } = generic_param_def.kind {
+                "TODO".serialize(s)
+            } else {
+                SymbolDef::serialize(&name, s)
+            }
+        } else {
+            "TODO".serialize(s)
+        }
+    }
 }
 
 #[derive(Serialize)]

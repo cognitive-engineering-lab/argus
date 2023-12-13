@@ -24,21 +24,7 @@ use crate::proof_tree::serialize::serialize_proof_tree;
 
 fluid_let!(pub static OBLIGATION_TARGET: Target);
 
-// TODO: figure out the trait bounds you dummy
-#[derive(Serialize)]
-#[serde(tag = "type")]
-pub enum ArgusOutputs<'tcx> {
-  Obligations {
-    data: Vec<Obligation<'tcx>>,
-  },
-  Tree {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<SerializedTree>,
-  },
-}
-
-// pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<Vec<Obligation<'tcx>>>
-pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<ArgusOutputs<'tcx>>
+pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<serde_json::Value>
 {
   let hir = tcx.hir();
   let local_def_id = hir.body_owner_def_id(body_id);
@@ -52,18 +38,24 @@ pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<ArgusOutp
   let mut result = Err(anyhow!("Hir Typeck never called inspect fn."));
 
   inspect_typeck(tcx, local_def_id, |fncx| {
+    let Some(infcx) = fncx.infcx() else {
+      return;
+    };
+
     let mut errors = fncx.get_fulfillment_errors();
     fncx.adjust_fulfillment_errors_for_expr_obligation(&mut errors);
-    result = Ok(ArgusOutputs::Obligations {
-      data: fncx.report_fulfillment_errors(def_id, errors),
+    let obligations = fncx.report_fulfillment_errors(def_id, errors);
+    let json = crate::ty::in_dynamic_ctx(infcx, || {
+      serde_json::to_value(&obligations).expect("Could not serialize Obligations")
     });
+    result = Ok(json);
   });
 
   result
 }
 
 
-pub fn tree<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<ArgusOutputs<'tcx>>
+pub fn tree<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<Option<SerializedTree>>
 {
   OBLIGATION_TARGET.get(|target| {
     let target = target.unwrap();
@@ -97,9 +89,7 @@ pub fn tree<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<ArgusOutputs<'tc
       })
     });
 
-    Ok(ArgusOutputs::Tree {
-      data: result,
-    })
+    Ok(result)
 
   })
 }

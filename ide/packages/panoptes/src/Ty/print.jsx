@@ -1,5 +1,8 @@
+import React, { useState } from "react";
 
-function printObligation(o) {
+
+export function printObligation(o) {
+    console.debug("Printing Obligation", o);
     return printBinderPredicateKind(o.data);
 }
 
@@ -54,10 +57,12 @@ function printClauseKind(o) {
 }
 
 function printTraitPredicate(o) {
-    // TODO use the polarity
     let polarity = o.polarity === "Negative" ? "!" : "";
     return (
-        <span>{polarity}</span><span>{printTraitRef(o.trait_ref);}</span>
+        <>
+            <span>{polarity}</span>
+            <span>{printTraitRef(o.trait_ref)}</span>
+        </>
     );
 }
 
@@ -66,11 +71,66 @@ function printTraitRef(o) {
         <span>
             <span>{printTy(o.self_ty)}</span>
             as
-            <span>{printTraitPath(o.trait_path)}</span>
+            <span>{printDefPath(o.trait_path)}</span>
         </span>
     );
 }
 
-function printTraitPath(o) {
-    throw new Error("TODO");
+function printDefPath(o) {
+    let [isHover, setIsHover] = useState(false);
+    let content = isHover ? printDefPathData(o.data) : printShortDefPath(o);
+    let toggleHover = () => setIsHover(!isHover);
+    return (
+        <span onMouseEnter={toggleHover} onMouseLeave={toggleHover}>{content}</span>
+    );
+}
+
+function printShortDefPath(o) {
+    return printDefPathData(_.last(o.data));
+}
+
+function printFullDefPath(o) {
+  let first = _.head(o.data);
+  let rest = _.tail(o.data);
+  return (
+    <>
+      <span>{printDefPathData(first)}</span>
+      {_.map(rest, (pathData, i) => {
+        return <span key={i}>::{printDefPathData(pathData)}</span>;
+      })}
+    </>
+  );
+}
+
+function printDefPathData(o) {
+    // TODO: see how they actually do it in rustc
+    if ("CrateRoot" in o) {
+        return "crate";
+    } else if ("Impl" in o) {
+        return "impl";
+    } else if ("ForeignMod" in o) {
+        return "foreign mod";
+    } else if ("Use" in o) {
+        return "use";
+    } else if ("GlobalAsm" in o) {
+        return "asm";
+    } else if ("TypeNs" in o) {
+        return o.TypeNs;
+    } else if ("ValueNs" in o) {
+        return o.TypeNs;
+    } else if ("MacroNs" in o) {
+        return o.MacroNs;
+    } else if ("LifetimeNs" in o) {
+        return o.LifetimeNs;
+    } else if ("Ctor" in o) {
+        return "{{constructor}}";
+    } else if ("AnonConst" in o) {
+        return "{{anon_constructor}}"
+    } else if ("ImplTrait" in o) {
+        return "impl-trait";
+    } else if ("ImplTraitAssocTy" in o) {
+        return "impl-trait-assoc-ty";
+    } else {
+        throw new Error("Unknown def path data", o);
+    }
 }
