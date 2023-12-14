@@ -120,7 +120,7 @@ const ObligationCard = ({ obligation }: { obligation: Obligation }) => {
       onMouseEnter={addHighlight}
       onMouseLeave={removeHighlight}
     >
-      <div>
+      <div className="PrettyObligationArea">
         <PrettyObligation obligation={obligation} />
       </div>
       <VSCodeButton

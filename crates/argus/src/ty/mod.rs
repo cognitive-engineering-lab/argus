@@ -320,7 +320,7 @@ pub enum TyKind__TyCtxt<'tcx> {
     Int(#[serde(with = "IntTyDef")] IntTy),
     Uint(#[serde(with = "UintTyDef")] UintTy),
     Float(#[serde(with = "FloatTyDef")] FloatTy),
-    Adt(#[serde(with = "DefIdDef")] DefId),
+    Adt(path::PathDefWithArgs<'tcx>),
     Str,
     Array(#[serde(with = "TyDef")] <TyCtxt<'tcx> as Interner>::Ty, #[serde(with = "ConstDef")] <TyCtxt<'tcx> as Interner>::Const),
     Slice(#[serde(with = "TyDef")] <TyCtxt<'tcx> as Interner>::Ty),
@@ -352,7 +352,7 @@ impl<'tcx> From<&ir::TyKind<TyCtxt<'tcx>>> for TyKind__TyCtxt<'tcx> {
             ir::TyKind::Uint(v) =>  TyKind__TyCtxt::Uint(*v),
             ir::TyKind::Float(v) => TyKind__TyCtxt::Float(*v),
             ir::TyKind::Str => TyKind__TyCtxt::Str,
-            ir::TyKind::Adt(def, args) => TyKind__TyCtxt::Adt(def.did()),
+            ir::TyKind::Adt(def, args) => TyKind__TyCtxt::Adt(path::PathDefWithArgs::new(def.did(), args)),
             ir::TyKind::Array(ty, sz) => TyKind__TyCtxt::Array(*ty, *sz),
             ir::TyKind::Slice(ty) => TyKind__TyCtxt::Slice(*ty),
             ir::TyKind::Ref(r, ty, mutbl) => TyKind__TyCtxt::Ref(*r, *ty, *mutbl),
@@ -534,6 +534,12 @@ pub struct TraitPredicateDef<'tcx> {
     #[serde(with = "ImplPolarityDef")]
     pub polarity: ImplPolarity,
 }
+
+#[derive(Serialize)]
+pub struct TraitRefPrintOnlyTraitPathDefWrapper<'tcx>(
+    #[serde(with = "TraitRefPrintOnlyTraitPathDef")] 
+    pub TraitRef<'tcx>
+);
 
 pub struct TraitRefDef;
 impl TraitRefDef {

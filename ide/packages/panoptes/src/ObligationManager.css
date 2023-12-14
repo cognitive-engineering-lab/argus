@@ -19,3 +19,9 @@
 :host([readonly]) .control {
     cursor: default;
 }
+
+.PrettyObligationArea {
+    font-family: monospace;
+    display: block;
+    padding: 0.15em;
+}

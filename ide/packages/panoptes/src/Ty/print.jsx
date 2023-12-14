@@ -1,7 +1,18 @@
+import _ from "lodash";
 import React, { useState } from "react";
 
+import "./print.css";
+
+function intersperse(arr, sep, proc = undefined) {
+  const doInner = proc === undefined ? (e, _i) => e : proc;
+  return _.flatMap(arr, (entry, i) => {
+    let e = doInner(entry, i);
+    return arr.length - 1 === i ? [e] : [e, sep];
+  });
+}
+
 export const PrettyObligation = ({ obligation }) => {
-  console.debug("Printing Obligation", obligation);
+  console.log("Printing Obligation", obligation);
   return <PrintBinderPredicateKind o={obligation.data} />;
 };
 
@@ -74,13 +85,174 @@ const PrintTraitRef = ({ o }) => {
   );
 };
 
+// NOTE: when we aren't hovering over the path, we just
+// want to show the last segment. On hover, it should be the fully
+// qualified path. (At least that's the current idea.)
 const PrintDefPath = ({ o }) => {
-  // TODO: change in the future
-  if (!(typeof o === "string")) {
-    throw new Error("Expected string", o);
+  if (o.length === 0) {
+    return "";
   }
 
-  return <span>{o}</span>;
+  return (
+    <div className="DefPathContainer">
+      <span className="DefPathShort">
+        <PrintDefPathShort o={o} />
+      </span>
+      <span className="DefPathFull">
+        <PrintDefPathFull o={o} />
+      </span>
+    </div>
+  );
+};
+
+// NOTE: difference between this and _.takeRightWhile is that
+// this will include the first element that matches the predicate.
+function takeRightUntil(arr, pred) {
+  let i = arr.length - 1;
+  while (0 <= i) {
+    if (pred(arr[i])) {
+      break;
+    }
+    i--;
+  }
+  return arr.slice(i, arr.length);
+}
+
+// PathSegment[]
+const PrintDefPathShort = ({ o }) => {
+  const prefix = takeRightUntil(o, segment => {
+    return (
+      segment.type === "crate" ||
+      segment.type === "ty" ||
+      segment.type === "defPathDataName" ||
+      segment.type === "implFor" ||
+      segment.type === "implAs"
+    );
+  });
+  console.log("Prefix", prefix);
+
+  return (
+    <span>
+      {_.map(prefix, (segment, i) => {
+        return <PrintPathSegment o={segment} key={i} />;
+      })}
+    </span>
+  );
+};
+
+// PathSegment[]
+const PrintDefPathFull = ({ o }) => {
+  return (
+    <span>
+      {_.map(o, (segment, i) => {
+        return <PrintPathSegment o={segment} key={i} />;
+      })}
+    </span>
+  );
+};
+
+const PrintPathSegment = ({ o }) => {
+  switch (o.type) {
+    case "colons": {
+      return "::";
+    }
+    case "localCrate": {
+      return "crate";
+    }
+    case "rawGuess": {
+      return "r#";
+    }
+    case "defPathDataName": {
+      const suffix = o.disambiguator != 0 ? `#${o.disambiguator}` : "";
+      return (
+        <span>
+          {o.name}
+          {suffix}
+        </span>
+      );
+    }
+    case "crate": {
+      return o.name;
+    }
+    case "ty": {
+      return <PrintTy o={o.ty} />;
+    }
+    case "genericDelimiters": {
+      // We don't want empty <> on the end of types
+      if (o.inner.length === 0) {
+        return "";
+      }
+
+      console.log("genericDelimiters", o);
+
+      let [lt, gt] = ["<", ">"];
+      return (
+        <span>
+          {lt}
+          <PrintDefPathFull o={o.inner} />
+          {gt}
+        </span>
+      );
+    }
+    case "commaSeparated": {
+      const doInner =
+        o.kind.type === "genericArg"
+          ? (e, i) => {
+              return <PrintGenericArg o={e} key={i} />;
+            }
+          : (_e, _i) => {
+              throw new Error("Unknown comma separated kind", o);
+            };
+      console.log("CommaSeparated", o);
+      return <>{intersperse(o.entries, ", ", doInner)}</>;
+    }
+    case "implFor": {
+      const path =
+        o.path === undefined ? (
+          ""
+        ) : (
+          <span>
+            <PrintDefPathFull o={o.path} />
+            for
+          </span>
+        );
+      return (
+        <span>
+          impl {path} <PrintTy o={o.ty} />
+        </span>
+      );
+    }
+    case "implAs": {
+      const path =
+        o.path === undefined ? (
+          ""
+        ) : (
+          <span>
+            as
+            <PrintDefPathFull o={o.path} />
+          </span>
+        );
+      return (
+        <span>
+          <PrintTy o={o.ty} />
+        </span>
+      );
+    }
+  }
+};
+
+const PrintGenericArg = ({ o }) => {
+  console.log("GenericArg", o);
+
+  if ("Type" in o) {
+    return <PrintTy o={o.Type} />;
+  } else if ("Lifetime" in o) {
+    throw new Error("TODO");
+  } else if ("Const" in o) {
+    throw new Error("TODO");
+  } else {
+    throw new Error("Unknown generic arg", o);
+  }
 };
 
 const PrintDefPathData = ({ o }) => {
@@ -117,10 +289,17 @@ const PrintDefPathData = ({ o }) => {
 };
 
 const PrintTy = ({ o }) => {
+  console.log("Printing Ty", o);
   return <PrintTyKind o={o} />;
 };
 
+// TODO: enums that don't have an inner object need to use a
+// comparison, instead of the `in` operator.
 const PrintTyKind = ({ o }) => {
+  if (o === "Error") {
+    return "{error}";
+  }
+
   if ("Bool" in o) {
     return "bool";
   } else if ("Char" in o) {
@@ -136,9 +315,19 @@ const PrintTyKind = ({ o }) => {
   } else if ("Str" in o) {
     return "str";
   } else if ("Array" in o) {
-    throw new Error("TODO");
+    // FIXME: the PrintTy and PrintConst are wrong,
+    // we need to pass the right arguments to them.
+    return (
+      <span>
+        [<PrintTy o={o} />; <PrintConst o={o} />]
+      </span>
+    );
   } else if ("Slice" in o) {
-    throw new Error("TODO");
+    return (
+      <span>
+        [<PrintTy o={o.Slice} />]
+      </span>
+    );
   } else if ("RawPtr" in o) {
     throw new Error("TODO");
   } else if ("Ref" in o) {
@@ -149,7 +338,15 @@ const PrintTyKind = ({ o }) => {
   } else if ("Never" in o) {
     return "!";
   } else if ("Tuple" in o) {
-    throw new Error("TODO");
+    return (
+      <span>
+        (
+        {intersperse(o.Tuple, ", ", (e, i) => {
+          return <PrintTy o={e} key={i} />;
+        })}
+        )
+      </span>
+    );
   } else if ("Placeholder" in o) {
     throw new Error("TODO");
   } else if ("Infer" in o) {
@@ -178,4 +375,16 @@ const PrintTyVar = ({ o }) => {
   } else {
     return <PrintTy o={o} />;
   }
+};
+
+const PrintFloatTy = ({ o }) => {
+  return o.toLowerCase();
+};
+
+const PrintUintTy = ({ o }) => {
+  return o.toLowerCase();
+};
+
+const PrintIntTy = ({ o }) => {
+  return o.toLowerCase();
 };
