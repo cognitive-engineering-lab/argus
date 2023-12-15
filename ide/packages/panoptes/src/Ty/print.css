@@ -1,3 +1,10 @@
+.PrintError {
+    background: #FF6961;
+    color: white;
+    font-weight: bold;
+    overflow-y: scroll;
+}
+
 .DefPathContainer {
     position: relative;
     display: inline-block;

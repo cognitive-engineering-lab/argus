@@ -1,0 +1,163 @@
+import React from "react";
+
+import { PrintConst } from "./const";
+import { PrintDefPath } from "./path";
+
+export const PrintBinder = ({ binder, innerF }) => {
+  return innerF(binder.value);
+};
+
+export const PrintTy = ({ o }) => {
+  console.log("Printing Ty", o);
+  return <PrintTyKind o={o} />;
+};
+
+// TODO: enums that don't have an inner object need to use a
+// comparison, instead of the `in` operator.
+export const PrintTyKind = ({ o }) => {
+  if ("Bool" === o) {
+    return "bool";
+  } else if ("Char" === o) {
+    return "char";
+  } else if ("Str" === o) {
+    return "str";
+  } else if ("Never" === o) {
+    return "!";
+  } else if ("Error" === o) {
+    return "{error}";
+  } else if ("Int" in o) {
+    return <PrintIntTy o={o.Int} />;
+  } else if ("Uint" in o) {
+    return <PrintUintTy o={o.Uint} />;
+  } else if ("Float" in o) {
+    return <PrintFloatTy o={o.Float} />;
+  } else if ("Adt" in o) {
+    return <PrintDefPath o={o.Adt} />;
+  } else if ("Array" in o) {
+    const [ty, sz] = o.Array;
+    return (
+      <span>
+        [<PrintTy o={ty} />; <PrintConst o={sz} />]
+      </span>
+    );
+  } else if ("Slice" in o) {
+    return (
+      <span>
+        [<PrintTy o={o.Slice} />]
+      </span>
+    );
+  } else if ("RawPtr" in o) {
+    const m = o.RawPtr.mutbl === "Not" ? "const" : "mut";
+    return (
+      <span>
+        *{m} <PrintTy o={o.RawPtr.ty} />
+      </span>
+    );
+  } else if ("Ref" in o) {
+    // TODO: when to print regions?
+    const [r, ty, mtbl] = o.Ref;
+    const tyAndMut = {
+      ty: ty,
+      mutbl: mtbl,
+    };
+    return (
+      <span>
+        &<PrintTypeAndMut o={tyAndMut} />
+      </span>
+    );
+  } else if ("FnDef" in o) {
+    // FIXME: function definitions should also have a signature
+    return <PrintDefPath o={o.FnDef} />;
+  } else if ("Tuple" in o) {
+    return (
+      <span>
+        (
+        {intersperse(o.Tuple, ", ", (e, i) => {
+          return <PrintTy o={e} key={i} />;
+        })}
+        )
+      </span>
+    );
+  } else if ("Placeholder" in o) {
+    return <PrintPlaceholderTy o={o.Placeholder} />;
+  } else if ("Infer" in o) {
+    return <PrintInferTy o={o.Infer} />;
+  } else if ("Foreign" in o) {
+    return <PrintDefPath o={o.Foreign} />;
+  } else if ("Closure" in o) {
+    return <PrintDefPath o={o.Closure} />;
+  } else {
+    throw new Error("Unknown ty kind", o);
+  }
+};
+
+export const PrintPlaceholderTy = ({ o }) => {
+  switch (o.bound.kind) {
+    case "Anon": {
+      // TODO: what do we really want to anon placeholders?
+      return "{anon}";
+    }
+    case "Param": {
+      // TODO: do we want to use the `path` here?
+      const [path, name] = o.bound.kind.Param;
+      return <span>{name}</span>;
+    }
+  }
+};
+
+export const PrintInferTy = ({ o }) => {
+  if ("ty_var" in o) {
+    return <PrintTy o={o.ty_var} />;
+  } else if ("infer_var" in o) {
+    // NOTE: currently infer_var is just a string.
+    return o.infer_var;
+  } else {
+    throw new Error("Unknown infer ty", o);
+  }
+};
+
+export const PrintTyVar = ({ o }) => {
+  if (typeof o === "string" || o instanceof String) {
+    return o;
+  } else {
+    return <PrintTy o={o} />;
+  }
+};
+
+export const PrintTypeAndMut = ({ o }) => {
+  return (
+    <span>
+      {o.mutbl === "Mut" ? "mut " : ""}
+      <PrintTy o={o.ty} />
+    </span>
+  );
+};
+
+export const PrintGenericArg = ({ o }) => {
+  console.log("GenericArg", o);
+
+  if ("Type" in o) {
+    return <PrintTy o={o.Type} />;
+  } else if ("Lifetime" in o) {
+    return <PrintRegion o={o.Lifetime} />;
+  } else if ("Const" in o) {
+    return <PrintConst o={o.Const} />;
+  } else {
+    throw new Error("Unknown generic arg", o);
+  }
+};
+
+// --------------------------
+// Numeric types
+
+export const PrintFloatTy = ({ o }) => {
+  return o.toLowerCase();
+};
+
+export const PrintUintTy = ({ o }) => {
+  return o.toLowerCase();
+};
+
+export const PrintIntTy = ({ o }) => {
+  return o.toLowerCase();
+};

@@ -28,6 +28,13 @@ macro_rules! define_scoped_cx {
     };
 }
 
+pub(super) fn path_def_no_args<S>(def_id: DefId, s: S) -> Result<S::Ok, S::Error> 
+where
+    S: serde::Serializer,
+{
+    PathBuilder::def_path(def_id, &[], s)
+}
+
 pub struct PathDefWithArgs<'tcx> {
     def_id: DefId,
     args: &'tcx [GenericArg<'tcx>],
