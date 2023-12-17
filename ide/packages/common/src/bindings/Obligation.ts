@@ -2,4 +2,4 @@
 import type { CharRange } from "./CharRange";
 import type { ObligationKind } from "./ObligationKind";
 
-export type Obligation = { range: CharRange, data: any, kind: ObligationKind };
+export type Obligation = { range: CharRange, data: any, hash: string, kind: ObligationKind };

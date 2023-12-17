@@ -47,6 +47,9 @@ pub struct Obligation<'tcx> {
   // #[ts(rename = "any")]
   #[serde(with = "PredicateDef")]
   pub data: Predicate<'tcx>,
+  // NOTE: Hash64 but we pass it as a String because JavaScript
+  // cannot handle the full range of 64 bit integers.
+  pub hash: String,
   pub range: CharRange,
   pub kind: ObligationKind,
 }

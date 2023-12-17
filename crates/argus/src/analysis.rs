@@ -1,8 +1,8 @@
 //! ProofTree analysis.
 
-use rustc_data_structures::fx::FxIndexSet;
+use rustc_data_structures::{fx::FxIndexSet, stable_hasher::Hash64};
 use rustc_hir::BodyId;
-use rustc_hir::def_id::DefId;
+use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_hir_analysis::astconv::AstConv;
 use rustc_hir_typeck::{inspect_typeck, FnCtxt};
 use rustc_infer::infer::error_reporting::TypeErrCtxt;
@@ -16,6 +16,7 @@ use anyhow::{Result, anyhow};
 use fluid_let::fluid_let;
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
+use itertools::Itertools;
 
 use crate::Target;
 use crate::proof_tree::{SerializedTree, Obligation, ObligationKind};
@@ -42,9 +43,7 @@ pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<serde_jso
       return;
     };
 
-    let mut errors = fncx.get_fulfillment_errors();
-    fncx.adjust_fulfillment_errors_for_expr_obligation(&mut errors);
-    let obligations = fncx.report_fulfillment_errors(def_id, errors);
+    let obligations = fncx.get_obligations(local_def_id);
     let json = crate::ty::in_dynamic_ctx(infcx, || {
       serde_json::to_value(&obligations).expect("Could not serialize Obligations")
     });
@@ -54,7 +53,6 @@ pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<serde_jso
   result
 }
 
-
 pub fn tree<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<Option<SerializedTree>>
 {
   OBLIGATION_TARGET.get(|target| {
@@ -62,28 +60,18 @@ pub fn tree<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<Option<Serialize
 
     let hir = tcx.hir();
     let local_def_id = hir.body_owner_def_id(body_id);
-    let def_id = local_def_id.to_def_id();
-
-    log::info!("Getting obligations");
 
     let mut result = None;
 
     inspect_typeck(tcx, local_def_id, |fncx| {
-      let Some(infcx) = fncx.infcx() else {
-        return;
-      };
-
-      let errors = fncx.get_fulfillment_errors();
-
-      result = errors.iter().find_map(|error| {
-        let (pretty, goal) = (
-          error.root_obligation.predicate.pretty(infcx, def_id),
-          Goal { predicate: error.root_obligation.predicate, param_env: error.root_obligation.param_env }
-        );
-
-        if &pretty != &target.data {
+      let errors = fncx.get_fulfillment_errors(local_def_id);
+      result = errors.iter().find_map(|(hash, error)| {
+        if hash.as_u64() != target.data {
           return None;
         }
+
+        let goal =
+          Goal { predicate: error.root_obligation.predicate, param_env: error.root_obligation.param_env };
 
         serialize_tree(goal, fncx)
       })
@@ -94,12 +82,6 @@ pub fn tree<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<Option<Serialize
   })
 }
 
-// fn serialize_error_tree<'tcx>(error: &FulfillmentError<'tcx>, fcx: &FnCtxt<'_, 'tcx>) -> Option<SerializedTree> {
-//   let o = &error.root_obligation;
-//   let goal = Goal { predicate: o.predicate, param_env: o.param_env };
-//   serialize_tree(goal, fcx)
-// }
-
 fn serialize_tree<'tcx>(goal: Goal<'tcx, ty::Predicate<'tcx>>, fcx: &FnCtxt<'_, 'tcx>) -> Option<SerializedTree> {
   let def_id = fcx.item_def_id();
   let infcx = fcx.infcx().expect("`FnCtxt` missing a `InferCtxt`.");
@@ -107,12 +89,36 @@ fn serialize_tree<'tcx>(goal: Goal<'tcx, ty::Predicate<'tcx>>, fcx: &FnCtxt<'_, 
   serialize_proof_tree(goal, infcx, def_id)
 }
 
+fn retain_fixpoint<T, F: FnMut(&T) -> bool>(v: &mut Vec<T>, mut pred: F) {
+  let mut did_change = true;
+  let start_size = v.len();
+  let mut removed_es = 0usize;
+  // While things have changed, keep iterating, except
+  // when we have a single element left.
+  while did_change && start_size - removed_es > 1 {
+    did_change = false;
+    v.retain(|e| {
+      let r = pred(e);
+      did_change |= !r;
+      if !r && start_size - removed_es > 1 {
+        removed_es += 1;
+        r
+      } else {
+        true
+      }
+    });
+  }
+}
+
 // --------------------------------
 
+type FulfillmentData<'tcx> = (Hash64, FulfillmentError<'tcx>);
+
 trait FnCtxtExt<'tcx> {
-  fn get_fulfillment_errors(&self) -> Vec<FulfillmentError<'tcx>>;
-  fn adjust_fulfillment_errors_for_expr_obligation(&self, errors: &mut Vec<FulfillmentError<'tcx>>);
-  fn report_fulfillment_errors(&self, def_id: DefId, errors: Vec<FulfillmentError<'tcx>>) -> Vec<Obligation<'tcx>>;
+  fn get_fulfillment_errors(&self, ldef_id: LocalDefId) -> Vec<FulfillmentData<'tcx>>;
+  fn get_obligations(&self, ldef_id: LocalDefId) -> Vec<Obligation<'tcx>>;
+  fn adjust_fulfillment_errors_for_expr_obligation(&self, errors: &mut Vec<FulfillmentData<'tcx>>);
+  fn report_fulfillment_errors(&self, errors: Vec<FulfillmentData<'tcx>>) -> Vec<Obligation<'tcx>>;
 }
 
 trait InferPrivateExt<'tcx> {
@@ -164,16 +170,34 @@ impl<'tcx> InferPrivateExt<'tcx> for TypeErrCtxt<'_, 'tcx> {
 }
 
 impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
-  fn get_fulfillment_errors(&self) -> Vec<FulfillmentError<'tcx>> {
+  fn get_obligations(&self, ldef_id: LocalDefId) -> Vec<Obligation<'tcx>> {
+      let mut errors = self.get_fulfillment_errors(ldef_id);
+      self.adjust_fulfillment_errors_for_expr_obligation(&mut errors);
+      self.report_fulfillment_errors(errors)
+  }
+
+  fn get_fulfillment_errors(&self, ldef_id: LocalDefId) -> Vec<FulfillmentData<'tcx>> {
     let errors = self.fulfillment_errors.borrow();
 
     let result = errors.iter().map(Clone::clone).collect::<Vec<_>>();
 
+    let return_with_hashes = |v: Vec<FulfillmentError<'tcx>>| {
+      self.tcx().with_stable_hashing_context(|mut hcx| {
+        v
+          .into_iter()
+          .map(|e| (e.stable_hash(&mut hcx), e))
+          .unique_by(|(h, _)| *h)
+          .collect::<Vec<_>>()
+      })
+    };
+
     if !result.is_empty() {
-      return result;
+      return return_with_hashes(result);
     }
 
     let mut result = Vec::new();
+
+    let def_id = ldef_id.to_def_id();
 
     if let Some(infcx) = self.infcx() {
       let fulfilled_obligations = infcx.fulfilled_obligations.borrow();
@@ -181,26 +205,49 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
 
       result.extend(
         fulfilled_obligations.iter().filter_map(|obl| {
+
           match obl {
-            FulfilledObligation::Failure {
-              error,
-              ..
-            } if error.root_obligation.predicate.is_necessary(tcx) => Some(error.clone()),
-            _ => None,
+            FulfilledObligation::Failure { error, .. } => {
+              log::debug!("[CAND] error {:?}", error.obligation.predicate.pretty(infcx, def_id));
+              Some(error.clone())
+            },
+            FulfilledObligation::Success(obl) => {
+              log::debug!("[CAND] success {:?}", obl.predicate.pretty(infcx, def_id));
+              None
+            }
           }
         }));
     }
 
-    result
+    // Iteratively filter out elements unless there's only one thing
+    // left; we don't want to remove the last remaining query.
+    // Queries in order of *least* importance:
+    // 1. (): TRAIT
+    // 2. TY: Sized
+    // 3. _: TRAIT
+    let tcx = &self.tcx();
+    retain_fixpoint(&mut result, |error| {
+      !error.obligation.predicate.is_unit_impl_trait(tcx)
+    });
+
+    retain_fixpoint(&mut result, |error| {
+      !error.obligation.predicate.is_ty_impl_sized(tcx)
+    });
+
+    retain_fixpoint(&mut result, |error| {
+      !error.obligation.predicate.is_ty_unknown(tcx)
+    });
+
+    return_with_hashes(result)
   }
 
   // Implementation taken from rustc_hir_typeck/fn_ctxt/checks.rs :: adjust_fulfillment_errors_for_expr_obligation
-  fn adjust_fulfillment_errors_for_expr_obligation(&self, errors: &mut Vec<FulfillmentError<'tcx>>) {
+  fn adjust_fulfillment_errors_for_expr_obligation(&self, errors: &mut Vec<FulfillmentData<'tcx>>) {
 
     let mut remap_cause = FxIndexSet::default();
     let mut not_adjusted = vec![];
 
-    for error in errors {
+    for (_, error) in errors {
       let before_span = error.obligation.cause.span;
       if self.adjust_fulfillment_error_for_expr_obligation(error)
         || before_span != error.obligation.cause.span
@@ -227,12 +274,13 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
     }
   }
 
-  fn report_fulfillment_errors(&self, def_id: DefId, mut errors: Vec<FulfillmentError<'tcx>>) -> Vec<Obligation<'tcx>> {
+  fn report_fulfillment_errors(&self, mut errors: Vec<FulfillmentData<'tcx>>) -> Vec<Obligation<'tcx>> {
     if errors.is_empty() {
       return Vec::new();
     }
     let source_map = self.tcx().sess.source_map();
     let infcx = self.infcx().unwrap();
+
     // let this = self.err_ctxt();
 
     // let reported = this
@@ -253,11 +301,12 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
 
     // log::debug!("Reported_errors {_split_idx} {reported_errors:#?}");
 
-    errors.into_iter().map(|error| {
+    errors.into_iter().map(|(hash, error)| {
+      let predicate = error.root_obligation.predicate;
       let range = CharRange::from_span(error.obligation.cause.span, source_map).unwrap();
-
       Obligation {
-        data: error.root_obligation.predicate, // pretty(infcx, def_id),
+        data: predicate,
+        hash: hash.as_u64().to_string(),
         range,
         kind: ObligationKind::Failure
       }

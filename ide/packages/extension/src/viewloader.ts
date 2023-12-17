@@ -153,12 +153,15 @@ export class ViewLoader {
     });
   }
 
-  private async getTree(host: Filename, predicate: Obligation) {
+  private async getTree(host: Filename, obl: Obligation) {
+    log("Fetching tree for file", host, obl.hash, obl);
+
     const res = await globals.backend<TreeOutput[]>([
       "tree",
       host,
-      predicate.data,
+      obl.hash,
     ]);
+
     if (res.type !== "output") {
       vscode.window.showErrorMessage(res.error);
       return;

@@ -1,18 +1,16 @@
 import { Filename } from "@argus/common";
 import { Obligation } from "@argus/common/types";
-import {
-  VSCodeButton,
-  VSCodePanelTab,
-  VSCodePanelView,
-  VSCodePanels,
-  VSCodeProgressRing,
-} from "@vscode/webview-ui-toolkit/react";
-import _ from "lodash";
+import { VSCodeButton, VSCodePanelTab, VSCodePanelView, VSCodePanels, VSCodeProgressRing } from "@vscode/webview-ui-toolkit/react";
+import _, { set } from "lodash";
 import React, { useEffect, useState } from "react";
+import { ErrorBoundary } from "react-error-boundary";
+
+
 
 import "./App.css";
 import ObligationManager from "./ObligationManager";
 import { messageExtension } from "./utilities/vscode";
+
 
 function basename(path: string) {
   return path.split("/").reverse()[0];
@@ -89,6 +87,19 @@ const OpenFile = ({ filename }: { filename: Filename }) => {
   );
 };
 
+const FatalErrorPanel = ({ error, resetErrorBoundary }: any) => {
+  return (
+    <div>
+      <p>Whoops! This is not a drill, a fatal error occurred.
+
+        Please <a href="https://github.com/gavinleroy/argus/issues/new">report this error</a> to the Argus team, and include the following information:
+      </p>
+      <pre>{error.message}</pre>
+      <button onClick={resetErrorBoundary}>Reset Argus</button>
+    </div>
+  );
+};
+
 const App = ({ initialFiles }: { initialFiles: Filename[] }) => {
   const [openFiles, setOpenFiles] = useState<[Filename, React.ReactElement][]>(
     _.map(initialFiles, filename => {
@@ -119,6 +130,7 @@ const App = ({ initialFiles }: { initialFiles: Filename[] }) => {
         );
         return;
       }
+
       default: {
         // Ignore all other cases.
         return;
@@ -131,6 +143,14 @@ const App = ({ initialFiles }: { initialFiles: Filename[] }) => {
     return () => window.removeEventListener("message", listener);
   }, []);
 
+  const resetState = () => {
+    setOpenFiles(
+      _.map(openFiles, ([filename, _], i) => {
+        return [filename, <OpenFile key={i} filename={filename} />];
+      })
+    );
+  };
+
   return (
     <VSCodePanels>
       {_.map(openFiles, ([filename, _], idx) => {
@@ -142,9 +162,15 @@ const App = ({ initialFiles }: { initialFiles: Filename[] }) => {
       })}
       {_.map(openFiles, ([_, content], idx) => {
         return (
-          <VSCodePanelView key={idx} id={`view-${idx}`}>
-            {content}
-          </VSCodePanelView>
+          <ErrorBoundary
+            key={idx}
+            FallbackComponent={FatalErrorPanel}
+            onReset={resetState}
+          >
+            <VSCodePanelView key={idx} id={`view-${idx}`}>
+              {content}
+            </VSCodePanelView>
+          </ErrorBoundary>
         );
       })}
     </VSCodePanels>

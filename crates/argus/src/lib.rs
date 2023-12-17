@@ -14,6 +14,7 @@ extern crate rustc_hir_typeck;
 extern crate rustc_infer;
 extern crate rustc_macros;
 extern crate rustc_middle;
+extern crate rustc_query_system;
 extern crate rustc_session;
 extern crate rustc_serialize;
 extern crate rustc_span;
@@ -28,14 +29,14 @@ pub mod ty;
 
 #[derive(Debug)]
 pub struct Target {
-  data: String,
+  data: u64,
 }
 
 pub trait ToTarget {
   fn to_target(self) -> Target;
 }
 
-impl ToTarget for String {
+impl ToTarget for u64 {
   fn to_target(self) -> Target {
     Target {
       data: self,
@@ -43,6 +44,9 @@ impl ToTarget for String {
   }
 }
 
+// FIXME: this shouldn't currently be used, because we now rely on
+// the serialization of rustc types, I need to update the TS-RS
+// generation.
 #[cfg(test)]
 mod tests {
     use ts_rs::TS;

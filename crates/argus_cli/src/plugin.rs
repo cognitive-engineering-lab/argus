@@ -40,7 +40,7 @@ enum ArgusCommand {
   },
   Tree {
     file: String,
-    id: String,
+    id: u64,
   },
 }
 
@@ -141,7 +141,7 @@ impl RustcPlugin for ArgusPlugin {
         postprocess(run(argus::analysis::tree, PathBuf::from(file), compute_target, &compiler_args))
       }
       Obligations { file, .. } => {
-        let nothing = || { None::<String> };
+        let nothing = || { None::<u64> };
         postprocess(run(argus::analysis::obligations, PathBuf::from(file), nothing, &compiler_args))
       }
       _ => unreachable!(),

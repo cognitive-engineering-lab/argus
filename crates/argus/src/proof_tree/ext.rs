@@ -1,3 +1,4 @@
+use rustc_data_structures::stable_hasher::{StableHasher, Hash64, HashStable};
 use rustc_middle::ty::print::{FmtPrinter, Print, PrettyPrinter};
 use rustc_middle::mir::interpret::{AllocRange, GlobalAlloc, Pointer, Provenance, Scalar};
 use rustc_middle::query::IntoQueryParam;
@@ -13,14 +14,26 @@ use rustc_hir::def_id::{DefId, DefIdSet, ModDefId, CRATE_DEF_ID, LOCAL_CRATE};
 use rustc_hir::definitions::{DefKey, DefPathData, DefPathDataName, DisambiguatedDefPathData};
 use rustc_hir::LangItem;
 use rustc_infer::infer::InferCtxt;
-
+use rustc_query_system::ich::StableHashingContext;
+use rustc_trait_selection::traits::FulfillmentError;
 use rustc_trait_selection::solve::inspect::InspectCandidate;
 use rustc_trait_selection::traits::solve::{Certainty, MaybeCause};
 use rustc_trait_selection::traits::query::NoSolution;
 use rustc_trait_selection::traits::solve::{inspect::ProbeKind, CandidateSource};
 
+pub trait StableHash<'__ctx>: HashStable<StableHashingContext<'__ctx>> {
+    fn stable_hash(&self, ctx: &mut StableHashingContext<'__ctx>) -> Hash64;
+}
+
 pub trait PredicateExt<'tcx> {
+    fn is_unit_impl_trait(&self, tcx: &TyCtxt<'tcx>) -> bool;
+    fn is_ty_impl_sized(&self, tcx: &TyCtxt<'tcx>) -> bool;
+    fn is_ty_unknown(&self, tcx: &TyCtxt<'tcx>) -> bool;
     fn is_necessary(&self, tcx: &TyCtxt<'tcx>) -> bool;
+}
+
+pub trait FulfillmentErrorExt {
+    fn stable_hash(&self, ctx: &mut StableHashingContext) -> Hash64;
 }
 
 /// Pretty printing for things that can already be printed.
@@ -50,17 +63,50 @@ pub trait CandidateExt {
 // -----------------------------------------------
 // Impls
 
+impl<'__ctx, T: HashStable<StableHashingContext<'__ctx>>> StableHash<'__ctx> for T {
+    fn stable_hash(&self, ctx: &mut StableHashingContext<'__ctx>) -> Hash64 {
+        let mut h = StableHasher::new();
+        self.hash_stable(ctx, &mut h);
+        h.finish()
+    }
+}
+
+impl FulfillmentErrorExt for FulfillmentError<'_> {
+    fn stable_hash(&self, ctx: &mut StableHashingContext) -> Hash64 {
+        // FIXME: should we be using the root_obligation here?
+        // The issue is that type variables cannot use hash_stable.
+        self.obligation.predicate.stable_hash(ctx)
+    }
+}
 
 impl<'tcx> PredicateExt<'tcx> for ty::Predicate<'tcx> {
+    fn is_unit_impl_trait(&self, tcx: &TyCtxt<'tcx>) -> bool {
+        matches!(self.kind().skip_binder(),
+                 ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
+                     trait_predicate.self_ty().is_unit()
+                 })
+    }
+
+    fn is_ty_impl_sized(&self, tcx: &TyCtxt<'tcx>) -> bool {
+        matches!(self.kind().skip_binder(),
+                 ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
+                     trait_predicate.def_id() == tcx.require_lang_item(LangItem::Sized, None)
+                 })
+    }
+
+    // TODO: I'm not 100% that this is the correct metric.
+    fn is_ty_unknown(&self, tcx: &TyCtxt<'tcx>) -> bool {
+        matches!(self.kind().skip_binder(),
+                 ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
+                     trait_predicate.self_ty().is_ty_var()
+                 })
+    }
+
     fn is_necessary(&self, tcx: &TyCtxt<'tcx>) -> bool {
-        matches!(self.kind().skip_binder(), ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
-            // NOTE: predicates of the form `_: TRAIT` and `(): TRAIT` are useless. The first doesn't have
-            // any information about the type of the Self var, and I've never understood why the latter
-            // occurs so frequently.
-            !trait_predicate.self_ty().is_ty_var() &&
-            !trait_predicate.self_ty().is_unit() &&
-                trait_predicate.def_id() != tcx.require_lang_item(LangItem::Sized, None)
-        })
+        // NOTE: predicates of the form `_: TRAIT` and `(): TRAIT` are useless. The first doesn't have
+        // any information about the type of the Self var, and I've never understood why the latter
+        // occurs so frequently.
+        !(self.is_unit_impl_trait(tcx) || self.is_ty_unknown(tcx) || self.is_ty_impl_sized(tcx))
     }
 }
 
