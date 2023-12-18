@@ -5,6 +5,11 @@ import { PrintDefPath } from "./path";
 import { PrintTerm } from "./term";
 import { PrintBinder, PrintGenericArg, PrintTy } from "./ty";
 
+export const PrintGoalPredicate = ({ o }) => {
+  // NOTE: by default just prin the predicate, not the env.
+  return <PrintBinderPredicateKind o={o.predicate} />;
+};
+
 export const PrintBinderPredicateKind = ({ o }) => {
   const inner = o => <PrintPredicateKind o={o} />;
   return <PrintBinder binder={o} innerF={inner} />;

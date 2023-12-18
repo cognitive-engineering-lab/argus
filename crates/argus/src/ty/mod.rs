@@ -1,8 +1,13 @@
 //! Remote serde::Serialize derives for Rustc types
+//!
+//! WARNING, these definitions were done hastily, and definitely
+//! need a little "fixing up." It will be done at some point.
+//! In the meantime, consume at your own risk.
 #![allow(
     non_camel_case_types,
     non_snake_case,
-    suspicious_double_ref_op // FIXME: get rid of this eventually
+    suspicious_double_ref_op,
+    dead_code
 )]
 
 mod r#const;
@@ -16,9 +21,10 @@ use rustc_type_ir as ir;
 use rustc_infer::infer::{InferCtxt, type_variable::TypeVariableOriginKind};
 use rustc_middle::{ty::{self, *, abstract_const::CastKind}, mir::{BinOp, UnOp}};
 use rustc_hir::def_id::{DefId, DefIndex, CrateNum};
-use rustc_span::symbol::{Symbol, kw};
+use rustc_span::symbol::Symbol;
 use rustc_target::spec::abi::Abi;
 use rustc_hir::Unsafety;
+use rustc_trait_selection::traits::solve::Goal;
 
 use serde::{Serialize, ser::SerializeSeq};
 
@@ -27,12 +33,19 @@ use path::*;
 use term::*;
 use my_ty::*;
 
+/// Entry function to serialize anything from rustc.
+pub fn serialize_to_value<'tcx, T: Serialize + 'tcx>(
+    value: &T, infcx: &InferCtxt<'tcx>
+) -> Result<serde_json::Value, serde_json::Error> {
+    in_dynamic_ctx(infcx, || serde_json::to_value(&value))
+}
+
 // NOTE: setting the dynamic TCX should *only* happen
 // before calling the serialize function, it must guarantee
 // that the 'tcx lifetime is the same as that of the serialized item.
 fluid_let::fluid_let!{static INFCX: &'static InferCtxt<'static>}
 
-pub fn in_dynamic_ctx<'tcx, T>(infcx: &InferCtxt<'tcx>, f: impl FnOnce() -> T) -> T {
+fn in_dynamic_ctx<'tcx, T>(infcx: &InferCtxt<'tcx>, f: impl FnOnce() -> T) -> T {
     let infcx: &'static InferCtxt<'static> = unsafe { std::mem::transmute(infcx) };
     INFCX.set(infcx, f)
 }
@@ -58,6 +71,46 @@ macro_rules! serialize_custom_seq {
 
 pub(crate) use serialize_custom_seq;
 
+// -----------------------------------------------
+// Serializing types, you most likely (definitely)
+// don't want to look in this module.
+
+pub fn goal__predicate_def<'tcx, S>(value: &Goal<'tcx, Predicate<'tcx>>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer
+{
+    Goal__PredicateDef::from(value).serialize(s)
+}
+
+#[derive(Serialize)]
+pub struct Goal__PredicateDef<'tcx> {
+    #[serde(with = "PredicateDef")]
+    pub predicate: Predicate<'tcx>,
+    #[serde(with = "ParamEnvDef")]
+    pub param_env: ParamEnv<'tcx>,
+}
+
+impl<'tcx> From<&Goal<'tcx, Predicate<'tcx>>> for Goal__PredicateDef<'tcx> {
+    fn from(value: &Goal<'tcx, Predicate<'tcx>>) -> Self {
+        Goal__PredicateDef { 
+            predicate: value.predicate.clone(), 
+            param_env: value.param_env 
+        }
+    }
+}
+
+pub struct ParamEnvDef;
+impl ParamEnvDef {
+    pub fn serialize<'tcx, S>(value: &ParamEnv<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        struct Wrapper<'tcx>(#[serde(with = "ClauseDef")] Clause<'tcx>);
+        serialize_custom_seq! { Wrapper, s, value.caller_bounds() }
+    }
+}
+
 pub struct PredicateDef;
 impl PredicateDef {
     pub fn serialize<'tcx, S>(value: &Predicate<'tcx>, s: S) -> Result<S::Ok, S::Error>
@@ -68,6 +121,30 @@ impl PredicateDef {
         Binder__PredicateKind::from(&value.kind()).serialize(s)
     }
 }
+
+#[derive(Serialize)]
+pub struct Binder__ClauseKindDef;
+impl Binder__ClauseKindDef {
+    pub fn serialize<'tcx, S>(value: &Binder<'tcx, ClauseKind<'tcx>>, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        struct Wrapper<'tcx> {
+            #[serde(serialize_with = "vec__bound_variable_kind")]
+            pub bound_vars: Vec<BoundVariableKind>,
+            #[serde(serialize_with = "clause_kind__ty_ctxt")]
+            pub value: ir::ClauseKind<TyCtxt<'tcx>>,
+        }
+
+        Wrapper {
+            bound_vars: value.bound_vars().to_vec(),
+            value: value.skip_binder(),
+        }.serialize(s)
+    }
+}
+
+
 
 #[derive(Serialize)]
 pub struct Binder__PredicateKind<'tcx> {
@@ -167,6 +244,16 @@ pub enum ClosureKindDef {
     Fn,
     FnMut,
     FnOnce,
+}
+
+pub struct ClauseDef;
+impl ClauseDef {
+    fn serialize<'tcx, S>(value: &Clause<'_>, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        Binder__ClauseKindDef::serialize(&value.kind(), s)
+    }
 }
 
 fn clause_kind__ty_ctxt<'tcx, S>(value: &ir::ClauseKind<TyCtxt<'tcx>>, s: S) -> Result<S::Ok, S::Error>

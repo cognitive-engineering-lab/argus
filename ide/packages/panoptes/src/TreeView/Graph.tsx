@@ -7,6 +7,8 @@ import React, {
   MouseEventHandler,
   useCallback,
   useContext,
+  useLayoutEffect,
+  useRef,
   useState,
 } from "react";
 // @ts-ignore
@@ -15,7 +17,7 @@ import ReactDOM from "react-dom";
 
 import "./Graph.css";
 import { ActiveContext, TreeContext } from "./context";
-import { nodeContent } from "./utilities";
+import { NodeContent } from "./utilities";
 
 const useCenteredTree = (
   defaultTranslate = { x: 0, y: 0 }
@@ -70,8 +72,20 @@ const TreeNode = observer(
   }) => {
     const treeContext = useContext(TreeContext)!;
     const idx = nodeDatum.name as number;
-    const label = nodeContent(treeContext.nodes[idx]);
+    const node = treeContext.nodes[idx];
+    const label = node.data; // FIXME: bad
+
     const [width, height] = calculateTextSize(label);
+
+    // const ref = useRef<null | HTMLDivElement>(null);
+    // const [width, setWidth] = useState(0);
+    // const [height, setHeight] = useState(0);
+    // useLayoutEffect(() => {
+    //   if (ref != null && ref.current != null) {
+    //     setWidth(ref.current.clientWidth);
+    //     setHeight(ref.current.clientHeight);
+    //   }
+    // }, []);
 
     return (
       <g>
@@ -99,6 +113,12 @@ const TreeNode = observer(
         </text>
       </g>
     );
+
+    // <foreignObject x="50%" y="6%" width={width} height={height}>
+    //   <div ref={ref} data-xmlns="http://www.w3.org/1999/xhtml">
+    //     <NodeContent node={node} />
+    //   </div>
+    // </foreignObject>
   }
 );
 

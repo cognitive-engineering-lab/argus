@@ -6,7 +6,7 @@ import React, { PropsWithChildren, useContext, useState } from "react";
 import { IcoDot, IcoTriangleDown, IcoTriangleRight } from "../utilities/icons";
 import "./Directory.css";
 import { TreeContext } from "./context";
-import { nodeContent } from "./utilities";
+import { NodeContent } from "./utilities";
 
 export const DirNode = ({
   idx,
@@ -26,13 +26,13 @@ export const DirNode = ({
     setIsOpen(!isOpen);
   };
 
-  const content = nodeContent(node);
-
   return (
     <>
       <div className="DirNode" onClick={toggleCollapse}>
         {isOpen ? openIco : closedIco}
-        <span className="information">{content}</span>
+        <span className="information">
+          <NodeContent node={node} />
+        </span>
       </div>
       <div id="Collapsible" className={isOpen ? "" : "collapsed"}>
         {children}

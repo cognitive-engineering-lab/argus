@@ -1,6 +1,5 @@
 use std::{borrow::Cow, env, process::{exit, Command}, time::Instant, path::PathBuf};
 
-use rustc_data_structures::captures::Captures;
 use rustc_errors::Handler;
 use rustc_interface::interface::Result as RustcResult;
 use rustc_middle::ty::TyCtxt;
@@ -165,7 +164,8 @@ fn run<A: ArgusAnalysis, T: ToTarget>(
 
   info!("Starting rustc analysis...");
 
-  run_with_callbacks(args, &mut callbacks);
+  #[allow(unused_must_use)]
+  let _ = run_with_callbacks(args, &mut callbacks);
 
   Ok(callbacks.result)
 }
@@ -190,7 +190,7 @@ pub fn run_with_callbacks(
 
   // Argus works even when the compiler exits with an error.
   #[allow(unused_must_use)]
-  compiler.run().map_err(|_| ArgusError::BuildError { range: None });
+  let _ = compiler.run().map_err(|_| ArgusError::BuildError { range: None });
 
   Ok(())
 }

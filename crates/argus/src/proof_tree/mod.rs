@@ -8,13 +8,15 @@ use std::collections::HashSet;
 
 use index_vec::IndexVec;
 use rustc_infer::traits::FulfilledObligation;
-// use rustc_macros::RustcEncodable;
+use rustc_trait_selection::traits::solve::Goal;
 use rustc_middle::ty::Predicate;
 use rustc_utils::source_map::range::CharRange;
 
 pub use topology::*;
-use crate::ty::PredicateDef;
+use crate::ty::{PredicateDef, goal__predicate_def};
 
+// FIXME: TS bindings were removed as the automatic 
+// generation doesn't have a serde::remote-like feature.
 use ts_rs::TS;
 use serde::Serialize;
 
@@ -22,26 +24,29 @@ crate::define_usize_idx! {
   ProofNodeIdx
 }
 
-#[derive(TS, Serialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub enum Node {
+pub enum Node<'tcx> {
     Result { data: String },
-    Goal { data: String },
+    Goal { 
+      data: serde_json::Value,
+      #[serde(skip)]
+      _marker: std::marker::PhantomData<&'tcx ()>,
+    },
     Candidate { data: String },
 }
 
-#[derive(TS, Serialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct SerializedTree {
+pub struct SerializedTree<'tcx> {
     pub root: ProofNodeIdx,
-    pub nodes: IndexVec<ProofNodeIdx, Node>,
+    pub nodes: IndexVec<ProofNodeIdx, Node<'tcx>>,
     pub topology: TreeTopology<ProofNodeIdx>,
     pub error_leaves: Vec<ProofNodeIdx>,
     pub unnecessary_roots: HashSet<ProofNodeIdx>,
 }
 
 #[derive(Serialize, Clone, Debug)]
-// TS,
 #[serde(tag = "type")]
 pub struct Obligation<'tcx> {
   // #[ts(rename = "any")]
@@ -54,7 +59,7 @@ pub struct Obligation<'tcx> {
   pub kind: ObligationKind,
 }
 
-#[derive(TS, Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ObligationKind {
   Success,

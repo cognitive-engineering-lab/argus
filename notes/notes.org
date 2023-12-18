@@ -60,10 +60,24 @@ preprocess step to better match the compiler.
 
 
 ** ARGUS
-***** [ ] TODO filter root obligations that are extraneous.
+***** [ ] TODO support serialization A note on seri
+****** A note on serializing Node Goals
+Each goal needs to be serialized in its own context. This is stored in the
+~InsepctGoal~ struct, so that's not hard. However, I've been running into issues
+when serializing inference variables, and paths. For inference variables, it
+seems like I'm fudging something up. With a frequency between rarely and
+frequent, I get index out of bounds exceptions with the inference variables.
+Paths on the other hand have been a complete nightmare. I've opted for a more
+simplistic approach to generating the paths, but even that runs into issues!
+(See [[https://github.com/rust-lang/rust/pull/89738]] and related comments in the
+pretty file about infinite recursion when resolving the paths.) Not great. I
+think I need to talk to someone about this because it's been a /royal/ headache.
+(Oh, and aliases are going to be even more of a nightmare.)
+***** [X] TODO filter root obligations that are extraneous.
 - [ ] we discussed these as being obligations of the form ~_: TRAIT~ or ~(): TRAIT~.
 - [ ] but how does rustc pick the ambiguity error to talk about? (I have a loose
   idea; it's a good idea to try and nab Michael Goulet's attention.)
 
 ***** [ ] TODO test on the set of example programs, and a few others to try and catch possible bugs.
 ***** [ ] TODO tests???
+

@@ -44,16 +44,15 @@ pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<serde_jso
     };
 
     let obligations = fncx.get_obligations(local_def_id);
-    let json = crate::ty::in_dynamic_ctx(infcx, || {
-      serde_json::to_value(&obligations).expect("Could not serialize Obligations")
-    });
+    let json = crate::ty::serialize_to_value(&obligations, infcx)
+      .expect("Could not serialize Obligations");
     result = Ok(json);
   });
 
   result
 }
 
-pub fn tree<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<Option<SerializedTree>>
+pub fn tree<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<Option<serde_json::Value>>
 {
   OBLIGATION_TARGET.get(|target| {
     let target = target.unwrap();
@@ -64,6 +63,10 @@ pub fn tree<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<Option<Serialize
     let mut result = None;
 
     inspect_typeck(tcx, local_def_id, |fncx| {
+      let Some(infcx) = fncx.infcx() else {
+        return;
+      };
+
       let errors = fncx.get_fulfillment_errors(local_def_id);
       result = errors.iter().find_map(|(hash, error)| {
         if hash.as_u64() != target.data {
@@ -72,17 +75,18 @@ pub fn tree<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<Option<Serialize
 
         let goal =
           Goal { predicate: error.root_obligation.predicate, param_env: error.root_obligation.param_env };
-
-        serialize_tree(goal, fncx)
+        let serial_tree = serialize_tree(goal, fncx)?;
+        let value = crate::ty::serialize_to_value(&serial_tree, infcx)
+          .expect("Could not serialize Tree");
+        Some(value)
       })
     });
 
     Ok(result)
-
   })
 }
 
-fn serialize_tree<'tcx>(goal: Goal<'tcx, ty::Predicate<'tcx>>, fcx: &FnCtxt<'_, 'tcx>) -> Option<SerializedTree> {
+fn serialize_tree<'tcx>(goal: Goal<'tcx, ty::Predicate<'tcx>>, fcx: &FnCtxt<'_, 'tcx>) -> Option<SerializedTree<'tcx>> {
   let def_id = fcx.item_def_id();
   let infcx = fcx.infcx().expect("`FnCtxt` missing a `InferCtxt`.");
 

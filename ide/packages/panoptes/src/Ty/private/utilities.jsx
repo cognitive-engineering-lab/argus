@@ -20,3 +20,13 @@ export function takeRightUntil(arr, pred) {
   }
   return arr.slice(i, arr.length);
 }
+
+export function fnInputsAndOutput(args) {
+  let inputs = args[(0).args.length - 1];
+  let output = args[args.length - 1];
+  return [inputs, output];
+}
+
+export function tyIsUnit(o) {
+  return "Tuple" in o && o.Tuple.length === 0;
+}

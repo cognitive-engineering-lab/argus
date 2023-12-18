@@ -2,6 +2,7 @@ import React from "react";
 
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
+import { fnInputsAndOutput, intersperse, tyIsUnit } from "./utilities";
 
 export const PrintBinder = ({ binder, innerF }) => {
   return innerF(binder.value);
@@ -10,6 +11,27 @@ export const PrintBinder = ({ binder, innerF }) => {
 export const PrintTy = ({ o }) => {
   console.log("Printing Ty", o);
   return <PrintTyKind o={o} />;
+};
+
+export const PrintFnSig = ({ inputs, output, cVariadic }) => {
+  const doTy = (ty, i) => {
+    return <PrintTy o={ty} key={i} />;
+  };
+  const variadic = !cVariadic ? "" : args.length === 0 ? "..." : ", ...";
+  const ret = tyIsUnit(output) ? (
+    ""
+  ) : (
+    <span>
+      {" "}
+      {"->"} <PrintTy o={output} />
+    </span>
+  );
+  return (
+    <span>
+      ({intersperse(inputs, ", ", doTy)}
+      {variadic}){ret}
+    </span>
+  );
 };
 
 // TODO: enums that don't have an inner object need to use a
@@ -68,6 +90,27 @@ export const PrintTyKind = ({ o }) => {
   } else if ("FnDef" in o) {
     // FIXME: function definitions should also have a signature
     return <PrintDefPath o={o.FnDef} />;
+  } else if ("FnPtr" in o) {
+    const binderFnSig = o.FnPtr;
+
+    const inner = o => {
+      const unsafetyStr = o.unsafety === "Unsafe" ? "unsafe " : "";
+      // TODO: we could write the ABI here, or expose it at least.
+      const abi = o.abi === "Rust" ? "" : "extern ";
+      const [inputs, output] = fnInputsAndOutput(o.inputs_and_output);
+      return (
+        <span>
+          fn{" "}
+          <PrintFnSig
+            inputs={inputs}
+            output={output}
+            cVariadic={o.c_variadic}
+          />
+        </span>
+      );
+    };
+
+    return <PrintBinder binder={binderFnSig} innerF={inner} />;
   } else if ("Tuple" in o) {
     return (
       <span>

@@ -29,6 +29,7 @@ pub trait PredicateExt<'tcx> {
     fn is_unit_impl_trait(&self, tcx: &TyCtxt<'tcx>) -> bool;
     fn is_ty_impl_sized(&self, tcx: &TyCtxt<'tcx>) -> bool;
     fn is_ty_unknown(&self, tcx: &TyCtxt<'tcx>) -> bool;
+    fn is_trait_predicate(&self) -> bool;
     fn is_necessary(&self, tcx: &TyCtxt<'tcx>) -> bool;
 }
 
@@ -102,11 +103,17 @@ impl<'tcx> PredicateExt<'tcx> for ty::Predicate<'tcx> {
                  })
     }
 
+    fn is_trait_predicate(&self) -> bool {
+        matches!(self.kind().skip_binder(),
+                 ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)))
+    }
+
     fn is_necessary(&self, tcx: &TyCtxt<'tcx>) -> bool {
         // NOTE: predicates of the form `_: TRAIT` and `(): TRAIT` are useless. The first doesn't have
         // any information about the type of the Self var, and I've never understood why the latter
         // occurs so frequently.
-        !(self.is_unit_impl_trait(tcx) || self.is_ty_unknown(tcx) || self.is_ty_impl_sized(tcx))
+        self.is_trait_predicate() &&
+            !(self.is_unit_impl_trait(tcx) || self.is_ty_unknown(tcx) || self.is_ty_impl_sized(tcx))
     }
 }
 

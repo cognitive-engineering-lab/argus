@@ -3,6 +3,7 @@
     color: white;
     font-weight: bold;
     overflow-y: scroll;
+    padding: 1em;
 }
 
 .DefPathContainer {
@@ -10,7 +11,7 @@
     display: inline-block;
 }
 
-.DefPathContainer .DefPathShort {
+/* .DefPathContainer .DefPathShort {
     max-width: 250px;
     transition: max-width 1s ease-out;
 }
@@ -29,4 +30,4 @@
 .DefPathContainer:hover .DefPathShort {
     max-width: 0;
     display: none;
-}
+} */

@@ -68,12 +68,12 @@ pub enum TyKind__TyCtxt<'tcx> {
     Error,
     Foreign(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId),
     Closure(path::PathDefWithArgs<'tcx>),
+    FnPtr(#[serde(with = "PolyFnSigDef")] <TyCtxt<'tcx> as Interner>::PolyFnSig),
 
-    // TODO: FnPtr(#[serde(with = "PolyFnSigDef")] <TyCtxt<'tcx> as Interner>::PolyFnSig),
+    // Alias(#[serde(with = "AliasKindDef")] AliasKind, #[serde(with = "AliasTyDef")] <TyCtxt<'tcx> as Interner>::AliasTy),
     // TODO: Dynamic(#[serde(with = "BoundExistentialPredicatesDef")] <TyCtxt<'tcx> as Interner>::BoundExistentialPredicates, #[serde(with = "RegionDef")] <TyCtxt<'tcx> as Interner>::Region, #[serde(with = "DynKindDef")] DynKind),
     // TODO: Coroutine(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs, #[serde(with = "MovabilityDef")] Movability),
     // TODO: CoroutineWitness(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs),
-    // TODO: Alias(#[serde(with = "AliasKindDef")] AliasKind, #[serde(with = "AliasTyDef")] <TyCtxt<'tcx> as Interner>::AliasTy),
     // TODO: Param(#[serde(with = "ParamTyDef")] <TyCtxt<'tcx> as Interner>::ParamTy),
     // TODO: Bound(#[serde(skip)] DebruijnIndex, #[serde(with = "BoundTyDef")] <TyCtxt<'tcx> as Interner>::BoundTy),
 }
@@ -100,10 +100,9 @@ impl<'tcx> From<&ir::TyKind<TyCtxt<'tcx>>> for TyKind__TyCtxt<'tcx> {
             ir::TyKind::RawPtr(tam) => TyKind__TyCtxt::RawPtr(*tam),
             ir::TyKind::Foreign(d) => TyKind__TyCtxt::Foreign(*d),
             ir::TyKind::Closure(def_id, args) => TyKind__TyCtxt::Closure(path::PathDefWithArgs::new(*def_id, args)),
+            ir::TyKind::FnPtr(v) => TyKind__TyCtxt::FnPtr(v.clone()),
 
-            // TODO: ir::TyKind::Alias(..) => TyKind__TyCtxt::Alias(..),
-
-            // TODO: FnPtr(#[serde(with = "PolyFnSigDef")] <TyCtxt<'tcx> as Interner>::PolyFnSig),
+            // TODO: ir::TyKind::Alias(k, aty) => TyKind__TyCtxt::Alias(*k, *aty),
             // TODO: Dynamic(#[serde(with = "BoundExistentialPredicatesDef")] <TyCtxt<'tcx> as Interner>::BoundExistentialPredicates, #[serde(with = "RegionDef")] <TyCtxt<'tcx> as Interner>::Region, #[serde(with = "DynKindDef")] DynKind),
             // TODO: Coroutine(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs, #[serde(with = "MovabilityDef")] Movability),
             // TODO: CoroutineWitness(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs),
@@ -296,15 +295,25 @@ pub enum AliasKindDef {
     Weak,
 }
 
-#[derive(Serialize)]
-#[serde(remote = "AliasTy")]
-pub struct AliasTyDef<'tcx> {
-    #[serde(with = "GenericArgsDef")]
-    pub args: GenericArgsRef<'tcx>,
-    #[serde(with = "DefIdDef")]
-    pub def_id: DefId,
-    #[serde(skip)]
-    _use_alias_ty_new_instead: (),
+// #[derive(Serialize)]
+// #[serde(remote = "AliasTy")]
+// pub struct AliasTyDef<'tcx> {
+//     #[serde(with = "GenericArgsDef")]
+//     pub args: GenericArgsRef<'tcx>,
+//     #[serde(with = "DefIdDef")]
+//     pub def_id: DefId,
+//     #[serde(skip)]
+//     _use_alias_ty_new_instead: (),
+// }
+
+pub struct AliasTyDef;
+impl AliasTyDef {
+    pub fn serialize<'tcx, S>(value: &AliasTy<'tcx>, s: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            path::PathDefWithArgs::new(value.def_id, value.args).serialize(s)
+        }
 }
 
 #[derive(Serialize)]
@@ -511,6 +520,9 @@ impl InferTyDef {
     }
 }
 
+// TODO:  when I don't know what to do, I just return "Unresolved", this 
+// should correspond to some '_' character in the frontend. I'm certainly 
+// doing something wrong with the inference variables, but I don't know what (yet).
 pub struct TyVidDef;
 impl TyVidDef {
     pub fn serialize<'a, 'tcx: 'a, S>(value: &TyVid, s: S) -> Result<S::Ok, S::Error>
@@ -523,7 +535,7 @@ impl TyVidDef {
         let Ok(ty) =  infcx.probe_ty_var(ty_vid) else {
             // If the type variable isn't resolved, what to do?
             log::debug!("ERROR UniverseIdx probe_ty_var {ty_vid:?}");
-            todo!();
+            return "Unresolved".serialize(s);
         };
 
         let Some(var_origin) = infcx.type_var_origin(ty) else {
@@ -541,12 +553,12 @@ impl TyVidDef {
             let idx = generics.param_def_id_to_index(infcx.tcx, def_id).unwrap();
             let generic_param_def = generics.param_at(idx as usize, infcx.tcx);
             if let ty::GenericParamDefKind::Type { synthetic: true, .. } = generic_param_def.kind {
-                "TODO".serialize(s)
+                "Unresolved".serialize(s)
             } else {
                 SymbolDef::serialize(&name, s)
             }
         } else {
-            "TODO".serialize(s)
+            "Unresolved".serialize(s)
         }
     }
 }

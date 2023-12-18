@@ -22,20 +22,21 @@ use serde::Serialize;
 use index_vec::IndexVec;
 
 
+use crate::ty::{goal__predicate_def};
 use ext::*;
 use super::*;
 
-pub struct SerializedTreeVisitor {
+pub struct SerializedTreeVisitor<'tcx> {
     pub def_id: DefId,
     pub root: Option<ProofNodeIdx>,
     pub previous: Option<ProofNodeIdx>,
-    pub nodes: IndexVec<ProofNodeIdx, Node>,
+    pub nodes: IndexVec<ProofNodeIdx, Node<'tcx>>,
     pub topology: TreeTopology<ProofNodeIdx>,
     pub error_leaves: Vec<ProofNodeIdx>,
     pub unnecessary_roots: HashSet<ProofNodeIdx>,
 }
 
-impl SerializedTreeVisitor {
+impl<'tcx> SerializedTreeVisitor<'tcx> {
     pub fn new(def_id: DefId) -> Self {
         SerializedTreeVisitor {
             def_id,
@@ -48,7 +49,7 @@ impl SerializedTreeVisitor {
         }
     }
 
-    pub fn into_tree(self) -> Option<SerializedTree> {
+    pub fn into_tree(self) -> Option<SerializedTree<'tcx>> {
         let SerializedTreeVisitor {
             root: Some(root),
             nodes,
@@ -70,16 +71,29 @@ impl SerializedTreeVisitor {
     }
 }
 
-impl SerializedTreeVisitor {}
-
-impl Node {
-    fn from_goal(goal: &InspectGoal, def_id: DefId) -> Self {
+impl<'tcx> Node<'tcx> {
+    fn from_goal(goal: &InspectGoal<'_, 'tcx>, def_id: DefId) -> Self {
         let infcx = goal.infcx();
-        let data = goal.goal().predicate.pretty(infcx, def_id);
-        Node::Goal { data }
+        let string = goal.goal().predicate.pretty(infcx, def_id);
+
+        // #[derive(Serialize)]
+        // struct Wrapper<'tcx>(
+        //     #[serde(serialize_with = "goal__predicate_def")] 
+        //     Goal<'tcx, Predicate<'tcx>>
+        // );
+        // let w = &Wrapper(goal.goal());
+        // let v = crate::ty::serialize_to_value(w, goal.infcx())
+        //     .expect("failed to serialize goal");
+        let v = crate::ty::serialize_to_value(&string, goal.infcx())
+            .expect("failed to serialize goal");
+
+        Node::Goal { 
+            data: v,
+            _marker: std::marker::PhantomData,
+        }
     }
 
-    fn from_candidate(candidate: &InspectCandidate, def_id: DefId) -> Self {
+    fn from_candidate(candidate: &InspectCandidate<'_, 'tcx>, def_id: DefId) -> Self {
         let infcx = candidate.infcx();
         let data = candidate.pretty(infcx, def_id);
         Node::Candidate { data }
@@ -90,12 +104,12 @@ impl Node {
     }
 }
 
-impl ProofTreeVisitor<'_> for SerializedTreeVisitor {
+impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
     type BreakTy = !;
 
     fn visit_goal(
         &mut self,
-        goal: &InspectGoal<'_, '_>
+        goal: &InspectGoal<'_, 'tcx>
     ) -> ControlFlow<Self::BreakTy> {
         let infcx = goal.infcx();
 
@@ -110,6 +124,8 @@ impl ProofTreeVisitor<'_> for SerializedTreeVisitor {
         let here_node = Node::from_goal(goal, self.def_id);
 
         let here_idx = self.nodes.push(here_node.clone());
+
+        log::debug!("Inserted goal: {:#?}", goal.goal());
 
         if self.root.is_none() {
             self.root = Some(here_idx);
@@ -154,7 +170,7 @@ impl ProofTreeVisitor<'_> for SerializedTreeVisitor {
     }
 }
 
-pub fn serialize_proof_tree<'tcx>(goal: Goal<'tcx, Predicate<'tcx>>, infcx: &InferCtxt<'tcx>, def_id: DefId) -> Option<SerializedTree> {
+pub fn serialize_proof_tree<'tcx>(goal: Goal<'tcx, Predicate<'tcx>>, infcx: &InferCtxt<'tcx>, def_id: DefId) -> Option<SerializedTree<'tcx>> {
     infcx.probe(|_| {
       let mut visitor = SerializedTreeVisitor::new(def_id);
       infcx.visit_proof_tree(goal, &mut visitor);

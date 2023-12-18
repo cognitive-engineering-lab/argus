@@ -1,8 +1,47 @@
 import _ from "lodash";
-import React from "react";
+import React, { useState } from "react";
 
 import { PrintGenericArg, PrintTy } from "./ty";
 import { intersperse, takeRightUntil } from "./utilities";
+
+const Tooltip = ({ text, children }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const handleMouseEnter = () => {
+    setShowTooltip(true);
+  };
+  const handleMouseLeave = () => {
+    setShowTooltip(false);
+  };
+
+  return (
+    <div style={{ position: "relative", display: "inline-block" }}>
+      <div
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        style={{ display: "inline-block" }}
+      >
+        {children}
+      </div>
+      {showTooltip && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: "100%",
+            left: "50%",
+            transform: "translateX(-50%)",
+            backgroundColor: "rgba(0, 0, 0, 0.6)",
+            color: "#fff",
+            padding: "4px 8px",
+            borderRadius: "4px",
+            zIndex: 9999,
+          }}
+        >
+          {text}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // NOTE: when we aren't hovering over the path, we just
 // want to show the last segment. On hover, it should be the fully
@@ -14,12 +53,17 @@ export const PrintDefPath = ({ o }) => {
 
   return (
     <div className="DefPathContainer">
-      <span className="DefPathShort">
-        <PrintDefPathShort o={o} />
-      </span>
-      <span className="DefPathFull">
-        <PrintDefPathFull o={o} />
-      </span>
+      <Tooltip
+        text={
+          <span className="DefPathFull">
+            <PrintDefPathFull o={o} />
+          </span>
+        }
+      >
+        <span className="DefPathShort">
+          <PrintDefPathShort o={o} />
+        </span>
+      </Tooltip>
     </div>
   );
 };
