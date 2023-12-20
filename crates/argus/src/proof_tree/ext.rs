@@ -6,7 +6,7 @@ use rustc_middle::query::Providers;
 use rustc_middle::traits::util::supertraits_for_pretty_printing;
 use rustc_middle::ty::{
     self, ConstInt, ParamConst, ScalarInt, Term, TermKind, Ty, TyCtxt, TypeFoldable,
-    TypeSuperFoldable, TypeSuperVisitable, TypeVisitable, TypeVisitableExt,
+    TypeSuperFoldable, TypeSuperVisitable, TypeVisitable, TypeFolder, TypeVisitableExt,
 };
 use rustc_middle::ty::{GenericArg, GenericArgKind};
 use rustc_hir::def::{self, CtorKind, DefKind, Namespace};
@@ -21,8 +21,8 @@ use rustc_trait_selection::traits::solve::{Certainty, MaybeCause};
 use rustc_trait_selection::traits::query::NoSolution;
 use rustc_trait_selection::traits::solve::{inspect::ProbeKind, CandidateSource};
 
-pub trait StableHash<'__ctx>: HashStable<StableHashingContext<'__ctx>> {
-    fn stable_hash(&self, ctx: &mut StableHashingContext<'__ctx>) -> Hash64;
+pub trait StableHash<'__ctx, 'tcx>: HashStable<StableHashingContext<'__ctx>> {
+    fn stable_hash(self, infcx: &InferCtxt<'tcx>, ctx: &mut StableHashingContext<'__ctx>) -> Hash64;
 }
 
 pub trait PredicateExt<'tcx> {
@@ -33,8 +33,8 @@ pub trait PredicateExt<'tcx> {
     fn is_necessary(&self, tcx: &TyCtxt<'tcx>) -> bool;
 }
 
-pub trait FulfillmentErrorExt {
-    fn stable_hash(&self, ctx: &mut StableHashingContext) -> Hash64;
+pub trait FulfillmentErrorExt<'tcx> {
+    fn stable_hash(&self, infcx: &InferCtxt<'tcx>, ctx: &mut StableHashingContext) -> Hash64;
 }
 
 /// Pretty printing for things that can already be printed.
@@ -64,19 +64,26 @@ pub trait CandidateExt {
 // -----------------------------------------------
 // Impls
 
-impl<'__ctx, T: HashStable<StableHashingContext<'__ctx>>> StableHash<'__ctx> for T {
-    fn stable_hash(&self, ctx: &mut StableHashingContext<'__ctx>) -> Hash64 {
+impl<'__ctx, 'tcx, T> StableHash<'__ctx, 'tcx> for T 
+where
+    T: HashStable<StableHashingContext<'__ctx>>,
+    T: TypeFoldable<TyCtxt<'tcx>>,
+{
+    fn stable_hash(self, infcx: &InferCtxt<'tcx>, ctx: &mut StableHashingContext<'__ctx>) -> Hash64 {
         let mut h = StableHasher::new();
-        self.hash_stable(ctx, &mut h);
+        let sans_regions = infcx.tcx.erase_regions(self);
+        let this = sans_regions.fold_with(&mut TyVarEraserVisitor { infcx, });
+        // erase infer vars
+        this.hash_stable(ctx, &mut h);
         h.finish()
     }
 }
 
-impl FulfillmentErrorExt for FulfillmentError<'_> {
-    fn stable_hash(&self, ctx: &mut StableHashingContext) -> Hash64 {
+impl<'tcx> FulfillmentErrorExt<'tcx> for FulfillmentError<'tcx> {
+    fn stable_hash(&self, infcx: &InferCtxt<'tcx>, ctx: &mut StableHashingContext) -> Hash64 {
         // FIXME: should we be using the root_obligation here?
         // The issue is that type variables cannot use hash_stable.
-        self.obligation.predicate.stable_hash(ctx)
+        self.obligation.predicate.stable_hash(infcx, ctx)
     }
 }
 
@@ -192,5 +199,50 @@ fn guess_def_namespace(tcx: TyCtxt<'_>, def_id: DefId) -> Namespace {
         DefPathData::MacroNs(..) => Namespace::MacroNS,
 
         _ => Namespace::TypeNS,
+    }
+}
+
+struct TyVarEraserVisitor<'a, 'tcx: 'a> {
+    infcx: &'a InferCtxt<'tcx>,
+}
+
+impl<'a, 'tcx: 'a> TyVarEraserVisitor<'a, 'tcx> {
+    fn ty_placeholder(&self) -> Ty<'tcx> {
+        Ty::new_placeholder(
+            self.infcx.tcx, 
+            ty::PlaceholderType {
+                universe: self.infcx.universe(),
+                bound: ty::BoundTy {
+                    var: ty::BoundVar::MAX,
+                    kind: ty::BoundTyKind::Anon,
+                }
+            }
+        )
+    }
+}
+
+impl<'tcx> TypeFolder<TyCtxt<'tcx>> for TyVarEraserVisitor<'_, 'tcx> {
+    fn interner(&self) -> TyCtxt<'tcx> {
+        self.infcx.tcx
+    }
+
+    fn fold_ty(&mut self, ty: Ty<'tcx>) -> Ty<'tcx> {
+        match ty.kind() {
+            ty::Infer(ty::TyVar(_)) => {
+                // HACK: I'm not sure if replacing type variables with 
+                // an anonymous placeholder is the best idea. It is *an* 
+                // idea, certainly.
+                self.ty_placeholder()
+            },
+            _ => ty.super_fold_with(self),
+        }
+    }
+
+    fn fold_binder<T>(&mut self, t: ty::Binder<'tcx, T>) -> ty::Binder<'tcx, T>
+    where
+        T: TypeFoldable<TyCtxt<'tcx>>,
+    {
+        let u = self.infcx.tcx.anonymize_bound_vars(t);
+        u.super_fold_with(self)
     }
 }

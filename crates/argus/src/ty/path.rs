@@ -66,10 +66,6 @@ enum PathSegment<'tcx> {
     Colons,     // ::
     LocalCrate, // crate
     RawGuess,   // r#
-    // Symbol {
-    //     #[serde(with = "SymbolDef")]
-    //     name: Symbol,
-    // },
     DefPathDataName {
         #[serde(with = "SymbolDef")]
         name: Symbol,
@@ -90,18 +86,20 @@ enum PathSegment<'tcx> {
         entries: Vec<serde_json::Value>,
         kind: CommaSeparatedKind,
     }, // ..., ..., ...
-    ImplFor { // <impl `PATH` for `Ty`>
+    Impl {
         #[serde(skip_serializing_if = "Option::is_none")]
         path: Option<TraitRefPrintOnlyTraitPathDefWrapper<'tcx>>,
         #[serde(with = "TyDef")]
         ty: Ty<'tcx>,
+        kind: ImplKind,
     },
-    ImplAs { // <`Ty` as `PATH`>
-        #[serde(skip_serializing_if = "Option::is_none")]
-        path: Option<TraitRefPrintOnlyTraitPathDefWrapper<'tcx>>,
-        #[serde(with = "TyDef")]
-        ty: Ty<'tcx>,
-    },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ImplKind {
+    As,
+    For,
 }
 
 struct PathBuilder<'a, 'tcx: 'a, S: serde::Serializer> {
@@ -119,6 +117,14 @@ pub enum CommaSeparatedKind {
 }
 
 impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
+    // Used for values instead of definition paths, rustc handles them the same.
+    pub fn value_path(def_id: DefId, args: &'tcx [GenericArg<'tcx>], s: S) -> Result<S::Ok, S::Error> 
+    where
+        S: serde::Serializer,
+    {
+        Self::def_path(def_id, args, s)
+    }
+
     pub fn def_path(def_id: DefId, args: &'tcx [GenericArg<'tcx>], s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -131,7 +137,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
             segments: Vec::new(),
             _marker: std::marker::PhantomData::<S>,
         };
-        builder.default_def_path(def_id, args);
+        builder.compile_def_path(def_id, args);
         builder.serialize(s)
     }
 
@@ -143,9 +149,40 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
         self.segments.serialize(s)
     }
 
+    fn try_trimmed_def_path(&mut self, def_id: DefId) -> bool {
+        false
+    }
+
+    fn try_visible_def_path(&mut self, def_id: DefId) -> bool {
+        false
+    }
+
+    // Equivalent to rustc_middle::ty::print::pretty::def_path
+    // This entry point handles the other grueling cases and handling overflow, 
+    // which apparently is a thing in pretty printing! (see issues #55779 and #87932).
+    // Equivalent to [rustc_middle::ty::print::pretty::print_def_path].
+    fn compile_def_path(&mut self, def_id: DefId, args: &'tcx [GenericArg<'tcx>]) {
+        if args.is_empty() {
+            if self.try_trimmed_def_path(def_id) {
+                return;
+            }
+
+            if self.try_visible_def_path(def_id) {
+                return;
+            }
+        }
+
+        // TODO(gavinleroy): rustc does some additional stuff to handle Impl paths,
+        // but to my understanding this should only be needed earlier in the compiler
+        // pipeline, and isn't necessary for our purposes.
+
+        self.default_def_path(def_id, args)
+    }
+
+    // Equivalent to rustc_middle::ty::print::default_def_path
     fn default_def_path(&mut self, def_id: DefId, args: &'tcx [GenericArg<'tcx>]) {
         let key = self.tcx().def_key(def_id);
-        log::debug!("{:?}", key);
+        log::debug!("DefId {:?} Args {:?} key {:?}", def_id, args, key);
 
         match key.disambiguated_data.data {
             DefPathData::CrateRoot => {
@@ -178,6 +215,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
                 let mut parent_args = args;
                 let mut trait_qualify_parent = false;
                 if !args.is_empty() {
+                    log::debug!("Default, with args {:?}", args);
                     let generics = self.tcx().generics_of(def_id);
                     parent_args = &args[..generics.parent_count.min(args.len())];
 
@@ -210,6 +248,8 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
                         && self.tcx().generics_of(parent_def_id).parent_count == 0;
                 }
 
+                log::debug!("Trait qualify parent {:?}", trait_qualify_parent);
+
                 self.path_append(
                     |cx: &mut Self| {
                         if trait_qualify_parent {
@@ -230,6 +270,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
     }
 
     fn path_crate(&mut self, cnum: CrateNum) {
+        log::debug!("Path crate {:?}", cnum);
         if cnum == LOCAL_CRATE {
             self.segments.push(PathSegment::LocalCrate)
         } else {
@@ -362,9 +403,10 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
 
         self.generic_delimiters(|cx| {
             define_scoped_cx!(cx);
-            cx.segments.push(PathSegment::ImplFor { 
+            cx.segments.push(PathSegment::Impl { 
                 path: trait_ref.map(|t| TraitRefPrintOnlyTraitPathDefWrapper(t)),
                 ty: self_ty,
+                kind: ImplKind::For,
             });
         })
     }
@@ -435,9 +477,10 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
 
         self.generic_delimiters(|cx| {
             define_scoped_cx!(cx);
-            cx.segments.push(PathSegment::ImplAs { 
+            cx.segments.push(PathSegment::Impl { 
                 path: trait_ref.map(|t| TraitRefPrintOnlyTraitPathDefWrapper(t)),
                 ty: self_ty,
+                kind: ImplKind::As,
             });
         })
     }

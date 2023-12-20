@@ -156,44 +156,56 @@ export const PrintPathSegment = ({ o }) => {
       console.log("CommaSeparated", o);
       return <>{intersperse(o.entries, ", ", doInner)}</>;
     }
-    case "implFor": {
-      const path =
-        o.path === undefined ? (
-          ""
-        ) : (
-          <span>
-            <PrintDefPathFull o={o.path} />
-            for
-          </span>
-        );
-      return (
-        <span>
-          impl {path} <PrintTy o={o.ty} />
-        </span>
-      );
-    }
-    case "implAs": {
-      const path =
-        o.path === undefined ? (
-          ""
-        ) : (
-          <span>
-            as
-            <PrintDefPathFull o={o.path} />
-          </span>
-        );
-      return (
-        <span>
-          <PrintTy o={o.ty} />
-          {path}
-        </span>
-      );
+    case "impl": {
+      if (o.kind === "for") {
+        return <PrintImplFor o={o} />;
+      } else if (o.kind === "as") {
+        return <PrintImplAs o={o} />;
+      } else {
+        throw new Error("Unknown impl kind", o);
+      }
     }
   }
 };
 
+// <impl PATH for TY>
+export const PrintImplFor = ({ o }) => {
+  const path =
+    o.path === undefined ? (
+      ""
+    ) : (
+      <span>
+        <PrintDefPathFull o={o.path} />
+        for
+      </span>
+    );
+  return (
+    <span>
+      impl {path} <PrintTy o={o.ty} />
+    </span>
+  );
+};
+
+// <TY as PATH>
+export const PrintImplAs = ({ o }) => {
+  const path =
+    o.path === undefined ? (
+      ""
+    ) : (
+      <span>
+        as
+        <PrintDefPathFull o={o.path} />
+      </span>
+    );
+  return (
+    <span>
+      <PrintTy o={o.ty} />
+      {path}
+    </span>
+  );
+};
+
 export const PrintDefPathData = ({ o }) => {
-  // TODO: see how they actually do it in rustc
   if ("CrateRoot" in o) {
     return "crate";
   } else if ("Impl" in o) {

@@ -49,7 +49,7 @@ export const NodeContent = ({ node }: { node: Node }) => {
     case "result":
       return node.data;
     case "goal":
-      // FIXME: return <PrintGoalPredicate o={node.data} />;
+      // return <PrintGoalPredicate o={node.data} />;
       return node.data;
     case "candidate":
       return node.data;

@@ -73,17 +73,17 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
 
 impl<'tcx> Node<'tcx> {
     fn from_goal(goal: &InspectGoal<'_, 'tcx>, def_id: DefId) -> Self {
-        let infcx = goal.infcx();
-        let string = goal.goal().predicate.pretty(infcx, def_id);
-
         // #[derive(Serialize)]
         // struct Wrapper<'tcx>(
         //     #[serde(serialize_with = "goal__predicate_def")] 
         //     Goal<'tcx, Predicate<'tcx>>
         // );
+        let infcx = goal.infcx();
         // let w = &Wrapper(goal.goal());
         // let v = crate::ty::serialize_to_value(w, goal.infcx())
         //     .expect("failed to serialize goal");
+
+        let string = goal.goal().predicate.pretty(infcx, def_id);
         let v = crate::ty::serialize_to_value(&string, goal.infcx())
             .expect("failed to serialize goal");
 

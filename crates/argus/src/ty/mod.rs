@@ -344,6 +344,7 @@ impl TraitRefPrintOnlyTraitPathDef {
     where
         S: serde::Serializer,
     {
+        log::debug!("Serializing trait ref {:#?}", value);
         path::PathDefWithArgs::new(value.def_id, value.args).serialize(s)
     }
 }

@@ -182,14 +182,14 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
 
   fn get_fulfillment_errors(&self, ldef_id: LocalDefId) -> Vec<FulfillmentData<'tcx>> {
     let errors = self.fulfillment_errors.borrow();
-
     let result = errors.iter().map(Clone::clone).collect::<Vec<_>>();
+    let infcx = self.infcx().unwrap();
 
     let return_with_hashes = |v: Vec<FulfillmentError<'tcx>>| {
       self.tcx().with_stable_hashing_context(|mut hcx| {
         v
           .into_iter()
-          .map(|e| (e.stable_hash(&mut hcx), e))
+          .map(|e| (e.stable_hash(infcx, &mut hcx), e))
           .unique_by(|(h, _)| *h)
           .collect::<Vec<_>>()
       })

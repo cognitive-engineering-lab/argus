@@ -9,10 +9,10 @@ import React from "react";
 import ReactJson from "react-json-view";
 
 import BottomUp from "./BottomUp";
+import { ActiveContext, ActiveState, TreeContext } from "./Context";
 import TreeArea from "./Graph";
 import TopDown from "./TopDown";
 import "./TreeApp.css";
-import { ActiveContext, ActiveState, TreeContext } from "./context";
 
 // TODO: don't really need this.
 type UnderlyingTree = SerializedTree[];

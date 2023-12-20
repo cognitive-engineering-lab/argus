@@ -4,8 +4,8 @@ import _ from "lodash";
 import React, { PropsWithChildren, useContext, useState } from "react";
 
 import { IcoDot, IcoTriangleDown, IcoTriangleRight } from "../utilities/icons";
+import { TreeContext } from "./Context";
 import "./Directory.css";
-import { TreeContext } from "./context";
 import { NodeContent } from "./utilities";
 
 export const DirNode = ({
