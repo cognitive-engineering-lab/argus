@@ -1,11 +1,18 @@
 .App {
-    width: 100vw;
-    height: 100vh;
-    display: grid;
-    /* grid-template-areas: 
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  /* grid-template-areas: 
       "tree-interact tree-interact node-info"
       "tree-interact tree-interact edge-info"; */
+  grid-template-areas:
+    "tree-interact";
+}
 
-    grid-template-areas: 
-      "tree-interact";
-  }
+.Error {
+  background: #FF6961;
+  color: white;
+  font-weight: bold;
+  overflow-y: scroll;
+  padding: 1em;
+}

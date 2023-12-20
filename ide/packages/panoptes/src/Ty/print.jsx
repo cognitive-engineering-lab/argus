@@ -27,7 +27,7 @@ const FallbackFromError = ({ error, resetErrorBoundary }) => {
   // NOTE: Call resetErrorBoundary() to reset the error boundary and retry the render.
   return (
     <div className="PrintError">
-      <p>Something went wrong:</p>
+      <p>Whoops! Something went wrong:</p>
       <pre>{error.message}</pre>
     </div>
   );

@@ -27,6 +27,19 @@ let TreeApp = ({ tree }: { tree: UnderlyingTree }) => {
   console.log("Initial data", tree);
   let attempt = getAttempt(tree);
 
+  if (attempt === null || attempt === undefined) {
+    // FIXME: this shouldn't ever happen, if a properly hashed
+    // value is returned. I need to think more about how to handle
+    // when we want to display "non-traditional" obligations. (subtypes,
+    // normalization, etc.)
+    return (
+      <div className="Error">
+        <p>Whoops! Something went wrong:</p>
+        <pre>No debug information found.</pre>
+      </div>
+    );
+  }
+
   let tabs: [string, React.ReactNode][] = [
     ["Graph", <TreeArea tree={attempt} />],
     ["TopDown", <TopDown tree={attempt} />],

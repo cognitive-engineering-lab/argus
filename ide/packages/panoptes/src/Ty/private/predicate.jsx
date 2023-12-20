@@ -25,18 +25,18 @@ export const PrintPredicateKind = ({ o }) => {
       </span>
     );
   } else if ("Subtype" in o) {
-    const o = o.Subtype;
+    const subty = o.Subtype;
     const st = "<:";
     return (
       <span>
-        <PrintTy o={o.a} /> {st} <PrintTy o={o.b} />
+        <PrintTy o={subty.a} /> {st} <PrintTy o={subty.b} />
       </span>
     );
   } else if ("Coerce" in o) {
-    const o = o.Coerce;
+    const coerce = o.Coerce;
     return (
       <span>
-        <PrintTy o={o.a} /> → <PrintTy o={o.b} />
+        <PrintTy o={coerce.a} /> → <PrintTy o={coerce.b} />
       </span>
     );
   } else if ("ConstEquate" in o) {
@@ -75,24 +75,24 @@ export const PrintClauseKind = ({ o }) => {
   if ("Trait" in o) {
     return <PrintTraitPredicate o={o.Trait} />;
   } else if ("RegionOutlives" in o) {
-    const o = o.RegionOutlives;
+    const ro = o.RegionOutlives;
     return (
       <span>
-        <PrintRegion o={o.a} />: <PrintRegion o={o.b} />
+        <PrintRegion o={ro.a} />: <PrintRegion o={ro.b} />
       </span>
     );
   } else if ("TypeOutlives" in o) {
-    const o = o.TypeOutlives;
+    const to = o.TypeOutlives;
     return (
       <span>
-        <PrintTy o={o.a} />: <PrintRegion o={o.b} />
+        <PrintTy o={to.a} />: <PrintRegion o={to.b} />
       </span>
     );
   } else if ("Projection" in o) {
-    const o = o.Projection;
+    const proj = o.Projection;
     return (
       <span>
-        <PrintAliasTy o={o.projection_ty} /> == <PrintTerm o={o.term} />
+        <PrintAliasTy o={proj.projection_ty} /> == <PrintTerm o={proj.term} />
       </span>
     );
   } else if ("ConstArgHasType" in o) {

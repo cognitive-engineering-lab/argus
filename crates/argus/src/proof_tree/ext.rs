@@ -83,7 +83,7 @@ impl<'tcx> FulfillmentErrorExt<'tcx> for FulfillmentError<'tcx> {
     fn stable_hash(&self, infcx: &InferCtxt<'tcx>, ctx: &mut StableHashingContext) -> Hash64 {
         // FIXME: should we be using the root_obligation here?
         // The issue is that type variables cannot use hash_stable.
-        self.obligation.predicate.stable_hash(infcx, ctx)
+        self.root_obligation.predicate.stable_hash(infcx, ctx)
     }
 }
 
@@ -228,10 +228,12 @@ impl<'tcx> TypeFolder<TyCtxt<'tcx>> for TyVarEraserVisitor<'_, 'tcx> {
 
     fn fold_ty(&mut self, ty: Ty<'tcx>) -> Ty<'tcx> {
         match ty.kind() {
-            ty::Infer(ty::TyVar(_)) => {
+            ty::Infer(ty::TyVar(_))
+            | ty::Infer(ty::IntVar(_))
+            | ty::Infer(ty::FloatVar(_)) => {
                 // HACK: I'm not sure if replacing type variables with 
                 // an anonymous placeholder is the best idea. It is *an* 
-                // idea, certainly.
+                // idea, certainly. But this should only happen before hashing.
                 self.ty_placeholder()
             },
             _ => ty.super_fold_with(self),
