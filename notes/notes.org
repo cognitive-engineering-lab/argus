@@ -2,7 +2,222 @@
 #+author: Gavin Gray
 
 * Ad-hoc Polymorphism at large
+
+** Scala2 (implicits)
+Most of this information is gleaned from the paper "Scala Implicits are
+Everywhere" [[https://arxiv.org/pdf/1908.07883.pdf]]
+
+There are really two separate mechanisms at play for /implicits/, each achieves
+something different but together they are a menace.
+
+*** Implicit conversions
+Conversions are defined as an implicit function or class (or value of function
+type) and the compiler will search for implicit conversions to make the program type-check.
+
+#+begin_src scala
+// paper pg 4.
+case class Duration(time: Long, unit: TimeUnit) {
+  def +(o: Duration) = Duration(time + unit.convert(o.time, o.unit), unit)
+}
+
+implicit class Int2Duration(that: Int) {
+  def seconds = new Duration(that, SECONDS); def minutes = new Duration(that, MINUTES)
+}
+
+5.seconds + 2.minutes // Duration(125L, SECONDS )
+#+end_src
+
+As shown above, implicit conversion are important for Scala DSLs.
+
+*** Implicit parameters
+Implicit parameters are filled in automatically by the compiler at the call site
+if there is an available implicit value. The name of the value is important, and
+thus introduces all the typicaly problems with variable naming (shadowing, etc).
+
+
+*** Important idioms
+- Late Trait Implementation, because classes are nominally typed, in order to
+  extend a class with a new trait a wrapper needs to be used. An implicit
+  conversion is then added when a specific  trait bound is required (but was
+  originally not declared).
+
+- Extension methods, adding methods to an existing class.
+
+- Type Classes, probably the most important use:
+
+#+begin_src scala
+trait Show[T] {
+  def show(x: T): String
+}
+
+def show[T](x: T)(implicit ev: Show[T]) = ev.show(x)
+
+// struct Shape
+case class Shape(n: Int)
+
+// impl Show for Shape { ... }
+implicit object shapeShow extends Show[Shape] {
+  def show(x: Shape) = x.n match {
+    case 3 => "a triangle";
+    case 4 => "a square"
+    case _ => "a shape with $n sides"
+  }
+}
+
+// impl<T: Show> Show for List<T> { ... }
+implicit def listShow[T](implicit ev: Show[T]) = new Show[List[T]] {
+  def show(x: List[T]) = x.map(x => ev.show(x)).mkString("a list of [", ", ", "]")
+}
+
+// Syntax extension, allowing one to write x.show instead of show(x)
+// this is more Scala specific and bridges the OO-class and functional-typeclass world.
+implicit class ShowOps[T](x: T)(implicit s: Show[T]) { def show = s.show(x) }
+#+end_src
+
+- Type Proofs,
+  #src_scala{class List[A] { def flatten[B](implicit ev: A => List[B]): List[B]
+  }} a type proof generator can be written #src_scala{implicit def isEq[A]: A=>A
+  = new =>[A,A]{}} which ensures that ~List(List(1)).flatten = List(1)~ but
+  ~List(1).flatten~ results in the error /No implicit view available from ~Int => List[B]~.
+
+- Contexts, threading a context through the environment can be done implicitly.
+  E.g., in Rust instead of requiring a ~TyCtxt~ parameter, it could be declared
+  implicitly and the compiler will pass it around automatically. This isn't
+  /directly/ used in Rust, however, async Rust /does/ desugar into a use of Traits
+  which achieves a similar result as threaded Scala code.
+
+Some of the problems with implicits are seen in Rust, I'll lay these out later.
+But some things are unique. But there are differences.
+
+- Conversion, proof generators, typeclass witnesses, all can be /named/. This is
+  different from Rust, where impl blocks are all anonymous. They can be imported
+  by name, however, in Rust when a Trait gets imported /all/ of the implementors
+  are imported.
+
+- Conversions are implicit in Scala where they would be explicit in Rust. For
+  example, in Rust you would /at least/ need a call to ~.into()~ to make a
+  conversion, but in Scala the compiler can insert these silently.
+
+** Scala3 (givens)
+
+** Swift (protocols)
+
+** Rust (traits)
+- All impl blocks are anonymous, this means you get them all or none (with no
+  trait import). This is in contrast to Scala implicits and givens, which can be
+  named and imported named.
+
+In the implicits paper, the authors identify that the implicit search is on of
+the problems when trying to understand implicits. In Rust, there is no local vs
+implicit scope, /everything/ is in the implicit scope. There are subtle
+differences, however, in Scala2 there is no global coherence. This allows for
+richer type declarations, but this also causes the compiler to lack information
+when reporting type errors. The authors say this is why the compiler would error
+out with /could not find implicit value/ or /member not found/. To avoid name
+collision library maintainers try to obfuscate the implicit names to avoid
+collision, but this of course affects ergonomics. Rust's inclusion of global
+coherence affects ergonomics in a different way, blanket implementations are
+provided to try and cover all use cases making code search harder.
+
+Rust does not (to my knowledge) insert any code, making the resolution easier
+and more predictable than Scala's. *However*, library authors will use macros to
+automatically derive a trait implementation, which can cause confusing errors in
+expanded code. This isn't specific to /traits/ but it is a result of global
+coherence rules.
+
+Rust idioms of why someone would want to use traits:
+- Conversions, ~into~, ~cast~, etc. I think this would even include the Bevy example
+  of where you are converting a function ~Fn~ (common type) into a ~System~
+  (domain-specific type). This conversion is common, e.g., Diesel's ~str~ to ~Text~.
+
+- Type proofs, ~nalgebra~, ~diesel~, ~Send~, ~Sync~, etc. This is probably the most
+  common use case, trying to get type safety by requiring certain trait bounds
+  on a type. This isn't necessarily an exclusive use-case from the previous. For
+  example, the Bevy example uses /both/ type proofs (by requiring function
+  parameter bounds) and implicit casting. This is used extensively in Rocket,
+  Diesel, etc.
+
+- Dynamic dispatch, ~dyn~, ~impl~, etc. ???
+
+*** Conversions
+**** Simple conversions
+#+begin_src rust
+// Example from:
+// https://rust-lang.github.io/chalk/chalk_ir/cast/index.html
+#![allow(dead_code)]
+
+struct A {}
+struct B {}
+struct C {}
+
+impl B {
+    fn foo(self) { }
+}
+
+trait CastTo<T>: Sized {
+    fn cast_to(self) -> T;
+}
+
+trait Cast: Sized {
+    fn cast<U>(self) -> U
+    where
+        Self: CastTo<U>,
+    {
+        self.cast_to()
+    }
+}
+
+impl<T> Cast for T {}
+
+// CastTo relationships
+
+macro_rules! rels {
+    ($($a:ident --> $b:ident,)*) => {
+        $(
+            impl CastTo<$b> for $a {
+                fn cast_to(self) -> $b {
+                    $b {}
+                }
+            }
+        )*
+    }
+}
+
+rels! {
+    B --> A,
+    C --> B,
+    C --> A,
+}
+
+// Client code
+
+fn requires(_: A) { }
+
+fn client(c: C) {
+    requires(c.cast())
+}
+
+fn main() {}
+#+end_src
+
+**** Marker conversions
+
+
+** Haskell (typeclasses)
+
+** Feature matrix
+
+| Language | Global Coherence | Multi-param Instances |
+|----------+------------------+-----------------------|
+| Rust     | X                | X                     |
+| Haskell  |                  |                       |
+| Swift    |                  |                       |
+| Scala2   |                  | X                     |
+| Scala3   |                  |                       |
+
+
 ***** [ ] TODO insert your research from Haskell / Scala.
+
 ***** [ ] TODO continue Will's dabbling with Java to compare diagnostics
 
 
