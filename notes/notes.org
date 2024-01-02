@@ -1,16 +1,166 @@
 #+title: Notes
 #+author: Gavin Gray
+#+date: October 23, 2023
+
+/Please note, this file contains in-progress information. It is not guaranteed
+that all information is correct, definitive, or properly cited. —Gavin/
+-----
 
 * Ad-hoc Polymorphism at large
 
-** Scala2 (implicits)
+***** [ ] TODO further exploration with OO-interfaces and /related/ systems.
+
+** Intro
+
+When typechecking with Typeclasses, the compiler needs to infer two pieces of information:
+
+1. the /monotype/
+2. the /context/, or set of constraints to satisfy
+
+Some languages require different machinery for each of these things to happen.
+In particular, the search for each respective piece can generate different
+developer needs.
+
+Haskell example from SPJ paper:
+
+#+begin_src coq
+fun xs -> case xs of
+  [] -> False
+  (y:ys) -> y > z || (y == z && [z] == ys)
+#+end_src
+
+This would infer the following
+Type: ~[a] -> Bool~
+Context: ~{ Ord a, Eq a, Eq [a] }~
+
+This then follows the context reduction rules:
+
+~{ Ord a, Eq a, Eq [a] } -> { Ord a, Eq a } by instance Eq a => Eq [a] ...~
+Specific instance declarations can be used to offload constraints. E.g., there
+is an implementation of ~Eq [a]~ given that ~Eq a~ is given.
+
+~{ Ord a, Eq a } -> { Ord a } by class Eq a => Ord a ...~
+Superclass constraints eliminate duplication. E.g., ~Eq~ is a superclass of ~Ord~,
+therefore, if an instance of ~Ord a~ is given there will exist an instance ~Eq a~.
+
+*To reduce the context /P/ to /P'/ is necessary (/but not sufficient/) to show that
+/P' ⊫  P/ .* It's insufficient because there must /be a unique/ /P'/ that entails /P/,
+but context reduction does not guarantee this. More on overlapping instances later.
+
+*** Failure
+When to report errors, see SPJ paper.
+
+*** Overlapping instances
+Two instances are said to overlap if ~Q1~ and ~Q2~ are unifiable in the below declarations.
+
+#+begin_src coq
+instance P1 => Q1 where ...
+instance P2 => Q2 where ...
+#+end_src
+
+Overlapping instances are great for a few things:
+- Default implementations & specializations
+- Monad transformers (/wrapping behavior/)
+
+*** Ambiguity
+There will always exist certain expressions with ambiguity, in haskell
+#src_coq{(show (read str))} the type read is unknown at compile-time and
+therefore typeclass resolution fails for ~show~.
+
+The authors suggest that multi-parameter typeclasses introduce new areas of
+ambiguity, but no concrete examples were given.
+
+*** Conclusion
+SPJ paper outlines the core  rules needed for the typeclass space:
+
+1. type-inference property (/specifically for Haskell/)
+2. decidable type-inference
+3. separate compilation
+4. *coherent* type system (/“every different valid typing derivation for a program
+   leads to resulting program that has the same dynamic semantics”/)
+   For example, how context reduction is performed affects the dynamic semantics
+   of the program /via/ the construction and use of dictionaries. The way in which
+   the typing derivation is constructed /should not/ affect the meaning of the program.
+
+*Important note*, these constraints are unique to Haskell. For example,
+type-inference in other languages: Rust, Scala, Swift, etc … only happens within
+bodies. But function/method signatures are required. Where, and to what degree,
+a language allows type-inference will simplify/complicate the language mechanism.
+
+The following are ground rules for class declarations:
+
+#src_coq{class P => C \alpha1 \alpha2 …  \alpha_n where { op1 :: Q => t; … }}
+(Iff a class constraint ~S~ appears in the context ~P~, it's said that ~S~ is a
+superclass of ~C~)
+
+1. There can be at most one class declaration for a class ~C~.
+2. All uses of ~C~ are applied to ~n~ arguments
+3.  ~\alpha1 \alpha2 … \alpha_n~ are /distinct/ type variables
+4. ~TV(P) \sube { \alpha1 \alpha2 … \alpha_n}~
+5. The superclass hierarchy of defined by the set of class declarations must be acyclic.
+
+Now the rules governing instance declarations:
+#src_coq{instance P => C t1 t2 … t_n where …}
+
+1. ~TV(P) \sube ∪ TV(t_i)~, that is, the instance context cannot mention type
+   variables not mentioned in the instance types.
+
+The authors provide a few more rules, these are intuitive. However, a further
+property is expressed:
+
+#+begin_quote
+Adding an instance declaration to a well-typed program should not alter either
+its static or dynamic semantics, except that it may give rise to an
+overlapping-instances error (in systems that disallow overlap).
+#+end_quote
+
+This mechanism exists in varying forms in different languages, examples of each
+are provided below and in the [[file:../samples][Samples directory]], and comparisons will be made
+using the degrees of freedom outlined in the paper.
+
+1. The form of types, /what limitations, if any, are there on the form of the
+   context of a type?/
+2. How much context reduction, /how much context reduction should be performed
+   before generalization?/
+3. Overlapping instance declarations, /are instance declarations with
+   overlapping (but not identical) instance types permitted?/
+4. Instance types, /what limitations, if any, are there on the form of the
+   instance types ~t_1, … t_n~?/
+5. Repeated type variables in instance heads, /can the instance head contain
+   repeated type variables?/
+6. Instance conexts, /what limitations, if any, are there on the form of the
+   instance context?/
+7. What superclasses are permitted, /what limitations, are there on the form of
+   the superclass context?/
+8. Improvement, *see SPJ paper*
+9. Class declarations, /what limitations, if any, are there on the contexts in
+   class-member type signatures?/
+
+*Other considerations (/not explored in the paper/)*
+1. Anonymous type synonyms (e.g., partially applied type synonyms)
+2. Relaxed superclass contexts, unconstrained type variables (a.k.a., quantified
+   types in a superclass).
+3. Controlling the scope of instances
+4. Relaxed type signature contexts
+
+  #+begin_src coq
+  (* could be written as `\forall s. { Monad m s => StateMonad m }` *)
+  class Monad m s => StateMonad m where
+    get :: m s s
+    set :: s -> m s ()
+  #+end_src
+
+
+** Languages
+
+*** Scala 2 (implicits)
 Most of this information is gleaned from the paper "Scala Implicits are
 Everywhere" [[https://arxiv.org/pdf/1908.07883.pdf]]
 
 There are really two separate mechanisms at play for /implicits/, each achieves
 something different but together they are a menace.
 
-*** Implicit conversions
+**** Implicit conversions
 Conversions are defined as an implicit function or class (or value of function
 type) and the compiler will search for implicit conversions to make the program type-check.
 
@@ -29,13 +179,13 @@ implicit class Int2Duration(that: Int) {
 
 As shown above, implicit conversion are important for Scala DSLs.
 
-*** Implicit parameters
+**** Implicit parameters
 Implicit parameters are filled in automatically by the compiler at the call site
 if there is an available implicit value. The name of the value is important, and
 thus introduces all the typicaly problems with variable naming (shadowing, etc).
 
 
-*** Important idioms
+**** Important idioms
 - Late Trait Implementation, because classes are nominally typed, in order to
   extend a class with a new trait a wrapper needs to be used. An implicit
   conversion is then added when a specific  trait bound is required (but was
@@ -98,11 +248,20 @@ But some things are unique. But there are differences.
   example, in Rust you would /at least/ need a call to ~.into()~ to make a
   conversion, but in Scala the compiler can insert these silently.
 
-** Scala3 (givens)
 
-** Swift (protocols)
+*** Scala 3 (givens)
 
-** Rust (traits)
+
+*** Swift (protocols)
+Swift protocols have a few different features from Typeclasses that make the
+language feature easier to debug.
+
+- Protocol extensions can /only/ be used on /named types/. This excludes compound
+  types such as ~Tuple~ and ~Func~, thus eliminating a whole swatch of problems.
+- Cannot name impl blocks.
+
+
+*** Rust (traits)
 - All impl blocks are anonymous, this means you get them all or none (with no
   trait import). This is in contrast to Scala implicits and givens, which can be
   named and imported named.
@@ -139,8 +298,8 @@ Rust idioms of why someone would want to use traits:
 
 - Dynamic dispatch, ~dyn~, ~impl~, etc. ???
 
-*** Conversions
-**** Simple conversions
+**** Conversions
+***** Simple conversions
 #+begin_src rust
 // Example from:
 // https://rust-lang.github.io/chalk/chalk_ir/cast/index.html
@@ -200,25 +359,31 @@ fn client(c: C) {
 fn main() {}
 #+end_src
 
-**** Marker conversions
+***** Marker conversions
 
 
-** Haskell (typeclasses)
+*** Haskell (typeclasses)
+- Intro to global coherence: [[http://blog.ezyang.com/2014/07/type-classes-confluence-coherence-global-uniqueness/][Confluence / Coherence]]
+- SPJ paper [[https://www.microsoft.com/en-us/research/publication/type-classes-an-exploration-of-the-design-space/][Typeclasses: exploring the design space]]
+- GHC issue, multiple instances [[https://gitlab.haskell.org/ghc/ghc/-/issues/2356][#2356]]
+
+
+*** Lean4 (typeclasses)
+
 
 ** Feature matrix
 
-| Language | Global Coherence | Multi-param Instances |
-|----------+------------------+-----------------------|
-| Rust     | X                | X                     |
-| Haskell  |                  |                       |
-| Swift    |                  |                       |
-| Scala2   |                  | X                     |
-| Scala3   |                  |                       |
+/Note, like everything else in this file the table is unfinished. The columns should probably encode the choices outlined in the SPJ paper, or at least a subset of those I deem important for this work./
 
-
-***** [ ] TODO insert your research from Haskell / Scala.
-
-***** [ ] TODO continue Will's dabbling with Java to compare diagnostics
+| Language |
+|----------|
+| Scala2   |
+| Scala3   |
+| Swift    |
+|----------|
+| Rust     |
+| Haskell  |
+| Lean4    |
 
 
 * How does /rustc/ report obligations?
