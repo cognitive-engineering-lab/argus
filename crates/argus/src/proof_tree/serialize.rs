@@ -73,19 +73,20 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
 
 impl<'tcx> Node<'tcx> {
     fn from_goal(goal: &InspectGoal<'_, 'tcx>, def_id: DefId) -> Self {
-        // #[derive(Serialize)]
-        // struct Wrapper<'tcx>(
-        //     #[serde(serialize_with = "goal__predicate_def")] 
-        //     Goal<'tcx, Predicate<'tcx>>
-        // );
-        let infcx = goal.infcx();
-        // let w = &Wrapper(goal.goal());
-        // let v = crate::ty::serialize_to_value(w, goal.infcx())
-        //     .expect("failed to serialize goal");
+        #[derive(Serialize)]
+        struct Wrapper<'tcx>(
+            #[serde(serialize_with = "goal__predicate_def")]
+            Goal<'tcx, Predicate<'tcx>>
+        );
 
-        let string = goal.goal().predicate.pretty(infcx, def_id);
-        let v = crate::ty::serialize_to_value(&string, goal.infcx())
+        let w = &Wrapper(goal.goal());
+        let v = crate::ty::serialize_to_value(w, goal.infcx())
             .expect("failed to serialize goal");
+
+        let string = goal.goal().predicate.pretty(goal.infcx(), def_id);
+        log::debug!("PRETTY {}", string);
+        // let v = crate::ty::serialize_to_value(&string, goal.infcx())
+        //     .expect("failed to serialize goal");
 
         Node::Goal { 
             data: v,
@@ -94,9 +95,48 @@ impl<'tcx> Node<'tcx> {
     }
 
     fn from_candidate(candidate: &InspectCandidate<'_, 'tcx>, def_id: DefId) -> Self {
-        let infcx = candidate.infcx();
-        let data = candidate.pretty(infcx, def_id);
-        Node::Candidate { data }
+        use rustc_trait_selection::traits::solve::{inspect::ProbeKind, CandidateSource};
+
+        let from_str = |s: &'static str| {
+            Candidate::Any(s.to_string())
+        };
+
+        let can: Candidate = match candidate.kind() {
+            ProbeKind::Root { .. } => "root".into(),
+            ProbeKind::NormalizedSelfTyAssembly => "normalized-self-ty-asm".into(),
+            ProbeKind::UnsizeAssembly => "unsize-asm".into(),
+            ProbeKind::CommitIfOk => "commit-if-ok".into(),
+            ProbeKind::UpcastProjectionCompatibility => "upcase-proj-compat".into(),
+            ProbeKind::MiscCandidate {
+                name,
+                ..
+            } => "misc".into(),
+            ProbeKind::TraitCandidate {
+                source,
+                ..
+            } => match source {
+                CandidateSource::BuiltinImpl(built_impl) => "builtin".into(),
+                CandidateSource::AliasBound => "alias-bound".into(),
+
+                // The only two we really care about.
+                CandidateSource::ParamEnv(idx) => "param-env".into(),
+                CandidateSource::Impl(def_id) => {
+                    let tr = candidate.infcx().tcx.impl_trait_ref(def_id).unwrap().skip_binder();
+                    let ty = tr.self_ty();
+                    Candidate::Impl {
+                        ty,
+                        trait_ref: tr,
+                    }
+                },
+            },
+        };
+
+        // -------
+
+        // let infcx = candidate.infcx();
+        // let data = candidate.pretty(infcx, def_id);
+
+        Node::Candidate(can)
     }
 
     fn from_result(result: &Result<Certainty, NoSolution>) -> Self {
@@ -121,11 +161,9 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
             return ControlFlow::Continue(());
         }
 
+        log::debug!("Inserting: {:#?}", goal.goal());
         let here_node = Node::from_goal(goal, self.def_id);
-
         let here_idx = self.nodes.push(here_node.clone());
-
-        log::debug!("Inserted goal: {:#?}", goal.goal());
 
         if self.root.is_none() {
             self.root = Some(here_idx);

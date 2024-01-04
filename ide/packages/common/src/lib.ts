@@ -1,4 +1,10 @@
-import { CharRange, Obligation, SerializedTree } from "./types";
+import {
+  CharRange,
+  Obligation,
+  ObligationOutput,
+  SerializedTree,
+  TreeOutput,
+} from "./types";
 
 // ----------------------------------------------------
 // Communication between the extension and the webview.
@@ -18,13 +24,13 @@ export type CommonData = {
 export type ExtensionToWebViewMsg = CommonData & { type: FROM_EXT } & (
     | { command: "open-file" }
     | { command: "close-file" }
-    | { command: "obligations"; obligations: Obligation[][] }
-    | { command: "tree"; tree: SerializedTree[] }
+    | { command: "obligations"; obligations: ObligationOutput[] }
+    | { command: "tree"; tree: TreeOutput }
   );
 
 export type WebViewToExtensionMsg = CommonData & { type: FROM_WV } & (
     | { command: "obligations" }
-    | { command: "tree"; predicate: Obligation }
+    | { command: "tree"; predicate: Obligation; range: CharRange }
     | { command: "add-highlight"; range: CharRange }
     | { command: "remove-highlight"; range: CharRange }
   );
@@ -60,6 +66,6 @@ export type CallArgus = <T>(
 ) => Promise<ArgusResult<T>>;
 
 export type ArgusArgs =
-  | ["preload"] // => Obligation[][]
-  | ["obligations", Filename] // => Obligation[][]
-  | ["tree", Filename, string]; // => SerializedTree[]
+  | ["preload"] // => void
+  | ["obligations", Filename] // => ObligationsInBody[]
+  | ["tree", Filename, string, number, number, number, number]; // => [SerializedTree | undefined]

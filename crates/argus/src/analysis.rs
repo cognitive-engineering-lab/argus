@@ -9,6 +9,7 @@ use rustc_infer::infer::error_reporting::TypeErrCtxt;
 use rustc_infer::traits::FulfilledObligation;
 use rustc_infer::traits::util::elaborate;
 use rustc_middle::ty::{self, TyCtxt, ToPolyTraitRef};
+use rustc_span::symbol::Symbol;
 use rustc_trait_selection::traits::FulfillmentError;
 use rustc_trait_selection::traits::solve::Goal;
 
@@ -16,20 +17,40 @@ use anyhow::{Result, anyhow};
 use fluid_let::fluid_let;
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
+use ts_rs::TS;
 use itertools::Itertools;
 
 use crate::Target;
 use crate::proof_tree::{SerializedTree, Obligation, ObligationKind};
 use crate::proof_tree::ext::*;
 use crate::proof_tree::serialize::serialize_proof_tree;
+use crate::ty::SymbolDef;
 
 fluid_let!(pub static OBLIGATION_TARGET: Target);
 
-pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<serde_json::Value>
+// Data returned from endpoints
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(TS))]
+pub struct ObligationsInBody {
+  #[serde(skip_serializing_if = "Option::is_none")]
+  #[serde(serialize_with = "serialize_option")]
+  #[cfg_attr(feature = "ts-rs", ts(type = "SymbolDef?"))]
+  name: Option<Symbol>,
+
+  range: CharRange,
+
+  // HACK it's easiest to already convert Obligations
+  // to a JSON Value to avoid having lifetimes in the
+  // plugin endpoint.
+  #[cfg_attr(feature = "ts-rs", ts(type = "Obligation[]"))]
+  obligations: serde_json::Value,
+}
+
+pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<ObligationsInBody>
 {
   let hir = tcx.hir();
   let local_def_id = hir.body_owner_def_id(body_id);
-  let def_id = local_def_id.to_def_id();
 
   log::info!("Getting obligations in body {}", {
     let owner = hir.body_owner(body_id);
@@ -46,21 +67,29 @@ pub fn obligations<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<serde_jso
     let obligations = fncx.get_obligations(local_def_id);
     let json = crate::ty::serialize_to_value(&obligations, infcx)
       .expect("Could not serialize Obligations");
-    result = Ok(json);
+    let body = hir.body(body_id);
+    let body_range = CharRange::from_span(body.value.span, tcx.sess.source_map())
+      .expect("Couldn't get body range");
+    result = Ok(ObligationsInBody {
+      name: hir.opt_name(body_id.hir_id),
+      range: body_range,
+      obligations: json,
+    });
   });
 
   result
 }
 
-pub fn tree<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<Option<serde_json::Value>>
+// NOTE: tree is only invoked for *a single* tree, it must be found
+// within the `body_id` and the appropriate `OBLIGATION_TARGET` (i.e., stable hash).
+pub fn tree<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<serde_json::Value>
 {
   OBLIGATION_TARGET.get(|target| {
     let target = target.unwrap();
 
     let hir = tcx.hir();
     let local_def_id = hir.body_owner_def_id(body_id);
-
-    let mut result = None;
+    let mut result = Err(anyhow!("Couldn't find proof tree with hash {:?}", target));
 
     inspect_typeck(tcx, local_def_id, |fncx| {
       let Some(infcx) = fncx.infcx() else {
@@ -68,21 +97,21 @@ pub fn tree<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<Option<serde_jso
       };
 
       let errors = fncx.get_fulfillment_errors(local_def_id);
-      result = errors.iter().find_map(|(hash, error)| {
-        if hash.as_u64() != target.data {
+      let found_tree = errors.iter().find_map(|(hash, error)| {
+        if hash.as_u64() != target.hash {
           return None;
         }
 
         let goal =
           Goal { predicate: error.root_obligation.predicate, param_env: error.root_obligation.param_env };
         let serial_tree = serialize_tree(goal, fncx)?;
-        let value = crate::ty::serialize_to_value(&serial_tree, infcx)
-          .expect("Could not serialize Tree");
-        Some(value)
-      })
+        crate::ty::serialize_to_value(&serial_tree, infcx).ok()
+      });
+
+      result = found_tree.ok_or(anyhow!("Couldn't find proof tree with hash {:?}", target));
     });
 
-    Ok(result)
+    result
   })
 }
 
@@ -181,8 +210,6 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
   }
 
   fn get_fulfillment_errors(&self, ldef_id: LocalDefId) -> Vec<FulfillmentData<'tcx>> {
-    let errors = self.fulfillment_errors.borrow();
-    let result = errors.iter().map(Clone::clone).collect::<Vec<_>>();
     let infcx = self.infcx().unwrap();
 
     let return_with_hashes = |v: Vec<FulfillmentError<'tcx>>| {
@@ -194,10 +221,6 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
           .collect::<Vec<_>>()
       })
     };
-
-    if !result.is_empty() {
-      return return_with_hashes(result);
-    }
 
     let mut result = Vec::new();
 
@@ -211,7 +234,7 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
         fulfilled_obligations.iter().filter_map(|obl| {
 
           match obl {
-            FulfilledObligation::Failure { error, .. } => {
+            FulfilledObligation::Failure(error) => {
               log::debug!("[CAND] error {:?}", error.obligation.predicate.pretty(infcx, def_id));
               Some(error.clone())
             },
@@ -316,4 +339,13 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
       }
     }).collect::<Vec<_>>()
   }
+}
+
+// Serialize an Option<Symbol> using SymbolDef but the value must be a Some(..)
+fn serialize_option<S: serde::Serializer>(value: &Option<Symbol>, s: S) -> Result<S::Ok, S::Error> {
+  let Some(symb) = value else {
+    unreachable!();
+  };
+
+  SymbolDef::serialize(symb, s)
 }

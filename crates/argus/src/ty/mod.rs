@@ -10,10 +10,10 @@
     dead_code
 )]
 
-mod r#const;
-mod path;
-mod term;
-mod my_ty;
+pub mod r#const;
+pub mod path;
+pub mod term;
+pub mod my_ty;
 
 use std::num::*;
 
@@ -234,8 +234,18 @@ pub enum PredicateKindDef<'tcx> {
     Coerce(#[serde(with = "CoercePredicateDef")] CoercePredicate<'tcx>),
     ConstEquate(#[serde(with = "ConstDef")] Const<'tcx>, #[serde(with = "ConstDef")] Const<'tcx>),
     Ambiguous,
+    NormalizesTo(#[serde(with = "NormalizesToDef")] NormalizesTo<'tcx>),
     AliasRelate(#[serde(with = "TermDef")] Term<'tcx>, #[serde(with = "TermDef")] Term<'tcx>, #[serde(with = "AliasRelationDirectionDef")] AliasRelationDirection),
-    ClosureKind(#[serde(with = "DefIdDef")] DefId, #[serde(with = "GenericArgsDef")] GenericArgsRef<'tcx>, #[serde(with = "ClosureKindDef")] ClosureKind),
+    // ClosureKind(#[serde(with = "DefIdDef")] DefId, #[serde(with = "GenericArgsDef")] GenericArgsRef<'tcx>, #[serde(with = "ClosureKindDef")] ClosureKind),
+}
+
+#[derive(Serialize)]
+#[serde(remote = "NormalizesTo")]
+pub struct NormalizesToDef<'tcx> {
+    #[serde(with = "AliasTyDef")]
+    pub alias: AliasTy<'tcx>,
+    #[serde(with = "TermDef")]
+    pub term: Term<'tcx>,
 }
 
 #[derive(Serialize)]
@@ -307,11 +317,22 @@ pub struct TraitPredicateDef<'tcx> {
     pub polarity: ImplPolarity,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct TraitRefPrintOnlyTraitPathDefWrapper<'tcx>(
     #[serde(with = "TraitRefPrintOnlyTraitPathDef")] 
     pub TraitRef<'tcx>
 );
+
+pub struct TraitRefPrintOnlyTraitPathDef;
+impl TraitRefPrintOnlyTraitPathDef {
+    pub fn serialize<'tcx, S>(value: &TraitRef<'tcx>, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        log::debug!("Serializing TraitRef[path only] {:#?}", value);
+        path::PathDefWithArgs::new(value.def_id, value.args).serialize(s)
+    }
+}
 
 pub struct TraitRefDef;
 impl TraitRefDef {
@@ -335,17 +356,6 @@ impl TraitRefDef {
             self_ty: value.self_ty(),
             trait_path: value,
         }.serialize(s)
-    }
-}
-
-pub struct TraitRefPrintOnlyTraitPathDef;
-impl TraitRefPrintOnlyTraitPathDef {
-    pub fn serialize<'tcx, S>(value: &TraitRef<'tcx>, s: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        log::debug!("Serializing trait ref {:#?}", value);
-        path::PathDefWithArgs::new(value.def_id, value.args).serialize(s)
     }
 }
 

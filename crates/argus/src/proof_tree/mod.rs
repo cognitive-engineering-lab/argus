@@ -9,11 +9,11 @@ use std::collections::HashSet;
 use index_vec::IndexVec;
 use rustc_infer::traits::FulfilledObligation;
 use rustc_trait_selection::traits::solve::Goal;
-use rustc_middle::ty::Predicate;
+use rustc_middle::ty::{Predicate, Ty, TraitRef};
 use rustc_utils::source_map::range::CharRange;
 
 pub use topology::*;
-use crate::ty::{PredicateDef, goal__predicate_def};
+use crate::ty::{PredicateDef, goal__predicate_def, my_ty::TyDef, TraitRefPrintOnlyTraitPathDef};
 
 // FIXME: TS bindings were removed as the automatic 
 // generation doesn't have a serde::remote-like feature.
@@ -25,18 +25,39 @@ crate::define_usize_idx! {
 }
 
 #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(featutre = "ts-rs", derive(TS))]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Node<'tcx> {
     Result { data: String },
-    Goal { 
+    Candidate(Candidate<'tcx>),
+    Goal {
+      #[cfg_attr(featutre = "ts-rs", ts(type = "any"))]
       data: serde_json::Value,
       #[serde(skip)]
       _marker: std::marker::PhantomData<&'tcx ()>,
     },
-    Candidate { data: String },
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+pub enum Candidate<'tcx> {
+  Impl {
+    #[serde(with = "TyDef")]
+    ty: Ty<'tcx>,
+    #[serde(with = "TraitRefPrintOnlyTraitPathDef")]
+    trait_ref: TraitRef<'tcx>,
+    // range: CharRange,
+  },
+  Any(String), // TODO(gavinleroy) remove
+}
+
+impl From<&'static str> for Candidate<'_> {
+  fn from(value: &'static str) -> Self {
+    Candidate::Any(value.to_string())
+  }
 }
 
 #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "ts-rs", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct SerializedTree<'tcx> {
     pub root: ProofNodeIdx,
@@ -47,9 +68,10 @@ pub struct SerializedTree<'tcx> {
 }
 
 #[derive(Serialize, Clone, Debug)]
+#[cfg_attr(feature = "ts-rs", derive(TS))]
 #[serde(tag = "type")]
 pub struct Obligation<'tcx> {
-  // #[ts(rename = "any")]
+  #[cfg_attr(feature = "ts-rs", ts(type = "any"))]
   #[serde(with = "PredicateDef")]
   pub data: Predicate<'tcx>,
   // NOTE: Hash64 but we pass it as a String because JavaScript
@@ -60,6 +82,7 @@ pub struct Obligation<'tcx> {
 }
 
 #[derive(Serialize, Clone, Debug)]
+#[cfg_attr(feature = "ts-rs", derive(TS))]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ObligationKind {
   Success,

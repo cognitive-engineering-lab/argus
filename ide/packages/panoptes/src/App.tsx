@@ -1,16 +1,19 @@
 import { Filename } from "@argus/common";
-import { Obligation } from "@argus/common/types";
-import { VSCodeButton, VSCodePanelTab, VSCodePanelView, VSCodePanels, VSCodeProgressRing } from "@vscode/webview-ui-toolkit/react";
+import { ObligationsInBody } from "@argus/common/types";
+import {
+  VSCodeButton,
+  VSCodePanelTab,
+  VSCodePanelView,
+  VSCodePanels,
+  VSCodeProgressRing,
+} from "@vscode/webview-ui-toolkit/react";
 import _, { set } from "lodash";
 import React, { useEffect, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
-
-
 import "./App.css";
 import ObligationManager from "./ObligationManager";
 import { messageExtension } from "./utilities/vscode";
-
 
 function basename(path: string) {
   return path.split("/").reverse()[0];
@@ -26,9 +29,9 @@ const WaitingOnObligations = () => {
 };
 
 const OpenFile = ({ filename }: { filename: Filename }) => {
-  const [obligations, setObligations] = useState<Obligation[] | undefined>(
-    undefined
-  );
+  const [obligations, setObligations] = useState<
+    ObligationsInBody[] | undefined
+  >(undefined);
   const [isLoading, setIsLoading] = useState(false);
 
   const listener = (e: MessageEvent) => {
@@ -46,7 +49,7 @@ const OpenFile = ({ filename }: { filename: Filename }) => {
 
     switch (msg.command) {
       case "obligations": {
-        setObligations(_.flatten(msg.obligations));
+        setObligations(msg.obligations);
         setIsLoading(false);
         return;
       }
@@ -78,10 +81,10 @@ const OpenFile = ({ filename }: { filename: Filename }) => {
       <div>
         <VSCodeButton onClick={handleClick}>Fetch Obligations</VSCodeButton>
       </div>
-      {isLoading ? (
+      {isLoading || obligations === undefined ? (
         <WaitingOnObligations />
       ) : (
-        <ObligationManager file={filename} obligations={obligations!} />
+        <ObligationManager file={filename} osibs={obligations} />
       )}
     </div>
   );
@@ -90,9 +93,12 @@ const OpenFile = ({ filename }: { filename: Filename }) => {
 const FatalErrorPanel = ({ error, resetErrorBoundary }: any) => {
   return (
     <div>
-      <p>Whoops! This is not a drill, a fatal error occurred.
-
-        Please <a href="https://github.com/gavinleroy/argus/issues/new">report this error</a> to the Argus team, and include the following information:
+      <p>
+        Whoops! This is not a drill, a fatal error occurred. Please{" "}
+        <a href="https://github.com/gavinleroy/argus/issues/new">
+          report this error
+        </a>{" "}
+        to the Argus team, and include the following information:
       </p>
       <pre>{error.message}</pre>
       <button onClick={resetErrorBoundary}>Reset Argus</button>

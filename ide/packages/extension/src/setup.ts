@@ -1,10 +1,10 @@
+import { ArgusArgs, CallArgus, Result } from "@argus/common";
 import cp from "child_process";
+import _ from "lodash";
 import os from "os";
 import path from "path";
 import vscode from "vscode";
-import _ from "lodash";
 
-import { ArgusArgs, CallArgus, Result } from "@argus/common";
 import { log } from "./logging";
 
 // TODO: read the version from rust-toolchain.toml
@@ -78,7 +78,6 @@ let execNotifyBinary = async (
   _title: string,
   opts?: any
 ): Promise<Buffer> => {
-
   log("Running command: ", cmd, args, opts);
 
   let proc = cp.spawn(cmd, args, opts);
@@ -206,10 +205,10 @@ export async function setup(
       if (editor) {
         await editor.document.save();
       }
-
+      const strArgs = _.map(args, arg => arg.toString());
       output = await execNotify(
         cargo,
-        [ ...cargoArgs, "argus", ...args],
+        [...cargoArgs, "argus", ...strArgs],
         "Waiting for Argus...",
         argusOpts
       );
@@ -229,7 +228,6 @@ export async function setup(
 
     let outputTyped: Result<T>;
     try {
-
       log("output", output);
 
       let outputStr = output;
@@ -247,7 +245,7 @@ export async function setup(
       return {
         type: "analysis-error",
         error: outputTyped.Err,
-      }
+      };
     }
 
     return {

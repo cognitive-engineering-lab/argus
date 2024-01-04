@@ -58,7 +58,7 @@ pub enum TyKind__TyCtxt<'tcx> {
     Str,
     Array(#[serde(with = "TyDef")] <TyCtxt<'tcx> as Interner>::Ty, #[serde(with = "ConstDef")] <TyCtxt<'tcx> as Interner>::Const),
     Slice(#[serde(with = "TyDef")] <TyCtxt<'tcx> as Interner>::Ty),
-    RawPtr(#[serde(with = "TypeAndMutDef")] <TyCtxt<'tcx> as Interner>::TypeAndMut),
+    RawPtr(#[serde(with = "TypeAndMutDef")] TypeAndMut<'tcx>),
     Ref(#[serde(with = "RegionDef")] <TyCtxt<'tcx> as Interner>::Region, #[serde(with = "TyDef")] <TyCtxt<'tcx> as Interner>::Ty, #[serde(with = "MutabilityDef")] Mutability),
     FnDef(path::PathDefWithArgs<'tcx>),
     Never,
@@ -69,13 +69,13 @@ pub enum TyKind__TyCtxt<'tcx> {
     Foreign(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId),
     Closure(path::PathDefWithArgs<'tcx>),
     FnPtr(#[serde(with = "PolyFnSigDef")] <TyCtxt<'tcx> as Interner>::PolyFnSig),
+    Param(#[serde(with = "ParamTyDef")] <TyCtxt<'tcx> as Interner>::ParamTy),
+    Bound(#[serde(skip)] DebruijnIndex, #[serde(with = "BoundTyDef")] <TyCtxt<'tcx> as Interner>::BoundTy),
 
     // Alias(#[serde(with = "AliasKindDef")] AliasKind, #[serde(with = "AliasTyDef")] <TyCtxt<'tcx> as Interner>::AliasTy),
     // TODO: Dynamic(#[serde(with = "BoundExistentialPredicatesDef")] <TyCtxt<'tcx> as Interner>::BoundExistentialPredicates, #[serde(with = "RegionDef")] <TyCtxt<'tcx> as Interner>::Region, #[serde(with = "DynKindDef")] DynKind),
     // TODO: Coroutine(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs, #[serde(with = "MovabilityDef")] Movability),
     // TODO: CoroutineWitness(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs),
-    // TODO: Param(#[serde(with = "ParamTyDef")] <TyCtxt<'tcx> as Interner>::ParamTy),
-    // TODO: Bound(#[serde(skip)] DebruijnIndex, #[serde(with = "BoundTyDef")] <TyCtxt<'tcx> as Interner>::BoundTy),
 }
 
 impl<'tcx> From<&ir::TyKind<TyCtxt<'tcx>>> for TyKind__TyCtxt<'tcx> {
@@ -101,19 +101,14 @@ impl<'tcx> From<&ir::TyKind<TyCtxt<'tcx>>> for TyKind__TyCtxt<'tcx> {
             ir::TyKind::Foreign(d) => TyKind__TyCtxt::Foreign(*d),
             ir::TyKind::Closure(def_id, args) => TyKind__TyCtxt::Closure(path::PathDefWithArgs::new(*def_id, args)),
             ir::TyKind::FnPtr(v) => TyKind__TyCtxt::FnPtr(v.clone()),
+            ir::TyKind::Param(param_ty) => TyKind__TyCtxt::Param(param_ty.clone()),
+            ir::TyKind::Bound(dji, bound_ty) => TyKind__TyCtxt::Bound(*dji, bound_ty.clone()),
 
-            // TODO: ir::TyKind::Alias(k, aty) => TyKind__TyCtxt::Alias(*k, *aty),
-            // TODO: Dynamic(#[serde(with = "BoundExistentialPredicatesDef")] <TyCtxt<'tcx> as Interner>::BoundExistentialPredicates, #[serde(with = "RegionDef")] <TyCtxt<'tcx> as Interner>::Region, #[serde(with = "DynKindDef")] DynKind),
-            // TODO: Coroutine(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs, #[serde(with = "MovabilityDef")] Movability),
-            // TODO: CoroutineWitness(#[serde(with = "DefIdDef")] <TyCtxt<'tcx> as Interner>::DefId, #[serde(with = "GenericArgsDef")] <TyCtxt<'tcx> as Interner>::GenericArgs),
-            // TODO: Param(#[serde(with = "ParamTyDef")] <TyCtxt<'tcx> as Interner>::ParamTy),
-            // TODO: Bound(#[serde(skip)] DebruijnIndex, #[serde(with = "BoundTyDef")] <TyCtxt<'tcx> as Interner>::BoundTy),
-
-            // FIXME: remove this as sooon as possible
-            _ => {
-                log::debug!("NYI {:#?}", value);
-                todo!()
-            }
+            // TODO(gavinleroy)
+            ir::TyKind::Alias(k, aty) => todo!("alias"),
+            ir::TyKind::Dynamic(bep, r, dy_kind) => todo!("dynamic"),
+            ir::TyKind::Coroutine(def_id, args) => todo!("coroutine"),
+            ir::TyKind::CoroutineWitness(def_id, args) => todo!("coroutine-witness"),
         }
     }
 }
@@ -414,6 +409,23 @@ pub struct TypeAndMutDef<'tcx> {
     #[serde(with = "MutabilityDef")]
     pub mutbl: Mutability,
 }
+
+// pub struct TypeAndMutDef;
+// impl TypeAndMutDef {
+//     pub fn serialize<'tcx, S>(value: &TypeAndMut<TyCtxt<'tcx>>, s: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: serde::Serializer,
+//     {
+//         #[derive(Serialize)]
+//         struct Wrapper {
+//             #[serde(with = "TyDef")]
+//             pub ty: &<TyCtxt<'tcx> as Interner>::Ty<'tcx>,
+//             #[serde(with = "MutabilityDef")]
+//             pub mutbl: Mutability,
+//         }
+//         Wrapper { ty: &value.ty, mutbl: value.mutbl }.serialize(s)
+//     }
+// }
 
 #[derive(Serialize)]
 #[serde(remote = "Mutability")]

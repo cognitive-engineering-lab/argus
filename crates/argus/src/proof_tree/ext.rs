@@ -166,7 +166,10 @@ impl CandidateExt for InspectCandidate<'_, '_> {
 
                 // The only two we really care about.
                 CandidateSource::ParamEnv(idx) => format!("param-env#{idx}"),
-                CandidateSource::Impl(def_id) => "impl".to_string(),
+                CandidateSource::Impl(def_id) => {
+
+                    "impl".to_string()
+                },
             },
         }
     }
@@ -187,13 +190,13 @@ impl CandidateExt for InspectCandidate<'_, '_> {
 
 fn guess_def_namespace(tcx: TyCtxt<'_>, def_id: DefId) -> Namespace {
     match tcx.def_key(def_id).disambiguated_data.data {
-        DefPathData::TypeNs(..) | DefPathData::CrateRoot | DefPathData::ImplTrait => {
+        DefPathData::TypeNs(..) | DefPathData::CrateRoot | DefPathData::OpaqueTy => {
             Namespace::TypeNS
         }
 
         DefPathData::ValueNs(..)
         | DefPathData::AnonConst
-        | DefPathData::ClosureExpr
+        | DefPathData::Closure
         | DefPathData::Ctor => Namespace::ValueNS,
 
         DefPathData::MacroNs(..) => Namespace::MacroNS,

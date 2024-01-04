@@ -129,9 +129,21 @@ export const PrintTyKind = ({ o }) => {
     return <PrintDefPath o={o.Foreign} />;
   } else if ("Closure" in o) {
     return <PrintDefPath o={o.Closure} />;
+  } else if ("Param" in o) {
+    return <PrintParamTy o={o.Param} />;
+  } else if ("Bound" in o) {
+    return <PrintBoundTy o={o.Bound} />;
   } else {
     throw new Error("Unknown ty kind", o);
   }
+};
+
+export const PrintParamTy = ({ o }) => {
+  return <PrintSymbol o={o.name} />;
+};
+
+export const PrintBoundTy = ({ o }) => {
+  throw new Error("TODO");
 };
 
 export const PrintPlaceholderTy = ({ o }) => {

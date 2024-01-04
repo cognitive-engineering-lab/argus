@@ -8,9 +8,9 @@ import {
 import {
   CharRange,
   Obligation,
+  ObligationOutput,
   SerializedTree,
   TreeOutput,
-  ObligationOutput,
 } from "@argus/common/dist/types";
 import _ from "lodash";
 import path from "path";
@@ -111,7 +111,7 @@ export class ViewLoader {
         return;
       }
       case "tree": {
-        this.getTree(message.file, message.predicate);
+        this.getTree(message.file, message.predicate, message.range);
         return;
       }
       case "add-highlight": {
@@ -132,7 +132,10 @@ export class ViewLoader {
   private async getObligations(host: Filename) {
     log("Fetching obligations for file", host);
 
-    const res = await globals.backend<ObligationOutput[]>(["obligations", host]);
+    const res = await globals.backend<ObligationOutput[]>([
+      "obligations",
+      host,
+    ]);
 
     log("Result", res);
 
@@ -153,13 +156,17 @@ export class ViewLoader {
     });
   }
 
-  private async getTree(host: Filename, obl: Obligation) {
+  private async getTree(host: Filename, obl: Obligation, range: CharRange) {
     log("Fetching tree for file", host, obl.hash, obl);
 
     const res = await globals.backend<TreeOutput[]>([
       "tree",
       host,
       obl.hash,
+      range.start.line,
+      range.start.column,
+      range.end.line,
+      range.end.column,
     ]);
 
     if (res.type !== "output") {
@@ -167,15 +174,19 @@ export class ViewLoader {
       return;
     }
 
-    // FIXME: there shouldn't be 'null' values in the array, in fact, it shouldn't 
+    // FIXME: there shouldn't be 'null' values in the array, in fact, it shouldn't
     // even *be* an array. It shoudld be an optional tree returned from the backend.
-    const tree = _.filter(res.value, t => t !== null) as SerializedTree[];
+    const tree = _.filter(
+      res.value,
+      t => t !== null || t !== undefined
+    ) as SerializedTree[];
+    const t0 = tree[0];
 
     this.messageWebview({
       type: "FROM_EXTENSION",
       file: host,
       command: "tree",
-      tree: tree,
+      tree: t0,
     });
   }
 

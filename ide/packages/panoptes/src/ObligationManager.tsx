@@ -1,5 +1,10 @@
 import { Filename } from "@argus/common";
-import { Obligation, SerializedTree } from "@argus/common/types";
+import {
+  CharRange,
+  Obligation,
+  ObligationsInBody,
+  SerializedTree,
+} from "@argus/common/types";
 import {
   VSCodeButton,
   VSCodeDivider,
@@ -19,7 +24,13 @@ import { messageExtension } from "./utilities/vscode";
 
 const FileContext = createContext<Filename | undefined>(undefined);
 
-const ObligationTreeWrapper = ({ obligation }: { obligation: Obligation }) => {
+const ObligationTreeWrapper = ({
+  range,
+  obligation,
+}: {
+  range: CharRange;
+  obligation: Obligation;
+}) => {
   const [isTreeLoaded, setIsTreeLoaded] = useState(false);
   const [tree, setTree] = useState<SerializedTree[] | undefined>(undefined);
   const file = useContext(FileContext)!;
@@ -61,6 +72,7 @@ const ObligationTreeWrapper = ({ obligation }: { obligation: Obligation }) => {
       file: file,
       command: "tree",
       predicate: obligation,
+      range: range,
     });
 
     // setTree(testTree);
@@ -80,7 +92,13 @@ const ObligationTreeWrapper = ({ obligation }: { obligation: Obligation }) => {
   return <>{content}</>;
 };
 
-const ObligationCard = ({ obligation }: { obligation: Obligation }) => {
+const ObligationCard = ({
+  range,
+  obligation,
+}: {
+  range: CharRange;
+  obligation: Obligation;
+}) => {
   const [isInfoVisible, setIsInfoVisible] = useState(false);
   const file = useContext(FileContext)!;
 
@@ -110,10 +128,6 @@ const ObligationCard = ({ obligation }: { obligation: Obligation }) => {
     setIsInfoVisible(!isInfoVisible);
   };
 
-  // <VSCodeTextArea value={JSON.stringify(obligation.data)} readOnly />
-  // TODO: work on the styling of printed obligations. They should go in a
-  // text area like thing. Or at least styled the same.
-  // <VSCodeTextArea value= readOnly />
   return (
     <div
       className="ObligationCard"
@@ -130,47 +144,46 @@ const ObligationCard = ({ obligation }: { obligation: Obligation }) => {
       >
         {isInfoVisible ? <IcoChevronUp /> : <IcoChevronDown />}
       </VSCodeButton>
-      {isInfoVisible && <ObligationTreeWrapper obligation={obligation} />}
+      {isInfoVisible && (
+        <ObligationTreeWrapper range={range} obligation={obligation} />
+      )}
     </div>
+  );
+};
+
+const ObligationBody = ({ osib }: { osib: ObligationsInBody }) => {
+  const bodyRange = osib.range;
+  const bodyName = osib.name;
+  const [_successes, failures] = _.partition(
+    osib.obligations,
+    obligation => obligation.kind.type === "success"
+  );
+
+  // TODO: add code for the successes too
+  return (
+    <>
+      <h3>Failed obligations in {bodyName}</h3>
+      {_.map(failures, (obligation, idx) => {
+        return (
+          <ObligationCard range={bodyRange} obligation={obligation} key={idx} />
+        );
+      })}
+    </>
   );
 };
 
 const ObligationManager = ({
   file,
-  obligations,
+  osibs,
 }: {
   file: Filename;
-  obligations: Obligation[] | undefined;
+  osibs: ObligationsInBody[];
 }) => {
-  if (obligations === undefined) {
-    return <p>Obligations not loaded</p>;
-  }
-
-  const [successes, failures] = _.partition(
-    obligations,
-    obligation => obligation.kind.type === "success"
-  );
-
-  // NOTE: the backend sorts the obligations by some metric, this usually involving what was
-  // "most likely" to cause the root obligation. All this to say, don't resort the obligations.
-  const doList = (obligations: Obligation[]) => {
-    const uqs = _.uniqBy(obligations, obligation => obligation.data);
-    return (
-      <>
-        {_.map(uqs, (obligation, idx) => {
-          return <ObligationCard obligation={obligation} key={idx} />;
-        })}
-      </>
-    );
-  };
-
   return (
     <FileContext.Provider value={file}>
-      <h2>Failed obligations</h2>
-      {doList(failures)}
-      <VSCodeDivider />
-      {/* <h2>Successful obligations</h2>
-      {doList(successes)} */}
+      {_.map(osibs, (osib, idx) => {
+        return <ObligationBody osib={osib} key={idx} />;
+      })}
     </FileContext.Provider>
   );
 };

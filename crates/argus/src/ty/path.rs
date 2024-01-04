@@ -1,38 +1,103 @@
+use std::cell::Cell;
+
 use rustc_type_ir as ir;
 use rustc_middle::{ty::{self, *, abstract_const::CastKind}, mir::{BinOp, UnOp}};
 use rustc_hir::def_id::{DefId, DefIndex, CrateNum};
 use rustc_data_structures::sso::SsoHashSet;
 use rustc_span::{symbol::{kw, sym, Ident, Symbol}, Span};
 use rustc_target::spec::abi::Abi;
-use rustc_hir::def_id::LOCAL_CRATE;
-use rustc_hir::Unsafety;
 use rustc_session::cstore::ExternCrateSource;
 use rustc_middle::ty::print as rustc_print;
 use rustc_session::cstore::ExternCrate;
+use rustc_hir::Unsafety;
 use rustc_hir::definitions::DefPathData;
 use rustc_hir::definitions::DisambiguatedDefPathData;
-use rustc_hir::def_id::ModDefId;
 use rustc_hir::definitions::DefPathDataName;
+use rustc_hir::definitions::DefKey;
+use rustc_hir::def::DefKind;
+use rustc_hir::def_id::LOCAL_CRATE;
+use rustc_hir::def_id::ModDefId;
 
 use serde::{Serialize, ser::SerializeSeq};
 use rustc_utils::source_map::range::CharRange;
+use log::debug;
 use super::*;
 
-macro_rules! define_scoped_cx {
-    ($cx:ident) => {
-        macro_rules! scoped_cx {
-            () => {
-                $cx
-            };
-        }
-    };
+thread_local! {
+    static FORCE_IMPL_FILENAME_LINE: Cell<bool> = const { Cell::new(false) };
+    static SHOULD_PREFIX_WITH_CRATE: Cell<bool> = const { Cell::new(false) };
+    static NO_TRIMMED_PATH: Cell<bool> = const { Cell::new(false) };
+    static FORCE_TRIMMED_PATH: Cell<bool> = const { Cell::new(false) };
+    static NO_QUERIES: Cell<bool> = const { Cell::new(false) };
+    static NO_VISIBLE_PATH: Cell<bool> = const { Cell::new(false) };
 }
+
+macro_rules! define_helper {
+    ($($(#[$a:meta])* fn $name:ident($helper:ident, $tl:ident);)+) => {
+        $(
+            #[must_use]
+            pub struct $helper(bool);
+
+            impl $helper {
+                pub fn new() -> $helper {
+                    $helper($tl.with(|c| c.replace(true)))
+                }
+            }
+
+            $(#[$a])*
+            pub macro $name($e:expr) {
+                {
+                    let _guard = $helper::new();
+                    $e
+                }
+            }
+
+            impl Drop for $helper {
+                fn drop(&mut self) {
+                    $tl.with(|c| c.set(self.0))
+                }
+            }
+
+            pub fn $name() -> bool {
+                $tl.with(|c| c.get())
+            }
+        )+
+    }
+}
+
+define_helper!(
+    /// Avoids running any queries during any prints that occur
+    /// during the closure. This may alter the appearance of some
+    /// types (e.g. forcing verbose printing for opaque types).
+    /// This method is used during some queries (e.g. `explicit_item_bounds`
+    /// for opaque types), to ensure that any debug printing that
+    /// occurs during the query computation does not end up recursively
+    /// calling the same query.
+    fn with_no_queries(NoQueriesGuard, NO_QUERIES);
+    /// Force us to name impls with just the filename/line number. We
+    /// normally try to use types. But at some points, notably while printing
+    /// cycle errors, this can result in extra or suboptimal error output,
+    /// so this variable disables that check.
+    fn with_forced_impl_filename_line(ForcedImplGuard, FORCE_IMPL_FILENAME_LINE);
+    /// Adds the `crate::` prefix to paths where appropriate.
+    fn with_crate_prefix(CratePrefixGuard, SHOULD_PREFIX_WITH_CRATE);
+    /// Prevent path trimming if it is turned on. Path trimming affects `Display` impl
+    /// of various rustc types, for example `std::vec::Vec` would be trimmed to `Vec`,
+    /// if no other `Vec` is found.
+    fn with_no_trimmed_paths(NoTrimmedGuard, NO_TRIMMED_PATH);
+    fn with_forced_trimmed_paths(ForceTrimmedGuard, FORCE_TRIMMED_PATH);
+    /// Prevent selection of visible paths. `Display` impl of DefId will prefer
+    /// visible (public) reexports of types as paths.
+    fn with_no_visible_paths(NoVisibleGuard, NO_VISIBLE_PATH);
+);
+
+// --------------------------------------------------------
 
 pub(super) fn path_def_no_args<S>(def_id: DefId, s: S) -> Result<S::Ok, S::Error> 
 where
     S: serde::Serializer,
 {
-    PathBuilder::def_path(def_id, &[], s)
+    PathBuilder::compile_def_path(def_id, &[], s)
 }
 
 pub struct PathDefWithArgs<'tcx> {
@@ -51,7 +116,7 @@ impl<'tcx> Serialize for PathDefWithArgs<'tcx> {
     where
         S: serde::Serializer
     {
-        PathBuilder::def_path(self.def_id, self.args, s)
+        PathBuilder::compile_def_path(self.def_id, self.args, s)
     }
 }
 
@@ -60,12 +125,16 @@ impl<'tcx> Serialize for PathDefWithArgs<'tcx> {
 #[derive(Serialize)]
 struct DefinedPath {}
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 enum PathSegment<'tcx> {
     Colons,     // ::
     LocalCrate, // crate
     RawGuess,   // r#
+    Symbol {
+        #[serde(with = "SymbolDef")]
+        name: Symbol,
+    },
     DefPathDataName {
         #[serde(with = "SymbolDef")]
         name: Symbol,
@@ -93,9 +162,12 @@ enum PathSegment<'tcx> {
         ty: Ty<'tcx>,
         kind: ImplKind,
     },
+    AnonImpl {
+        range: CharRange,
+    }
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ImplKind {
     As,
@@ -110,7 +182,7 @@ struct PathBuilder<'a, 'tcx: 'a, S: serde::Serializer> {
     _marker: std::marker::PhantomData<S>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum CommaSeparatedKind {
     GenericArg,
@@ -118,14 +190,14 @@ pub enum CommaSeparatedKind {
 
 impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
     // Used for values instead of definition paths, rustc handles them the same.
-    pub fn value_path(def_id: DefId, args: &'tcx [GenericArg<'tcx>], s: S) -> Result<S::Ok, S::Error> 
+    pub fn compile_value_path(def_id: DefId, args: &'tcx [GenericArg<'tcx>], s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        Self::def_path(def_id, args, s)
+        Self::compile_def_path(def_id, args, s)
     }
 
-    pub fn def_path(def_id: DefId, args: &'tcx [GenericArg<'tcx>], s: S) -> Result<S::Ok, S::Error>
+    pub fn compile_def_path(def_id: DefId, args: &'tcx [GenericArg<'tcx>], s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -137,7 +209,16 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
             segments: Vec::new(),
             _marker: std::marker::PhantomData::<S>,
         };
-        builder.compile_def_path(def_id, args);
+
+        // HACK: I don't think we actually want to trim
+        // anything, so I'll just disable it here,
+        // XXX can be removed in the future.
+        with_no_trimmed_paths!{
+            with_no_visible_paths!{
+                builder.def_path(def_id, args)
+            }
+        };
+
         builder.serialize(s)
     }
 
@@ -146,22 +227,19 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
     }
 
     fn serialize(self, s: S) -> Result<S::Ok, S::Error> {
+        debug!("Serializing segments {:#?}", self.segments);
         self.segments.serialize(s)
     }
 
-    fn try_trimmed_def_path(&mut self, def_id: DefId) -> bool {
-        false
-    }
-
-    fn try_visible_def_path(&mut self, def_id: DefId) -> bool {
-        false
+    pub fn value_path(&mut self, def_id: DefId, args: &'tcx [GenericArg<'tcx>]) {
+        self.def_path(def_id, args)
     }
 
     // Equivalent to rustc_middle::ty::print::pretty::def_path
-    // This entry point handles the other grueling cases and handling overflow, 
+    // This entry point handles the other grueling cases and handling overflow,
     // which apparently is a thing in pretty printing! (see issues #55779 and #87932).
     // Equivalent to [rustc_middle::ty::print::pretty::print_def_path].
-    fn compile_def_path(&mut self, def_id: DefId, args: &'tcx [GenericArg<'tcx>]) {
+    fn def_path(&mut self, def_id: DefId, args: &'tcx [GenericArg<'tcx>]) {
         if args.is_empty() {
             if self.try_trimmed_def_path(def_id) {
                 return;
@@ -172,22 +250,344 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
             }
         }
 
-        // TODO(gavinleroy): rustc does some additional stuff to handle Impl paths,
-        // but to my understanding this should only be needed earlier in the compiler
-        // pipeline, and isn't necessary for our purposes.
+        let key = self.tcx().def_key(def_id);
+        if let DefPathData::Impl = key.disambiguated_data.data {
+            // Always use types for non-local impls, where types are always
+            // available, and filename/line-number is mostly uninteresting.
+            let use_types = !def_id.is_local() || {
+                // Otherwise, use filename/line-number if forced.
+                let force_no_types = with_forced_impl_filename_line();
+                !force_no_types
+            };
+
+            if !use_types {
+                // If no type info is available, fall back to
+                // pretty printing some span information. This should
+                // only occur very early in the compiler pipeline.
+                let parent_def_id = DefId { index: key.parent.unwrap(), ..def_id };
+                let span = self.tcx().def_span(def_id);
+
+                self.def_path(parent_def_id, &[]);
+
+                // HACK(eddyb) copy of `path_append` to avoid
+                // constructing a `DisambiguatedDefPathData`.
+                if !self.empty_path {
+                    self.segments.push(PathSegment::Colons);
+                }
+                let Ok(impl_range) = CharRange::from_span(span, self.tcx().sess.source_map()) else {
+                    todo!("impl span not converted to `CharRange`");
+                };
+
+                self.segments.push(PathSegment::AnonImpl {
+                    range: impl_range,
+                });
+                self.empty_path = false;
+
+                return;
+            }
+        }
 
         self.default_def_path(def_id, args)
+    }
+
+    fn force_trimmed_def_path(&mut self, def_id: DefId) -> bool {
+        let key = self.tcx().def_key(def_id);
+        let visible_parent_map = self.tcx().visible_parent_map(());
+        let kind = self.tcx().def_kind(def_id);
+
+        let get_local_name = |this: &Self, name, def_id, key: DefKey| {
+            if let Some(visible_parent) = visible_parent_map.get(&def_id)
+                && let actual_parent = this.tcx().opt_parent(def_id)
+                && let DefPathData::TypeNs(_) = key.disambiguated_data.data
+                && Some(*visible_parent) != actual_parent
+            {
+                this.tcx()
+                // FIXME(typed_def_id): Further propagate ModDefId
+                    .module_children(ModDefId::new_unchecked(*visible_parent))
+                    .iter()
+                    .filter(|child| child.res.opt_def_id() == Some(def_id))
+                    .find(|child| child.vis.is_public() && child.ident.name != kw::Underscore)
+                    .map(|child| child.ident.name)
+                    .unwrap_or(name)
+            } else {
+                name
+            }
+        };
+
+        if let DefKind::Variant = kind
+            && let Some(symbol) = self.tcx().trimmed_def_paths(()).get(&def_id)
+        {
+            // If `Assoc` is unique, we don't want to talk about `Trait::Assoc`.
+            self.segments.push(PathSegment::Symbol {
+                name: get_local_name(self, *symbol, def_id, key),
+            });
+            return true;
+
+        }
+
+        if let Some(symbol) = key.get_opt_name() {
+            if let DefKind::AssocConst | DefKind::AssocFn | DefKind::AssocTy = kind
+                && let Some(parent) = self.tcx().opt_parent(def_id)
+                && let parent_key = self.tcx().def_key(parent)
+                && let Some(symbol) = parent_key.get_opt_name()
+            {
+                // Trait
+                self.segments.push(PathSegment::Symbol {
+                    name: get_local_name(self, symbol, parent, parent_key)
+                });
+                self.segments.push(PathSegment::Colons);
+
+            } else if let DefKind::Variant = kind
+                && let Some(parent) = self.tcx().opt_parent(def_id)
+                && let parent_key = self.tcx().def_key(parent)
+                && let Some(symbol) = parent_key.get_opt_name()
+            {
+                // Enum
+
+                // For associated items and variants, we want the "full" path, namely, include
+                // the parent type in the path. For example, `Iterator::Item`.
+                self.segments.push(PathSegment::Symbol {
+                    name: get_local_name(self, symbol, parent, parent_key)
+                });
+                self.segments.push(PathSegment::Colons);
+
+            } else if let DefKind::Struct
+                | DefKind::Union
+                | DefKind::Enum
+                | DefKind::Trait
+                | DefKind::TyAlias
+                | DefKind::Fn
+                | DefKind::Const
+                | DefKind::Static(_) = kind
+            { /* intentionally blank */ } else {
+                // If not covered above, like for example items out of `impl` blocks, fallback.
+                return false;
+            }
+            self.segments.push(
+                PathSegment::Symbol {
+                    name: get_local_name(self, symbol, def_id, key)
+                }
+            );
+            return true;
+        }
+        false
+    }
+
+    fn try_trimmed_def_path(&mut self, def_id: DefId) -> bool {
+        if with_forced_trimmed_paths() {
+            let trimmed = self.force_trimmed_def_path(def_id);
+            if trimmed {
+                return true;
+            }
+        }
+        if
+            // !self.tcx().sess.opts.unstable_opts.trim_diagnostic_paths
+            // || matches!(self.tcx().sess.opts.trimmed_def_paths, TrimmedDefPaths::Never)
+            // ||
+            with_no_trimmed_paths()
+            || with_crate_prefix()
+        {
+            return false;
+        }
+
+        match self.tcx().trimmed_def_paths(()).get(&def_id) {
+            None => false,
+            Some(symbol) => {
+                self.segments.push(PathSegment::Symbol{ name: *symbol });
+                // write!(self, "{}", Ident::with_dummy_span(*symbol))?;
+                true
+            }
+        }
+    }
+
+    fn try_visible_def_path_recur(&mut self, def_id: DefId, callers: &mut Vec<DefId>) -> bool {
+        debug!("try_visible_def_path: def_id={:?}", def_id);
+
+        // If `def_id` is a direct or injected extern crate, return the
+        // path to the crate followed by the path to the item within the crate.
+        if let Some(cnum) = def_id.as_crate_root() {
+            if cnum == LOCAL_CRATE {
+                self.path_crate(cnum);
+                return true;
+            }
+
+            // In local mode, when we encounter a crate other than
+            // LOCAL_CRATE, execution proceeds in one of two ways:
+            //
+            // 1. For a direct dependency, where user added an
+            //    `extern crate` manually, we put the `extern
+            //    crate` as the parent. So you wind up with
+            //    something relative to the current crate.
+            // 2. For an extern inferred from a path or an indirect crate,
+            //    where there is no explicit `extern crate`, we just prepend
+            //    the crate name.
+            match self.tcx().extern_crate(def_id) {
+                Some(&ExternCrate { src, dependency_of, span, .. }) => match (src, dependency_of) {
+                    (ExternCrateSource::Extern(def_id), LOCAL_CRATE) => {
+                        // NOTE(eddyb) the only reason `span` might be dummy,
+                        // that we're aware of, is that it's the `std`/`core`
+                        // `extern crate` injected by default.
+                        // FIXME(eddyb) find something better to key this on,
+                        // or avoid ending up with `ExternCrateSource::Extern`,
+                        // for the injected `std`/`core`.
+                        if span.is_dummy() {
+                            self.path_crate(cnum);
+                            return true;
+                        }
+
+                        // Disable `try_print_trimmed_def_path` behavior within
+                        // the `print_def_path` call, to avoid infinite recursion
+                        // in cases where the `extern crate foo` has non-trivial
+                        // parents, e.g. it's nested in `impl foo::Trait for Bar`
+                        // (see also issues #55779 and #87932).
+                        with_no_visible_paths!(self.def_path(def_id, &[]));
+
+                        return true;
+                    }
+                    (ExternCrateSource::Path, LOCAL_CRATE) => {
+                        self.path_crate(cnum);
+                        return true;
+                    }
+                    _ => {}
+                },
+                None => {
+                    self.path_crate(cnum);
+                    return true;
+                }
+            }
+        }
+
+        if def_id.is_local() {
+            return false;
+        }
+
+        let visible_parent_map = self.tcx().visible_parent_map(());
+
+        let mut cur_def_key = self.tcx().def_key(def_id);
+        debug!("try_visible_def_path: cur_def_key={:?}", cur_def_key);
+
+        // For a constructor, we want the name of its parent rather than <unnamed>.
+        if let DefPathData::Ctor = cur_def_key.disambiguated_data.data {
+            let parent = DefId {
+                krate: def_id.krate,
+                index: cur_def_key
+                    .parent
+                    .expect("`DefPathData::Ctor` / `VariantData` missing a parent"),
+            };
+
+            cur_def_key = self.tcx().def_key(parent);
+        }
+
+        let Some(visible_parent) = visible_parent_map.get(&def_id).cloned() else {
+            return false;
+        };
+
+        let actual_parent = self.tcx().opt_parent(def_id);
+        debug!(
+            "try_visible_def_path: visible_parent={:?} actual_parent={:?}",
+            visible_parent, actual_parent,
+        );
+
+        let mut data = cur_def_key.disambiguated_data.data;
+        debug!(
+            "try_visible_def_path: data={:?} visible_parent={:?} actual_parent={:?}",
+            data, visible_parent, actual_parent,
+        );
+
+        match data {
+            // In order to output a path that could actually be imported (valid and visible),
+            // we need to handle re-exports correctly.
+            //
+            // For example, take `std::os::unix::process::CommandExt`, this trait is actually
+            // defined at `std::sys::unix::ext::process::CommandExt` (at time of writing).
+            //
+            // `std::os::unix` reexports the contents of `std::sys::unix::ext`. `std::sys` is
+            // private so the "true" path to `CommandExt` isn't accessible.
+            //
+            // In this case, the `visible_parent_map` will look something like this:
+            //
+            // (child) -> (parent)
+            // `std::sys::unix::ext::process::CommandExt` -> `std::sys::unix::ext::process`
+            // `std::sys::unix::ext::process` -> `std::sys::unix::ext`
+            // `std::sys::unix::ext` -> `std::os`
+            //
+            // This is correct, as the visible parent of `std::sys::unix::ext` is in fact
+            // `std::os`.
+            //
+            // When printing the path to `CommandExt` and looking at the `cur_def_key` that
+            // corresponds to `std::sys::unix::ext`, we would normally print `ext` and then go
+            // to the parent - resulting in a mangled path like
+            // `std::os::ext::process::CommandExt`.
+            //
+            // Instead, we must detect that there was a re-export and instead print `unix`
+            // (which is the name `std::sys::unix::ext` was re-exported as in `std::os`). To
+            // do this, we compare the parent of `std::sys::unix::ext` (`std::sys::unix`) with
+            // the visible parent (`std::os`). If these do not match, then we iterate over
+            // the children of the visible parent (as was done when computing
+            // `visible_parent_map`), looking for the specific child we currently have and then
+            // have access to the re-exported name.
+            DefPathData::TypeNs(ref mut name) if Some(visible_parent) != actual_parent => {
+                // Item might be re-exported several times, but filter for the one
+                // that's public and whose identifier isn't `_`.
+                let reexport = self
+                    .tcx()
+                    // FIXME(typed_def_id): Further propagate ModDefId
+                    .module_children(ModDefId::new_unchecked(visible_parent))
+                    .iter()
+                    .filter(|child| child.res.opt_def_id() == Some(def_id))
+                    .find(|child| child.vis.is_public() && child.ident.name != kw::Underscore)
+                    .map(|child| child.ident.name);
+
+                if let Some(new_name) = reexport {
+                    *name = new_name;
+                } else {
+                    // There is no name that is public and isn't `_`, so bail.
+                    return false;
+                }
+            }
+            // Re-exported `extern crate` (#43189).
+            DefPathData::CrateRoot => {
+                data = DefPathData::TypeNs(self.tcx().crate_name(def_id.krate));
+            }
+            _ => {}
+        }
+        debug!("try_visible_def_path: data={:?}", data);
+
+        if callers.contains(&visible_parent) {
+            return false;
+        }
+        callers.push(visible_parent);
+        // HACK(eddyb) this bypasses `path_append`'s prefix printing to avoid
+        // knowing ahead of time whether the entire path will succeed or not.
+        // To support printers that do not implement `PrettyPrinter`, a `Vec` or
+        // linked list on the stack would need to be built, before any printing.
+        match self.try_visible_def_path_recur(visible_parent, callers) {
+            false => return false,
+            true => {}
+        }
+        callers.pop();
+        self.path_append(|_| (), &DisambiguatedDefPathData { data, disambiguator: 0 });
+        true
+    }
+
+    fn try_visible_def_path(&mut self, def_id: DefId) -> bool {
+        if with_no_visible_paths() {
+            return false;
+        }
+
+        let mut callers = Vec::new();
+        self.try_visible_def_path_recur(def_id, &mut callers)
     }
 
     // Equivalent to rustc_middle::ty::print::default_def_path
     fn default_def_path(&mut self, def_id: DefId, args: &'tcx [GenericArg<'tcx>]) {
         let key = self.tcx().def_key(def_id);
-        log::debug!("DefId {:?} Args {:?} key {:?}", def_id, args, key);
+        debug!("{:?}", key);
 
         match key.disambiguated_data.data {
             DefPathData::CrateRoot => {
                 assert!(key.parent.is_none());
-                self.path_crate(def_id.krate);
+                self.path_crate(def_id.krate)
             }
 
             DefPathData::Impl => {
@@ -205,8 +605,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
                         impl_trait_ref.map(|i| i.instantiate_identity()),
                     )
                 };
-
-                self.impl_path(def_id, args, self_ty,  impl_trait_ref);
+                self.impl_path(def_id, args, self_ty, impl_trait_ref)
             }
 
             _ => {
@@ -215,13 +614,12 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
                 let mut parent_args = args;
                 let mut trait_qualify_parent = false;
                 if !args.is_empty() {
-                    log::debug!("Default, with args {:?}", args);
                     let generics = self.tcx().generics_of(def_id);
                     parent_args = &args[..generics.parent_count.min(args.len())];
 
                     match key.disambiguated_data.data {
                         // Closures' own generics are only captures, don't print them.
-                        DefPathData::ClosureExpr => {}
+                        DefPathData::Closure => {}
                         // This covers both `DefKind::AnonConst` and `DefKind::InlineConst`.
                         // Anon consts doesn't have their own generics, and inline consts' own
                         // generics are their inferred types, so don't print them.
@@ -230,10 +628,10 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
                         // If we have any generic arguments to print, we do that
                         // on top of the same path, but without its own generics.
                         _ => {
-                            if !generics.params.is_empty() && args.len() >= generics.count() {
+                            if false && /* <-- TODO(gavinleroy) */!generics.params.is_empty() && args.len() >= generics.count() {
                                 let args = generics.own_args_no_defaults(self.tcx(), args);
                                 return self.path_generic_args(
-                                    |cx| cx.default_def_path(def_id, parent_args),
+                                    |cx| cx.def_path(def_id, parent_args),
                                     args,
                                 );
                             }
@@ -248,8 +646,6 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
                         && self.tcx().generics_of(parent_def_id).parent_count == 0;
                 }
 
-                log::debug!("Trait qualify parent {:?}", trait_qualify_parent);
-
                 self.path_append(
                     |cx: &mut Self| {
                         if trait_qualify_parent {
@@ -260,7 +656,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
                             );
                             cx.path_qualified(trait_ref.self_ty(), Some(trait_ref))
                         } else {
-                            cx.default_def_path(parent_def_id, parent_args)
+                            cx.def_path(parent_def_id, parent_args)
                         }
                     },
                     &key.disambiguated_data,
@@ -270,14 +666,22 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
     }
 
     fn path_crate(&mut self, cnum: CrateNum) {
-        log::debug!("Path crate {:?}", cnum);
+        debug!("Path crate {:?}", cnum);
+        self.empty_path = true;
         if cnum == LOCAL_CRATE {
-            self.segments.push(PathSegment::LocalCrate)
+            if self.tcx().sess.at_least_rust_2018() {
+                // We add the `crate::` keyword on Rust 2018, only when desired.
+                if with_crate_prefix() {
+                    self.segments.push(PathSegment::LocalCrate);
+                    self.empty_path = false;
+                }
+            }
+
         } else {
             let name = self.tcx().crate_name(cnum);
-            self.segments.push(PathSegment::Crate { name })
+            self.segments.push(PathSegment::Crate { name });
+            self.empty_path = false;
         }
-        self.empty_path = false;
     }
 
     fn impl_path(
@@ -297,7 +701,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
         self_ty: Ty<'tcx>,
         impl_trait_ref: Option<ty::TraitRef<'tcx>>,
     ) {
-        log::debug!(
+        debug!(
             "impl_path: impl_def_id={:?}, self_ty={}, impl_trait_ref={:?}",
             impl_def_id, self_ty, impl_trait_ref
         );
@@ -324,7 +728,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
             // trait-type, then fallback to a format that identifies
             // the module more clearly.
             self.path_append_impl(
-                |cx| cx.default_def_path(parent_def_id, &[]),
+                |cx| cx.def_path(parent_def_id, &[]),
                 &key.disambiguated_data,
                 self_ty,
                 impl_trait_ref,
@@ -358,11 +762,12 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
                 self.segments.push(PathSegment::RawGuess);
             }
         }
-        self.disambiguated_def_path_data(disambiguated_data);
+
+        self.disambiguated_def_path_data(disambiguated_data, true);
         self.empty_path = false;
     }
 
-    fn disambiguated_def_path_data(&mut self, disambiguated_data: &DisambiguatedDefPathData) {
+    fn disambiguated_def_path_data(&mut self, disambiguated_data: &DisambiguatedDefPathData, _verbose: bool) {
         let name = match disambiguated_data.data.name() {
             DefPathDataName::Named(name) => name, 
             DefPathDataName::Anon { namespace } => namespace, 
@@ -380,6 +785,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
         self_ty: Ty<'tcx>,
         trait_ref: Option<ty::TraitRef<'tcx>>,
     ) {
+        debug!("path_append_impl  {:?} {:?}", self_ty, trait_ref);
         self.pretty_path_append_impl(
             |cx| {
                 prefix(cx);
@@ -402,8 +808,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
         prefix(self);
 
         self.generic_delimiters(|cx| {
-            define_scoped_cx!(cx);
-            cx.segments.push(PathSegment::Impl { 
+            cx.segments.push(PathSegment::Impl {
                 path: trait_ref.map(|t| TraitRefPrintOnlyTraitPathDefWrapper(t)),
                 ty: self_ty,
                 kind: ImplKind::For,
@@ -455,6 +860,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
         self_ty: Ty<'tcx>,
         trait_ref: Option<ty::TraitRef<'tcx>>,
     ) {
+        debug!("pretty_path_qualified {self_ty:?} {trait_ref:?}");
         if trait_ref.is_none() {
             // Inherent impls. Try to print `Foo::bar` for an inherent
             // impl on `Foo`, but fallback to `<Foo>::bar` if self-type is
@@ -476,8 +882,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
         }
 
         self.generic_delimiters(|cx| {
-            define_scoped_cx!(cx);
-            cx.segments.push(PathSegment::Impl { 
+            cx.segments.push(PathSegment::Impl {
                 path: trait_ref.map(|t| TraitRefPrintOnlyTraitPathDefWrapper(t)),
                 ty: self_ty,
                 kind: ImplKind::As,
@@ -492,39 +897,13 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
     ) {
         prefix(self);
 
-        let tcx = self.tcx();
-
-        let args = args.iter().copied();
-
-        let args: Vec<_> = if !tcx.sess.verbose() {
-            // skip host param as those are printed as `~const`
-            args.filter(|arg| match arg.unpack() {
-                // FIXME(effects) there should be a better way than just matching the name
-                GenericArgKind::Const(c)
-                    if tcx.features().effects
-                        && matches!(
-                            c.kind(),
-                            ty::ConstKind::Param(ty::ParamConst { name: sym::host, .. })
-                        ) =>
-                {
-                    false
-                }
-                _ => true,
-            })
-            .collect()
-        } else {
-            // If -Zverbose is passed, we should print the host parameter instead
-            // of eating it.
-            args.collect()
-        };
-
         if !args.is_empty() {
             if self.in_value {
                 self.segments.push(PathSegment::Colons);
             }
             self.generic_delimiters(|cx| {
                 #[derive(Serialize)]
-                struct Wrapper<'tcx>(#[serde(with = "GenericArgDef")] GenericArg<'tcx>);
+                struct Wrapper<'a, 'tcx: 'a>(#[serde(with = "GenericArgDef")] &'a GenericArg<'tcx>);
                 cx.comma_sep(args.into_iter().map(Wrapper), CommaSeparatedKind::GenericArg)
             })
         }

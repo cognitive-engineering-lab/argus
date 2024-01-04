@@ -3,7 +3,8 @@
     trait_alias,
     never_type, // proof tree visitor
     min_specialization, // for rustc_index
-    let_chains
+    let_chains,
+    decl_macro // path serialize
 )]
 
 extern crate rustc_data_structures;
@@ -27,22 +28,35 @@ pub mod proof_tree;
 // pub mod serialize;
 pub mod ty;
 
+// ---------------
+
+use anyhow::Result;
+use rustc_span::Span;
+use rustc_middle::ty::TyCtxt;
+use rustc_utils::source_map::range::ToSpan;
+
 #[derive(Debug)]
 pub struct Target {
-  data: u64,
+  pub hash: u64,
+  pub span: Span,
 }
 
 pub trait ToTarget {
-  fn to_target(self) -> Target;
+  fn to_target(self, tcx: TyCtxt) -> Result<Target>;
 }
 
-impl ToTarget for u64 {
-  fn to_target(self) -> Target {
-    Target {
-      data: self,
-    }
+impl<U: Into<u64>, T: ToSpan> ToTarget for (U, T) {
+  fn to_target(self, tcx: TyCtxt) -> Result<Target> {
+    self.1.to_span(tcx).map(|span| {
+      Target {
+        hash: self.0.into(),
+        span,
+      }
+    })
   }
 }
+
+// TS-RS exports, these should be moved to a different module. They aren't used now anyways.
 
 // FIXME: this shouldn't currently be used, because we now rely on
 // the serialization of rustc types, I need to update the TS-RS

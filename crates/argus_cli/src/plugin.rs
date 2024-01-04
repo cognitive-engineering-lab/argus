@@ -1,6 +1,6 @@
 use std::{borrow::Cow, env, process::{exit, Command}, time::Instant, path::PathBuf};
 
-use rustc_errors::Handler;
+use rustc_errors::DiagCtxt;
 use rustc_interface::interface::Result as RustcResult;
 use rustc_middle::ty::TyCtxt;
 use rustc_hir::BodyId;
@@ -9,8 +9,9 @@ use rustc_plugin::{CrateFilter, RustcPlugin, RustcPluginArgs, Utf8Path};
 use rustc_utils::{
   errors::silent_emitter::SilentEmitter,
   source_map::{
-    find_bodies::find_bodies,
-    range::CharRange,
+    find_bodies::{find_bodies, find_enclosing_bodies},
+    filename::Filename,
+    range::{CharRange, CharPos},
   },
   timer::elapsed,
 };
@@ -38,8 +39,13 @@ enum ArgusCommand {
     file: String,
   },
   Tree {
-    file: String,
     id: u64,
+    file: String,
+    // Represents enclosing body `CharRange`
+    start_line: usize,
+    start_column: usize,
+    end_line: usize,
+    end_column: usize,
   },
 }
 
@@ -135,13 +141,30 @@ impl RustcPlugin for ArgusPlugin {
   ) -> RustcResult<()> {
     use ArgusCommand::*;
     match plugin_args.command {
-      Tree { file, id } => {
-        let compute_target = move || { Some(id) };
-        postprocess(run(argus::analysis::tree, PathBuf::from(file), compute_target, &compiler_args))
+      Tree {
+        file,
+        id,
+        start_line,
+        start_column,
+        end_line,
+        end_column
+      } => {
+        let filename = Filename::intern(&file);
+        let compute_target = move || {
+          let range = CharRange {
+            start: CharPos { line: start_line, column: start_column, },
+            end: CharPos { line: end_line, column: end_column, },
+            filename,
+          };
+          Some((id, range))
+        };
+        let v = run(argus::analysis::tree, PathBuf::from(file), compute_target, &compiler_args);
+        postprocess(v)
       }
       Obligations { file, .. } => {
-        let nothing = || { None::<u64> };
-        postprocess(run(argus::analysis::obligations, PathBuf::from(file), nothing, &compiler_args))
+        let nothing = || None::<(u64, CharRange)>;
+        let v = run(argus::analysis::obligations, PathBuf::from(file), nothing , &compiler_args);
+        postprocess(v)
       }
       _ => unreachable!(),
     }
@@ -177,7 +200,7 @@ pub fn run_with_callbacks(
   let mut args = args.to_vec();
   // -Z identify-regions -Z track-diagnostics=yes
   args.extend(
-    "-Z trait-solver=next -Z track-trait-obligations -A warnings"
+    "-Z next-solver -Z track-trait-obligations -A warnings"
       .split(' ')
       .map(|s| s.to_owned()),
   );
@@ -211,8 +234,7 @@ impl<
       // Create a new emitter writer which consumes *silently* all
       // errors. There most certainly is a *better* way to do this,
       // if you, the reader, know what that is, please open an issue :)
-      let handler = Handler::with_emitter(Box::new(SilentEmitter));
-      sess.span_diagnostic = handler;
+      sess.dcx = DiagCtxt::with_emitter(Box::new(SilentEmitter));
     }));
  }
 
@@ -228,7 +250,7 @@ impl<
       elapsed("global_ctxt", start);
       let mut analysis = self.analysis.take().unwrap();
 
-      let inner = |(_, body)| {
+      let mut inner = |(_, body)| {
         if let FileName::Real(RealFileName::LocalPath(p)) = get_file_of_body(tcx, body) {
           if self.file.ends_with(&p) {
             match analysis.analyze(tcx, body) {
@@ -246,17 +268,19 @@ impl<
 
       self.result = match (self.compute_target.take().unwrap())() {
         Some(target) => {
-          let target = target.to_target();
+          let target = target.to_target(tcx).expect("Couldn't compute target");
+          let body_span = target.span.clone();
 
           debug!("target: {target:?}");
 
           fluid_set!(argus::analysis::OBLIGATION_TARGET, target);
 
-          find_bodies(tcx).into_iter().filter_map(inner).collect::<Vec<_>>()
+          find_enclosing_bodies(tcx, body_span)
+            .filter_map(|b| inner((body_span, b)))
+            .collect::<Vec<_>>()
         },
         None => {
           debug!("no target");
-
           find_bodies(tcx).into_iter().filter_map(inner).collect::<Vec<_>>()
         }
       };

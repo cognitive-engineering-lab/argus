@@ -11,8 +11,8 @@ rustc_private = true
 [dependencies]
 argus = { path = "../argus" }
 
-rustc_plugin = "0.7.3-nightly-2023-11-08"
-rustc_utils = { version = "0.7.3-nightly-2023-11-08", features = ["serde"] }
+rustc_plugin = "=0.7.4-nightly-2023-08-25"
+rustc_utils = { version = "=0.7.4-nightly-2023-08-25", features = ["serde"] }
 
 # For binaries
 log = "0.4"
