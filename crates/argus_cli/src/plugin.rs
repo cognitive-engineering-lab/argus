@@ -1,26 +1,31 @@
-use std::{borrow::Cow, env, process::{exit, Command}, time::Instant, path::PathBuf};
+use std::{
+  borrow::Cow,
+  env,
+  path::PathBuf,
+  process::{exit, Command},
+  time::Instant,
+};
 
+use argus::ToTarget;
+use clap::{Parser, Subcommand};
+use fluid_let::fluid_set;
+use log::{debug, info};
 use rustc_errors::DiagCtxt;
+use rustc_hir::BodyId;
 use rustc_interface::interface::Result as RustcResult;
 use rustc_middle::ty::TyCtxt;
-use rustc_hir::BodyId;
-use rustc_span::{FileName, RealFileName};
 use rustc_plugin::{CrateFilter, RustcPlugin, RustcPluginArgs, Utf8Path};
+use rustc_span::{FileName, RealFileName};
 use rustc_utils::{
   errors::silent_emitter::SilentEmitter,
   source_map::{
-    find_bodies::{find_bodies, find_enclosing_bodies},
     filename::Filename,
-    range::{CharRange, CharPos},
+    find_bodies::{find_bodies, find_enclosing_bodies},
+    range::{CharPos, CharRange},
   },
   timer::elapsed,
 };
-
-use clap::{Parser, Subcommand};
-use log::{debug, info};
 use serde::{self, Deserialize, Serialize};
-use fluid_let::fluid_set;
-use argus::ToTarget;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -51,7 +56,11 @@ enum ArgusCommand {
 
 trait ArgusAnalysis: Sized + Send + Sync {
   type Output: Serialize + Send + Sync;
-  fn analyze(&mut self, tcx: TyCtxt, id: BodyId) -> anyhow::Result<Self::Output>;
+  fn analyze(
+    &mut self,
+    tcx: TyCtxt,
+    id: BodyId,
+  ) -> anyhow::Result<Self::Output>;
 }
 
 impl<O, F> ArgusAnalysis for F
@@ -60,7 +69,11 @@ where
   O: Serialize + Send + Sync,
 {
   type Output = O;
-  fn analyze<'tcx>(&mut self, tcx: TyCtxt<'tcx>, id: BodyId) -> anyhow::Result<Self::Output> {
+  fn analyze<'tcx>(
+    &mut self,
+    tcx: TyCtxt<'tcx>,
+    id: BodyId,
+  ) -> anyhow::Result<Self::Output> {
     (self)(tcx, id)
   }
 }
@@ -77,7 +90,7 @@ struct ArgusCallbacks<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>> {
 #[serde(tag = "type")]
 pub enum ArgusError {
   BuildError { range: Option<CharRange> },
-  AnalysisError { error: String,  }
+  AnalysisError { error: String },
 }
 
 pub type ArgusResult<T> = std::result::Result<T, ArgusError>;
@@ -133,7 +146,6 @@ impl RustcPlugin for ArgusPlugin {
     }
   }
 
-
   fn run(
     self,
     compiler_args: Vec<String>,
@@ -147,23 +159,39 @@ impl RustcPlugin for ArgusPlugin {
         start_line,
         start_column,
         end_line,
-        end_column
+        end_column,
       } => {
         let filename = Filename::intern(&file);
         let compute_target = move || {
           let range = CharRange {
-            start: CharPos { line: start_line, column: start_column, },
-            end: CharPos { line: end_line, column: end_column, },
+            start: CharPos {
+              line: start_line,
+              column: start_column,
+            },
+            end: CharPos {
+              line: end_line,
+              column: end_column,
+            },
             filename,
           };
           Some((id, range))
         };
-        let v = run(argus::analysis::tree, PathBuf::from(file), compute_target, &compiler_args);
+        let v = run(
+          argus::analysis::tree,
+          PathBuf::from(file),
+          compute_target,
+          &compiler_args,
+        );
         postprocess(v)
       }
       Obligations { file, .. } => {
         let nothing = || None::<(u64, CharRange)>;
-        let v = run(argus::analysis::obligations, PathBuf::from(file), nothing , &compiler_args);
+        let v = run(
+          argus::analysis::obligations,
+          PathBuf::from(file),
+          nothing,
+          &compiler_args,
+        );
         postprocess(v)
       }
       _ => unreachable!(),
@@ -213,7 +241,9 @@ pub fn run_with_callbacks(
 
   // Argus works even when the compiler exits with an error.
   #[allow(unused_must_use)]
-  let _ = compiler.run().map_err(|_| ArgusError::BuildError { range: None });
+  let _ = compiler
+    .run()
+    .map_err(|_| ArgusError::BuildError { range: None });
 
   Ok(())
 }
@@ -224,19 +254,17 @@ fn postprocess<T: Serialize>(result: T) -> RustcResult<()> {
   Ok(())
 }
 
-impl<
-  A: ArgusAnalysis,
-  T: ToTarget,
-  F: FnOnce() -> Option<T>,
-> rustc_driver::Callbacks for ArgusCallbacks<A, T, F> {
- fn config(&mut self, config: &mut rustc_interface::Config) {
+impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
+  rustc_driver::Callbacks for ArgusCallbacks<A, T, F>
+{
+  fn config(&mut self, config: &mut rustc_interface::Config) {
     config.parse_sess_created = Some(Box::new(|sess| {
       // Create a new emitter writer which consumes *silently* all
       // errors. There most certainly is a *better* way to do this,
       // if you, the reader, know what that is, please open an issue :)
       sess.dcx = DiagCtxt::with_emitter(Box::new(SilentEmitter));
     }));
- }
+  }
 
   fn after_expansion<'tcx>(
     &mut self,
@@ -251,7 +279,9 @@ impl<
       let mut analysis = self.analysis.take().unwrap();
 
       let mut inner = |(_, body)| {
-        if let FileName::Real(RealFileName::LocalPath(p)) = get_file_of_body(tcx, body) {
+        if let FileName::Real(RealFileName::LocalPath(p)) =
+          get_file_of_body(tcx, body)
+        {
           if self.file.ends_with(&p) {
             match analysis.analyze(tcx, body) {
               Ok(v) => Some(v),
@@ -278,10 +308,13 @@ impl<
           find_enclosing_bodies(tcx, body_span)
             .filter_map(|b| inner((body_span, b)))
             .collect::<Vec<_>>()
-        },
+        }
         None => {
           debug!("no target");
-          find_bodies(tcx).into_iter().filter_map(inner).collect::<Vec<_>>()
+          find_bodies(tcx)
+            .into_iter()
+            .filter_map(inner)
+            .collect::<Vec<_>>()
         }
       };
     });
@@ -291,8 +324,8 @@ impl<
 }
 
 fn get_file_of_body(tcx: TyCtxt<'_>, body_id: rustc_hir::BodyId) -> FileName {
-    let hir = tcx.hir();
-    let body_span = hir.body(body_id).value.span;
-    let source_map = tcx.sess.source_map();
-    source_map.span_to_filename(body_span)
+  let hir = tcx.hir();
+  let body_span = hir.body(body_id).value.span;
+  let source_map = tcx.sess.source_map();
+  source_map.span_to_filename(body_span)
 }

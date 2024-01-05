@@ -1,5 +1,5 @@
-pub mod topology;
 pub mod ext;
+pub mod topology;
 #[macro_use]
 mod macros;
 pub(super) mod serialize;
@@ -7,18 +7,16 @@ pub(super) mod serialize;
 use std::collections::HashSet;
 
 use index_vec::IndexVec;
-use rustc_infer::traits::FulfilledObligation;
-use rustc_trait_selection::traits::solve::Goal;
-use rustc_middle::ty::{Predicate, Ty, TraitRef};
+use rustc_middle::ty::{Predicate, TraitRef, Ty};
 use rustc_utils::source_map::range::CharRange;
-
-pub use topology::*;
-use crate::serialize::ty::{PredicateDef, goal__predicate_def, TyDef, TraitRefPrintOnlyTraitPathDef};
-
-// FIXME: TS bindings were removed as the automatic 
+// FIXME: TS bindings were removed as the automatic
 // generation doesn't have a serde::remote-like feature.
-use ts_rs::TS;
 use serde::Serialize;
+pub use topology::*;
+
+use crate::serialize::ty::{
+  PredicateDef, TraitRefPrintOnlyTraitPathDef, TyDef,
+};
 
 crate::define_usize_idx! {
   ProofNodeIdx
@@ -28,14 +26,18 @@ crate::define_usize_idx! {
 #[cfg_attr(featutre = "ts-rs", derive(TS))]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Node<'tcx> {
-    Result { data: String },
-    Candidate { data: Candidate<'tcx> },
-    Goal {
-      #[cfg_attr(featutre = "ts-rs", ts(type = "any"))]
-      data: serde_json::Value,
-      #[serde(skip)]
-      _marker: std::marker::PhantomData<&'tcx ()>,
-    },
+  Result {
+    data: String,
+  },
+  Candidate {
+    data: Candidate<'tcx>,
+  },
+  Goal {
+    #[cfg_attr(featutre = "ts-rs", ts(type = "any"))]
+    data: serde_json::Value,
+    #[serde(skip)]
+    _marker: std::marker::PhantomData<&'tcx ()>,
+  },
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
@@ -50,12 +52,16 @@ pub enum Candidate<'tcx> {
   },
 
   // TODO(gavinleroy) when everything is structured
-  Any { data: String },
+  Any {
+    data: String,
+  },
 }
 
 impl From<&'static str> for Candidate<'_> {
   fn from(value: &'static str) -> Self {
-    Candidate::Any { data: value.to_string() }
+    Candidate::Any {
+      data: value.to_string(),
+    }
   }
 }
 
@@ -63,11 +69,11 @@ impl From<&'static str> for Candidate<'_> {
 #[cfg_attr(feature = "ts-rs", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct SerializedTree<'tcx> {
-    pub root: ProofNodeIdx,
-    pub nodes: IndexVec<ProofNodeIdx, Node<'tcx>>,
-    pub topology: TreeTopology<ProofNodeIdx>,
-    pub error_leaves: Vec<ProofNodeIdx>,
-    pub unnecessary_roots: HashSet<ProofNodeIdx>,
+  pub root: ProofNodeIdx,
+  pub nodes: IndexVec<ProofNodeIdx, Node<'tcx>>,
+  pub topology: TreeTopology<ProofNodeIdx>,
+  pub error_leaves: Vec<ProofNodeIdx>,
+  pub unnecessary_roots: HashSet<ProofNodeIdx>,
 }
 
 #[derive(Serialize, Clone, Debug)]

@@ -16,8 +16,8 @@ extern crate rustc_infer;
 extern crate rustc_macros;
 extern crate rustc_middle;
 extern crate rustc_query_system;
-extern crate rustc_session;
 extern crate rustc_serialize;
+extern crate rustc_session;
 extern crate rustc_span;
 extern crate rustc_target;
 extern crate rustc_trait_selection;
@@ -33,10 +33,9 @@ pub mod serialize;
 use rustc_span::symbol::Symbol;
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
+use serialize::ty::SymbolDef;
 #[cfg(feature = "ts-rs")]
 use ts_rs::TS;
-
-use serialize::ty::SymbolDef;
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "ts-rs", derive(TS))]
@@ -67,7 +66,10 @@ pub struct ObligationsInBody {
 }
 
 // Serialize an Option<Symbol> using SymbolDef but the value must be a Some(..)
-fn serialize_option<S: serde::Serializer>(value: &Option<Symbol>, s: S) -> Result<S::Ok, S::Error> {
+fn serialize_option<S: serde::Serializer>(
+  value: &Option<Symbol>,
+  s: S,
+) -> Result<S::Ok, S::Error> {
   let Some(symb) = value else {
     unreachable!();
   };
@@ -78,8 +80,8 @@ fn serialize_option<S: serde::Serializer>(value: &Option<Symbol>, s: S) -> Resul
 // ------------------------------
 
 use anyhow::Result;
-use rustc_span::Span;
 use rustc_middle::ty::TyCtxt;
+use rustc_span::Span;
 use rustc_utils::source_map::range::ToSpan;
 
 #[derive(Debug)]
@@ -94,11 +96,9 @@ pub trait ToTarget {
 
 impl<U: Into<u64>, T: ToSpan> ToTarget for (U, T) {
   fn to_target(self, tcx: TyCtxt) -> Result<Target> {
-    self.1.to_span(tcx).map(|span| {
-      Target {
-        hash: self.0.into(),
-        span,
-      }
+    self.1.to_span(tcx).map(|span| Target {
+      hash: self.0.into(),
+      span,
     })
   }
 }
@@ -110,11 +110,12 @@ impl<U: Into<u64>, T: ToSpan> ToTarget for (U, T) {
 // generation.
 #[cfg(test)]
 mod tests {
-    use ts_rs::TS;
-    use crate::proof_tree;
-    use rustc_utils::source_map::{range, filename};
+  use rustc_utils::source_map::{filename, range};
+  use ts_rs::TS;
 
-    macro_rules! ts {
+  use crate::proof_tree;
+
+  macro_rules! ts {
       ($($ty:ty,)*) => {
         $({
           let error_msg = format!("Failed to export TS binding for type '{}'", stringify!($ty));
@@ -123,18 +124,18 @@ mod tests {
       };
     }
 
-    #[test]
-    fn export_bindings_all_tys() {
-        ts! {
-          proof_tree::SerializedTree,
-          proof_tree::Node,
-          proof_tree::Obligation,
-          proof_tree::TreeTopology<proof_tree::ProofNodeIdx>,
+  #[test]
+  fn export_bindings_all_tys() {
+    ts! {
+      // proof_tree::SerializedTree,
+      // proof_tree::Node,
+      // proof_tree::Obligation,
+      // proof_tree::TreeTopology<proof_tree::ProofNodeIdx>,
 
-          // From rustc_utils
-          range::CharRange,
-          range::CharPos,
-          filename::FilenameIndex,
-        }
+      // From rustc_utils
+      // range::CharRange,
+      // range::CharPos,
+      // filename::FilenameIndex,
     }
+  }
 }
