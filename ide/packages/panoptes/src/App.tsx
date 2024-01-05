@@ -81,10 +81,10 @@ const OpenFile = ({ filename }: { filename: Filename }) => {
       <div>
         <VSCodeButton onClick={handleClick}>Fetch Obligations</VSCodeButton>
       </div>
-      {isLoading || obligations === undefined ? (
+      {isLoading ? (
         <WaitingOnObligations />
       ) : (
-        <ObligationManager file={filename} osibs={obligations} />
+        <ObligationManager file={filename} osibs={obligations!} />
       )}
     </div>
   );

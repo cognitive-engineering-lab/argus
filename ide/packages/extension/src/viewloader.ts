@@ -174,19 +174,18 @@ export class ViewLoader {
       return;
     }
 
-    // FIXME: there shouldn't be 'null' values in the array, in fact, it shouldn't
-    // even *be* an array. It shoudld be an optional tree returned from the backend.
-    const tree = _.filter(
-      res.value,
-      t => t !== null || t !== undefined
-    ) as SerializedTree[];
-    const t0 = tree[0];
+    // NOTE: the returned value should be an array of a single tree, however,
+    // it is possible that no tree is returned. (This is but we're working on it.)
+    const tree = _.filter(res.value, t => t !== undefined) as Array<
+      SerializedTree | undefined
+    >;
+    const tree0 = tree[0];
 
     this.messageWebview({
       type: "FROM_EXTENSION",
       file: host,
       command: "tree",
-      tree: t0,
+      tree: tree0,
     });
   }
 

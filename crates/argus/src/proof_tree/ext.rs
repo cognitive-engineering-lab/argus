@@ -43,7 +43,7 @@ pub trait PrettyPrintExt<'a, 'tcx>: Print<'tcx, FmtPrinter<'a, 'tcx>> {
         let tcx = infcx.tcx;
         let namespace = guess_def_namespace(tcx, def_id);
         let mut fmt = FmtPrinter::new(tcx, namespace);
-        self.print(&mut fmt);
+        self.print(&mut fmt).unwrap();
         fmt.into_buffer()
     }
 }

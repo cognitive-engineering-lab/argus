@@ -7,7 +7,7 @@ import {
 } from "./types";
 
 // ----------------------------------------------------
-// Communication between the extension and the webview.
+// Interface between the webview and extension
 
 export type Filename = string;
 
@@ -21,12 +21,16 @@ export type CommonData = {
   file: Filename;
 };
 
-export type ExtensionToWebViewMsg = CommonData & { type: FROM_EXT } & (
-    | { command: "open-file" }
-    | { command: "close-file" }
-    | { command: "obligations"; obligations: ObligationOutput[] }
-    | { command: "tree"; tree: TreeOutput }
-  );
+export type ExtensionToWebViewMsg = { type: FROM_EXT } & (
+  | { command: "invalidate" }
+  | (CommonData &
+      (
+        | { command: "open-file" }
+        | { command: "close-file" }
+        | { command: "obligations"; obligations: ObligationOutput[] }
+        | { command: "tree"; tree: TreeOutput }
+      ))
+);
 
 export type WebViewToExtensionMsg = CommonData & { type: FROM_WV } & (
     | { command: "obligations" }
@@ -36,7 +40,7 @@ export type WebViewToExtensionMsg = CommonData & { type: FROM_WV } & (
   );
 
 // ------------------------------------------------------
-// interface types between the extension and rustc plugin
+// Interface between the extension and rustc plugin
 
 // serde-compatible type
 export type Result<T> = { Ok: T } | { Err: ArgusError };
@@ -58,8 +62,8 @@ export interface ArgusOutput<T> {
 
 export type ArgusResult<T> = ArgusOutput<T> | ArgusError | BuildError;
 
-// TODO: what we *really* want here is dependent typing...
-// it might be achievable with TS, but too tired rn to think about that.
+// TODO: what we really want here is dependent typing ... it
+// might be achievable with TS, but too tired rn to think about that.
 export type CallArgus = <T>(
   _args: ArgusArgs,
   _no_output?: boolean
@@ -68,4 +72,5 @@ export type CallArgus = <T>(
 export type ArgusArgs =
   | ["preload"] // => void
   | ["obligations", Filename] // => ObligationsInBody[]
+  // NOTE: the hashes need to remain a string, otherwise JS cuts off the higher bits on bignums.
   | ["tree", Filename, string, number, number, number, number]; // => [SerializedTree | undefined]

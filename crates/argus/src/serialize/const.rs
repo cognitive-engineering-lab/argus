@@ -1,17 +1,17 @@
 use std::num::*;
 
+use super::*;
+use ty::*;
+
 use rustc_type_ir as ir;
 use rustc_infer::infer::{InferCtxt, type_variable::TypeVariableOriginKind};
-use rustc_middle::{ty::{self, *, abstract_const::CastKind}, mir::{BinOp, UnOp}};
+use rustc_middle::{ty::{*, abstract_const::CastKind}, mir::{BinOp, UnOp}};
 use rustc_hir::def_id::{DefId, DefIndex, CrateNum};
 use rustc_span::symbol::{Symbol, kw};
 use rustc_target::spec::abi::Abi;
 use rustc_hir::Unsafety;
 
 use serde::{Serialize, ser::SerializeSeq};
-
-use super::*;
-use my_ty::*;
 
 pub struct ConstDef;
 impl ConstDef {

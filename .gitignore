@@ -20,3 +20,4 @@ sample-book/
 # Rust things
 target/
 debug/
+*.txt

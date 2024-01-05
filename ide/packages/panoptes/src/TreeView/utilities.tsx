@@ -43,15 +43,3 @@ export function pathFromRoot(
     path: path.reverse(),
   };
 }
-
-export const NodeContent = ({ node }: { node: Node }) => {
-  switch (node.type) {
-    case "result":
-      return node.data;
-    case "goal":
-      // return <PrintGoalPredicate o={node.data} />;
-      return node.data;
-    case "candidate":
-      return node.data;
-  }
-};

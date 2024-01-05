@@ -32,7 +32,7 @@ const ObligationTreeWrapper = ({
   obligation: Obligation;
 }) => {
   const [isTreeLoaded, setIsTreeLoaded] = useState(false);
-  const [tree, setTree] = useState<SerializedTree[] | undefined>(undefined);
+  const [tree, setTree] = useState<SerializedTree | undefined>(undefined);
   const file = useContext(FileContext)!;
 
   const listener = (e: MessageEvent) => {

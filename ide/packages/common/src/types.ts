@@ -1,3 +1,4 @@
+import { Candidate } from "./bindings/Candidate";
 import { CharPos } from "./bindings/CharPos";
 import { CharRange } from "./bindings/CharRange";
 import { FilenameIndex } from "./bindings/FilenameIndex";
@@ -16,6 +17,7 @@ export {
   CharPos,
   CharRange,
   FilenameIndex,
+  Candidate,
 };
 
 export type ObligationOutput = ObligationsInBody;

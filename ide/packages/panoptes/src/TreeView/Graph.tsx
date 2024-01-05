@@ -17,7 +17,7 @@ import ReactDOM from "react-dom";
 
 import { ActiveContext, TreeContext } from "./Context";
 import "./Graph.css";
-import { NodeContent } from "./utilities";
+import { Node } from "./Node";
 
 const useCenteredTree = (
   defaultTranslate = { x: 0, y: 0 }
@@ -73,7 +73,7 @@ const TreeNode = observer(
     const treeContext = useContext(TreeContext)!;
     const idx = nodeDatum.name as number;
     const node = treeContext.nodes[idx];
-    const label = node.data; // FIXME: bad
+    const label = "NODE CONTENT"; // node.data; // FIXME: bad
 
     const [width, height] = calculateTextSize(label);
 
@@ -114,6 +114,9 @@ const TreeNode = observer(
       </g>
     );
 
+    // TODO: this royally doesn't work, I'm not sure how to get
+    // (or  estimate) the width / height of the node before embedding
+    // it into the SVG.
     // <foreignObject x="50%" y="6%" width={width} height={height}>
     //   <div ref={ref} data-xmlns="http://www.w3.org/1999/xhtml">
     //     <NodeContent node={node} />

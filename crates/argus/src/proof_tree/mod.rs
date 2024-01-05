@@ -13,7 +13,7 @@ use rustc_middle::ty::{Predicate, Ty, TraitRef};
 use rustc_utils::source_map::range::CharRange;
 
 pub use topology::*;
-use crate::ty::{PredicateDef, goal__predicate_def, my_ty::TyDef, TraitRefPrintOnlyTraitPathDef};
+use crate::serialize::ty::{PredicateDef, goal__predicate_def, TyDef, TraitRefPrintOnlyTraitPathDef};
 
 // FIXME: TS bindings were removed as the automatic 
 // generation doesn't have a serde::remote-like feature.
@@ -29,7 +29,7 @@ crate::define_usize_idx! {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Node<'tcx> {
     Result { data: String },
-    Candidate(Candidate<'tcx>),
+    Candidate { data: Candidate<'tcx> },
     Goal {
       #[cfg_attr(featutre = "ts-rs", ts(type = "any"))]
       data: serde_json::Value,
@@ -39,6 +39,7 @@ pub enum Node<'tcx> {
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum Candidate<'tcx> {
   Impl {
     #[serde(with = "TyDef")]
@@ -47,12 +48,14 @@ pub enum Candidate<'tcx> {
     trait_ref: TraitRef<'tcx>,
     // range: CharRange,
   },
-  Any(String), // TODO(gavinleroy) remove
+
+  // TODO(gavinleroy) when everything is structured
+  Any { data: String },
 }
 
 impl From<&'static str> for Candidate<'_> {
   fn from(value: &'static str) -> Self {
-    Candidate::Any(value.to_string())
+    Candidate::Any { data: value.to_string() }
   }
 }
 

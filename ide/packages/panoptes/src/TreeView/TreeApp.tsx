@@ -14,24 +14,11 @@ import TreeArea from "./Graph";
 import TopDown from "./TopDown";
 import "./TreeApp.css";
 
-// TODO: don't really need this.
-type UnderlyingTree = SerializedTree[];
-
-function getAttempt(tree: UnderlyingTree) {
-  return _.maxBy(tree, (attempt: SerializedTree) => {
-    return attempt.nodes.length;
-  })!;
-}
-
-let TreeApp = ({ tree }: { tree: UnderlyingTree }) => {
-  console.log("Initial data", tree);
-  let attempt = getAttempt(tree);
-
-  if (attempt === null || attempt === undefined) {
-    // FIXME: this shouldn't ever happen, if a properly hashed
-    // value is returned. I need to think more about how to handle
-    // when we want to display "non-traditional" obligations. (subtypes,
-    // normalization, etc.)
+const TreeApp = ({ tree }: { tree: SerializedTree | undefined }) => {
+  // FIXME: this shouldn't ever happen, if a properly hashed
+  // value is sent and returned. I need to think more about how to handle
+  // when we want to display "non-traditional" obligations.
+  if (tree === undefined) {
     return (
       <div className="Error">
         <p>Whoops! Something went wrong:</p>
@@ -41,14 +28,14 @@ let TreeApp = ({ tree }: { tree: UnderlyingTree }) => {
   }
 
   let tabs: [string, React.ReactNode][] = [
-    ["Graph", <TreeArea tree={attempt} />],
-    ["TopDown", <TopDown tree={attempt} />],
-    ["BottomUp", <BottomUp tree={attempt} />],
-    ["JSON", <ReactJson src={attempt} />],
+    // ["Graph", <TreeArea tree={attempt} />],
+    ["TopDown", <TopDown tree={tree} />],
+    ["BottomUp", <BottomUp tree={tree} />],
+    ["JSON", <ReactJson src={tree} />],
   ];
 
   return (
-    <TreeContext.Provider value={attempt}>
+    <TreeContext.Provider value={tree}>
       <ActiveContext.Provider value={new ActiveState()}>
         <div className="App">
           <VSCodePanels>

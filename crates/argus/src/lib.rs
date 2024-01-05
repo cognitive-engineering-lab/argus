@@ -25,10 +25,57 @@ extern crate rustc_type_ir;
 
 pub mod analysis;
 pub mod proof_tree;
-// pub mod serialize;
-pub mod ty;
+pub mod serialize;
 
-// ---------------
+// -----------------
+// Interfacing types
+
+use rustc_span::symbol::Symbol;
+use rustc_utils::source_map::range::CharRange;
+use serde::Serialize;
+#[cfg(feature = "ts-rs")]
+use ts_rs::TS;
+
+use serialize::ty::SymbolDef;
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AmbiguityError {}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct TraitBoundError {}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(TS))]
+pub struct ObligationsInBody {
+  #[serde(skip_serializing_if = "Option::is_none")]
+  #[serde(serialize_with = "serialize_option")]
+  #[cfg_attr(feature = "ts-rs", ts(type = "SymbolDef?"))]
+  name: Option<Symbol>,
+  range: CharRange,
+  ambiguity_errors: Vec<AmbiguityError>,
+  trait_errors: Vec<TraitBoundError>,
+
+  // HACK it's easiest to already convert Obligations
+  // to a JSON Value to avoid having lifetimes in the
+  // plugin endpoint.
+  #[cfg_attr(feature = "ts-rs", ts(type = "Obligation[]"))]
+  obligations: serde_json::Value,
+}
+
+// Serialize an Option<Symbol> using SymbolDef but the value must be a Some(..)
+fn serialize_option<S: serde::Serializer>(value: &Option<Symbol>, s: S) -> Result<S::Ok, S::Error> {
+  let Some(symb) = value else {
+    unreachable!();
+  };
+
+  SymbolDef::serialize(symb, s)
+}
+
+// ------------------------------
 
 use anyhow::Result;
 use rustc_span::Span;

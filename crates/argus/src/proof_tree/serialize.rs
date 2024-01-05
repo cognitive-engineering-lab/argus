@@ -22,7 +22,7 @@ use serde::Serialize;
 use index_vec::IndexVec;
 
 
-use crate::ty::{goal__predicate_def};
+use crate::serialize::{ty::goal__predicate_def, serialize_to_value};
 use ext::*;
 use super::*;
 
@@ -80,7 +80,7 @@ impl<'tcx> Node<'tcx> {
         );
 
         let w = &Wrapper(goal.goal());
-        let v = crate::ty::serialize_to_value(w, goal.infcx())
+        let v = serialize_to_value(w, goal.infcx())
             .expect("failed to serialize goal");
 
         let string = goal.goal().predicate.pretty(goal.infcx(), def_id);
@@ -97,11 +97,7 @@ impl<'tcx> Node<'tcx> {
     fn from_candidate(candidate: &InspectCandidate<'_, 'tcx>, def_id: DefId) -> Self {
         use rustc_trait_selection::traits::solve::{inspect::ProbeKind, CandidateSource};
 
-        let from_str = |s: &'static str| {
-            Candidate::Any(s.to_string())
-        };
-
-        let can: Candidate = match candidate.kind() {
+        let can = match candidate.kind() {
             ProbeKind::Root { .. } => "root".into(),
             ProbeKind::NormalizedSelfTyAssembly => "normalized-self-ty-asm".into(),
             ProbeKind::UnsizeAssembly => "unsize-asm".into(),
@@ -117,7 +113,6 @@ impl<'tcx> Node<'tcx> {
             } => match source {
                 CandidateSource::BuiltinImpl(built_impl) => "builtin".into(),
                 CandidateSource::AliasBound => "alias-bound".into(),
-
                 // The only two we really care about.
                 CandidateSource::ParamEnv(idx) => "param-env".into(),
                 CandidateSource::Impl(def_id) => {
@@ -131,12 +126,7 @@ impl<'tcx> Node<'tcx> {
             },
         };
 
-        // -------
-
-        // let infcx = candidate.infcx();
-        // let data = candidate.pretty(infcx, def_id);
-
-        Node::Candidate(can)
+        Node::Candidate { data: can }
     }
 
     fn from_result(result: &Result<Certainty, NoSolution>) -> Self {
