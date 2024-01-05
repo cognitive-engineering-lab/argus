@@ -34,7 +34,7 @@ importers:
         version: 5.2.2
       vite:
         specifier: ^4.4.9
-        version: 4.4.9(@types/node@20.2.5)
+        version: 4.4.9(@types/node@20.8.0)
       vitest:
         specifier: ^0.34.6
         version: 0.34.6
@@ -50,6 +50,9 @@ importers:
       '@argus/common':
         specifier: workspace:*
         version: link:../common
+      '@estruyf/vscode':
+        specifier: ^1.1.0
+        version: 1.1.0
       lodash:
         specifier: ^4.17.21
         version: 4.17.21
@@ -95,6 +98,10 @@ importers:
         version: 4.4.9(@types/node@20.2.5)
 
   packages/panoptes:
+    dependencies:
+      '@estruyf/vscode':
+        specifier: ^1.1.0
+        version: 1.1.0
     devDependencies:
       '@argus/common':
         specifier: workspace:*
@@ -161,7 +168,7 @@ importers:
         version: 1.21.3(@types/react@18.2.14)(react-dom@18.0.0)(react@18.0.0)
       vite:
         specifier: ^4.4.9
-        version: 4.4.9(@types/node@20.2.5)
+        version: 4.4.9(@types/node@20.8.0)
 
 packages:
 
@@ -543,6 +550,13 @@ packages:
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
     dev: true
 
+  /@estruyf/vscode@1.1.0:
+    resolution: {integrity: sha512-JOjok+d870IsBPqk/E+KeW9E5ar+slqW8Sae5PtNb1yB8aMudJy9DHV5wQeki/ZwggFYDv+6EPjyzW/71/5yVw==}
+    dependencies:
+      '@types/vscode-webview': 1.57.0
+      uuid: 9.0.1
+    dev: false
+
   /@humanwhocodes/config-array@0.11.11:
     resolution: {integrity: sha512-N2brEuAadi0CcdeMXUkhbZB84eskAc8MEX1By6qEchoVywSgXPIjou4rYsl0V3Hj0ZnuGycGCjdNgockbzeWNA==}
     engines: {node: '>=10.10.0'}
@@ -766,6 +780,10 @@ packages:
   /@types/semver@7.5.3:
     resolution: {integrity: sha512-OxepLK9EuNEIPxWNME+C6WwbRAOOI2o2BaQEGzz5Lu2e4Z5eDnEo+/aVEDMIXywoJitJ7xWd641wrGLZdtwRyw==}
     dev: true
+
+  /@types/vscode-webview@1.57.0:
+    resolution: {integrity: sha512-x3Cb/SMa1IwRHfSvKaZDZOTh4cNoG505c3NjTqGlMC082m++x/ETUmtYniDsw6SSmYzZXO8KBNhYxR0+VqymqA==}
+    dev: false
 
   /@types/vscode-webview@1.57.4:
     resolution: {integrity: sha512-RrVw9s6gBJuY1IkUHMNznWgj/ktjwLpATyOTcKxUDIbbp7AQeK7S0E1+P/8Z75OgAW13OMqSAmaiuWw25dh59Q==}
@@ -3060,6 +3078,11 @@ packages:
     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
     hasBin: true
     dev: true
+
+  /uuid@9.0.1:
+    resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
+    hasBin: true
+    dev: false
 
   /vite-node@0.34.6(@types/node@20.8.0):
     resolution: {integrity: sha512-nlBMJ9x6n7/Amaz6F3zJ97EBwR2FkzhBRxF5e+jE6LA3yi6Wtc2lyTij1OnDMIr34v5g/tVQtsVAzhT0jc5ygA==}

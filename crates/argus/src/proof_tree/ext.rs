@@ -229,15 +229,27 @@ struct TyVarEraserVisitor<'a, 'tcx: 'a> {
   infcx: &'a InferCtxt<'tcx>,
 }
 
+// FIXME: these placeholders are a huge hack, there's definitely
+// something better we could do here.
+macro_rules! gen_placeholders {
+  ($( [$f:ident $n:literal],)*) => {$(
+    fn $f(&self) -> Ty<'tcx> {
+      Ty::new_placeholder(self.infcx.tcx, ty::PlaceholderType {
+        universe: self.infcx.universe(),
+        bound: ty::BoundTy {
+          var: ty::BoundVar::from_u32(ty::BoundVar::MAX_AS_U32 - $n),
+          kind: ty::BoundTyKind::Anon,
+        },
+      })
+    })*
+  }
+}
+
 impl<'a, 'tcx: 'a> TyVarEraserVisitor<'a, 'tcx> {
-  fn ty_placeholder(&self) -> Ty<'tcx> {
-    Ty::new_placeholder(self.infcx.tcx, ty::PlaceholderType {
-      universe: self.infcx.universe(),
-      bound: ty::BoundTy {
-        var: ty::BoundVar::MAX,
-        kind: ty::BoundTyKind::Anon,
-      },
-    })
+  gen_placeholders! {
+    [ty_placeholder    0],
+    [int_placeholder   1],
+    [float_placeholder 2],
   }
 }
 
@@ -247,15 +259,13 @@ impl<'tcx> TypeFolder<TyCtxt<'tcx>> for TyVarEraserVisitor<'_, 'tcx> {
   }
 
   fn fold_ty(&mut self, ty: Ty<'tcx>) -> Ty<'tcx> {
+    // HACK: I'm not sure if replacing type variables with
+    // an anonymous placeholder is the best idea. It is *an*
+    // idea, certainly. But this should only happen before hashing.
     match ty.kind() {
-      ty::Infer(ty::TyVar(_))
-      | ty::Infer(ty::IntVar(_))
-      | ty::Infer(ty::FloatVar(_)) => {
-        // HACK: I'm not sure if replacing type variables with
-        // an anonymous placeholder is the best idea. It is *an*
-        // idea, certainly. But this should only happen before hashing.
-        self.ty_placeholder()
-      }
+      ty::Infer(ty::TyVar(_)) => self.ty_placeholder(),
+      ty::Infer(ty::IntVar(_)) => self.int_placeholder(),
+      ty::Infer(ty::FloatVar(_)) => self.float_placeholder(),
       _ => ty.super_fold_with(self),
     }
   }

@@ -8,7 +8,6 @@ use std::{
 };
 
 use serde::Serialize;
-// use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use smallvec::SmallVec;
 use ts_rs::TS;
 

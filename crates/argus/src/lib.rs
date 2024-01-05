@@ -110,10 +110,6 @@ impl<U: Into<u64>, T: ToSpan> ToTarget for (U, T) {
 // generation.
 #[cfg(test)]
 mod tests {
-  use rustc_utils::source_map::{filename, range};
-  use ts_rs::TS;
-
-  use crate::proof_tree;
 
   macro_rules! ts {
       ($($ty:ty,)*) => {

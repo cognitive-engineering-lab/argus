@@ -44,8 +44,8 @@ enum ArgusCommand {
     file: String,
   },
   Tree {
-    id: u64,
     file: String,
+    id: u64,
     // Represents enclosing body `CharRange`
     start_line: usize,
     start_column: usize,
@@ -161,24 +161,21 @@ impl RustcPlugin for ArgusPlugin {
         end_line,
         end_column,
       } => {
-        let filename = Filename::intern(&file);
-        let compute_target = move || {
-          let range = CharRange {
-            start: CharPos {
-              line: start_line,
-              column: start_column,
-            },
-            end: CharPos {
-              line: end_line,
-              column: end_column,
-            },
-            filename,
-          };
-          Some((id, range))
-        };
+        let compute_target = || Some((id, CharRange {
+          start: CharPos {
+            line: start_line,
+            column: start_column,
+          },
+          end: CharPos {
+            line: end_line,
+            column: end_column,
+          },
+          filename: Filename::intern(&file),
+        }));
+
         let v = run(
           argus::analysis::tree,
-          PathBuf::from(file),
+          PathBuf::from(&file),
           compute_target,
           &compiler_args,
         );
@@ -298,7 +295,9 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
 
       self.result = match (self.compute_target.take().unwrap())() {
         Some(target) => {
+          log::debug!("Getting target");
           let target = target.to_target(tcx).expect("Couldn't compute target");
+          log::debug!("Got target");
           let body_span = target.span.clone();
 
           debug!("target: {target:?}");

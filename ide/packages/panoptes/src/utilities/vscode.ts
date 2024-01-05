@@ -1,5 +1,6 @@
-import type { WebviewApi } from "vscode-webview";
 import { WebViewToExtensionMsg } from "@argus/common";
+import { messageHandler } from "@estruyf/vscode/dist/client";
+import type { WebviewApi } from "vscode-webview";
 
 /**
  * A utility wrapper around the acquireVsCodeApi() function, which enables
@@ -9,9 +10,9 @@ import { WebViewToExtensionMsg } from "@argus/common";
  * This utility also enables webview code to be run in a web browser-based
  * dev server by using native web browser features that mock the functionality
  * enabled by acquireVsCodeApi.
- * 
+ *
  * See:
- * https://github.com/microsoft/vscode-webview-ui-toolkit-samples/blob/main/frameworks/hello-world-react-vite/webview-ui/src/utilities/vscode.ts  
+ * https://github.com/microsoft/vscode-webview-ui-toolkit-samples/blob/main/frameworks/hello-world-react-vite/webview-ui/src/utilities/vscode.ts
  */
 class VSCodeAPIWrapper {
   private readonly vsCodeApi: WebviewApi<unknown> | undefined;
@@ -79,8 +80,14 @@ class VSCodeAPIWrapper {
 }
 
 // Exports class singleton to prevent multiple invocations of acquireVsCodeApi.
-const vscode = new VSCodeAPIWrapper();
+// const vscode = new VSCodeAPIWrapper();
 
-export function messageExtension(msg: WebViewToExtensionMsg) {
-  vscode.postMessage(msg);
-}
+export const requestFromExtension = <T>(
+  body: WebViewToExtensionMsg
+): Promise<T> => {
+  return messageHandler.request<T>(body.command, body);
+};
+
+export const postToExtension = (body: WebViewToExtensionMsg) => {
+  return messageHandler.send(body.command, body);
+};

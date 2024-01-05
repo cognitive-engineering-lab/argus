@@ -13,7 +13,7 @@ import { ErrorBoundary } from "react-error-boundary";
 
 import "./App.css";
 import ObligationManager from "./ObligationManager";
-import { messageExtension } from "./utilities/vscode";
+import { requestFromExtension } from "./utilities/vscode";
 
 function basename(path: string) {
   return path.split("/").reverse()[0];
@@ -34,45 +34,20 @@ const OpenFile = ({ filename }: { filename: Filename }) => {
   >(undefined);
   const [isLoading, setIsLoading] = useState(false);
 
-  const listener = (e: MessageEvent) => {
-    console.log("Received message from extension", e.data);
-
-    const msg = e.data;
-    if (msg.type !== "FROM_EXTENSION") {
-      // FIXME: yeah, don't throw an error. Just ignore it.
-      throw new Error(`Unexpected message type ${msg}`);
-    }
-
-    if (msg.file !== filename) {
-      return;
-    }
-
-    switch (msg.command) {
-      case "obligations": {
-        setObligations(msg.obligations);
-        setIsLoading(false);
-        return;
-      }
-      default: {
-        // Ignore all other cases.
-        return;
-      }
-    }
-  };
-
-  useEffect(() => {
-    window.addEventListener("message", listener);
-    return () => window.removeEventListener("message", listener);
-  }, []);
-
   const handleClick = () => {
     // Send a message back to the extension
     setIsLoading(true);
     setObligations(undefined);
-    messageExtension({
+    requestFromExtension<ObligationsInBody[]>({
       type: "FROM_WEBVIEW",
-      file: filename,
       command: "obligations",
+      file: filename,
+    }).then((obligations: any) => {
+      // FIXME: ^^^^^^^^^^^^
+      // this doesn't have type any
+      // The webview / extension interaction needs to be updated.
+      console.log("Received obligations from extension", obligations);
+      setObligations(obligations.payload.obligations!);
     });
   };
 
@@ -113,15 +88,13 @@ const App = ({ initialFiles }: { initialFiles: Filename[] }) => {
     })
   );
 
+  // NOTE: this listener should only listen for posted messages, not
+  // for things that could be an expected response from a webview request.
   const listener = (e: MessageEvent) => {
     console.log("Received message from extension", e.data);
-
     const msg = e.data;
-    if (msg.type !== "FROM_EXTENSION") {
-      // FIXME: yeah, don't throw an error. Just ignore it.
-      throw new Error(`Unexpected message type ${msg}`);
-    }
 
+    // TODO: none of these messages are actually getting sent yet.
     switch (msg.command) {
       case "open-file": {
         setOpenFiles([
@@ -137,10 +110,13 @@ const App = ({ initialFiles }: { initialFiles: Filename[] }) => {
         return;
       }
 
-      default: {
-        // Ignore all other cases.
-        return;
+      case "invalidate": {
+        throw new Error("Invalidation, not yet implemented!");
       }
+
+      // Everthing else must be ignored.
+      default:
+        return;
     }
   };
 

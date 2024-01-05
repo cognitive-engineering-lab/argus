@@ -12,6 +12,7 @@ import {
   SerializedTree,
   TreeOutput,
 } from "@argus/common/dist/types";
+import { MessageHandlerData } from "@estruyf/vscode";
 import _ from "lodash";
 import path from "path";
 import vscode from "vscode";
@@ -36,6 +37,13 @@ const rangeHighlight = vscode.window.createTextEditorDecorationType({
   backgroundColor: new vscode.ThemeColor("editor.selectionBackground"),
   borderRadius: "2px",
 });
+
+// Wraps around the MessageHandler data types from @estruyf/vscode.
+type BlessedMessage = {
+  command: string;
+  requestId: string;
+  payload: WebViewToExtensionMsg;
+};
 
 export class ViewLoader {
   public static currentPanel: ViewLoader | undefined;
@@ -104,22 +112,38 @@ export class ViewLoader {
 
   // ---------------------------------------------------
 
-  private async handleMessage(message: WebViewToExtensionMsg) {
-    switch (message.command) {
+  private async handleMessage(message: BlessedMessage) {
+    const { command, requestId, payload } = message;
+
+    if (command !== payload.command) {
+      log(
+        `
+        Command mismatch 
+          expected: ${payload.command} 
+          but got: ${command}
+        `
+      );
+      return;
+    }
+
+    switch (payload.command) {
       case "obligations": {
-        this.getObligations(message.file);
+        this.getObligations(requestId, payload.file);
         return;
       }
       case "tree": {
-        this.getTree(message.file, message.predicate, message.range);
+        this.getTree(requestId, payload.file, payload.predicate, payload.range);
         return;
       }
+
+      // These messages don't require a response.
+
       case "add-highlight": {
-        this.addHighlightRange(message.file, message.range);
+        this.addHighlightRange(payload.file, payload.range);
         return;
       }
       case "remove-highlight": {
-        this.removeHighlightRange(message.file, message.range);
+        this.removeHighlightRange(payload.file, payload.range);
         return;
       }
       default: {
@@ -129,7 +153,7 @@ export class ViewLoader {
     }
   }
 
-  private async getObligations(host: Filename) {
+  private async getObligations(requestId: string, host: Filename) {
     log("Fetching obligations for file", host);
 
     const res = await globals.backend<ObligationOutput[]>([
@@ -143,12 +167,10 @@ export class ViewLoader {
       vscode.window.showErrorMessage(res.error);
       return;
     }
-
     const obligations = res.value;
-
     log("Returning obligations", obligations);
 
-    this.messageWebview({
+    this.messageWebview<ObligationOutput[]>(requestId, {
       type: "FROM_EXTENSION",
       file: host,
       command: "obligations",
@@ -156,7 +178,12 @@ export class ViewLoader {
     });
   }
 
-  private async getTree(host: Filename, obl: Obligation, range: CharRange) {
+  private async getTree(
+    requestId: string,
+    host: Filename,
+    obl: Obligation,
+    range: CharRange
+  ) {
     log("Fetching tree for file", host, obl.hash, obl);
 
     const res = await globals.backend<TreeOutput[]>([
@@ -181,7 +208,7 @@ export class ViewLoader {
     >;
     const tree0 = tree[0];
 
-    this.messageWebview({
+    this.messageWebview<SerializedTree>(requestId, {
       type: "FROM_EXTENSION",
       file: host,
       command: "tree",
@@ -231,8 +258,12 @@ export class ViewLoader {
   // --------------------------------
   // Utilities
 
-  private messageWebview(msg: ExtensionToWebViewMsg) {
-    this.panel.webview.postMessage(msg);
+  private messageWebview<T>(requestId: string, msg: ExtensionToWebViewMsg) {
+    this.panel.webview.postMessage({
+      command: msg.command,
+      requestId: requestId,
+      payload: msg,
+    } as MessageHandlerData<T>);
   }
 
   private getEditorByName(name: Filename): vscode.TextEditor | undefined {

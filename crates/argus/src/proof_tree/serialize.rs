@@ -2,9 +2,7 @@ use std::{collections::HashSet, ops::ControlFlow};
 
 use ext::*;
 use index_vec::IndexVec;
-// use rustc_hash::FxHashSet as HashSet;
 use rustc_hir::def_id::DefId;
-use rustc_hir_analysis::astconv::AstConv;
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::ty::Predicate;
 use rustc_trait_selection::{
