@@ -1,4 +1,8 @@
-import { WebViewToExtensionMsg } from "@argus/common";
+import {
+  ExtensionReturn,
+  ExtensionToWebViewMsg,
+  WebViewToExtensionMsg,
+} from "@argus/common";
 import { messageHandler } from "@estruyf/vscode/dist/client";
 import type { WebviewApi } from "vscode-webview";
 
@@ -82,10 +86,13 @@ class VSCodeAPIWrapper {
 // Exports class singleton to prevent multiple invocations of acquireVsCodeApi.
 // const vscode = new VSCodeAPIWrapper();
 
-export const requestFromExtension = <T>(
+// TODO: how can we force T === body.command?
+export const requestFromExtension = <
+  T extends ExtensionToWebViewMsg["command"]
+>(
   body: WebViewToExtensionMsg
-): Promise<T> => {
-  return messageHandler.request<T>(body.command, body);
+): Promise<ExtensionReturn<T>> => {
+  return messageHandler.request<ExtensionReturn<T>>(body.command, body);
 };
 
 export const postToExtension = (body: WebViewToExtensionMsg) => {

@@ -34,21 +34,18 @@ const OpenFile = ({ filename }: { filename: Filename }) => {
   >(undefined);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleClick = () => {
-    // Send a message back to the extension
+  const handleClick = async () => {
     setIsLoading(true);
     setObligations(undefined);
-    requestFromExtension<ObligationsInBody[]>({
+
+    const obligations = await requestFromExtension<"obligations">({
       type: "FROM_WEBVIEW",
       command: "obligations",
       file: filename,
-    }).then((obligations: any) => {
-      // FIXME: ^^^^^^^^^^^^
-      // this doesn't have type any
-      // The webview / extension interaction needs to be updated.
-      console.log("Received obligations from extension", obligations);
-      setObligations(obligations.payload.obligations!);
     });
+
+    setObligations(obligations.obligations);
+    setIsLoading(false);
   };
 
   return (

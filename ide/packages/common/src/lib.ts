@@ -21,6 +21,13 @@ export type CommonData = {
   file: Filename;
 };
 
+export type ExtensionReturn<T extends ExtensionToWebViewMsg["command"]> =
+  T extends "tree"
+    ? { tree: TreeOutput }
+    : T extends "obligations"
+    ? { obligations: ObligationOutput[] }
+    : {};
+
 export type ExtensionToWebViewMsg = { type: FROM_EXT } & (
   | { command: "invalidate" }
   | (CommonData &

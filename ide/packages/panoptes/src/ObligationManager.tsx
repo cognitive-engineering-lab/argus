@@ -35,23 +35,24 @@ const ObligationTreeWrapper = ({
   const [tree, setTree] = useState<SerializedTree | undefined>(undefined);
   const file = useContext(FileContext)!;
 
-  // Load the tree once;
-  // FIXME: this isn't going to work, come back and fix.
-  if (!isTreeLoaded) {
-    requestFromExtension<SerializedTree>({
-      type: "FROM_WEBVIEW",
-      file: file,
-      command: "tree",
-      predicate: obligation,
-      range: range,
-    }).then(tree => {
-      setTree(tree);
+  // FIXME: is this right, we only want o load things once.
+  useEffect(() => {
+    const getData = async () => {
+      const tree = await requestFromExtension<"tree">({
+        type: "FROM_WEBVIEW",
+        file: file,
+        command: "tree",
+        predicate: obligation,
+        range: range,
+      });
+      setTree(tree.tree);
       setIsTreeLoaded(true);
-    });
-  }
+    };
+    getData();
+  }, []);
 
   const content =
-    tree === undefined ? (
+    isTreeLoaded === false || tree === undefined ? (
       <>
         <p>Loading tree...</p>
         <VSCodeProgressRing />
