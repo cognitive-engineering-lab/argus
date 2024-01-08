@@ -146,6 +146,7 @@ impl<'tcx> PredicateExt<'tcx> for ty::Predicate<'tcx> {
 impl<'a, 'tcx, T: Print<'tcx, FmtPrinter<'a, 'tcx>>> PrettyPrintExt<'a, 'tcx>
   for T
 {
+  /* intentionally blank */
 }
 
 /// Pretty printer for results

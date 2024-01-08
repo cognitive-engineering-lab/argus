@@ -14,12 +14,12 @@ import {
 import _ from "lodash";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-import "./ObligationManager.css";
+import "./File.css";
 import TreeApp from "./TreeView/TreeApp";
 // @ts-ignore
 import { PrettyObligation } from "./Ty/print";
+import { WaitingOn } from "./utilities/WaitingOn";
 import { IcoChevronDown, IcoChevronUp } from "./utilities/icons";
-import { testTree } from "./utilities/tree";
 import { postToExtension, requestFromExtension } from "./utilities/vscode";
 
 const FileContext = createContext<Filename | undefined>(undefined);
@@ -31,7 +31,6 @@ const ObligationTreeWrapper = ({
   range: CharRange;
   obligation: Obligation;
 }) => {
-  const [isTreeLoaded, setIsTreeLoaded] = useState(false);
   const [tree, setTree] = useState<SerializedTree | undefined>(undefined);
   const file = useContext(FileContext)!;
 
@@ -46,17 +45,13 @@ const ObligationTreeWrapper = ({
         range: range,
       });
       setTree(tree.tree);
-      setIsTreeLoaded(true);
     };
     getData();
   }, []);
 
   const content =
-    isTreeLoaded === false || tree === undefined ? (
-      <>
-        <p>Loading tree...</p>
-        <VSCodeProgressRing />
-      </>
+    tree === undefined ? (
+      <WaitingOn message="proof tree" />
     ) : (
       <TreeApp tree={tree} />
     );
@@ -157,7 +152,7 @@ const ObligationBody = ({ osib }: { osib: ObligationsInBody }) => {
   return <div>{doList("Failed", failures)}</div>;
 };
 
-const ObligationManager = ({
+const File = ({
   file,
   osibs,
 }: {
@@ -173,4 +168,4 @@ const ObligationManager = ({
   );
 };
 
-export default ObligationManager;
+export default File;

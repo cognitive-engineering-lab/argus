@@ -14,6 +14,7 @@ pub mod r#const;
 pub mod path;
 pub mod term;
 pub mod ty;
+pub mod compound;
 
 use r#const::*;
 use rustc_infer::infer::InferCtxt;
@@ -53,7 +54,6 @@ fn get_dynamic_ctx<'a, 'tcx: 'a>() -> &'a InferCtxt<'tcx> {
   }
 }
 
-// TODO: we could also generate the functions
 macro_rules! serialize_custom_seq {
   ($wrap:ident, $serializer:expr, $value:expr) => {{
     let mut seq = $serializer.serialize_seq(Some($value.len()))?;

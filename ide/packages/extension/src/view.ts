@@ -14,9 +14,9 @@ import {
 } from "@argus/common/dist/types";
 import { MessageHandlerData } from "@estruyf/vscode";
 import _ from "lodash";
-import path from "path";
 import vscode from "vscode";
 
+import { rangeHighlight } from "./decorate";
 import { showErrorDialog } from "./errors";
 import { globals } from "./lib";
 import { log } from "./logging";
@@ -24,19 +24,23 @@ import { log } from "./logging";
 const outDir = "dist";
 const packageName = "panoptes";
 
-function rootUri(extensionUri: vscode.Uri) {
-  return vscode.Uri.joinPath(extensionUri, "..");
-}
+// ------------------------------------
+// Endpoints for the extension to call.
 
-export let launchArgus = async (extensionPath: vscode.Uri) => {
+export const launchArgus = async (extensionPath: vscode.Uri) => {
   ViewLoader.createOrShow(extensionPath);
 };
 
-// Using the background selection color is sometimes a little too subtle.
-const rangeHighlight = vscode.window.createTextEditorDecorationType({
-  backgroundColor: new vscode.ThemeColor("editor.selectionBackground"),
-  borderRadius: "2px",
-});
+export const onChange = () => {
+  // TODO: invalidate the webview information
+};
+
+// ----------------------
+// Internal functionality
+
+function rootUri(extensionUri: vscode.Uri) {
+  return vscode.Uri.joinPath(extensionUri, "..");
+}
 
 // Wraps around the MessageHandler data types from @estruyf/vscode.
 type BlessedMessage = {
@@ -45,7 +49,9 @@ type BlessedMessage = {
   payload: WebViewToExtensionMsg;
 };
 
-export class ViewLoader {
+// Class wrapping the state around the webview panel.
+
+class ViewLoader {
   public static currentPanel: ViewLoader | undefined;
 
   private readonly panel: vscode.WebviewPanel;
@@ -91,11 +97,6 @@ export class ViewLoader {
       null,
       this.disposables
     );
-
-    // TODO: add / remove files when they are opened / closed. I'm unsure
-    // how we actually want to do this. Someone can often have lots of open files,
-    // which I'm sure we don't want to imitate, but only having visible files can also
-    // get annoying if someone navigates away then wants to come back.
   }
 
   public dispose() {
@@ -147,7 +148,7 @@ export class ViewLoader {
         return;
       }
       default: {
-        vscode.window.showErrorMessage(`Message not understood ${message}`);
+        log(`Message not understood ${message}`);
         return;
       }
     }
@@ -258,6 +259,8 @@ export class ViewLoader {
   // --------------------------------
   // Utilities
 
+  // FIXME: the type T here is wrong, it should be a response message similar to
+  // how the webview encodes the return value.
   private messageWebview<T>(requestId: string, msg: ExtensionToWebViewMsg) {
     this.panel.webview.postMessage({
       command: msg.command,

@@ -10,17 +10,17 @@ export const Candidate = ({ candidate }: { candidate: CandidateTy }) => {
     case "any":
       return <span>{candidate.data}</span>;
     case "impl":
+      const implTrait =
+        candidate.traitRef !== undefined ? (
+          <PrintDefPath o={candidate.traitRef} />
+        ) : (
+          "{anon}"
+        );
+      const candidateTy = <PrintTy o={candidate.ty} />;
       return (
-        <div>
-          impl
-          {candidate.traitRef !== undefined ? (
-            <PrintDefPath o={candidate.traitRef} />
-          ) : (
-            "{anon}"
-          )}
-          for
-          <PrintTy o={candidate.ty} />
-        </div>
+        <span>
+          impl {implTrait} for {candidateTy}
+        </span>
       );
     default:
       throw new Error(`Unexpected candidate type ${candidate}`);

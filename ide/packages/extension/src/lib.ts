@@ -1,13 +1,14 @@
+import { CallArgus } from "@argus/common";
 import vscode from "vscode";
 
-import { CallArgus } from "@argus/common";
 import { showErrorDialog } from "./errors";
 import { log } from "./logging";
 import { setup } from "./setup";
-import { launchArgus } from "./viewloader";
+import { launchArgus, onChange as webviewOnChange } from "./view";
 
 export let globals: {
   backend: CallArgus;
+  diagnosticCollection: vscode.DiagnosticCollection;
 };
 
 // This method is called when your extension is activated
@@ -20,7 +21,11 @@ export async function activate(context: vscode.ExtensionContext) {
       backend: () => {
         throw Error("Unreachable");
       },
+      diagnosticCollection:
+        vscode.languages.createDiagnosticCollection("argus"),
     };
+
+    context.subscriptions.push(globals.diagnosticCollection);
 
     let b = await setup(context);
 
@@ -43,10 +48,13 @@ export async function activate(context: vscode.ExtensionContext) {
       let disposable = vscode.commands.registerCommand(`argus.${name}`, func);
       context.subscriptions.push(disposable);
     });
-
   } catch (e: any) {
     showErrorDialog(e);
   }
+}
+
+export function onChange() {
+  webviewOnChange();
 }
 
 // This method is called when your extension is deactivated

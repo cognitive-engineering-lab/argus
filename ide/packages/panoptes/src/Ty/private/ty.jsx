@@ -142,6 +142,10 @@ export const PrintParamTy = ({ o }) => {
   return <PrintSymbol o={o.name} />;
 };
 
+export const PrintSymbol = ({ o }) => {
+  return o;
+};
+
 export const PrintBoundTy = ({ o }) => {
   throw new Error("TODO");
 };

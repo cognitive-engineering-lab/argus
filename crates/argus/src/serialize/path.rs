@@ -1,7 +1,6 @@
 use std::cell::Cell;
 
-use rustc_type_ir as ir;
-use rustc_middle::{ty::{self, *, abstract_const::CastKind}, mir::{BinOp, UnOp}};
+use rustc_middle::{ty::{self, *}};
 use rustc_hir::def_id::{DefId, DefIndex, CrateNum};
 use rustc_data_structures::sso::SsoHashSet;
 use rustc_span::{symbol::{kw, sym, Ident, Symbol}, Span};
@@ -828,7 +827,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
         self.segments.push(PathSegment::GenericDelimiters { inner });
     }
 
-    fn comma_sep<T>(&mut self, mut elems: impl Iterator<Item = T>, kind: CommaSeparatedKind) 
+    fn comma_sep<T>(&mut self, elems: impl Iterator<Item = T>, kind: CommaSeparatedKind)
     where
         T: Serialize,
     {

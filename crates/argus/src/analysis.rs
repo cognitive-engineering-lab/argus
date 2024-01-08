@@ -1,5 +1,4 @@
 //! ProofTree analysis.
-
 use anyhow::{anyhow, Result};
 use fluid_let::fluid_let;
 use itertools::Itertools;
@@ -16,12 +15,13 @@ use rustc_trait_selection::traits::{solve::Goal, FulfillmentError};
 use rustc_utils::source_map::range::CharRange;
 
 use crate::{
+  rustc::FnCtxtExt as RustcFnCtxtExt,
   proof_tree::{
     ext::*, serialize::serialize_proof_tree, Obligation, ObligationKind,
     SerializedTree,
   },
   serialize::serialize_to_value,
-  ObligationsInBody, Target,
+  ObligationsInBody, TraitError, Target,
 };
 
 fluid_let!(pub static OBLIGATION_TARGET: Target);
@@ -31,7 +31,7 @@ fluid_let!(pub static OBLIGATION_TARGET: Target);
 pub fn obligations<'tcx>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
-) -> Result<ObligationsInBody> {
+) -> Result<serde_json::Value> {
   let hir = tcx.hir();
   let local_def_id = hir.body_owner_def_id(body_id);
 
@@ -51,19 +51,31 @@ pub fn obligations<'tcx>(
     };
 
     let obligations = fncx.get_obligations(local_def_id);
-    let json = serialize_to_value(&obligations, infcx)
-      .expect("Could not serialize Obligations");
     let body = hir.body(body_id);
+    let source_map = tcx.sess.source_map();
     let body_range =
-      CharRange::from_span(body.value.span, tcx.sess.source_map())
+      CharRange::from_span(body.value.span, source_map)
         .expect("Couldn't get body range");
-    result = Ok(ObligationsInBody {
+
+    let trait_errors = infcx.reported_trait_errors.borrow().iter().flat_map(|(span, predicates)| {
+      let range = CharRange::from_span(*span, source_map)
+        .expect("Couldn't get trait bound range");
+      predicates.iter().map(move |predicate| TraitError {
+        range,
+        predicate: predicate.clone(),
+      })
+    }).collect::<Vec<_>>();
+
+    let obligation_in_body = ObligationsInBody {
       name: hir.opt_name(body_id.hir_id),
       range: body_range,
       ambiguity_errors: vec![],
-      trait_errors: vec![],
-      obligations: json,
-    });
+      trait_errors,
+      obligations,
+    };
+
+    result = serialize_to_value(&obligation_in_body, infcx)
+      .map_err(|e| anyhow!(e));
   });
 
   result
@@ -121,17 +133,21 @@ fn serialize_tree<'tcx>(
 }
 
 fn retain_fixpoint<T, F: FnMut(&T) -> bool>(v: &mut Vec<T>, mut pred: F) {
+  // NOTE: the original intent was to keep a single element, but that doesn't seem
+  // to be ideal. Perhaps it's best to remove all elements and then allow users to
+  // toggle these "hidden elements" should they choose to.
+  let keep_n_elems = 0;
   let mut did_change = true;
   let start_size = v.len();
   let mut removed_es = 0usize;
   // While things have changed, keep iterating, except
   // when we have a single element left.
-  while did_change && start_size - removed_es > 1 {
+  while did_change && start_size - removed_es > keep_n_elems {
     did_change = false;
     v.retain(|e| {
       let r = pred(e);
       did_change |= !r;
-      if !r && start_size - removed_es > 1 {
+      if !r && start_size - removed_es > keep_n_elems {
         removed_es += 1;
         r
       } else {
@@ -143,89 +159,27 @@ fn retain_fixpoint<T, F: FnMut(&T) -> bool>(v: &mut Vec<T>, mut pred: F) {
 
 // --------------------------------
 
-type FulfillmentData<'tcx> = (Hash64, FulfillmentError<'tcx>);
+pub(crate) type FulfillmentData<'tcx> = (Hash64, FulfillmentError<'tcx>);
 
 trait FnCtxtExt<'tcx> {
+  fn get_obligations(&self, ldef_id: LocalDefId) -> Vec<Obligation<'tcx>>;
+
   fn get_fulfillment_errors(
     &self,
     ldef_id: LocalDefId,
   ) -> Vec<FulfillmentData<'tcx>>;
-  fn get_obligations(&self, ldef_id: LocalDefId) -> Vec<Obligation<'tcx>>;
-  fn adjust_fulfillment_errors_for_expr_obligation(
-    &self,
-    errors: &mut Vec<FulfillmentData<'tcx>>,
-  );
-  fn report_fulfillment_errors(
+
+  fn convert_fulfillment_errors(
     &self,
     errors: Vec<FulfillmentData<'tcx>>,
   ) -> Vec<Obligation<'tcx>>;
-}
-
-trait InferPrivateExt<'tcx> {
-  fn error_implies(
-    &self,
-    cond: ty::Predicate<'tcx>,
-    error: ty::Predicate<'tcx>,
-  ) -> bool;
-}
-
-// Taken from rustc_trait_selection/src/traits/error_reporting/type_err_ctxt_ext.rs
-impl<'tcx> InferPrivateExt<'tcx> for TypeErrCtxt<'_, 'tcx> {
-  fn error_implies(
-    &self,
-    cond: ty::Predicate<'tcx>,
-    error: ty::Predicate<'tcx>,
-  ) -> bool {
-    use log::debug;
-
-    if cond == error {
-      return true;
-    }
-
-    // FIXME: It should be possible to deal with `ForAll` in a cleaner way.
-    let bound_error = error.kind();
-    let (cond, error) =
-      match (cond.kind().skip_binder(), bound_error.skip_binder()) {
-        (
-          ty::PredicateKind::Clause(ty::ClauseKind::Trait(..)),
-          ty::PredicateKind::Clause(ty::ClauseKind::Trait(error)),
-        ) => (cond, bound_error.rebind(error)),
-        _ => {
-          // FIXME: make this work in other cases too.
-          return false;
-        }
-      };
-
-    for pred in elaborate(self.tcx, std::iter::once(cond)) {
-      let bound_predicate = pred.kind();
-      if let ty::PredicateKind::Clause(ty::ClauseKind::Trait(implication)) =
-        bound_predicate.skip_binder()
-      {
-        let error = error.to_poly_trait_ref();
-        let implication = bound_predicate.rebind(implication.trait_ref);
-        // FIXME: I'm just not taking associated types at all here.
-        // Eventually I'll need to implement param-env-aware
-        // `Γ₁ ⊦ φ₁ => Γ₂ ⊦ φ₂` logic.
-        let param_env = ty::ParamEnv::empty();
-        if self.can_sub(param_env, error, implication) {
-          debug!(
-            "error_implies: {:?} -> {:?} -> {:?}",
-            cond, error, implication
-          );
-          return true;
-        }
-      }
-    }
-
-    false
-  }
 }
 
 impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
   fn get_obligations(&self, ldef_id: LocalDefId) -> Vec<Obligation<'tcx>> {
     let mut errors = self.get_fulfillment_errors(ldef_id);
     self.adjust_fulfillment_errors_for_expr_obligation(&mut errors);
-    self.report_fulfillment_errors(errors)
+    self.convert_fulfillment_errors(errors)
   }
 
   fn get_fulfillment_errors(
@@ -237,9 +191,9 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
     let return_with_hashes = |v: Vec<FulfillmentError<'tcx>>| {
       self.tcx().with_stable_hashing_context(|mut hcx| {
         v.into_iter()
-          .map(|e| (e.stable_hash(infcx, &mut hcx), e))
-          .unique_by(|(h, _)| *h)
-          .collect::<Vec<_>>()
+         .map(|e| (e.stable_hash(infcx, &mut hcx), e))
+         .unique_by(|(h, _)| *h)
+         .collect::<Vec<_>>()
       })
     };
 
@@ -252,20 +206,8 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
       let _tcx = &infcx.tcx;
 
       result.extend(fulfilled_obligations.iter().filter_map(|obl| match obl {
-        FulfilledObligation::Failure(error) => {
-          log::debug!(
-            "[CAND] error {:?}",
-            error.obligation.predicate.pretty(infcx, def_id)
-          );
-          Some(error.clone())
-        }
-        FulfilledObligation::Success(obl) => {
-          log::debug!(
-            "[CAND] success {:?}",
-            obl.predicate.pretty(infcx, def_id)
-          );
-          None
-        }
+        FulfilledObligation::Failure(error) => Some(error.clone()),
+        FulfilledObligation::Success(obl) => None,
       }));
     }
 
@@ -291,42 +233,8 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
     return_with_hashes(result)
   }
 
-  // Implementation taken from rustc_hir_typeck/fn_ctxt/checks.rs :: adjust_fulfillment_errors_for_expr_obligation
-  fn adjust_fulfillment_errors_for_expr_obligation(
-    &self,
-    errors: &mut Vec<FulfillmentData<'tcx>>,
-  ) {
-    let mut remap_cause = FxIndexSet::default();
-    let mut not_adjusted = vec![];
 
-    for (_, error) in errors {
-      let before_span = error.obligation.cause.span;
-      if self.adjust_fulfillment_error_for_expr_obligation(error)
-        || before_span != error.obligation.cause.span
-      {
-        remap_cause.insert((
-          before_span,
-          error.obligation.predicate,
-          error.obligation.cause.clone(),
-        ));
-      } else {
-        not_adjusted.push(error);
-      }
-    }
-
-    for error in not_adjusted {
-      for (span, predicate, cause) in &remap_cause {
-        if *predicate == error.obligation.predicate
-          && span.contains(error.obligation.cause.span)
-        {
-          error.obligation.cause = cause.clone();
-          continue;
-        }
-      }
-    }
-  }
-
-  fn report_fulfillment_errors(
+  fn convert_fulfillment_errors(
     &self,
     errors: Vec<FulfillmentData<'tcx>>,
   ) -> Vec<Obligation<'tcx>> {
@@ -362,7 +270,7 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
         let predicate = error.root_obligation.predicate;
         let range =
           CharRange::from_span(error.obligation.cause.span, source_map)
-            .unwrap();
+          .unwrap();
         Obligation {
           data: predicate,
           hash: hash.as_u64().to_string(),

@@ -412,12 +412,16 @@ preprocess step to better match the compiler.
 
 ***** [ ] TODO talk with the diagnostics team
 
-***** [ ] TODO investigate ambiguity errors and where to siphon obligations.
+***** [X] TODO investigate ambiguity errors and where to siphon obligations.
 
 
 * Thinking about
 ***** [ ] TODO we need an understanding of how people debug trait errors. (all categories)
 ***** [ ] TODO what is our set of /metric problems/.
+      - These problems should involve coinduction
+      - Futures, async/await, etc...
+      - Ambiguous expressions (this is more common and more difficult.)
+      - Hard trait bounds errors
 
 
 * Checklist α-release
@@ -427,14 +431,11 @@ preprocess step to better match the compiler.
 
 
 ** RUSTC (thins to upstream)
-***** [ ] TODO why did the serde code not trigger anything in ARGUS? Investigate this a little further, it's possible there's one more route that would make catching these obligations more robust. (Or it's possible that the expansion uses the old trait solver.)
-***** [ ] TODO ~inspect_typeck~ (or another entry point).
-***** [ ] TODO exposing obligations on the ~FnCtxt~.
-- [ ] I'm currently catching all fulfilled obligations, which is a bit messy.
-  There are /lots/, many of which are unimportant. Is this what we want?
-- [ ] I also have Will's net in the ~TypeErrCtxt~, which is great for getting the
-  errors that were reported, but does having both make the changes a harder
-  sell? Additionally, this net needs to be behind the same unstable flag as all obligations.
+***** [X] TODO why did the serde code not trigger anything in ARGUS? Investigate this a little further, it's possible there's one more route that would make catching these obligations more robust. (Or it's possible that the expansion uses the old trait solver.)
+***** [X] TODO ~inspect_typeck~ (or another entry point).
+***** [X] TODO exposing obligations on the ~FnCtxt~.
+- [X] I'm currently catching all fulfilled obligations, which is a bit messy. There are /lots/, many of which are unimportant. Is this what we want?
+- [X] I also have Will's net in the ~TypeErrCtxt~, which is great for getting the errors that were reported, but does having both make the changes a harder sell? Additionally, this net needs to be behind the same unstable flag as all obligations.
 
 ***** [ ] TODO ^ use the ~CandidateSource::ParamEnv~, there doesn't seem to be a clear path to its inclusion, but this is the second most important candidate probe kind.
 
@@ -454,9 +455,8 @@ pretty file about infinite recursion when resolving the paths.) Not great. I
 think I need to talk to someone about this because it's been a /royal/ headache.
 (Oh, and aliases are going to be even more of a nightmare.)
 ***** [X] TODO filter root obligations that are extraneous.
-- [ ] we discussed these as being obligations of the form ~_: TRAIT~ or ~(): TRAIT~.
-- [ ] but how does rustc pick the ambiguity error to talk about? (I have a loose
-  idea; it's a good idea to try and nab Michael Goulet's attention.)
+- [X] we discussed these as being obligations of the form ~_: TRAIT~ or ~(): TRAIT~.
+- [X] but how does rustc pick the ambiguity error to talk about? (I have a loose idea; it's a good idea to try and nab Michael Goulet's attention.)
 
 ***** [ ] TODO test on the set of example programs, and a few others to try and catch possible bugs.
 ***** [ ] TODO tests???

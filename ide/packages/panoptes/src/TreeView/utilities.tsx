@@ -1,7 +1,5 @@
-import { Node, SerializedTree, TreeTopology } from "@argus/common/types";
+import { SerializedTree } from "@argus/common/types";
 import React from "react";
-
-import { PrintGoalPredicate } from "../Ty/private/predicate";
 
 interface Path<T, Direction> {
   from: T;
