@@ -64,10 +64,7 @@ class ViewLoader {
 
   public static createOrShow(extensionPath: vscode.Uri) {
     if (ViewLoader.currentPanel) {
-      const column = vscode.window.activeTextEditor
-        ? vscode.window.activeTextEditor.viewColumn
-        : undefined;
-      ViewLoader.currentPanel.panel.reveal(column);
+      ViewLoader.currentPanel.panel.reveal();
     } else {
       ViewLoader.currentPanel = new ViewLoader(
         extensionPath,
