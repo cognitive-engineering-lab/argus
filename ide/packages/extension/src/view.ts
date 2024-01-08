@@ -10,16 +10,18 @@ import {
   Obligation,
   ObligationOutput,
   SerializedTree,
+  TraitError,
   TreeOutput,
 } from "@argus/common/dist/types";
 import { MessageHandlerData } from "@estruyf/vscode";
 import _ from "lodash";
 import vscode from "vscode";
 
-import { rangeHighlight } from "./decorate";
+import { rangeHighlight, traitErrorDecorate } from "./decorate";
 import { showErrorDialog } from "./errors";
 import { globals } from "./lib";
 import { log } from "./logging";
+import { RustEditor, isRustEditor, rustRangeToVscodeRange } from "./utils";
 
 const outDir = "dist";
 const packageName = "panoptes";
@@ -171,6 +173,10 @@ class ViewLoader {
     const obligations = res.value;
     log("Returning obligations", obligations);
 
+    // TODO: for each obligations in body set the trait errors.
+    const traitErrors = _.flatMap(obligations, oib => oib.traitErrors);
+    this.setTraitErrors(host, traitErrors);
+
     this.messageWebview<ObligationOutput[]>(requestId, {
       type: "FROM_EXTENSION",
       file: host,
@@ -203,7 +209,7 @@ class ViewLoader {
     }
 
     // NOTE: the returned value should be an array of a single tree, however,
-    // it is possible that no tree is returned. (This is but we're working on it.)
+    // it is possible that no tree is returned. (Yes, but I'm working on it.)
     const tree = _.filter(res.value, t => t !== undefined) as Array<
       SerializedTree | undefined
     >;
@@ -217,16 +223,38 @@ class ViewLoader {
     });
   }
 
+  // ----------------------
+  // Decorations
+
+  private setTraitErrors(host: Filename, errors: TraitError[]) {
+    const editor = this.getEditorByName(host);
+    if (editor === undefined) {
+      showErrorDialog(`No editor for file ${host}`);
+      return;
+    }
+
+    editor.setDecorations(
+      traitErrorDecorate,
+      _.map(errors, e => {
+        return {
+          range: rustRangeToVscodeRange(e.range),
+          hoverMessage: `This is a trait error!`,
+        };
+      })
+    );
+  }
+
   private async addHighlightRange(host: Filename, range: CharRange) {
     log("Adding highlight range", host, range);
 
     const editor = this.getEditorByName(host);
     if (editor === undefined) {
       showErrorDialog(`No editor for file ${host}`);
-    } else {
-      this.highlightRanges.push(range);
-      await this.refreshHighlights(editor);
+      return;
     }
+
+    this.highlightRanges.push(range);
+    await this.refreshHighlights(editor);
   }
 
   private async removeHighlightRange(host: Filename, range: CharRange) {
@@ -235,24 +263,20 @@ class ViewLoader {
     const editor = this.getEditorByName(host);
     if (editor === undefined) {
       showErrorDialog(`No editor for file ${host}`);
-    } else {
-      this.highlightRanges = _.filter(
-        this.highlightRanges,
-        r => !_.isEqual(r, range)
-      );
-      await this.refreshHighlights(editor);
+      return;
     }
+
+    this.highlightRanges = _.filter(
+      this.highlightRanges,
+      r => !_.isEqual(r, range)
+    );
+    await this.refreshHighlights(editor);
   }
 
   private async refreshHighlights(editor: vscode.TextEditor) {
     editor.setDecorations(
       rangeHighlight,
-      _.map(this.highlightRanges, (r: CharRange) => {
-        return new vscode.Range(
-          new vscode.Position(r.start.line, r.start.column),
-          new vscode.Position(r.end.line, r.end.column)
-        );
-      })
+      _.map(this.highlightRanges, r => rustRangeToVscodeRange(r))
     );
   }
 
@@ -270,10 +294,17 @@ class ViewLoader {
   }
 
   private getEditorByName(name: Filename): vscode.TextEditor | undefined {
-    return _.find(
-      vscode.window.visibleTextEditors,
-      e => e.document.fileName === name
-    );
+    return _.find(this.visibleEditors(), e => e.document.fileName === name);
+  }
+
+  private visibleEditors(): RustEditor[] {
+    let editors = [];
+    for (let editor of vscode.window.visibleTextEditors) {
+      if (isRustEditor(editor)) {
+        editors.push(editor);
+      }
+    }
+    return editors;
   }
 
   private getHtmlForWebview() {
@@ -300,7 +331,7 @@ class ViewLoader {
     );
 
     let initialFiles: Filename[] = _.map(
-      vscode.window.visibleTextEditors,
+      this.visibleEditors(),
       e => e.document.fileName
     );
 

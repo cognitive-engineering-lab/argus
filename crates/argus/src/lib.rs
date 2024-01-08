@@ -57,6 +57,7 @@ pub struct TraitError<'tcx> {
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "ts-rs", derive(TS))]
+#[serde(rename_all = "camelCase")]
 pub struct ObligationsInBody<'tcx> {
   #[serde(skip_serializing_if = "Option::is_none")]
   #[serde(serialize_with = "serialize_option")]

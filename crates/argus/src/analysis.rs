@@ -211,24 +211,32 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
       }));
     }
 
+    let tcx = &self.tcx();
+    // NOTE: this will remove everything that is not "necessary,"
+    // below might be a better strategy. The best is ordering them by
+    // relevance and then hiding unnecessary obligations unless the
+    // user wants to see them.
+    retain_fixpoint(&mut result, |error| {
+      error.obligation.predicate.is_necessary(tcx)
+    });
+
     // Iteratively filter out elements unless there's only one thing
     // left; we don't want to remove the last remaining query.
     // Queries in order of *least* importance:
     // 1. (): TRAIT
     // 2. TY: Sized
     // 3. _: TRAIT
-    let tcx = &self.tcx();
-    retain_fixpoint(&mut result, |error| {
-      !error.obligation.predicate.is_unit_impl_trait(tcx)
-    });
+    // retain_fixpoint(&mut result, |error| {
+    //   !error.obligation.predicate.is_unit_impl_trait(tcx)
+    // });
 
-    retain_fixpoint(&mut result, |error| {
-      !error.obligation.predicate.is_ty_impl_sized(tcx)
-    });
+    // retain_fixpoint(&mut result, |error| {
+    //   !error.obligation.predicate.is_ty_impl_sized(tcx)
+    // });
 
-    retain_fixpoint(&mut result, |error| {
-      !error.obligation.predicate.is_ty_unknown(tcx)
-    });
+    // retain_fixpoint(&mut result, |error| {
+    //   !error.obligation.predicate.is_ty_unknown(tcx)
+    // });
 
     return_with_hashes(result)
   }

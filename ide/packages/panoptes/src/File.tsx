@@ -5,12 +5,7 @@ import {
   ObligationsInBody,
   SerializedTree,
 } from "@argus/common/types";
-import {
-  VSCodeButton,
-  VSCodeDivider,
-  VSCodeProgressRing,
-  VSCodeTextArea,
-} from "@vscode/webview-ui-toolkit/react";
+import { VSCodeButton } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
@@ -34,7 +29,6 @@ const ObligationTreeWrapper = ({
   const [tree, setTree] = useState<SerializedTree | undefined>(undefined);
   const file = useContext(FileContext)!;
 
-  // FIXME: is this right, we only want o load things once.
   useEffect(() => {
     const getData = async () => {
       const tree = await requestFromExtension<"tree">({
