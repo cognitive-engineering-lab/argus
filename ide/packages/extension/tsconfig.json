@@ -4,10 +4,7 @@
     "src"
   ],
   "compilerOptions": {
-    "moduleResolution": "Node",
-    "module": "CommonJS",
-    "target": "ES6",
-    "lib": ["ES6", "DOM"],
-    "outDir": "dist",
+    "noEmit": true,
+    "outDir": "dist"
   }
 }

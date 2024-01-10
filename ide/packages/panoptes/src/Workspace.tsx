@@ -1,12 +1,11 @@
-import { Filename } from "@argus/common";
-import { ObligationsInBody } from "@argus/common/types";
+import { Filename } from "@argus/common/lib";
 import {
   VSCodePanelTab,
   VSCodePanelView,
   VSCodePanels,
 } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import "./Workspace.css";

@@ -1,4 +1,4 @@
-import { CallArgus } from "@argus/common";
+import { CallArgus } from "@argus/common/lib";
 import vscode from "vscode";
 
 import { showErrorDialog } from "./errors";

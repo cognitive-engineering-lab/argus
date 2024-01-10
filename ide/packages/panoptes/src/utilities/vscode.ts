@@ -2,7 +2,7 @@ import {
   ExtensionReturn,
   ExtensionToWebViewMsg,
   WebViewToExtensionMsg,
-} from "@argus/common";
+} from "@argus/common/lib";
 import { messageHandler } from "@estruyf/vscode/dist/client";
 
 // TODO: how can we force T === body.command?

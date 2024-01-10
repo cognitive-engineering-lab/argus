@@ -2,9 +2,7 @@ import {
   ExtensionToWebViewMsg,
   Filename,
   WebViewToExtensionMsg,
-} from "@argus/common";
-// FIXME: some build thingy is wrong. The 'dist/' should not be necessary?
-// Elsewhere I can just use '@argus/common/types', but TS can't find the type decls.
+} from "@argus/common/lib";
 import {
   CharRange,
   Obligation,
@@ -12,19 +10,16 @@ import {
   SerializedTree,
   TraitError,
   TreeOutput,
-} from "@argus/common/dist/types";
+} from "@argus/common/types";
 import { MessageHandlerData } from "@estruyf/vscode";
 import _ from "lodash";
 import vscode from "vscode";
 
 import { rangeHighlight, traitErrorDecorate } from "./decorate";
 import { showErrorDialog } from "./errors";
-import { globals } from "./lib";
 import { log } from "./logging";
+import { globals } from "./main";
 import { RustEditor, isRustEditor, rustRangeToVscodeRange } from "./utils";
-
-const outDir = "dist";
-const packageName = "panoptes";
 
 // ------------------------------------
 // Endpoints for the extension to call.
@@ -63,16 +58,12 @@ class ViewLoader {
   private highlightRanges: CharRange[] = [];
 
   public static createOrShow(extensionPath: vscode.Uri) {
-    const column = vscode.window.activeTextEditor
-      ? vscode.window.activeTextEditor.viewColumn
-      : undefined;
-
     if (ViewLoader.currentPanel) {
-      ViewLoader.currentPanel.panel.reveal(column);
+      ViewLoader.currentPanel.panel.reveal();
     } else {
       ViewLoader.currentPanel = new ViewLoader(
         extensionPath,
-        column || vscode.ViewColumn.Beside
+        vscode.ViewColumn.Beside
       );
     }
   }
@@ -308,21 +299,24 @@ class ViewLoader {
   }
 
   private getHtmlForWebview() {
-    const root = rootUri(this.extensionPath);
-    const buildDir = vscode.Uri.joinPath(root, packageName, outDir);
+    const panoptesDir = vscode.Uri.joinPath(
+      this.extensionPath,
+      "node_modules",
+      "@argus",
+      "panoptes"
+    );
 
     const scriptUri = this.panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(buildDir, "panoptes.iife.js")
+      vscode.Uri.joinPath(panoptesDir, "dist", "panoptes.iife.js")
     );
 
     const styleUri = this.panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(buildDir, "style.css")
+      vscode.Uri.joinPath(panoptesDir, "dist", "style.css")
     );
 
     const codiconsUri = this.panel.webview.asWebviewUri(
       vscode.Uri.joinPath(
-        root,
-        packageName,
+        panoptesDir,
         "node_modules",
         "@vscode/codicons",
         "dist",

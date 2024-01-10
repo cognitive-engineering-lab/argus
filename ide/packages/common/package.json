@@ -7,7 +7,7 @@
   "main": "dist/lib.js",
   "exports": {
     ".": {
-      "default": "./dist/lib.js"
+      "default": "./dist/*.js"
     },
     "./*": {
       "default": "./dist/*.js"

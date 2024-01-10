@@ -1,4 +1,4 @@
-import { ArgusArgs, CallArgus, Result } from "@argus/common";
+import { ArgusArgs, CallArgus, Result } from "@argus/common/lib";
 import cp from "child_process";
 import _ from "lodash";
 import os from "os";

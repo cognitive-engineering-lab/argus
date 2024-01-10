@@ -1,4 +1,4 @@
-import { Filename } from "@argus/common";
+import { Filename } from "@argus/common/lib";
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 
