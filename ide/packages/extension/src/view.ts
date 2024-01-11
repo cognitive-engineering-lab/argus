@@ -1,16 +1,17 @@
 import {
-  ExtensionToWebViewMsg,
-  Filename,
-  WebViewToExtensionMsg,
-} from "@argus/common/lib";
-import {
   CharRange,
   Obligation,
+  ObligationHash,
   ObligationOutput,
   SerializedTree,
   TraitError,
   TreeOutput,
 } from "@argus/common/bindings";
+import {
+  ExtensionToWebViewMsg,
+  Filename,
+  WebViewToExtensionMsg,
+} from "@argus/common/lib";
 import { MessageHandlerData } from "@estruyf/vscode";
 import _ from "lodash";
 import vscode from "vscode";
@@ -24,13 +25,23 @@ import { RustEditor, isRustEditor, rustRangeToVscodeRange } from "./utils";
 // ------------------------------------
 // Endpoints for the extension to call.
 
-export const launchArgus = async (extensionPath: vscode.Uri) => {
+export async function launchArgus(extensionPath: vscode.Uri) {
   ViewLoader.createOrShow(extensionPath);
-};
+}
 
-export const onChange = () => {
+export async function blingObligation(_extensionPath: vscode.Uri) {
+  const obligation = globals.params?.obligation;
+  const file = globals.params?.file;
+  if (obligation === undefined || file === undefined) {
+    showErrorDialog("Obligation calling context unsatisfied");
+    return;
+  }
+  ViewLoader.currentPanel?.blingObligation(file, obligation);
+}
+
+export function onChange() {
   // TODO: invalidate the webview information
-};
+}
 
 // ----------------------
 // Internal functionality
@@ -211,6 +222,15 @@ class ViewLoader {
       file: host,
       command: "tree",
       tree: tree0,
+    });
+  }
+
+  public async blingObligation(file: Filename, obligation: ObligationHash) {
+    this.messageWebview<void>("bling", {
+      type: "FROM_EXTENSION",
+      command: "bling",
+      file,
+      hash: obligation,
     });
   }
 

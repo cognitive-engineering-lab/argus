@@ -5,6 +5,11 @@
     margin-bottom: 2em;
 }
 
+.ObligationCard .bling {
+    background-color: yellow;
+    transition: background-color 2s ease-out;
+}
+
 .ObligationCard > vscode-text-area {
     font-family: monospace;
     display: block;

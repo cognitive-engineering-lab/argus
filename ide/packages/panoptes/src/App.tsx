@@ -1,9 +1,9 @@
+import { ObligationHash, ObligationsInBody } from "@argus/common/bindings";
 import { Filename } from "@argus/common/lib";
-import { ObligationsInBody } from "@argus/common/bindings";
 import _ from "lodash";
-import React, { useEffect, useState } from "react";
+import React, { RefObject, useEffect, useState } from "react";
 
-import File from "./File";
+import File, { ObligationHookContext } from "./File";
 import Workspace from "./Workspace";
 import { WaitingOn } from "./utilities/WaitingOn";
 import { requestFromExtension } from "./utilities/vscode";
@@ -44,6 +44,30 @@ const App = ({ initialFiles }: { initialFiles: Filename[] }) => {
     })
   );
 
+  const [obligations, setObligations] = useState<
+    [Filename, ObligationHash, RefObject<HTMLDivElement>][]
+  >([]);
+  const addRefToList = (
+    file: Filename,
+    hash: ObligationHash,
+    ref: RefObject<HTMLDivElement>
+  ) => setObligations([...obligations, [file, hash, ref]]);
+
+  const briefHighlight = (file: Filename, hash: ObligationHash) => {
+    const idx = _.findIndex(
+      obligations,
+      ([f, h, _o]) => f === file && h === hash
+    );
+    const o = obligations[idx][2];
+
+    if (o !== undefined) {
+      o.current?.classList.add("highlight");
+      setTimeout(() => {
+        o.current?.classList.remove("highlight");
+      }, 2000);
+    }
+  };
+
   // NOTE: this listener should only listen for posted messages, not
   // for things that could be an expected response from a webview request.
   const listener = (e: MessageEvent) => {
@@ -52,6 +76,11 @@ const App = ({ initialFiles }: { initialFiles: Filename[] }) => {
 
     // TODO: none of these messages are actually getting sent yet.
     switch (msg.command) {
+      case "bling": {
+        briefHighlight(msg.file, msg.hash);
+        return;
+      }
+
       case "open-file": {
         setOpenFiles([
           ...openFiles,
@@ -89,7 +118,11 @@ const App = ({ initialFiles }: { initialFiles: Filename[] }) => {
     );
   };
 
-  return <Workspace files={openFiles} reset={resetState} />;
+  return (
+    <ObligationHookContext.Provider value={addRefToList}>
+      <Workspace files={openFiles} reset={resetState} />
+    </ObligationHookContext.Provider>
+  );
 };
 
 export default App;

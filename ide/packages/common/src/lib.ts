@@ -1,6 +1,7 @@
 import {
   CharRange,
   Obligation,
+  ObligationHash,
   ObligationOutput,
   TreeOutput,
 } from "./bindings";
@@ -31,6 +32,7 @@ export type ExtensionToWebViewMsg = { type: FROM_EXT } & (
   | { command: "invalidate" }
   | (CommonData &
       (
+        | { command: "bling"; hash: ObligationHash }
         | { command: "open-file" }
         | { command: "close-file" }
         | { command: "obligations"; obligations: ObligationOutput[] }

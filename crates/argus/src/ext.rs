@@ -112,6 +112,7 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
     &self,
     ldef_id: LocalDefId,
   ) -> Vec<FulfillmentData<'tcx>> {
+    use rustc_hir_typeck::Inherited;
     let infcx = self.infcx().unwrap();
 
     let return_with_hashes = |v: Vec<FulfillmentError<'tcx>>| {
@@ -123,19 +124,28 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
       })
     };
 
-    let mut result = Vec::new();
+    // NON-Updated code (with-probes)
+    // let mut result = Vec::new();
+    // let _def_id = ldef_id.to_def_id();
+    // if let Some(infcx) = self.infcx() {
+    //   let fulfilled_obligations = infcx.fulfilled_obligations.borrow();
+    //   result.extend(fulfilled_obligations.iter().filter_map(|obl| match obl {
+    //     FulfilledObligation::Failure(error) => Some(error.clone()),
+    //     FulfilledObligation::Success(_obl) => None,
+    //   }));
+    // }
 
-    let _def_id = ldef_id.to_def_id();
-
-    if let Some(infcx) = self.infcx() {
-      let fulfilled_obligations = infcx.fulfilled_obligations.borrow();
-      let _tcx = &infcx.tcx;
-
-      result.extend(fulfilled_obligations.iter().filter_map(|obl| match obl {
+    // Updated code (sans-probes)
+    let inh: &Inherited<'tcx> = self;
+    let engine = inh.get_engine();
+    let fulfilled_obligations = engine.get_tracked_obligations().unwrap();
+    let mut result = fulfilled_obligations
+      .iter()
+      .filter_map(|obl| match obl {
         FulfilledObligation::Failure(error) => Some(error.clone()),
         FulfilledObligation::Success(_obl) => None,
-      }));
-    }
+      })
+      .collect::<Vec<_>>();
 
     let tcx = &self.tcx();
     // NOTE: this will remove everything that is not "necessary,"

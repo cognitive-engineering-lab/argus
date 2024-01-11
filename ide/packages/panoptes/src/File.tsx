@@ -1,13 +1,20 @@
-import { Filename } from "@argus/common/lib";
 import {
   CharRange,
   Obligation,
+  ObligationHash,
   ObligationsInBody,
   SerializedTree,
 } from "@argus/common/bindings";
+import { Filename } from "@argus/common/lib";
 import { VSCodeButton, VSCodeDivider } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  RefObject,
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 
 import "./File.css";
 import TreeApp from "./TreeView/TreeApp";
@@ -18,6 +25,9 @@ import { IcoChevronDown, IcoChevronUp } from "./utilities/icons";
 import { postToExtension, requestFromExtension } from "./utilities/vscode";
 
 const FileContext = createContext<Filename | undefined>(undefined);
+export const ObligationHookContext = createContext<
+  (file: Filename, hash: ObligationHash, o: RefObject<HTMLDivElement>) => void
+>((_file, _hash, _o) => {});
 
 const NoTreeFound = ({ obligation }: { obligation: Obligation }) => {
   return (
@@ -68,6 +78,10 @@ const ObligationTreeWrapper = ({
   return <>{content}</>;
 };
 
+function obligationId(file: Filename, ohash: ObligationHash) {
+  return `obligation-${file}-${ohash}`;
+}
+
 const ObligationCard = ({
   range,
   obligation,
@@ -76,10 +90,16 @@ const ObligationCard = ({
   obligation: Obligation;
 }) => {
   const [isInfoVisible, setIsInfoVisible] = useState(false);
+  const obligationRef = React.createRef<HTMLDivElement>();
   const file = useContext(FileContext)!;
+  const hookMe = useContext(ObligationHookContext)!;
+
+  // Hook the element up to the app manager.
+  useEffect(() => {
+    hookMe(file, obligation.hash, obligationRef);
+  }, []);
 
   const addHighlight = () => {
-    console.log("Highlighting range", obligation.range);
     postToExtension({
       type: "FROM_WEBVIEW",
       file: file,
@@ -89,7 +109,6 @@ const ObligationCard = ({
   };
 
   const removeHighlight = () => {
-    console.log("Removing highlight", obligation.range);
     postToExtension({
       type: "FROM_WEBVIEW",
       file: file,
@@ -104,6 +123,7 @@ const ObligationCard = ({
 
   return (
     <div
+      ref={obligationRef}
       className="ObligationCard"
       onMouseEnter={addHighlight}
       onMouseLeave={removeHighlight}

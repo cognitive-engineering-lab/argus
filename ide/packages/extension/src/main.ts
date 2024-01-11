@@ -1,13 +1,24 @@
-import { CallArgus } from "@argus/common/lib";
+import { ObligationHash } from "@argus/common/bindings";
+import { CallArgus, Filename } from "@argus/common/lib";
 import vscode from "vscode";
 
 import { showErrorDialog } from "./errors";
 import { log } from "./logging";
 import { setup } from "./setup";
-import { launchArgus, onChange as webviewOnChange } from "./view";
+import {
+  blingObligation,
+  launchArgus,
+  onChange as webviewOnChange,
+} from "./view";
+
+// FIXME: HACK: VSCode commands cannot have arguments, nor can Markdown
+// links call arbitrary code. This is a workaround but there is
+// certainly a better way to do this.
+export type CommandParameters = { obligation: ObligationHash; file: Filename };
 
 export let globals: {
   backend: CallArgus;
+  params?: CommandParameters;
   diagnosticCollection: vscode.DiagnosticCollection;
 };
 
@@ -15,7 +26,6 @@ export let globals: {
 export async function activate(context: vscode.ExtensionContext) {
   log("Activating Argus ...");
 
-  // TODO: this needs to be a little more robust.
   try {
     globals = {
       backend: () => {
@@ -42,6 +52,7 @@ export async function activate(context: vscode.ExtensionContext) {
     // Note, list must match commands listed in package.json.
     let commands: [string, () => Promise<void>][] = [
       ["launchArgus", async () => launchArgus(context.extensionUri)],
+      ["blingObligation", async () => blingObligation(context.extensionUri)],
     ];
 
     commands.forEach(([name, func]) => {

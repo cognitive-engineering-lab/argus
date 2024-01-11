@@ -18,7 +18,7 @@ export const PrettyObligation = ({ obligation }) => {
         console.error(details);
       }}
     >
-      <PrintBinderPredicateKind o={obligation.data} />
+      <PrintBinderPredicateKind o={obligation.predicate} />
     </ErrorBoundary>
   );
 };
