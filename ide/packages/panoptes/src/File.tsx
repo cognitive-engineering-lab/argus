@@ -5,7 +5,7 @@ import {
   ObligationsInBody,
   SerializedTree,
 } from "@argus/common/types";
-import { VSCodeButton } from "@vscode/webview-ui-toolkit/react";
+import { VSCodeButton, VSCodeDivider } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
@@ -19,6 +19,17 @@ import { postToExtension, requestFromExtension } from "./utilities/vscode";
 
 const FileContext = createContext<Filename | undefined>(undefined);
 
+const NoTreeFound = ({ obligation }: { obligation: Obligation }) => {
+  return (
+    <div>
+      <h3>Couldn't find a proof tree for this obligation</h3>
+      <PrettyObligation obligation={obligation} />
+
+      <p>This is a bug, please report it!</p>
+    </div>
+  );
+};
+
 const ObligationTreeWrapper = ({
   range,
   obligation,
@@ -26,7 +37,9 @@ const ObligationTreeWrapper = ({
   range: CharRange;
   obligation: Obligation;
 }) => {
-  const [tree, setTree] = useState<SerializedTree | undefined>(undefined);
+  const [tree, setTree] = useState<SerializedTree | undefined | "loading">(
+    "loading"
+  );
   const file = useContext(FileContext)!;
 
   useEffect(() => {
@@ -44,8 +57,10 @@ const ObligationTreeWrapper = ({
   }, []);
 
   const content =
-    tree === undefined ? (
+    tree === "loading" ? (
       <WaitingOn message="proof tree" />
+    ) : tree === undefined ? (
+      <NoTreeFound obligation={obligation} />
     ) : (
       <TreeApp tree={tree} />
     );
@@ -113,23 +128,17 @@ const ObligationCard = ({
 const ObligationBody = ({ osib }: { osib: ObligationsInBody }) => {
   const bodyRange = osib.range;
   const bodyName = osib.name;
-  const [_successes, failures] = _.partition(
+  const [successes, failures] = _.partition(
     osib.obligations,
     obligation => obligation.kind.type === "success"
   );
 
   const doList = (kind: "Solved" | "Failed", obligations: Obligation[]) => {
-    if (obligations.length === 0) {
-      return;
-    }
-
-    const name = bodyName === undefined ? "" : "in " + bodyName;
-    return (
-      <>
-        <h3>
-          {kind} obligations {name}
-        </h3>
-        {_.map(obligations, (obligation, idx) => {
+    const content =
+      obligations.length === 0 ? (
+        <span>No {kind.toLowerCase()} obligations</span>
+      ) : (
+        _.map(obligations, (obligation, idx) => {
           return (
             <ObligationCard
               range={bodyRange}
@@ -137,13 +146,27 @@ const ObligationBody = ({ osib }: { osib: ObligationsInBody }) => {
               key={idx}
             />
           );
-        })}
+        })
+      );
+
+    const name = bodyName === undefined ? "" : "in " + bodyName;
+    return (
+      <>
+        <h3>
+          {kind} obligations {name}
+        </h3>
+        {content}
       </>
     );
   };
 
   // TODO: add code for the successes too
-  return <div>{doList("Failed", failures)}</div>;
+  return (
+    <>
+      <div>{doList("Failed", failures)}</div>
+      <div>{doList("Solved", successes)}</div>
+    </>
+  );
 };
 
 const File = ({
@@ -156,7 +179,12 @@ const File = ({
   return (
     <FileContext.Provider value={file}>
       {_.map(osibs, (osib, idx) => {
-        return <ObligationBody osib={osib} key={idx} />;
+        return (
+          <>
+            <VSCodeDivider />
+            <ObligationBody osib={osib} key={idx} />
+          </>
+        );
       })}
     </FileContext.Provider>
   );

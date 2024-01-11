@@ -371,19 +371,139 @@ fn main() {}
 *** Lean4 (typeclasses)
 
 
-** Feature matrix
+** Feature matrix (standard)
 
 /Note, like everything else in this file the table is unfinished. The columns should probably encode the choices outlined in the SPJ paper, or at least a subset of those I deem important for this work./
 
-| Language |
-|----------|
-| Scala2   |
-| Scala3   |
-| Swift    |
-|----------|
-| Rust     |
-| Haskell  |
-| Lean4    |
+| Language | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|----------+---+---+---+---+---+---+---+---+---|
+| Scala2   |   |   |   |   |   |   |   |   |   |
+| Scala3   |   |   |   |   |   |   |   |   |   |
+| Swift    |   |   |   |   |   |   |   |   |   |
+|----------+---+---+---+---+---+---+---+---+---|
+| Rust     |   |   |   |   |   |   |   |   |   |
+| Haskell  |   |   |   |   |   |   |   |   |   |
+| Lean4    |   |   |   |   |   |   |   |   |   |
+
+*** Language Details
+**** Decision 1: the form of types
+***** Scala2
+***** Scala3
+***** Swift
+***** Rust
+***** Haskell
+***** Lean4
+
+**** Decision 2: how much context reduction
+***** Scala2
+***** Scala3
+***** Swift
+***** Rust
+***** Haskell
+***** Lean4
+
+**** Decision 3: overlapping instance declarations
+***** Scala2
+***** Scala3
+***** Swift
+***** Rust
+***** Haskell
+***** Lean4
+
+**** Decision 4: instance types
+***** Scala2
+***** Scala3
+***** Swift
+***** Rust
+***** Haskell
+***** Lean4
+
+**** Decision 5: repeated type variables in instance heads
+***** Scala2
+***** Scala3
+***** Swift
+***** Rust
+***** Haskell
+***** Lean4
+
+**** Decision 6: instance contexts
+***** Scala2
+***** Scala3
+***** Swift
+***** Rust
+***** Haskell
+***** Lean4
+
+**** Decision 7: what superclasses are permitted
+***** Scala2
+***** Scala3
+***** Swift
+***** Rust
+***** Haskell
+***** Lean4
+
+**** Decision 8: improvement
+***** Scala2
+***** Scala3
+***** Swift
+***** Rust
+***** Haskell
+***** Lean4
+
+**** Decision 9: class declarations
+***** Scala2
+***** Scala3
+***** Swift
+***** Rust
+***** Haskell
+***** Lean4
+
+
+** Feature matrix (extended)
+
+| Language | 1 | 2 | 3 | 4 |
+|----------+---+---+---+---|
+| Scala2   |   |   |   |   |
+| Scala3   |   |   |   |   |
+| Swift    |   |   |   |   |
+|----------+---+---+---+---|
+| Rust     |   |   |   |   |
+| Haskell  |   |   |   |   |
+| Lean4    |   |   |   |   |
+
+*** Language Details
+**** 1: anonymous type synonyms
+***** Scala2
+***** Scala3
+***** Swift
+***** Rust
+***** Haskell
+***** Lean4
+
+**** 2: relaxed superclass constraints
+***** Scala2
+***** Scala3
+***** Swift
+***** Rust
+***** Haskell
+***** Lean4
+
+**** 3: instance scope
+***** Scala2
+***** Scala3
+***** Swift
+***** Rust
+***** Haskell
+***** Lean4
+
+**** 4: relaxed type signature constraints
+***** Scala2
+***** Scala3
+***** Swift
+***** Rust
+***** Haskell
+***** Lean4
+
 
 
 * How does /rustc/ report obligations?
