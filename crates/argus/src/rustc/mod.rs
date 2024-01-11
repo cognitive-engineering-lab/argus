@@ -31,7 +31,7 @@ pub trait FnCtxtExt<'tcx> {
     );
 }
 
-pub trait InferPrivateExt<'tcx> {
+pub trait InferCtxtExt<'tcx> {
   fn error_implies(
     &self,
     cond: ty::Predicate<'tcx>,
@@ -79,7 +79,7 @@ impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
 }
 
 // Taken from rustc_trait_selection/src/traits/error_reporting/type_err_ctxt_ext.rs
-impl<'tcx> InferPrivateExt<'tcx> for TypeErrCtxt<'_, 'tcx> {
+impl<'tcx> InferCtxtExt<'tcx> for TypeErrCtxt<'_, 'tcx> {
   fn error_implies(
     &self,
     cond: ty::Predicate<'tcx>,

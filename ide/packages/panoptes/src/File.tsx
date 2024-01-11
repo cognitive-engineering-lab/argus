@@ -4,7 +4,7 @@ import {
   Obligation,
   ObligationsInBody,
   SerializedTree,
-} from "@argus/common/types";
+} from "@argus/common/bindings";
 import { VSCodeButton, VSCodeDivider } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import React, { createContext, useContext, useEffect, useState } from "react";

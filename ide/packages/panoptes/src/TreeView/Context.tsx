@@ -1,7 +1,7 @@
 import { makeAutoObservable } from "mobx";
 import { createContext } from "react";
 
-import { SerializedTree } from "@argus/common/types";
+import { SerializedTree } from "@argus/common/bindings";
 
 export class ActiveState {
   currentNode: number | null = null;

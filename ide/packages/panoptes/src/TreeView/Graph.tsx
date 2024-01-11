@@ -1,5 +1,4 @@
-import { SerializedTree } from "@argus/common/types";
-import { TreeTopology } from "@argus/common/types";
+import { SerializedTree, TreeTopology } from "@argus/common/bindings";
 import _ from "lodash";
 import { observer } from "mobx-react";
 import React, {

@@ -8,6 +8,7 @@ import { ObligationsInBody } from "./bindings/ObligationsInBody";
 import { SerializedTree } from "./bindings/SerializedTree";
 import { TraitError } from "./bindings/TraitError";
 import { TreeTopology } from "./bindings/TreeTopology";
+import { ObligationHash } from "./bindings/ObligationHash";
 
 export {
   SerializedTree,
@@ -20,6 +21,7 @@ export {
   FilenameIndex,
   Candidate,
   TraitError,
+  ObligationHash,
 };
 
 export type ObligationOutput = ObligationsInBody;

@@ -1,4 +1,4 @@
-import { Candidate as CandidateTy, Node as NodeTy } from "@argus/common/types";
+import { Candidate as CandidateTy, Node as NodeTy } from "@argus/common/bindings";
 import React from "react";
 
 import { PrintDefPath } from "../Ty/private/path";

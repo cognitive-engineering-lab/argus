@@ -1,4 +1,4 @@
-import { SerializedTree } from "@argus/common/types";
+import { SerializedTree } from "@argus/common/bindings";
 import _ from "lodash";
 import React from "react";
 

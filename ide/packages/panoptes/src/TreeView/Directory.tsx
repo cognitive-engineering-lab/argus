@@ -1,4 +1,4 @@
-import { SerializedTree } from "@argus/common/types";
+import { SerializedTree } from "@argus/common/bindings";
 import classNames from "classnames";
 import _ from "lodash";
 import React, { PropsWithChildren, useContext, useState } from "react";

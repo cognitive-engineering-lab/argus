@@ -6,7 +6,7 @@ use std::{
   time::Instant,
 };
 
-use argus::ToTarget;
+use argus::types::{ToTarget, ObligationHash};
 use clap::{Parser, Subcommand};
 use fluid_let::fluid_set;
 use log::{debug, info};
@@ -45,7 +45,7 @@ enum ArgusCommand {
   },
   Tree {
     file: String,
-    id: u64,
+    id: ObligationHash,
     // Represents enclosing body `CharRange`
     start_line: usize,
     start_column: usize,
@@ -182,7 +182,7 @@ impl RustcPlugin for ArgusPlugin {
         postprocess(v)
       }
       Obligations { file, .. } => {
-        let nothing = || None::<(u64, CharRange)>;
+        let nothing = || None::<(ObligationHash, CharRange)>;
         let v = run(
           argus::analysis::obligations,
           PathBuf::from(file),

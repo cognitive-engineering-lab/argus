@@ -1,4 +1,4 @@
-import { CharRange } from "@argus/common/types";
+import { CharRange } from "@argus/common/bindings";
 import vscode from "vscode";
 
 export type RustDocument = vscode.TextDocument & { languageId: "rust" };

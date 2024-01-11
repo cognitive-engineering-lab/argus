@@ -10,7 +10,7 @@ import {
   SerializedTree,
   TraitError,
   TreeOutput,
-} from "@argus/common/types";
+} from "@argus/common/bindings";
 import { MessageHandlerData } from "@estruyf/vscode";
 import _ from "lodash";
 import vscode from "vscode";

@@ -1,4 +1,5 @@
 pub mod ext;
+#[allow(dead_code)] // Some analysis functions aren't used, yet.
 pub mod topology;
 #[macro_use]
 mod macros;
@@ -14,8 +15,11 @@ use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 pub use topology::*;
 
-use crate::serialize::ty::{
+use crate::{
+  types::ObligationHash,
+  serialize::ty::{
   PredicateDef, TraitRefPrintOnlyTraitPathDef, TyDef,
+}
 };
 
 crate::define_usize_idx! {
@@ -82,10 +86,8 @@ pub struct SerializedTree<'tcx> {
 pub struct Obligation<'tcx> {
   #[cfg_attr(feature = "ts-rs", ts(type = "any"))]
   #[serde(with = "PredicateDef")]
-  pub data: Predicate<'tcx>,
-  // NOTE: Hash64 but we pass it as a String because JavaScript
-  // cannot handle the full range of 64 bit integers.
-  pub hash: String,
+  pub predicate: Predicate<'tcx>,
+  pub hash: ObligationHash,
   pub range: CharRange,
   pub kind: ObligationKind,
 }

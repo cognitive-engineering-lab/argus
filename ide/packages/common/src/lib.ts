@@ -2,9 +2,8 @@ import {
   CharRange,
   Obligation,
   ObligationOutput,
-  SerializedTree,
   TreeOutput,
-} from "./types";
+} from "./bindings";
 
 // ----------------------------------------------------
 // Interface between the webview and extension

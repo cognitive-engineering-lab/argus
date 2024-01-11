@@ -1,5 +1,5 @@
 import { Filename } from "@argus/common/lib";
-import { ObligationsInBody } from "@argus/common/types";
+import { ObligationsInBody } from "@argus/common/bindings";
 import _ from "lodash";
 import React, { useEffect, useState } from "react";
 

@@ -1,7 +1,8 @@
 import { CharRange } from "./CharRange";
+import { ObligationHash } from "./ObligationHash";
 
 export type TraitError = {
   range: CharRange;
-  // TODO: predicates aren't typed yet, but should be soon.
+  candidates: ObligationHash[];
   predicate: any;
 };
