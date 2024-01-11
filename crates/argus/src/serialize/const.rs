@@ -1,7 +1,6 @@
 use rustc_middle::ty::*;
 use rustc_type_ir as ir;
 use serde::{ser::SerializeSeq, Serialize};
-use ty::*;
 
 use super::*;
 

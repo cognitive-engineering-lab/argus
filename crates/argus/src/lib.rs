@@ -24,8 +24,8 @@ extern crate rustc_trait_selection;
 extern crate rustc_type_ir;
 
 pub mod analysis;
-mod proof_tree;
-mod serialize;
-mod rustc;
-pub mod types;
 mod ext;
+mod proof_tree;
+mod rustc;
+mod serialize;
+pub mod types;

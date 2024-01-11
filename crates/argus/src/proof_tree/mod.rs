@@ -1,5 +1,8 @@
+//! Proof tree types sent to the Argus frontend.
+
 pub mod ext;
-#[allow(dead_code)] // Some analysis functions aren't used, yet.
+// FIXME: update topology module for current needs
+#[allow(dead_code, unused_assignments, unused_variables)]
 pub mod topology;
 #[macro_use]
 mod macros;
@@ -10,16 +13,16 @@ use std::collections::HashSet;
 use index_vec::IndexVec;
 use rustc_middle::ty::{Predicate, TraitRef, Ty};
 use rustc_utils::source_map::range::CharRange;
-// FIXME: TS bindings were removed as the automatic
-// generation doesn't have a serde::remote-like feature.
 use serde::Serialize;
+
+#[cfg(feature = "ts-rs")]
+use ts_rs::TS;
+
 pub use topology::*;
 
 use crate::{
+  serialize::ty::{PredicateDef, TraitRefPrintOnlyTraitPathDef, TyDef},
   types::ObligationHash,
-  serialize::ty::{
-  PredicateDef, TraitRefPrintOnlyTraitPathDef, TyDef,
-}
 };
 
 crate::define_usize_idx! {

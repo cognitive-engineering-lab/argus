@@ -1,10 +1,8 @@
-use r#const::*;
 use rustc_middle::{
   mir::{BinOp, UnOp},
   ty::{abstract_const::CastKind, *},
 };
 use serde::Serialize;
-use ty::*;
 
 use super::*;
 

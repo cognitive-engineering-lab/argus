@@ -3,32 +3,24 @@
 //! These are things that we might be able to convince people to make
 //! public within Rustc itself, but our needs may change so it hasn't
 //! happened yet.
-use anyhow::{anyhow, Result};
-use fluid_let::fluid_let;
-use itertools::Itertools;
-use rustc_data_structures::{fx::FxIndexSet, stable_hasher::Hash64};
-use rustc_hir::{def_id::LocalDefId, BodyId};
-use rustc_hir_analysis::astconv::AstConv;
-use rustc_hir_typeck::{inspect_typeck, FnCtxt};
+
+use rustc_data_structures::fx::FxIndexSet;
+use rustc_hir_typeck::FnCtxt;
 use rustc_infer::{
-  infer::error_reporting::TypeErrCtxt,
-  traits::{util::elaborate, FulfilledObligation},
+  infer::error_reporting::TypeErrCtxt, traits::util::elaborate,
 };
-use rustc_middle::ty::{self, ToPolyTraitRef, TyCtxt};
-use rustc_trait_selection::traits::{solve::Goal, FulfillmentError};
-use rustc_utils::source_map::range::CharRange;
+use rustc_middle::ty::{self, ToPolyTraitRef};
 
 // ------------------------
 // Used interface
-
 use crate::analysis::FulfillmentData;
 
 pub trait FnCtxtExt<'tcx> {
-    // NOTE: the errors taken are of `FulfillmentData` to conform to local needs
-    fn adjust_fulfillment_errors_for_expr_obligation(
-        &self,
-        errors: &mut Vec<FulfillmentData<'tcx>>,
-    );
+  // NOTE: the errors taken are of `FulfillmentData` to conform to local needs
+  fn adjust_fulfillment_errors_for_expr_obligation(
+    &self,
+    errors: &mut Vec<FulfillmentData<'tcx>>,
+  );
 }
 
 pub trait InferCtxtExt<'tcx> {
@@ -43,39 +35,39 @@ pub trait InferCtxtExt<'tcx> {
 // Impls
 
 impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
-    fn adjust_fulfillment_errors_for_expr_obligation(
-        &self,
-        errors: &mut Vec<FulfillmentData<'tcx>>,
-    ) {
-        let mut remap_cause = FxIndexSet::default();
-        let mut not_adjusted = vec![];
+  fn adjust_fulfillment_errors_for_expr_obligation(
+    &self,
+    errors: &mut Vec<FulfillmentData<'tcx>>,
+  ) {
+    let mut remap_cause = FxIndexSet::default();
+    let mut not_adjusted = vec![];
 
-        for (_, error) in errors {
-            let before_span = error.obligation.cause.span;
-            if self.adjust_fulfillment_error_for_expr_obligation(error)
-                || before_span != error.obligation.cause.span
-            {
-                remap_cause.insert((
-                    before_span,
-                    error.obligation.predicate,
-                    error.obligation.cause.clone(),
-                ));
-            } else {
-                not_adjusted.push(error);
-            }
-        }
-
-        for error in not_adjusted {
-            for (span, predicate, cause) in &remap_cause {
-                if *predicate == error.obligation.predicate
-                    && span.contains(error.obligation.cause.span)
-                {
-                    error.obligation.cause = cause.clone();
-                    continue;
-                }
-            }
-        }
+    for (_, error) in errors {
+      let before_span = error.obligation.cause.span;
+      if self.adjust_fulfillment_error_for_expr_obligation(error)
+        || before_span != error.obligation.cause.span
+      {
+        remap_cause.insert((
+          before_span,
+          error.obligation.predicate,
+          error.obligation.cause.clone(),
+        ));
+      } else {
+        not_adjusted.push(error);
+      }
     }
+
+    for error in not_adjusted {
+      for (span, predicate, cause) in &remap_cause {
+        if *predicate == error.obligation.predicate
+          && span.contains(error.obligation.cause.span)
+        {
+          error.obligation.cause = cause.clone();
+          continue;
+        }
+      }
+    }
+  }
 }
 
 // Taken from rustc_trait_selection/src/traits/error_reporting/type_err_ctxt_ext.rs

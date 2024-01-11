@@ -10,11 +10,11 @@
   dead_code
 )]
 
+pub mod compound;
 pub mod r#const;
 pub mod path;
 pub mod term;
 pub mod ty;
-pub mod compound;
 
 use r#const::*;
 use rustc_infer::infer::InferCtxt;

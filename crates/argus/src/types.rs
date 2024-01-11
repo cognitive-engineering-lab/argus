@@ -7,24 +7,25 @@
 //! in the [frontend](../../../ide/packages/common).
 use std::{ops::Deref, str::FromStr};
 
+use anyhow::Result;
 use rustc_data_structures::stable_hasher::Hash64;
 use rustc_middle::ty::{Predicate, TyCtxt};
 use rustc_span::{symbol::Symbol, Span};
-
-use anyhow::Result;
 use rustc_utils::source_map::range::{CharRange, ToSpan};
-use serde::{Serialize, Deserialize};
-
-use crate::{proof_tree::Obligation, serialize::ty::{SymbolDef, PredicateDef}};
-
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "ts-rs")]
 use ts_rs::TS;
+
+use crate::{
+  proof_tree::Obligation,
+  serialize::ty::{PredicateDef, SymbolDef},
+};
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "ts-rs", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct AmbiguityError<'tcx> {
-    _marker: std::marker::PhantomData<&'tcx ()>
+  _marker: std::marker::PhantomData<&'tcx ()>,
 }
 
 #[derive(Serialize)]
@@ -70,29 +71,29 @@ fn serialize_option<S: serde::Serializer>(
 pub struct ObligationHash(#[serde(with = "string")] u64);
 
 impl Deref for ObligationHash {
-    type Target = u64;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+  type Target = u64;
+  fn deref(&self) -> &Self::Target {
+    &self.0
+  }
 }
 
 impl FromStr for ObligationHash {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> Result<Self> {
-        Ok(<u64 as FromStr>::from_str(s)?.into())
-    }
+  type Err = anyhow::Error;
+  fn from_str(s: &str) -> Result<Self> {
+    Ok(<u64 as FromStr>::from_str(s)?.into())
+  }
 }
 
 impl From<u64> for ObligationHash {
-    fn from(value: u64) -> Self {
-        ObligationHash(value)
-    }
+  fn from(value: u64) -> Self {
+    ObligationHash(value)
+  }
 }
 
 impl From<Hash64> for ObligationHash {
-    fn from(value: Hash64) -> Self {
-        value.as_u64().into()
-    }
+  fn from(value: Hash64) -> Self {
+    value.as_u64().into()
+  }
 }
 
 #[derive(Debug)]
@@ -115,25 +116,28 @@ impl<U: Into<ObligationHash>, T: ToSpan> ToTarget for (U, T) {
 }
 
 mod string {
-    use std::fmt::Display;
-    use std::str::FromStr;
+  use std::{fmt::Display, str::FromStr};
 
-    use serde::{de, Serializer, Deserialize, Deserializer};
+  use serde::{de, Deserialize, Deserializer, Serializer};
 
-    pub fn serialize<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
-        where T: Display,
-              S: Serializer
-    {
-        serializer.collect_str(value)
-    }
+  pub fn serialize<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    T: Display,
+    S: Serializer,
+  {
+    serializer.collect_str(value)
+  }
 
-    pub fn deserialize<'de, T, D>(deserializer: D) -> Result<T, D::Error>
-        where T: FromStr,
-              T::Err: Display,
-              D: Deserializer<'de>
-    {
-        String::deserialize(deserializer)?.parse().map_err(de::Error::custom)
-    }
+  pub fn deserialize<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+  where
+    T: FromStr,
+    T::Err: Display,
+    D: Deserializer<'de>,
+  {
+    String::deserialize(deserializer)?
+      .parse()
+      .map_err(de::Error::custom)
+  }
 }
 
 #[cfg(test)]

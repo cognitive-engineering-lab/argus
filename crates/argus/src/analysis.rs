@@ -1,28 +1,19 @@
 //! ProofTree analysis.
 use anyhow::{anyhow, Result};
 use fluid_let::fluid_let;
-use itertools::Itertools;
-use rustc_data_structures::{fx::FxIndexSet, stable_hasher::Hash64};
-use rustc_hir::{def_id::LocalDefId, BodyId};
+use rustc_data_structures::stable_hasher::Hash64;
+use rustc_hir::BodyId;
 use rustc_hir_analysis::astconv::AstConv;
 use rustc_hir_typeck::{inspect_typeck, FnCtxt};
-use rustc_infer::{
-  infer::error_reporting::TypeErrCtxt,
-  traits::{util::elaborate, FulfilledObligation},
-};
-use rustc_middle::ty::{self, ToPolyTraitRef, TyCtxt};
+use rustc_middle::ty::{self, TyCtxt};
 use rustc_trait_selection::traits::{solve::Goal, FulfillmentError};
 use rustc_utils::source_map::range::CharRange;
 
 use crate::{
-  ext::{InferCtxtExt, FnCtxtExt as ArgusFnCtxtExt},
-  rustc::FnCtxtExt as RustcFnCtxtExt,
-  proof_tree::{
-    ext::*, serialize::serialize_proof_tree, Obligation, ObligationKind,
-    SerializedTree,
-  },
+  ext::{FnCtxtExt as ArgusFnCtxtExt, InferCtxtExt},
+  proof_tree::{serialize::serialize_proof_tree, SerializedTree},
   serialize::serialize_to_value,
-  types::{ObligationsInBody, TraitError, Target},
+  types::{ObligationsInBody, Target},
 };
 
 fluid_let!(pub static OBLIGATION_TARGET: Target);
@@ -54,9 +45,8 @@ pub fn obligations<'tcx>(
     let obligations = fncx.get_obligations(local_def_id);
     let body = hir.body(body_id);
     let source_map = tcx.sess.source_map();
-    let body_range =
-      CharRange::from_span(body.value.span, source_map)
-        .expect("Couldn't get body range");
+    let body_range = CharRange::from_span(body.value.span, source_map)
+      .expect("Couldn't get body range");
 
     let trait_errors = infcx.build_trait_errors(&obligations);
 
@@ -68,8 +58,8 @@ pub fn obligations<'tcx>(
       obligations,
     };
 
-    result = serialize_to_value(&obligation_in_body, infcx)
-      .map_err(|e| anyhow!(e));
+    result =
+      serialize_to_value(&obligation_in_body, infcx).map_err(|e| anyhow!(e));
   });
 
   result
@@ -125,4 +115,3 @@ fn serialize_tree<'tcx>(
 
   serialize_proof_tree(goal, infcx, def_id)
 }
-

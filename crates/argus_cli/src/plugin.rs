@@ -6,7 +6,7 @@ use std::{
   time::Instant,
 };
 
-use argus::types::{ToTarget, ObligationHash};
+use argus::types::{ObligationHash, ToTarget};
 use clap::{Parser, Subcommand};
 use fluid_let::fluid_set;
 use log::{debug, info};
@@ -161,17 +161,19 @@ impl RustcPlugin for ArgusPlugin {
         end_line,
         end_column,
       } => {
-        let compute_target = || Some((id, CharRange {
-          start: CharPos {
-            line: start_line,
-            column: start_column,
-          },
-          end: CharPos {
-            line: end_line,
-            column: end_column,
-          },
-          filename: Filename::intern(&file),
-        }));
+        let compute_target = || {
+          Some((id, CharRange {
+            start: CharPos {
+              line: start_line,
+              column: start_column,
+            },
+            end: CharPos {
+              line: end_line,
+              column: end_column,
+            },
+            filename: Filename::intern(&file),
+          }))
+        };
 
         let v = run(
           argus::analysis::tree,
