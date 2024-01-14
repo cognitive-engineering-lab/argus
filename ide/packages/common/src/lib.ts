@@ -32,7 +32,7 @@ export type ExtensionToWebViewMsg = { type: FROM_EXT } & (
   | { command: "invalidate" }
   | (CommonData &
       (
-        | { command: "bling"; hash: ObligationHash }
+        | { command: "bling"; oblHash: ObligationHash }
         | { command: "open-file" }
         | { command: "close-file" }
         | { command: "obligations"; obligations: ObligationOutput[] }

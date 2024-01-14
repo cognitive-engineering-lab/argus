@@ -1,13 +1,14 @@
 .ObligationCard {
     display: block;
     width: 100%;
-    margin-top: 1em;
-    margin-bottom: 2em;
+    padding: 1em;
+    margin-bottom: 1em;
+    transition: background-color 1s ease-out;
 }
 
-.ObligationCard .bling {
+.ObligationCard.bling {
     background-color: yellow;
-    transition: background-color 2s ease-out;
+    transition: background-color 0s;
 }
 
 .ObligationCard > vscode-text-area {

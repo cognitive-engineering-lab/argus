@@ -15,8 +15,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "argus.launchArgus",
-        "title": "Argus: Obligation dashboard"
+        "command": "argus.inspectWorkspace",
+        "title": "Argus: Inspect Workspace"
       }
     ]
   },

@@ -4,7 +4,6 @@ import {
   ObligationHash,
   ObligationOutput,
   SerializedTree,
-  TraitError,
   TreeOutput,
 } from "@argus/common/bindings";
 import {
@@ -16,39 +15,9 @@ import { MessageHandlerData } from "@estruyf/vscode";
 import _ from "lodash";
 import vscode from "vscode";
 
-import { rangeHighlight, traitErrorDecorate } from "./decorate";
-import { showErrorDialog } from "./errors";
 import { log } from "./logging";
 import { globals } from "./main";
-import { RustEditor, isRustEditor, rustRangeToVscodeRange } from "./utils";
-
-// ------------------------------------
-// Endpoints for the extension to call.
-
-export async function launchArgus(extensionPath: vscode.Uri) {
-  ViewLoader.createOrShow(extensionPath);
-}
-
-export async function blingObligation(_extensionPath: vscode.Uri) {
-  const obligation = globals.params?.obligation;
-  const file = globals.params?.file;
-  if (obligation === undefined || file === undefined) {
-    showErrorDialog("Obligation calling context unsatisfied");
-    return;
-  }
-  ViewLoader.currentPanel?.blingObligation(file, obligation);
-}
-
-export function onChange() {
-  // TODO: invalidate the webview information
-}
-
-// ----------------------
-// Internal functionality
-
-function rootUri(extensionUri: vscode.Uri) {
-  return vscode.Uri.joinPath(extensionUri, "..");
-}
+import { RustEditor } from "./utils";
 
 // Wraps around the MessageHandler data types from @estruyf/vscode.
 type BlessedMessage = {
@@ -57,39 +26,33 @@ type BlessedMessage = {
   payload: WebViewToExtensionMsg;
 };
 
-// Class wrapping the state around the webview panel.
-
-class ViewLoader {
-  public static currentPanel: ViewLoader | undefined;
-
+export class ViewLoader {
+  private static currentPanel: ViewLoader | undefined;
   private readonly panel: vscode.WebviewPanel;
-  private readonly extensionPath: vscode.Uri;
-
+  private readonly extensionUri: vscode.Uri;
   private disposables: vscode.Disposable[] = [];
-  private highlightRanges: CharRange[] = [];
 
-  public static createOrShow(extensionPath: vscode.Uri) {
+  public static createOrShow(extensionUri: vscode.Uri) {
     if (ViewLoader.currentPanel) {
       ViewLoader.currentPanel.panel.reveal();
     } else {
       ViewLoader.currentPanel = new ViewLoader(
-        extensionPath,
+        extensionUri,
         vscode.ViewColumn.Beside
       );
     }
   }
 
-  private constructor(extensionPath: vscode.Uri, column: vscode.ViewColumn) {
-    this.extensionPath = extensionPath;
-    const root = rootUri(this.extensionPath);
-
+  private constructor(extensionUri: vscode.Uri, column: vscode.ViewColumn) {
+    console.log(`Creating view in ${extensionUri}`);
+    this.extensionUri = extensionUri;
     this.panel = vscode.window.createWebviewPanel("argus", "Argus", column, {
       enableScripts: true,
-      localResourceRoots: [root],
+      localResourceRoots: [extensionUri],
     });
 
     // Set the webview's initial html content
-    this.panel.webview.html = this.getHtmlForWebview();
+    this.panel.webview.html = this.getHtmlForWebview(globals.ctx.visibleEditors);
 
     // Listen for when the panel is disposed
     // This happens when the user closes the panel or when the panel is closed programatically
@@ -115,8 +78,6 @@ class ViewLoader {
     }
   }
 
-  // ---------------------------------------------------
-
   private async handleMessage(message: BlessedMessage) {
     const { command, requestId, payload } = message;
 
@@ -137,18 +98,24 @@ class ViewLoader {
         return;
       }
       case "tree": {
-        this.getTree(requestId, payload.file, payload.predicate, payload.range);
+        this.getTree(
+          requestId,
+          payload.file,
+          payload.predicate,
+          payload.range
+        );
         return;
       }
 
       // These messages don't require a response.
-
+      // TODO: but they need to interact with the Ctx.
+      //
       case "add-highlight": {
-        this.addHighlightRange(payload.file, payload.range);
+        globals.ctx.addHighlightRange(payload.file, payload.range);
         return;
       }
       case "remove-highlight": {
-        this.removeHighlightRange(payload.file, payload.range);
+        globals.ctx.removeHighlightRange(payload.file, payload.range);
         return;
       }
       default: {
@@ -159,25 +126,21 @@ class ViewLoader {
   }
 
   private async getObligations(requestId: string, host: Filename) {
-    log("Fetching obligations for file", host);
-
-    const res = await globals.backend<ObligationOutput[]>([
+    const res = await globals.ctx.backend<ObligationOutput[]>([
       "obligations",
       host,
     ]);
-
-    log("Result", res);
 
     if (res.type !== "output") {
       vscode.window.showErrorMessage(res.error);
       return;
     }
     const obligations = res.value;
-    log("Returning obligations", obligations);
 
-    // TODO: for each obligations in body set the trait errors.
+    // For each of the returned bodies, we need to register the trait errors
+    // in the editor context. TODO: register ambiguity errors when we have them.
     const traitErrors = _.flatMap(obligations, oib => oib.traitErrors);
-    this.setTraitErrors(host, traitErrors);
+    globals.ctx.setTraitErrors(host, traitErrors);
 
     this.messageWebview<ObligationOutput[]>(requestId, {
       type: "FROM_EXTENSION",
@@ -193,9 +156,7 @@ class ViewLoader {
     obl: Obligation,
     range: CharRange
   ) {
-    log("Fetching tree for file", host, obl.hash, obl);
-
-    const res = await globals.backend<TreeOutput[]>([
+    const res = await globals.ctx.backend<TreeOutput[]>([
       "tree",
       host,
       obl.hash,
@@ -225,74 +186,17 @@ class ViewLoader {
     });
   }
 
-  public async blingObligation(file: Filename, obligation: ObligationHash) {
-    this.messageWebview<void>("bling", {
+  public static async blingObligation(
+    file: Filename,
+    obligation: ObligationHash
+  ) {
+    this.currentPanel?.messageWebview<ObligationHash>("bling", {
       type: "FROM_EXTENSION",
       command: "bling",
       file,
-      hash: obligation,
+      oblHash: obligation,
     });
   }
-
-  // ----------------------
-  // Decorations
-
-  private setTraitErrors(host: Filename, errors: TraitError[]) {
-    const editor = this.getEditorByName(host);
-    if (editor === undefined) {
-      showErrorDialog(`No editor for file ${host}`);
-      return;
-    }
-
-    editor.setDecorations(
-      traitErrorDecorate,
-      _.map(errors, e => {
-        return {
-          range: rustRangeToVscodeRange(e.range),
-          hoverMessage: `This is a trait error!`,
-        };
-      })
-    );
-  }
-
-  private async addHighlightRange(host: Filename, range: CharRange) {
-    log("Adding highlight range", host, range);
-
-    const editor = this.getEditorByName(host);
-    if (editor === undefined) {
-      showErrorDialog(`No editor for file ${host}`);
-      return;
-    }
-
-    this.highlightRanges.push(range);
-    await this.refreshHighlights(editor);
-  }
-
-  private async removeHighlightRange(host: Filename, range: CharRange) {
-    log("Removing highlight range", host, range);
-
-    const editor = this.getEditorByName(host);
-    if (editor === undefined) {
-      showErrorDialog(`No editor for file ${host}`);
-      return;
-    }
-
-    this.highlightRanges = _.filter(
-      this.highlightRanges,
-      r => !_.isEqual(r, range)
-    );
-    await this.refreshHighlights(editor);
-  }
-
-  private async refreshHighlights(editor: vscode.TextEditor) {
-    editor.setDecorations(
-      rangeHighlight,
-      _.map(this.highlightRanges, r => rustRangeToVscodeRange(r))
-    );
-  }
-
-  // --------------------------------
-  // Utilities
 
   // FIXME: the type T here is wrong, it should be a response message similar to
   // how the webview encodes the return value.
@@ -304,23 +208,9 @@ class ViewLoader {
     } as MessageHandlerData<T>);
   }
 
-  private getEditorByName(name: Filename): vscode.TextEditor | undefined {
-    return _.find(this.visibleEditors(), e => e.document.fileName === name);
-  }
-
-  private visibleEditors(): RustEditor[] {
-    let editors = [];
-    for (let editor of vscode.window.visibleTextEditors) {
-      if (isRustEditor(editor)) {
-        editors.push(editor);
-      }
-    }
-    return editors;
-  }
-
-  private getHtmlForWebview() {
+  private getHtmlForWebview(openEditors: RustEditor[] = []) {
     const panoptesDir = vscode.Uri.joinPath(
-      this.extensionPath,
+      this.extensionUri,
       "node_modules",
       "@argus",
       "panoptes"
@@ -344,8 +234,8 @@ class ViewLoader {
       )
     );
 
-    let initialFiles: Filename[] = _.map(
-      this.visibleEditors(),
+    const initialFiles: Filename[] = _.map(
+      openEditors,
       e => e.document.fileName
     );
 
@@ -355,7 +245,7 @@ class ViewLoader {
       <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Config View</title>
+          <title>Argus Inspector</title>
           <link rel="stylesheet" type="text/css" href=${styleUri}>
           <link rel="stylesheet" type="text/css" href=${codiconsUri}>
           <script>window.initialData = ${JSON.stringify(initialFiles)};</script>

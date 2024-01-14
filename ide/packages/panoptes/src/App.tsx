@@ -1,19 +1,23 @@
 import { ObligationHash, ObligationsInBody } from "@argus/common/bindings";
-import { Filename } from "@argus/common/lib";
+import { ExtensionToWebViewMsg, Filename } from "@argus/common/lib";
 import _ from "lodash";
 import React, { RefObject, useEffect, useState } from "react";
 
-import File, { ObligationHookContext } from "./File";
+
+
+import File, { ObligationHookContext, obligationCardId } from "./File";
 import Workspace from "./Workspace";
 import { WaitingOn } from "./utilities/WaitingOn";
 import { requestFromExtension } from "./utilities/vscode";
+
 
 const OpenFile = ({ filename }: { filename: Filename }) => {
   const [obligations, setObligations] = useState<
     ObligationsInBody[] | undefined
   >(undefined);
 
-  // FIXME: is this right, we only want o load things once.
+  // FIXME: we only want to load things once, and on invalidation, currently
+  // this will run on every render.
   useEffect(() => {
     const getData = async () => {
       const obligations = await requestFromExtension<"obligations">({
@@ -44,27 +48,15 @@ const App = ({ initialFiles }: { initialFiles: Filename[] }) => {
     })
   );
 
-  const [obligations, setObligations] = useState<
-    [Filename, ObligationHash, RefObject<HTMLDivElement>][]
-  >([]);
-  const addRefToList = (
-    file: Filename,
-    hash: ObligationHash,
-    ref: RefObject<HTMLDivElement>
-  ) => setObligations([...obligations, [file, hash, ref]]);
-
   const briefHighlight = (file: Filename, hash: ObligationHash) => {
-    const idx = _.findIndex(
-      obligations,
-      ([f, h, _o]) => f === file && h === hash
-    );
-    const o = obligations[idx][2];
-
-    if (o !== undefined) {
-      o.current?.classList.add("highlight");
-      setTimeout(() => {
-        o.current?.classList.remove("highlight");
-      }, 2000);
+    const elem = document.getElementById(obligationCardId(file, hash));
+    const className = "bling";
+    if (elem !== null) {
+      elem.scrollIntoView();
+      elem.classList.add(className);
+      setTimeout(() => elem.classList.remove(className), 1000); // Let the emphasis stay for 1 second.
+    } else {
+      console.error("Couldn't find element to highlight at", file, hash);
     }
   };
 
@@ -72,25 +64,33 @@ const App = ({ initialFiles }: { initialFiles: Filename[] }) => {
   // for things that could be an expected response from a webview request.
   const listener = (e: MessageEvent) => {
     console.log("Received message from extension", e.data);
-    const msg = e.data;
+    const {
+      command,
+      payload,
+    }: { command: string; payload: ExtensionToWebViewMsg } = e.data;
+
+    if (command != payload.command) {
+      console.log("Received message with mismatched commands", e.data);
+      return;
+    }
 
     // TODO: none of these messages are actually getting sent yet.
-    switch (msg.command) {
+    switch (payload.command) {
       case "bling": {
-        briefHighlight(msg.file, msg.hash);
+        briefHighlight(payload.file, payload.oblHash);
         return;
       }
 
       case "open-file": {
-        setOpenFiles([
-          ...openFiles,
-          [msg.file, <OpenFile filename={msg.file} />],
+        setOpenFiles((currFiles) => [
+          [payload.file, <OpenFile filename={payload.file} />],
+          ...currFiles,
         ]);
         return;
       }
       case "close-file": {
-        setOpenFiles(
-          _.filter(openFiles, ([filename, _]) => filename !== msg.filename)
+        setOpenFiles((currFiles) =>
+          _.filter(currFiles, ([filename, _]) => filename !== payload.file)
         );
         return;
       }
@@ -111,18 +111,14 @@ const App = ({ initialFiles }: { initialFiles: Filename[] }) => {
   }, []);
 
   const resetState = () => {
-    setOpenFiles(
-      _.map(openFiles, ([filename, _], i) => {
+    setOpenFiles(currFiles =>
+      _.map(currFiles, ([filename, _], i) => {
         return [filename, <OpenFile key={i} filename={filename} />];
       })
     );
   };
 
-  return (
-    <ObligationHookContext.Provider value={addRefToList}>
-      <Workspace files={openFiles} reset={resetState} />
-    </ObligationHookContext.Provider>
-  );
+  return <Workspace files={openFiles} reset={resetState} />;
 };
 
 export default App;

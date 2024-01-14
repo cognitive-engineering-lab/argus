@@ -11,6 +11,7 @@ declare global {
 }
 
 window.addEventListener("load", () => {
+  console.log("Loading initialData", window.initialData);
   ReactDOM.render(
     <React.StrictMode>
       <App initialFiles={window.initialData} />

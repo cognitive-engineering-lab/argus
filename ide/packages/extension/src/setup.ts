@@ -6,6 +6,7 @@ import path from "path";
 import vscode from "vscode";
 
 import { log } from "./logging";
+import { Ctx } from "./ctx";
 
 // TODO: read the version from rust-toolchain.toml
 declare const VERSION: string;
@@ -178,7 +179,7 @@ let findWorkspaceRoot = async (): Promise<string | null> => {
 };
 
 export async function setup(
-  context: vscode.ExtensionContext
+  context: Ctx,
 ): Promise<CallArgus | null> {
   log("Getting workspace root");
 
@@ -213,7 +214,7 @@ export async function setup(
         argusOpts
       );
     } catch (e: any) {
-      context.workspaceState.update("err_log", e);
+      context.extCtx.workspaceState.update("err_log", e);
       return {
         type: "build-error",
         error: e,

@@ -29,6 +29,11 @@ export const ObligationHookContext = createContext<
   (file: Filename, hash: ObligationHash, o: RefObject<HTMLDivElement>) => void
 >((_file, _hash, _o) => {});
 
+export function obligationCardId(file: Filename, hash: ObligationHash) {
+  const name = file.split(/[\\/]/).pop(); 
+  return `obl-${name}-${hash}`;
+}
+
 const NoTreeFound = ({ obligation }: { obligation: Obligation }) => {
   return (
     <div>
@@ -78,10 +83,6 @@ const ObligationTreeWrapper = ({
   return <>{content}</>;
 };
 
-function obligationId(file: Filename, ohash: ObligationHash) {
-  return `obligation-${file}-${ohash}`;
-}
-
 const ObligationCard = ({
   range,
   obligation,
@@ -90,14 +91,8 @@ const ObligationCard = ({
   obligation: Obligation;
 }) => {
   const [isInfoVisible, setIsInfoVisible] = useState(false);
-  const obligationRef = React.createRef<HTMLDivElement>();
   const file = useContext(FileContext)!;
-  const hookMe = useContext(ObligationHookContext)!;
-
-  // Hook the element up to the app manager.
-  useEffect(() => {
-    hookMe(file, obligation.hash, obligationRef);
-  }, []);
+  const id = obligationCardId(file, obligation.hash);
 
   const addHighlight = () => {
     postToExtension({
@@ -123,7 +118,7 @@ const ObligationCard = ({
 
   return (
     <div
-      ref={obligationRef}
+      id={id}
       className="ObligationCard"
       onMouseEnter={addHighlight}
       onMouseLeave={removeHighlight}
