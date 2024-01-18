@@ -11,8 +11,8 @@ pub(super) mod serialize;
 use std::collections::HashSet;
 
 use index_vec::IndexVec;
-use rustc_middle::ty::{Predicate, TraitRef, Ty};
-use rustc_utils::source_map::range::CharRange;
+use rustc_middle::ty::{TraitRef, Ty};
+
 use serde::Serialize;
 
 #[cfg(feature = "ts-rs")]
@@ -21,8 +21,7 @@ use ts_rs::TS;
 pub use topology::*;
 
 use crate::{
-  serialize::ty::{PredicateDef, TraitRefPrintOnlyTraitPathDef, TyDef},
-  types::ObligationHash,
+  serialize::ty::{TraitRefPrintOnlyTraitPathDef, TyDef},
 };
 
 crate::define_usize_idx! {

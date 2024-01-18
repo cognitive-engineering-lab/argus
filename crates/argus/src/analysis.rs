@@ -1,29 +1,28 @@
 //! ProofTree analysis.
-use std::cell::RefCell;
+
 
 use anyhow::{anyhow, Result};
 use fluid_let::fluid_let;
-use rustc_data_structures::stable_hasher::Hash64;
+
 use rustc_hir::BodyId;
-use rustc_hir::def_id::LocalDefId;
-use rustc_hir_analysis::astconv::AstConv;
+
+
 use rustc_hir_typeck::{
-  inspect_typeck,
-  FnCtxt
+  inspect_typeck
 };
-use rustc_middle::ty::{self, TyCtxt};
-use rustc_span::Span;
-use rustc_middle::traits::{solve::Certainty, query::NoSolution};
-use rustc_trait_selection::traits::{solve::Goal, FulfillmentError};
+use rustc_middle::ty::{TyCtxt};
+
+
+use rustc_trait_selection::traits::{solve::Goal};
 use rustc_utils::source_map::range::CharRange;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 
 pub(crate) use crate::types::intermediate::{EvaluationResult, FulfillmentData};
 use crate::{
   ext::InferCtxtExt,
-  proof_tree::{serialize::serialize_proof_tree, SerializedTree},
+  proof_tree::{serialize::serialize_proof_tree},
   serialize::serialize_to_value,
-  types::{ObligationsInBody, Target, Obligation, ObligationKind},
+  types::{ObligationsInBody, Target},
   tls,
 };
 
@@ -115,7 +114,7 @@ fn process_obligation<'tcx>(infcx: &InferCtxt<'tcx>, obl: &PredicateObligation<'
   tls::push_obligation(ldef_id, o);
 }
 
-fn process_obligation_for_tree<'tcx>(infcx: &InferCtxt<'tcx>, obl: &PredicateObligation<'tcx>, result: EvaluationResult) {
+fn process_obligation_for_tree<'tcx>(infcx: &InferCtxt<'tcx>, obl: &PredicateObligation<'tcx>, _result: EvaluationResult) {
   guard_inspection! {}
 
   OBLIGATION_TARGET.get(|target| {

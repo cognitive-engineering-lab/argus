@@ -1,20 +1,17 @@
-use rustc_data_structures::stable_hasher::{Hash64, HashStable, StableHasher};
+
 use rustc_hir::{
-  def::Namespace, def_id::DefId, definitions::DefPathData, LangItem,
+  def::Namespace, def_id::DefId, definitions::DefPathData,
 };
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::ty::{
-  self,
-  print::{FmtPrinter, Print},
-  Ty, TyCtxt, TypeFoldable, TypeFolder, TypeSuperFoldable,
+  print::{FmtPrinter, Print}, TyCtxt,
 };
-use rustc_query_system::ich::StableHashingContext;
+
 use rustc_trait_selection::{
   solve::inspect::InspectCandidate,
   traits::{
     query::NoSolution,
     solve::{inspect::ProbeKind, CandidateSource, Certainty, MaybeCause},
-    FulfillmentError,
   },
 };
 

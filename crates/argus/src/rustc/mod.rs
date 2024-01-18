@@ -4,7 +4,7 @@
 //! public within Rustc itself, but our needs may change so it hasn't
 //! happened yet.
 
-use rustc_data_structures::fx::FxIndexSet;
+
 use rustc_hir_typeck::FnCtxt;
 use rustc_infer::{
   infer::error_reporting::TypeErrCtxt, traits::util::elaborate,
@@ -37,7 +37,7 @@ pub trait InferCtxtExt<'tcx> {
 impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
   fn adjust_fulfillment_errors_for_expr_obligation(
     &self,
-    errors: &mut Vec<FulfillmentData<'_, 'tcx>>,
+    _errors: &mut Vec<FulfillmentData<'_, 'tcx>>,
   ) {
     todo!()
 

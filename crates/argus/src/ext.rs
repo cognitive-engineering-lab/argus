@@ -1,9 +1,9 @@
-use itertools::Itertools;
+
 use rustc_hir::def_id::LocalDefId;
 use rustc_hir_analysis::astconv::AstConv;
-use rustc_hir_typeck::FnCtxt;
+
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
-use rustc_trait_selection::traits::FulfillmentError;
+
 use rustc_data_structures::stable_hasher::{Hash64, HashStable, StableHasher};
 use rustc_query_system::ich::StableHashingContext;
 use rustc_hir::LangItem;
@@ -17,9 +17,7 @@ use serde::Serialize;
 use crate::{
   analysis::{FulfillmentData, EvaluationResult},
   serialize::{serialize_to_value, ty::PredicateDef},
-  proof_tree::ext::*,
-  rustc::FnCtxtExt as RustcFnCtxtExt,
-  types::{AmbiguityError, TraitError, Obligation, ObligationKind},
+  types::{Obligation},
 };
 
 pub trait CharRangeExt: Copy + Sized {
@@ -160,7 +158,7 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
 
   fn bless_fulfilled<'a>(
     &self,
-    ldef_id: LocalDefId,
+    _ldef_id: LocalDefId,
     obligation: &'a PredicateObligation<'tcx>,
     result: EvaluationResult,
   ) -> FulfillmentData<'a, 'tcx> {

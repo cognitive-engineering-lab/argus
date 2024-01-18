@@ -17,22 +17,22 @@ use rustc_data_structures::{
   stable_hasher::Hash64,
   fx::{FxHashMap as HashMap, FxHashSet as HashSet}
 };
-use rustc_middle::ty::{Predicate, TyCtxt};
+use rustc_middle::ty::{TyCtxt};
 use rustc_span::{symbol::Symbol, Span};
 
 
-use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
+use rustc_infer::{traits::PredicateObligation};
 use rustc_middle::traits::{solve::Certainty, query::NoSolution};
 
 
-use index_vec::IndexVec;
+
 use rustc_utils::source_map::range::{CharRange, ToSpan};
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
 #[cfg(feature = "ts-rs")]
 use ts_rs::TS;
 
-use crate::serialize::ty::{PredicateDef, SymbolDef};
+use crate::serialize::ty::{SymbolDef};
 
 // -----------------
 
