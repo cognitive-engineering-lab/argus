@@ -25,8 +25,8 @@ use ty::*;
 
 /// Entry function to serialize anything from rustc.
 pub fn serialize_to_value<'tcx, T: Serialize + 'tcx>(
-  value: &T,
   infcx: &InferCtxt<'tcx>,
+  value: &T,
 ) -> Result<serde_json::Value, serde_json::Error> {
   in_dynamic_ctx(infcx, || serde_json::to_value(&value))
 }

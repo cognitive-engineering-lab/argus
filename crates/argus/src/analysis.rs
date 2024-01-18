@@ -1,24 +1,47 @@
 //! ProofTree analysis.
+use std::cell::RefCell;
+
 use anyhow::{anyhow, Result};
 use fluid_let::fluid_let;
 use rustc_data_structures::stable_hasher::Hash64;
 use rustc_hir::BodyId;
+use rustc_hir::def_id::LocalDefId;
 use rustc_hir_analysis::astconv::AstConv;
-use rustc_hir_typeck::{inspect_typeck, FnCtxt};
+use rustc_hir_typeck::{
+  inspect_typeck,
+  FnCtxt
+};
 use rustc_middle::ty::{self, TyCtxt};
+use rustc_span::Span;
+use rustc_middle::traits::{solve::Certainty, query::NoSolution};
 use rustc_trait_selection::traits::{solve::Goal, FulfillmentError};
 use rustc_utils::source_map::range::CharRange;
+use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 
+pub(crate) use crate::types::intermediate::{EvaluationResult, FulfillmentData};
 use crate::{
-  ext::{FnCtxtExt as ArgusFnCtxtExt, InferCtxtExt},
+  ext::InferCtxtExt,
   proof_tree::{serialize::serialize_proof_tree, SerializedTree},
   serialize::serialize_to_value,
-  types::{ObligationsInBody, Target},
+  types::{ObligationsInBody, Target, Obligation, ObligationKind},
+  tls,
 };
 
-fluid_let!(pub static OBLIGATION_TARGET: Target);
+fluid_let! {
+  pub static OBLIGATION_TARGET: Target;
 
-pub(crate) type FulfillmentData<'tcx> = (Hash64, FulfillmentError<'tcx>);
+  static INSPECTING: bool;
+}
+
+// ---
+
+macro_rules! guard_inspection {
+  () => {{
+    if INSPECTING.copied().unwrap_or(false) {
+      return;
+    }
+  }}
+}
 
 pub fn obligations<'tcx>(
   tcx: TyCtxt<'tcx>,
@@ -35,34 +58,30 @@ pub fn obligations<'tcx>(
       .unwrap_or("<anon body>".to_string())
   });
 
-  let mut result = Err(anyhow!("Hir Typeck never called inspect fn."));
+  // Typecks the current body and invokes `process_obligation` for each
+  // obligation solved for. Our information accumulates in thread local.
+  inspect_typeck(tcx, local_def_id, process_obligation);
 
-  inspect_typeck(tcx, local_def_id, |fncx| {
-    let Some(infcx) = fncx.infcx() else {
-      return;
-    };
+  let source_map = tcx.sess.source_map();
+  let name = hir.opt_name(hir.body_owner(body_id));
+  let body = hir.body(body_id);
+  let body_range = CharRange::from_span(body.value.span, source_map)
+    .expect("Couldn't get body range");
 
-    let obligations = fncx.get_obligations(local_def_id);
-    let body = hir.body(body_id);
-    let source_map = tcx.sess.source_map();
-    let body_range = CharRange::from_span(body.value.span, source_map)
-      .expect("Couldn't get body range");
+  let obligations = tls::take_obligations();
+  let ambiguity_errors = tls::get_ambiguity_errors();
+  let trait_errors = tls::get_trait_errors();
 
-    let trait_errors = infcx.build_trait_errors(&obligations);
+  let obligations_in_body = ObligationsInBody {
+    name,
+    range: body_range,
+    ambiguity_errors,
+    trait_errors,
+    obligations,
+  };
 
-    let obligation_in_body = ObligationsInBody {
-      name: hir.opt_name(body_id.hir_id),
-      range: body_range,
-      ambiguity_errors: vec![],
-      trait_errors,
-      obligations,
-    };
-
-    result =
-      serialize_to_value(&obligation_in_body, infcx).map_err(|e| anyhow!(e));
-  });
-
-  result
+  serde_json::to_value(&obligations_in_body)
+    .map_err(|e| anyhow!(e))
 }
 
 // NOTE: tree is only invoked for *a single* tree, it must be found
@@ -71,47 +90,60 @@ pub fn tree<'tcx>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
 ) -> Result<serde_json::Value> {
+  let local_def_id = tcx.hir().body_owner_def_id(body_id);
+  inspect_typeck(tcx, local_def_id, process_obligation_for_tree);
+  tls::take_tree().ok_or_else(|| {
+    OBLIGATION_TARGET.get(|target| {
+      anyhow!("failed to locate proof tree with target {:?}", target)
+    })
+  })
+}
+
+// --------------------------------
+// Rustc inspection points
+
+fn process_obligation<'tcx>(infcx: &InferCtxt<'tcx>, obl: &PredicateObligation<'tcx>, result: EvaluationResult) {
+  guard_inspection! {}
+
+  let Some(ldef_id) = infcx.body_id() else {
+    todo!()
+  };
+
+  let fdata = infcx.bless_fulfilled(ldef_id, obl, result);
+  let o = infcx.erase_non_local_data(fdata);
+
+  tls::push_obligation(ldef_id, o);
+}
+
+fn process_obligation_for_tree<'tcx>(infcx: &InferCtxt<'tcx>, obl: &PredicateObligation<'tcx>, result: EvaluationResult) {
+  guard_inspection! {}
+
   OBLIGATION_TARGET.get(|target| {
-    let target = target.unwrap();
+    INSPECTING.set(true, || {
+      let inner = move || {
 
-    let hir = tcx.hir();
-    let local_def_id = hir.body_owner_def_id(body_id);
-    let mut result =
-      Err(anyhow!("Couldn't find proof tree with hash {:?}", target));
+        let target = target?;
+        let hash = infcx.predicate_hash(&obl.predicate);
 
-    inspect_typeck(tcx, local_def_id, |fncx| {
-      let Some(infcx) = fncx.infcx() else {
-        return;
-      };
-
-      let errors = fncx.get_fulfillment_errors(local_def_id);
-      let found_tree = errors.iter().find_map(|(hash, error)| {
         if hash.as_u64() != *target.hash {
           return None;
         }
 
         let goal = Goal {
-          predicate: error.root_obligation.predicate,
-          param_env: error.root_obligation.param_env,
+          predicate: obl.predicate,
+          param_env: obl.param_env,
         };
-        let serial_tree = serialize_tree(goal, fncx)?;
-        serialize_to_value(&serial_tree, infcx).ok()
-      });
 
-      result = found_tree
-        .ok_or(anyhow!("Couldn't find proof tree with hash {:?}", target));
-    });
+        let item_def_id = infcx.body_id()?.to_def_id();
+        let serial_tree =
+          serialize_proof_tree(goal, infcx, item_def_id)?;
 
-    result
+        serialize_to_value(infcx, &serial_tree).ok()
+      };
+
+      if let Some(stree)  = inner() {
+        tls::store_tree(stree);
+      }
+    })
   })
-}
-
-fn serialize_tree<'tcx>(
-  goal: Goal<'tcx, ty::Predicate<'tcx>>,
-  fcx: &FnCtxt<'_, 'tcx>,
-) -> Option<SerializedTree<'tcx>> {
-  let def_id = fcx.item_def_id();
-  let infcx = fcx.infcx().expect("`FnCtxt` missing a `InferCtxt`.");
-
-  serialize_proof_tree(goal, infcx, def_id)
 }

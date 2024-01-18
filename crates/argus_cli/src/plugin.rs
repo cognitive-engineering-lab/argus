@@ -227,7 +227,7 @@ pub fn run_with_callbacks(
   let mut args = args.to_vec();
   // -Z identify-regions -Z track-diagnostics=yes
   args.extend(
-    "-Z next-solver -Z track-trait-obligations -A warnings"
+    "-Z next-solver -A warnings"
       .split(' ')
       .map(|s| s.to_owned()),
   );

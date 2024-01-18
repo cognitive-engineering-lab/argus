@@ -83,22 +83,3 @@ pub struct SerializedTree<'tcx> {
   pub unnecessary_roots: HashSet<ProofNodeIdx>,
 }
 
-#[derive(Serialize, Clone, Debug)]
-#[cfg_attr(feature = "ts-rs", derive(TS))]
-#[serde(tag = "type")]
-pub struct Obligation<'tcx> {
-  #[cfg_attr(feature = "ts-rs", ts(type = "any"))]
-  #[serde(with = "PredicateDef")]
-  pub predicate: Predicate<'tcx>,
-  pub hash: ObligationHash,
-  pub range: CharRange,
-  pub kind: ObligationKind,
-}
-
-#[derive(Serialize, Clone, Debug)]
-#[cfg_attr(feature = "ts-rs", derive(TS))]
-#[serde(tag = "type", rename_all = "camelCase")]
-pub enum ObligationKind {
-  Success,
-  Failure,
-}

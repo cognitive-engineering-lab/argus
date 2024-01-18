@@ -17,7 +17,10 @@ use rustc_trait_selection::{
 use serde::Serialize;
 
 use super::*;
-use crate::serialize::{serialize_to_value, ty::goal__predicate_def};
+use crate::{
+  ext::InferCtxtExt,
+  serialize::{serialize_to_value, ty::goal__predicate_def}
+};
 
 pub struct SerializedTreeVisitor<'tcx> {
   pub def_id: DefId,
@@ -75,7 +78,8 @@ impl<'tcx> Node<'tcx> {
 
     let w = &Wrapper(goal.goal());
     let v =
-      serialize_to_value(w, goal.infcx()).expect("failed to serialize goal");
+      serialize_to_value(goal.infcx(), w)
+      .expect("failed to serialize goal");
 
     let string = goal.goal().predicate.pretty(goal.infcx(), def_id);
     log::debug!("PRETTY {}", string);
@@ -144,7 +148,7 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
     // The frontend doesn't use them, but eventually we will!
     // self.unnecessary_roots.insert(n);
 
-    if !goal.goal().predicate.is_necessary(&infcx.tcx) {
+    if !infcx.is_necessary_predicate(&goal.goal().predicate) {
       return ControlFlow::Continue(());
     }
 

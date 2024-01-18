@@ -18,32 +18,6 @@ use rustc_trait_selection::{
   },
 };
 
-pub trait StableHash<'__ctx, 'tcx>:
-  HashStable<StableHashingContext<'__ctx>>
-{
-  fn stable_hash(
-    self,
-    infcx: &InferCtxt<'tcx>,
-    ctx: &mut StableHashingContext<'__ctx>,
-  ) -> Hash64;
-}
-
-pub trait PredicateExt<'tcx> {
-  fn is_unit_impl_trait(&self, tcx: &TyCtxt<'tcx>) -> bool;
-  fn is_ty_impl_sized(&self, tcx: &TyCtxt<'tcx>) -> bool;
-  fn is_ty_unknown(&self, tcx: &TyCtxt<'tcx>) -> bool;
-  fn is_trait_predicate(&self) -> bool;
-  fn is_necessary(&self, tcx: &TyCtxt<'tcx>) -> bool;
-}
-
-pub trait FulfillmentErrorExt<'tcx> {
-  fn stable_hash(
-    &self,
-    infcx: &InferCtxt<'tcx>,
-    ctx: &mut StableHashingContext,
-  ) -> Hash64;
-}
-
 /// Pretty printing for things that can already be printed.
 pub trait PrettyPrintExt<'a, 'tcx>: Print<'tcx, FmtPrinter<'a, 'tcx>> {
   fn pretty(&self, infcx: &'a InferCtxt<'tcx>, def_id: DefId) -> String {
@@ -70,78 +44,6 @@ pub trait CandidateExt {
 
 // -----------------------------------------------
 // Impls
-
-impl<'__ctx, 'tcx, T> StableHash<'__ctx, 'tcx> for T
-where
-  T: HashStable<StableHashingContext<'__ctx>>,
-  T: TypeFoldable<TyCtxt<'tcx>>,
-{
-  fn stable_hash(
-    self,
-    infcx: &InferCtxt<'tcx>,
-    ctx: &mut StableHashingContext<'__ctx>,
-  ) -> Hash64 {
-    let mut h = StableHasher::new();
-    let sans_regions = infcx.tcx.erase_regions(self);
-    let this = sans_regions.fold_with(&mut TyVarEraserVisitor { infcx });
-    // erase infer vars
-    this.hash_stable(ctx, &mut h);
-    h.finish()
-  }
-}
-
-impl<'tcx> FulfillmentErrorExt<'tcx> for FulfillmentError<'tcx> {
-  fn stable_hash(
-    &self,
-    infcx: &InferCtxt<'tcx>,
-    ctx: &mut StableHashingContext,
-  ) -> Hash64 {
-    // FIXME: should we be using the root_obligation here?
-    // The issue is that type variables cannot use hash_stable.
-    self.root_obligation.predicate.stable_hash(infcx, ctx)
-  }
-}
-
-impl<'tcx> PredicateExt<'tcx> for ty::Predicate<'tcx> {
-  fn is_unit_impl_trait(&self, _tcx: &TyCtxt<'tcx>) -> bool {
-    matches!(self.kind().skip_binder(),
-    ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
-        trait_predicate.self_ty().is_unit()
-    })
-  }
-
-  fn is_ty_impl_sized(&self, tcx: &TyCtxt<'tcx>) -> bool {
-    matches!(self.kind().skip_binder(),
-    ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
-        trait_predicate.def_id() == tcx.require_lang_item(LangItem::Sized, None)
-    })
-  }
-
-  // TODO: I'm not 100% that this is the correct metric.
-  fn is_ty_unknown(&self, _tcx: &TyCtxt<'tcx>) -> bool {
-    matches!(self.kind().skip_binder(),
-    ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
-        trait_predicate.self_ty().is_ty_var()
-    })
-  }
-
-  fn is_trait_predicate(&self) -> bool {
-    matches!(
-      self.kind().skip_binder(),
-      ty::PredicateKind::Clause(ty::ClauseKind::Trait(_trait_predicate))
-    )
-  }
-
-  fn is_necessary(&self, tcx: &TyCtxt<'tcx>) -> bool {
-    // NOTE: predicates of the form `_: TRAIT` and `(): TRAIT` are useless. The first doesn't have
-    // any information about the type of the Self var, and I've never understood why the latter
-    // occurs so frequently.
-    self.is_trait_predicate()
-      && !(self.is_unit_impl_trait(tcx)
-        || self.is_ty_unknown(tcx)
-        || self.is_ty_impl_sized(tcx))
-  }
-}
 
 impl<'a, 'tcx, T: Print<'tcx, FmtPrinter<'a, 'tcx>>> PrettyPrintExt<'a, 'tcx>
   for T
@@ -226,56 +128,3 @@ fn guess_def_namespace(tcx: TyCtxt<'_>, def_id: DefId) -> Namespace {
   }
 }
 
-struct TyVarEraserVisitor<'a, 'tcx: 'a> {
-  infcx: &'a InferCtxt<'tcx>,
-}
-
-// FIXME: these placeholders are a huge hack, there's definitely
-// something better we could do here.
-macro_rules! gen_placeholders {
-  ($( [$f:ident $n:literal],)*) => {$(
-    fn $f(&self) -> Ty<'tcx> {
-      Ty::new_placeholder(self.infcx.tcx, ty::PlaceholderType {
-        universe: self.infcx.universe(),
-        bound: ty::BoundTy {
-          var: ty::BoundVar::from_u32(ty::BoundVar::MAX_AS_U32 - $n),
-          kind: ty::BoundTyKind::Anon,
-        },
-      })
-    })*
-  }
-}
-
-impl<'a, 'tcx: 'a> TyVarEraserVisitor<'a, 'tcx> {
-  gen_placeholders! {
-    [ty_placeholder    0],
-    [int_placeholder   1],
-    [float_placeholder 2],
-  }
-}
-
-impl<'tcx> TypeFolder<TyCtxt<'tcx>> for TyVarEraserVisitor<'_, 'tcx> {
-  fn interner(&self) -> TyCtxt<'tcx> {
-    self.infcx.tcx
-  }
-
-  fn fold_ty(&mut self, ty: Ty<'tcx>) -> Ty<'tcx> {
-    // HACK: I'm not sure if replacing type variables with
-    // an anonymous placeholder is the best idea. It is *an*
-    // idea, certainly. But this should only happen before hashing.
-    match ty.kind() {
-      ty::Infer(ty::TyVar(_)) => self.ty_placeholder(),
-      ty::Infer(ty::IntVar(_)) => self.int_placeholder(),
-      ty::Infer(ty::FloatVar(_)) => self.float_placeholder(),
-      _ => ty.super_fold_with(self),
-    }
-  }
-
-  fn fold_binder<T>(&mut self, t: ty::Binder<'tcx, T>) -> ty::Binder<'tcx, T>
-  where
-    T: TypeFoldable<TyCtxt<'tcx>>,
-  {
-    let u = self.infcx.tcx.anonymize_bound_vars(t);
-    u.super_fold_with(self)
-  }
-}

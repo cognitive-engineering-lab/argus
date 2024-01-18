@@ -19,7 +19,7 @@ pub trait FnCtxtExt<'tcx> {
   // NOTE: the errors taken are of `FulfillmentData` to conform to local needs
   fn adjust_fulfillment_errors_for_expr_obligation(
     &self,
-    errors: &mut Vec<FulfillmentData<'tcx>>,
+    errors: &mut Vec<FulfillmentData<'_, 'tcx>>,
   );
 }
 
@@ -37,36 +37,42 @@ pub trait InferCtxtExt<'tcx> {
 impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
   fn adjust_fulfillment_errors_for_expr_obligation(
     &self,
-    errors: &mut Vec<FulfillmentData<'tcx>>,
+    errors: &mut Vec<FulfillmentData<'_, 'tcx>>,
   ) {
-    let mut remap_cause = FxIndexSet::default();
-    let mut not_adjusted = vec![];
+    todo!()
 
-    for (_, error) in errors {
-      let before_span = error.obligation.cause.span;
-      if self.adjust_fulfillment_error_for_expr_obligation(error)
-        || before_span != error.obligation.cause.span
-      {
-        remap_cause.insert((
-          before_span,
-          error.obligation.predicate,
-          error.obligation.cause.clone(),
-        ));
-      } else {
-        not_adjusted.push(error);
-      }
-    }
+    // let mut remap_cause = FxIndexSet::default();
+    // let mut not_adjusted = vec![];
 
-    for error in not_adjusted {
-      for (span, predicate, cause) in &remap_cause {
-        if *predicate == error.obligation.predicate
-          && span.contains(error.obligation.cause.span)
-        {
-          error.obligation.cause = cause.clone();
-          continue;
-        }
-      }
-    }
+    // for fdata in errors {
+    //   let FulfilledDataKind::Err(error) = &mut fdata.data else {
+    //     continue;
+    //   };
+
+    //   let before_span = error.obligation.cause.span;
+    //   if self.adjust_fulfillment_error_for_expr_obligation(error)
+    //     || before_span != error.obligation.cause.span
+    //   {
+    //     remap_cause.insert((
+    //       before_span,
+    //       error.obligation.predicate,
+    //       error.obligation.cause.clone(),
+    //     ));
+    //   } else {
+    //     not_adjusted.push(error);
+    //   }
+    // }
+
+    // for error in not_adjusted {
+    //   for (span, predicate, cause) in &remap_cause {
+    //     if *predicate == error.obligation.predicate
+    //       && span.contains(error.obligation.cause.span)
+    //     {
+    //       error.obligation.cause = cause.clone();
+    //       continue;
+    //     }
+    //   }
+    // }
   }
 }
 
