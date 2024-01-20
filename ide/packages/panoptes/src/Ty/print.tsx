@@ -1,15 +1,24 @@
+import { Obligation } from "@argus/common/bindings";
 import _ from "lodash";
 import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
+
+
 import "./print.css";
+//@ts-ignore
 import { PrintBinderPredicateKind } from "./private/predicate";
+
 
 // NOTE: we only export the Obligation because that's all that's
 // used within the obligations/tree view ATM. We wrap this in an
 // error boundary to avoid any of the other untyped code from
 // crashing the application.
-export const PrettyObligation = ({ obligation }) => {
+export const PrettyObligation = ({
+  obligation,
+}: {
+  obligation: Obligation;
+}) => {
   console.log("Printing Obligation", obligation);
   return (
     <ErrorBoundary
@@ -23,7 +32,14 @@ export const PrettyObligation = ({ obligation }) => {
   );
 };
 
-const FallbackFromError = ({ error, resetErrorBoundary }) => {
+// TODO: allow reseting the component.
+const FallbackFromError = ({
+  error,
+  resetErrorBoundary,
+}: {
+  error: any;
+  resetErrorBoundary: (...args: any[]) => void;
+}) => {
   // NOTE: Call resetErrorBoundary() to reset the error boundary and retry the render.
   return (
     <div className="PrintError">

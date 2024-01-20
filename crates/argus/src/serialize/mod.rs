@@ -54,6 +54,16 @@ fn get_dynamic_ctx<'a, 'tcx: 'a>() -> &'a InferCtxt<'tcx> {
   }
 }
 
+trait InferCtxtSerializeExt {
+  fn should_print_verbose(&self) -> bool; 
+}
+
+impl<'tcx> InferCtxtSerializeExt for InferCtxt<'tcx> {
+  fn should_print_verbose(&self) -> bool {
+    self.tcx.sess.verbose_internals()
+  }
+}
+
 macro_rules! serialize_custom_seq {
   ($wrap:ident, $serializer:expr, $value:expr) => {{
     let mut seq = $serializer.serialize_seq(Some($value.len()))?;

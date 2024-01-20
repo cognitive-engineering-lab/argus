@@ -1,7 +1,7 @@
 import _ from "lodash";
 import React, { useState } from "react";
 
-import { PrintGenericArg, PrintTy } from "./ty";
+import { PrintGenericArg, PrintSymbol, PrintTy } from "./ty";
 import { intersperse, takeRightUntil } from "./utilities";
 
 const Tooltip = ({ text, children }) => {
@@ -70,6 +70,7 @@ export const PrintDefPath = ({ o }) => {
 
 // PathSegment[]
 export const PrintDefPathShort = ({ o }) => {
+  console.log("Printing def path short: ", o);
   const prefix = takeRightUntil(o, segment => {
     return (
       segment.type === "crate" ||
@@ -102,6 +103,7 @@ export const PrintDefPathFull = ({ o }) => {
 };
 
 export const PrintPathSegment = ({ o }) => {
+  console.log("Printing path segment", o);
   switch (o.type) {
     case "colons": {
       return "::";
@@ -112,8 +114,16 @@ export const PrintPathSegment = ({ o }) => {
     case "rawGuess": {
       return "r#";
     }
+    case "crate": {
+      return o.name;
+    }
+    case "ty": {
+      return <PrintTy o={o.ty} />;
+    }
     case "defPathDataName": {
-      const suffix = o.disambiguator != 0 ? `#${o.disambiguator}` : "";
+      const suffix = (o.disambiguator !== undefined && o.disambiguator != 0) 
+        ? `#${o.disambiguator}` 
+        : "";
       return (
         <span>
           {o.name}
@@ -121,20 +131,20 @@ export const PrintPathSegment = ({ o }) => {
         </span>
       );
     }
-    case "crate": {
-      return o.name;
-    }
-    case "ty": {
-      return <PrintTy o={o.ty} />;
+    case "impl": {
+      if (o.kind === "for") {
+        return <PrintImplFor o={o} />;
+      } else if (o.kind === "as") {
+        return <PrintImplAs o={o} />;
+      } else {
+        throw new Error("Unknown impl kind", o);
+      }
     }
     case "genericDelimiters": {
       // We don't want empty <> on the end of types
       if (o.inner.length === 0) {
         return "";
       }
-
-      console.log("genericDelimiters", o);
-
       let [lt, gt] = ["<", ">"];
       return (
         <span>
@@ -156,14 +166,8 @@ export const PrintPathSegment = ({ o }) => {
       console.log("CommaSeparated", o);
       return <>{intersperse(o.entries, ", ", doInner)}</>;
     }
-    case "impl": {
-      if (o.kind === "for") {
-        return <PrintImplFor o={o} />;
-      } else if (o.kind === "as") {
-        return <PrintImplAs o={o} />;
-      } else {
-        throw new Error("Unknown impl kind", o);
-      }
+    default: {
+      throw new Error("Unknown path segment type", o);
     }
   }
 };

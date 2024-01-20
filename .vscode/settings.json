@@ -1,0 +1,7 @@
+{
+    "rust-analyzer.linkedProjects": [
+        "./crates/argus/Cargo.toml",
+        "./crates/argus/Cargo.toml"
+    ],
+    "rust-analyzer.showUnlinkedFileNotification": false
+}

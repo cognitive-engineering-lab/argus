@@ -88,8 +88,7 @@ export const PrintTyKind = ({ o }) => {
       </span>
     );
   } else if ("FnDef" in o) {
-    // FIXME: function definitions should also have a signature
-    return <PrintDefPath o={o.FnDef} />;
+    return <PrintFnDef o={o.FnDef} />;
   } else if ("FnPtr" in o) {
     const binderFnSig = o.FnPtr;
 
@@ -138,6 +137,12 @@ export const PrintTyKind = ({ o }) => {
   }
 };
 
+export const PrintFnDef = ({ o }) => {
+  // NOTE: `FnDef`s have both a path and a signature.
+  // We should show both (somehow), not sure what's the best way to present it.
+  return <PrintDefPath o={o.path} />;
+};
+
 export const PrintParamTy = ({ o }) => {
   return <PrintSymbol o={o.name} />;
 };
@@ -165,11 +170,8 @@ export const PrintPlaceholderTy = ({ o }) => {
 };
 
 export const PrintInferTy = ({ o }) => {
-  if ("ty_var" in o) {
-    return <PrintTy o={o.ty_var} />;
-  } else if ("infer_var" in o) {
-    // NOTE: currently infer_var is just a string.
-    return o.infer_var;
+  if (o === "Unresolved") {
+    return "???";
   } else {
     throw new Error("Unknown infer ty", o);
   }
