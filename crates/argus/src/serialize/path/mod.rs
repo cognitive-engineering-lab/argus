@@ -72,6 +72,30 @@ impl<'tcx> Serialize for ValuePathWithArgs<'tcx> {
   }
 }
 
+
+// --------------------------------------------------------
+// Opaque impl types
+
+pub struct OpaqueImplType<'tcx> {
+  def_id: DefId,
+  args: &'tcx [GenericArg<'tcx>],
+}
+
+impl<'tcx> OpaqueImplType<'tcx> {
+  pub fn new(def_id: DefId, args: &'tcx [GenericArg<'tcx>]) -> Self {
+    OpaqueImplType { def_id, args }
+  }
+}
+
+impl<'tcx> Serialize for OpaqueImplType<'tcx> {
+  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    todo!()
+  }
+}
+
 // NOTE: this is the type that the PathBuilder
 // will build and serialize.
 #[derive(Serialize)]
@@ -224,8 +248,8 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
         } */
       }
       DefPathDataName::Anon { namespace } => {
-        todo!();
-        // write!(writer, "{{{}#{}}}", namespace, data.disambiguator)
+        // CHANGE: write!(writer, "{{{}#{}}}", namespace, data.disambiguator)
+        self.segments.push(PathSegment::ambiguous_name(namespace, data.disambiguator));
       }
     }
   }

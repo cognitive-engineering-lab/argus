@@ -170,8 +170,24 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
   where
     S: serde::Serializer,
   {
-    // TODO: this is wrong
-    let with_no_queries = || false;
+    // NOTE: this wrapper should be used to serialize anything within this
+    // method. Alias types are complicated, and we need to tag the serialized
+    // type to the frontend.
+    #[derive(Serialize)]
+    #[serde(tag = "type", rename_all = "camelCase")]
+    enum AliasTyKindWrapper<'tcx> {
+      OpaqueImplType {
+        data: path::OpaqueImplType<'tcx>,
+      },
+      AliasTy {
+        #[serde(with = "AliasTyDef")]
+        data: AliasTy<'tcx>,
+      },
+      DefPath {
+        data: path::PathDefWithArgs<'tcx>,
+      },
+    };
+
     let infcx = get_dynamic_ctx();
     match self.kind {
       AliasKind::Projection | AliasKind::Inherent | AliasKind::Weak => {
@@ -180,11 +196,15 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
         if !(infcx.should_print_verbose() || with_no_queries())
           && infcx.tcx.is_impl_trait_in_trait(data.def_id)
         {
-          // return self.pretty_print_opaque_impl_type(data.def_id, data.args);
-          todo!()
+          // CHANGE: return self.pretty_print_opaque_impl_type(data.def_id, data.args);
+          AliasTyKindWrapper::OpaqueImplType { 
+            data: path::OpaqueImplType::new(data.def_id, data.args) 
+          }.serialize(s)
         } else {
           // CHANGE: p!(print(data))
-          AliasTyDef::serialize(&data, s)
+          AliasTyKindWrapper::AliasTy { 
+            data,
+          }.serialize(s)
         }
       }
       AliasKind::Opaque => {
@@ -199,9 +219,14 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
         // example.]
         if infcx.should_print_verbose() {
           // FIXME(eddyb) print this with `print_def_path`.
-          // p!(write("Opaque({:?}, {})", def_id, args.print_as_list()));
+          // CHANGE: p!(write("Opaque({:?}, {})", def_id, args.print_as_list()));
           // return Ok(())
-          return todo!();
+          // NOTE: I'm taking the risk of using print_def_path here 
+          // as indicated by the above comment. If things break, look here 
+          // first.
+          return AliasTyKindWrapper::DefPath {
+            data: path::PathDefWithArgs::new(def_id, args),
+          }.serialize(s);
         }
 
         let parent = infcx.tcx.parent(def_id);
@@ -215,24 +240,32 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
               if d == def_id {
                 // If the type alias directly starts with the `impl` of the
                 // opaque type we're printing, then skip the `::{opaque#1}`.
-                // p!(print_def_path(parent, args));
+                // CHANGE: p!(print_def_path(parent, args));
                 // return Ok(())
-                return todo!();
+                return AliasTyKindWrapper::DefPath {
+                  data: path::PathDefWithArgs::new(parent, args),
+                }.serialize(s);
               }
             }
             // Complex opaque type, e.g. `type Foo = (i32, impl Debug);`
-            // p!(print_def_path(def_id, args));
+            // CHANGE: p!(print_def_path(def_id, args));
             // return Ok(())
-            return todo!();
+            return AliasTyKindWrapper::DefPath { 
+              data: path::PathDefWithArgs::new(def_id, args) 
+            }.serialize(s);
           }
           _ => {
             if with_no_queries() {
-              // p!(print_def_path(def_id, &[]));
+              // CHANGE: p!(print_def_path(def_id, &[]));
               // return Ok(())
-              return todo!();
+             AliasTyKindWrapper::DefPath {
+              data: path::PathDefWithArgs::new(def_id, &[]),
+             }.serialize(s)
             } else {
-              // return self.pretty_print_opaque_impl_type(def_id, args);
-              return todo!();
+              // CHANGE: return self.pretty_print_opaque_impl_type(def_id, args);
+              AliasTyKindWrapper::OpaqueImplType { 
+                data: path::OpaqueImplType::new(def_id, args) 
+              }.serialize(s)
             }
           }
         }

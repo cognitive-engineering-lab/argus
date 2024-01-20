@@ -26,85 +26,6 @@ use serde::Serialize;
 
 use super::*;
 
-// TODO: get rid
-macro_rules! define_scoped_cx {
-  ($cx:ident) => {
-    macro_rules! scoped_cx {
-      () => {
-        $cx
-      };
-    }
-  };
-}
-
-thread_local! {
-    static FORCE_IMPL_FILENAME_LINE: Cell<bool> = const { Cell::new(false) };
-    static SHOULD_PREFIX_WITH_CRATE: Cell<bool> = const { Cell::new(false) };
-    static NO_TRIMMED_PATH: Cell<bool> = const { Cell::new(false) };
-    static FORCE_TRIMMED_PATH: Cell<bool> = const { Cell::new(false) };
-    static NO_QUERIES: Cell<bool> = const { Cell::new(false) };
-    static NO_VISIBLE_PATH: Cell<bool> = const { Cell::new(false) };
-}
-
-macro_rules! define_helper {
-    ($($(#[$a:meta])* fn $name:ident($helper:ident, $tl:ident);)+) => {
-        $(
-            #[must_use]
-            pub struct $helper(bool);
-
-            impl $helper {
-                pub fn new() -> $helper {
-                    $helper($tl.with(|c| c.replace(true)))
-                }
-            }
-
-            $(#[$a])*
-            pub macro $name($e:expr) {
-                {
-                    let _guard = $helper::new();
-                    $e
-                }
-            }
-
-            impl Drop for $helper {
-                fn drop(&mut self) {
-                    $tl.with(|c| c.set(self.0))
-                }
-            }
-
-            pub fn $name() -> bool {
-                $tl.with(|c| c.get())
-            }
-        )+
-    }
-}
-
-define_helper!(
-    /// Avoids running any queries during any prints that occur
-    /// during the closure. This may alter the appearance of some
-    /// types (e.g. forcing verbose printing for opaque types).
-    /// This method is used during some queries (e.g. `explicit_item_bounds`
-    /// for opaque types), to ensure that any debug printing that
-    /// occurs during the query computation does not end up recursively
-    /// calling the same query.
-    fn with_no_queries(NoQueriesGuard, NO_QUERIES);
-    /// Force us to name impls with just the filename/line number. We
-    /// normally try to use types. But at some points, notably while printing
-    /// cycle errors, this can result in extra or suboptimal error output,
-    /// so this variable disables that check.
-    fn with_forced_impl_filename_line(ForcedImplGuard, FORCE_IMPL_FILENAME_LINE);
-    /// Adds the `crate::` prefix to paths where appropriate.
-    fn with_crate_prefix(CratePrefixGuard, SHOULD_PREFIX_WITH_CRATE);
-    /// Prevent path trimming if it is turned on. Path trimming affects `Display` impl
-    /// of various rustc types, for example `std::vec::Vec` would be trimmed to `Vec`,
-    /// if no other `Vec` is found.
-    fn with_no_trimmed_paths(NoTrimmedGuard, NO_TRIMMED_PATH);
-    fn with_forced_trimmed_paths(ForceTrimmedGuard, FORCE_TRIMMED_PATH);
-    /// Prevent selection of visible paths. `Display` impl of DefId will prefer
-    /// visible (public) reexports of types as paths.
-    fn with_no_visible_paths(NoVisibleGuard, NO_VISIBLE_PATH);
-);
-
 impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
   pub fn print_def_path(
     &mut self,
@@ -147,15 +68,24 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
         // constructing a `DisambiguatedDefPathData`.
         if !self.empty_path {
           self.segments.push(PathSegment::Colons);
+        
+
         }
-        todo!();
-        // write!(
+
+        // CHANGE: write!(
         //     self,
         //     "<impl at {}>",
         //     // This may end up in stderr diagnostics but it may also be emitted
         //     // into MIR. Hence we use the remapped path if available
         //     self.tcx.sess.source_map().span_to_embeddable_string(span)
         // )?;
+        let impl_range =
+            CharRange::from_span(span, self.tcx().sess.source_map())
+                .expect("impl span not converted to `CharRange`");
+        self
+            .segments
+            .push(PathSegment::AnonImpl { range: impl_range });
+
         self.empty_path = false;
         return;
       }
@@ -175,8 +105,8 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
       && !with_crate_prefix()
       && let Some(symbol) = self.tcx().trimmed_def_paths(()).get(&def_id)
   {
-    todo!();
-      // write!(self, "{}", Ident::with_dummy_span(*symbol))?;
+      // CHANGE: write!(self, "{}", Ident::with_dummy_span(*symbol))?;
+      self.segments.push(PathSegment::unambiguous_name(*symbol));
       true
   } else {
       false
@@ -426,8 +356,8 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
           && let Some(symbol) = self.tcx().trimmed_def_paths(()).get(&def_id)
       {
           // If `Assoc` is unique, we don't want to talk about `Trait::Assoc`.
-          todo!();
-          // self.write_str(get_local_name(self, *symbol, def_id, key).as_str())?;
+          // CHANGE: self.write_str(get_local_name(self, *symbol, def_id, key).as_str())?;
+          self.segments.push(PathSegment::unambiguous_name(get_local_name(self, *symbol, def_id, key)));
           return true;
       }
     if let Some(symbol) = key.get_opt_name() {
@@ -436,22 +366,23 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
               && let parent_key = self.tcx().def_key(parent)
               && let Some(symbol) = parent_key.get_opt_name()
           {
-              // Trait
-              todo!();
+              // CHANGE: Trait
               // self.write_str(get_local_name(self, symbol, parent, parent_key).as_str())?;
               // self.write_str("::")?;
+              self.segments.push(PathSegment::unambiguous_name(get_local_name(self, symbol, parent, parent_key)));
+              self.segments.push(PathSegment::Colons);
           } else if let DefKind::Variant = kind
               && let Some(parent) = self.tcx().opt_parent(def_id)
               && let parent_key = self.tcx().def_key(parent)
               && let Some(symbol) = parent_key.get_opt_name()
           {
-              // Enum
-
+              // CHANGE: Enum
               // For associated items and variants, we want the "full" path, namely, include
               // the parent type in the path. For example, `Iterator::Item`.
-              todo!();
               // self.write_str(get_local_name(self, symbol, parent, parent_key).as_str())?;
               // self.write_str("::")?;
+              self.segments.push(PathSegment::unambiguous_name(get_local_name(self, symbol, parent, parent_key)));
+              self.segments.push(PathSegment::Colons);
           } else if let DefKind::Struct
           | DefKind::Union
           | DefKind::Enum
@@ -465,8 +396,8 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
               // If not covered above, like for example items out of `impl` blocks, fallback.
               return false;
           }
-      todo!();
-      // self.write_str(get_local_name(self, symbol, def_id, key).as_str())?;
+      // CHANGE: self.write_str(get_local_name(self, symbol, def_id, key).as_str())?;
+      self.segments.push(PathSegment::unambiguous_name(get_local_name(self, symbol, def_id, key)));
       return true;
     }
     false
@@ -513,13 +444,14 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
 
     if let DefPathDataName::Named(name) = name {
       if Ident::with_dummy_span(name).is_raw_guess() {
-        todo!();
-        // write!(self, "r#")?;
+        // CHANGE: write!(self, "r#")?;
+        self.segments.push(PathSegment::RawGuess);
       }
     }
 
     let verbose = self.should_print_verbose();
     // CHANGE: not printing on DisambiguatedDefData method.
+    // dsamiguated_data.fmt_maybe_verbose(self, verbose);
     self.fmt_maybe_verbose(disambiguated_data, verbose);
 
     self.empty_path = false;
@@ -534,8 +466,8 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
 
     if !args.is_empty() {
       if self.in_value {
-        todo!();
-        // write!(self, "::")?;
+        // CHANGE: write!(self, "::")?;
+        self.segments.push(PathSegment::Colons);
       }
       self.generic_delimiters(|cx| {
         #[derive(Serialize)]
@@ -577,8 +509,8 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
         | ty::Int(_)
         | ty::Uint(_)
         | ty::Float(_) => {
-          todo!();
-          // return self_ty.print(self);
+          // CHANGE: return self_ty.print(self);
+          self.segments.push(PathSegment::Ty { ty: self_ty });
         }
 
         _ => {}
@@ -651,8 +583,8 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
       |cx| {
         print_prefix(cx);
         if !cx.empty_path {
-          todo!();
-          // write!(cx, "::")?;
+          // CHANGE: write!(cx, "::")?;
+          cx.segments.push(PathSegment::Colons);
         }
       },
       self_ty,
@@ -670,14 +602,17 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
     print_prefix(self);
 
     self.generic_delimiters(|cx| {
-      define_scoped_cx!(cx);
-
-      todo!();
+      // CHANGE: define_scoped_cx!(cx);
       // p!("impl ");
       // if let Some(trait_ref) = trait_ref {
       //     p!(print(trait_ref.print_only_trait_path()), " for ");
       // }
       // p!(print(self_ty));
+      cx.segments.push(PathSegment::Impl {
+        ty: self_ty,
+        path: trait_ref.map(|t| TraitRefPrintOnlyTraitPathDefWrapper(t)),
+        kind: ImplKind::For,
+      })
     })
   }
 }
