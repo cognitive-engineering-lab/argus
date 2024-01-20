@@ -1,23 +1,18 @@
-
-use rustc_hir::def_id::LocalDefId;
-use rustc_hir_analysis::astconv::AstConv;
-
-use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
-
 use rustc_data_structures::stable_hasher::{Hash64, HashStable, StableHasher};
-use rustc_query_system::ich::StableHashingContext;
-use rustc_hir::LangItem;
+use rustc_hir::{def_id::LocalDefId, LangItem};
+use rustc_hir_analysis::astconv::AstConv;
+use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::ty::{
-  self, Ty, TyCtxt, TypeFoldable, TypeFolder, TypeSuperFoldable, Predicate
+  self, Predicate, Ty, TyCtxt, TypeFoldable, TypeFolder, TypeSuperFoldable,
 };
-
+use rustc_query_system::ich::StableHashingContext;
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 
 use crate::{
-  analysis::{FulfillmentData, EvaluationResult},
+  analysis::{EvaluationResult, FulfillmentData},
   serialize::{serialize_to_value, ty::PredicateDef},
-  types::{Obligation},
+  types::Obligation,
 };
 
 pub trait CharRangeExt: Copy + Sized {
@@ -34,8 +29,6 @@ pub trait StableHash<'__ctx, 'tcx>:
     ctx: &mut StableHashingContext<'__ctx>,
   ) -> Hash64;
 }
-
-
 
 pub trait InferCtxtExt<'tcx> {
   fn bless_fulfilled<'a>(
@@ -92,7 +85,8 @@ where
   ) -> Hash64 {
     let mut h = StableHasher::new();
     let sans_regions = infcx.tcx.erase_regions(self);
-    let this = sans_regions.fold_with(&mut ty_eraser::TyVarEraserVisitor { infcx });
+    let this =
+      sans_regions.fold_with(&mut ty_eraser::TyVarEraserVisitor { infcx });
     // erase infer vars
     this.hash_stable(ctx, &mut h);
     h.finish()
@@ -100,7 +94,6 @@ where
 }
 
 impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
-
   fn is_unit_impl_trait(&self, p: &Predicate<'tcx>) -> bool {
     matches!(p.kind().skip_binder(),
     ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
@@ -151,9 +144,9 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
   }
 
   fn predicate_hash(&self, p: &Predicate<'tcx>) -> Hash64 {
-    self.tcx.with_stable_hashing_context(|mut hcx| {
-      p.stable_hash(self, &mut hcx)
-    })
+    self
+      .tcx
+      .with_stable_hashing_context(|mut hcx| p.stable_hash(self, &mut hcx))
   }
 
   fn bless_fulfilled<'a>(
@@ -162,7 +155,6 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     obligation: &'a PredicateObligation<'tcx>,
     result: EvaluationResult,
   ) -> FulfillmentData<'a, 'tcx> {
-
     FulfillmentData {
       hash: self.predicate_hash(&obligation.predicate),
       obligation,
@@ -173,32 +165,22 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
   fn erase_non_local_data(
     &self,
     fdata: FulfillmentData<'_, 'tcx>,
-  ) -> Obligation
-  {
+  ) -> Obligation {
     let obl = &fdata.obligation;
     let source_map = self.tcx.sess.source_map();
-    let range =
-      CharRange::from_span(obl.cause.span, source_map)
+    let range = CharRange::from_span(obl.cause.span, source_map)
       .expect("couldn't convert obligation span to range");
-    let is_necessary =
-      self.is_necessary_predicate(&obl.predicate);
+    let is_necessary = self.is_necessary_predicate(&obl.predicate);
 
     #[derive(Serialize)]
-    struct Wrapper<'tcx>(
-      #[serde(with = "PredicateDef")]
-      Predicate<'tcx>
-    );
-
+    struct Wrapper<'tcx>(#[serde(with = "PredicateDef")] Predicate<'tcx>);
 
     let predicate = if is_necessary {
       let w = Wrapper(obl.predicate.clone());
-      serialize_to_value(self, &w)
-        .expect("could not serialize predicate")
+      serialize_to_value(self, &w).expect("could not serialize predicate")
     } else {
-      serialize_to_value(self, &())
-        .expect("could not serialize predicate")
+      serialize_to_value(self, &()).expect("could not serialize predicate")
     };
-
 
     Obligation {
       predicate,
@@ -209,55 +191,54 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     }
   }
 
-//   fn build_trait_errors(
-//     &self,
-//     obligations: &[Obligation<'tcx>],
-//   ) -> Vec<TraitError<'tcx>> {
-//     let tcx = &self.tcx;
-//     let source_map = tcx.sess.source_map();
-//     self
-//       .reported_trait_errors
-//       .borrow()
-//       .iter()
-//       .flat_map(|(span, predicates)| {
-//         let range = CharRange::from_span(*span, source_map)
-//           .expect("Couldn't get trait bound range");
+  //   fn build_trait_errors(
+  //     &self,
+  //     obligations: &[Obligation<'tcx>],
+  //   ) -> Vec<TraitError<'tcx>> {
+  //     let tcx = &self.tcx;
+  //     let source_map = tcx.sess.source_map();
+  //     self
+  //       .reported_trait_errors
+  //       .borrow()
+  //       .iter()
+  //       .flat_map(|(span, predicates)| {
+  //         let range = CharRange::from_span(*span, source_map)
+  //           .expect("Couldn't get trait bound range");
 
-//         predicates.iter().map(move |predicate| {
-//           // TODO: these simple comparisons are not going to cut it ...
-//           // We can always take a similar approach to the ambiguity errors and
-//           // just recompute the errors that rustc does.
-//           //
-//           // Another idea would be to use the "X implies Y" mechanism from the
-//           // diagnostic system. This will collapse all implied errors into the one reported.
-//           let candidates = obligations
-//             .iter()
-//             .filter_map(|obl| {
-//               if !range.overlaps(obl.range) || obl.predicate != *predicate {
-//                 return None;
-//               }
-//               Some(obl.hash)
-//             })
-//             .collect::<Vec<_>>();
+  //         predicates.iter().map(move |predicate| {
+  //           // TODO: these simple comparisons are not going to cut it ...
+  //           // We can always take a similar approach to the ambiguity errors and
+  //           // just recompute the errors that rustc does.
+  //           //
+  //           // Another idea would be to use the "X implies Y" mechanism from the
+  //           // diagnostic system. This will collapse all implied errors into the one reported.
+  //           let candidates = obligations
+  //             .iter()
+  //             .filter_map(|obl| {
+  //               if !range.overlaps(obl.range) || obl.predicate != *predicate {
+  //                 return None;
+  //               }
+  //               Some(obl.hash)
+  //             })
+  //             .collect::<Vec<_>>();
 
-//           TraitError {
-//             range,
-//             predicate: predicate.clone(),
-//             candidates,
-//           }
-//         })
-//       })
-//       .collect::<Vec<_>>()
-//   }
+  //           TraitError {
+  //             range,
+  //             predicate: predicate.clone(),
+  //             candidates,
+  //           }
+  //         })
+  //       })
+  //       .collect::<Vec<_>>()
+  //   }
 
-//   fn build_ambiguity_errors(
-//     &self,
-//     _obligations: &[Obligation<'tcx>],
-//   ) -> Vec<AmbiguityError<'tcx>> {
-//     todo!()
-//   }
-// }
-
+  //   fn build_ambiguity_errors(
+  //     &self,
+  //     _obligations: &[Obligation<'tcx>],
+  //   ) -> Vec<AmbiguityError<'tcx>> {
+  //     todo!()
+  //   }
+  // }
 }
 
 // impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
@@ -396,7 +377,6 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
 //   }
 // }
 
-
 mod ty_eraser {
   use super::*;
 
@@ -453,5 +433,4 @@ mod ty_eraser {
       u.super_fold_with(self)
     }
   }
-
 }

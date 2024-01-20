@@ -13,26 +13,23 @@
 //! trait resolution.
 use std::{ops::Deref, str::FromStr};
 
+use anyhow::Result;
 use rustc_data_structures::{
+  fx::{FxHashMap as HashMap, FxHashSet as HashSet},
   stable_hasher::Hash64,
-  fx::{FxHashMap as HashMap, FxHashSet as HashSet}
 };
-use rustc_middle::ty::{TyCtxt};
+use rustc_infer::traits::PredicateObligation;
+use rustc_middle::{
+  traits::{query::NoSolution, solve::Certainty},
+  ty::TyCtxt,
+};
 use rustc_span::{symbol::Symbol, Span};
-
-
-use rustc_infer::{traits::PredicateObligation};
-use rustc_middle::traits::{solve::Certainty, query::NoSolution};
-
-
-
 use rustc_utils::source_map::range::{CharRange, ToSpan};
 use serde::{Deserialize, Serialize};
-use anyhow::Result;
 #[cfg(feature = "ts-rs")]
 use ts_rs::TS;
 
-use crate::serialize::ty::{SymbolDef};
+use crate::serialize::ty::SymbolDef;
 
 // -----------------
 
@@ -54,12 +51,10 @@ index_vec::define_index_type! {
     pub struct TyIdx = IdxSize;
 }
 
-
 #[derive(Serialize)]
 #[cfg_attr(feature = "ts-rs", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct AmbiguityError {}
-
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "ts-rs", derive(TS))]
@@ -71,7 +66,6 @@ pub struct TraitError {
   /// Actual type, `Predicate<'tcx>`
   pub predicate: serde_json::Value,
 }
-
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "ts-rs", derive(TS))]
@@ -99,14 +93,12 @@ pub struct ObligationsInBody {
   pub obligations: Vec<Obligation>,
 }
 
-
 /// The set of relations between obligation data.
 // TODO: it may also be interesting to include information such as:
 // - trait visibility, which traits are currently visible.
 // - ...
 #[derive(Serialize)]
 pub struct Relations {
-
   /// Bounds errors : TraitError -> [Obligation]
   ///
   /// When a hard trait bound occurs, e.g., `Vec<(i32, i32)>: Clone`,
@@ -147,7 +139,6 @@ pub struct Relations {
   deref_map: HashMap<TraitErrorIdx, ObligationIdx>,
 }
 
-
 #[derive(Serialize, Clone, Debug)]
 #[cfg_attr(feature = "ts-rs", derive(TS))]
 #[serde(tag = "type")]
@@ -161,7 +152,6 @@ pub struct Obligation {
   pub is_necessary: bool,
 }
 
-
 #[derive(Serialize, Clone, Debug)]
 #[cfg_attr(feature = "ts-rs", derive(TS))]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -170,7 +160,6 @@ pub enum ObligationKind {
   Ambiguous,
   Failure,
 }
-
 
 // Serialize an Option<Symbol> using SymbolDef but the value must be a Some(..)
 fn serialize_option<S: serde::Serializer>(
@@ -184,11 +173,9 @@ fn serialize_option<S: serde::Serializer>(
   SymbolDef::serialize(symb, s)
 }
 
-
 #[derive(Deserialize, Serialize, Copy, Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "ts-rs", derive(TS))]
 pub struct ObligationHash(#[serde(with = "string")] u64);
-
 
 #[derive(Debug)]
 pub struct Target {
@@ -196,14 +183,11 @@ pub struct Target {
   pub span: Span,
 }
 
-
 pub trait ToTarget {
   fn to_target(self, tcx: TyCtxt) -> Result<Target>;
 }
 
-
 // ------------------------------
-
 
 impl Deref for ObligationHash {
   type Target = u64;
@@ -212,14 +196,12 @@ impl Deref for ObligationHash {
   }
 }
 
-
 impl FromStr for ObligationHash {
   type Err = anyhow::Error;
   fn from_str(s: &str) -> Result<Self> {
     Ok(<u64 as FromStr>::from_str(s)?.into())
   }
 }
-
 
 impl From<u64> for ObligationHash {
   fn from(value: u64) -> Self {
@@ -233,8 +215,6 @@ impl From<Hash64> for ObligationHash {
   }
 }
 
-
-
 impl<U: Into<ObligationHash>, T: ToSpan> ToTarget for (U, T) {
   fn to_target(self, tcx: TyCtxt) -> Result<Target> {
     self.1.to_span(tcx).map(|span| Target {
@@ -243,7 +223,6 @@ impl<U: Into<ObligationHash>, T: ToSpan> ToTarget for (U, T) {
     })
   }
 }
-
 
 mod string {
   use std::{fmt::Display, str::FromStr};
@@ -269,7 +248,6 @@ mod string {
       .map_err(de::Error::custom)
   }
 }
-
 
 // Types that do not live past a single inspection run. Use these
 // to build up intermediate information that *does not* need to

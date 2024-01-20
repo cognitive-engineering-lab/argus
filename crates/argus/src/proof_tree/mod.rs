@@ -12,17 +12,12 @@ use std::collections::HashSet;
 
 use index_vec::IndexVec;
 use rustc_middle::ty::{TraitRef, Ty};
-
 use serde::Serialize;
-
+pub use topology::*;
 #[cfg(feature = "ts-rs")]
 use ts_rs::TS;
 
-pub use topology::*;
-
-use crate::{
-  serialize::ty::{TraitRefPrintOnlyTraitPathDef, TyDef},
-};
+use crate::serialize::ty::{TraitRefPrintOnlyTraitPathDef, TyDef};
 
 crate::define_usize_idx! {
   ProofNodeIdx
@@ -81,4 +76,3 @@ pub struct SerializedTree<'tcx> {
   pub error_leaves: Vec<ProofNodeIdx>,
   pub unnecessary_roots: HashSet<ProofNodeIdx>,
 }
-

@@ -1,29 +1,23 @@
 //! ProofTree analysis.
 
-
 use anyhow::{anyhow, Result};
 use fluid_let::fluid_let;
-
 use rustc_hir::BodyId;
-
-
-use rustc_hir_typeck::{
-  inspect_typeck
-};
-use rustc_middle::ty::{TyCtxt};
-
-
-use rustc_trait_selection::traits::{solve::Goal};
-use rustc_utils::source_map::range::CharRange;
+use rustc_hir_typeck::inspect_typeck;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
+use rustc_middle::ty::TyCtxt;
+use rustc_trait_selection::traits::solve::Goal;
+use rustc_utils::source_map::range::CharRange;
 
-pub(crate) use crate::types::intermediate::{EvaluationResult, FulfillmentData};
+pub(crate) use crate::types::intermediate::{
+  EvaluationResult, FulfillmentData,
+};
 use crate::{
   ext::InferCtxtExt,
-  proof_tree::{serialize::serialize_proof_tree},
+  proof_tree::serialize::serialize_proof_tree,
   serialize::serialize_to_value,
-  types::{ObligationsInBody, Target},
   tls,
+  types::{ObligationsInBody, Target},
 };
 
 fluid_let! {
@@ -39,7 +33,7 @@ macro_rules! guard_inspection {
     if INSPECTING.copied().unwrap_or(false) {
       return;
     }
-  }}
+  }};
 }
 
 pub fn obligations<'tcx>(
@@ -79,8 +73,7 @@ pub fn obligations<'tcx>(
     obligations,
   };
 
-  serde_json::to_value(&obligations_in_body)
-    .map_err(|e| anyhow!(e))
+  serde_json::to_value(&obligations_in_body).map_err(|e| anyhow!(e))
 }
 
 // NOTE: tree is only invoked for *a single* tree, it must be found
@@ -101,7 +94,11 @@ pub fn tree<'tcx>(
 // --------------------------------
 // Rustc inspection points
 
-fn process_obligation<'tcx>(infcx: &InferCtxt<'tcx>, obl: &PredicateObligation<'tcx>, result: EvaluationResult) {
+fn process_obligation<'tcx>(
+  infcx: &InferCtxt<'tcx>,
+  obl: &PredicateObligation<'tcx>,
+  result: EvaluationResult,
+) {
   guard_inspection! {}
 
   let Some(ldef_id) = infcx.body_id() else {
@@ -114,13 +111,16 @@ fn process_obligation<'tcx>(infcx: &InferCtxt<'tcx>, obl: &PredicateObligation<'
   tls::push_obligation(ldef_id, o);
 }
 
-fn process_obligation_for_tree<'tcx>(infcx: &InferCtxt<'tcx>, obl: &PredicateObligation<'tcx>, _result: EvaluationResult) {
+fn process_obligation_for_tree<'tcx>(
+  infcx: &InferCtxt<'tcx>,
+  obl: &PredicateObligation<'tcx>,
+  _result: EvaluationResult,
+) {
   guard_inspection! {}
 
   OBLIGATION_TARGET.get(|target| {
     INSPECTING.set(true, || {
       let inner = move || {
-
         let target = target?;
         let hash = infcx.predicate_hash(&obl.predicate);
 
@@ -134,13 +134,12 @@ fn process_obligation_for_tree<'tcx>(infcx: &InferCtxt<'tcx>, obl: &PredicateObl
         };
 
         let item_def_id = infcx.body_id()?.to_def_id();
-        let serial_tree =
-          serialize_proof_tree(goal, infcx, item_def_id)?;
+        let serial_tree = serialize_proof_tree(goal, infcx, item_def_id)?;
 
         serialize_to_value(infcx, &serial_tree).ok()
       };
 
-      if let Some(stree)  = inner() {
+      if let Some(stree) = inner() {
         tls::store_tree(stree);
       }
     })

@@ -1,5 +1,6 @@
 use std::cell::Cell;
 
+use log::debug;
 use rustc_hir::{
   def::DefKind,
   def_id::{CrateNum, DefId, ModDefId, LOCAL_CRATE},
@@ -10,15 +11,13 @@ use rustc_hir::{
 use rustc_middle::ty::{self, print as rustc_print, *};
 use rustc_session::cstore::{ExternCrate, ExternCrateSource};
 use rustc_span::symbol::{kw, Ident, Symbol};
-
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
-use log::debug;
 
 use super::*;
 
-mod pretty;
 mod default;
+mod pretty;
 
 pub(super) fn path_def_no_args<S>(
   def_id: &DefId,
@@ -200,29 +199,36 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
     self.infcx.should_print_verbose()
   }
 
-
-  pub fn print_value_path(&mut self, def_id: DefId, args: &'tcx [GenericArg<'tcx>]) {
+  pub fn print_value_path(
+    &mut self,
+    def_id: DefId,
+    args: &'tcx [GenericArg<'tcx>],
+  ) {
     self.print_def_path(def_id, args)
   }
 
-
-  pub fn fmt_maybe_verbose(&mut self, data: &DisambiguatedDefPathData, verbose: bool) {
+  pub fn fmt_maybe_verbose(
+    &mut self,
+    data: &DisambiguatedDefPathData,
+    verbose: bool,
+  ) {
     match data.data.name() {
-        DefPathDataName::Named(name) => {
-            self.segments.push(PathSegment::ambiguous_name(name, data.disambiguator));
-            /* CHANGE: if verbose && data.disambiguator != 0 {
-              write!(writer, "{}#{}", name, data.disambiguator)
-            } else {
-              writer.write_str(name.as_str())
-            } */
-        }
-        DefPathDataName::Anon { namespace } => {
-            todo!();
-            // write!(writer, "{{{}#{}}}", namespace, data.disambiguator)
-        }
+      DefPathDataName::Named(name) => {
+        self
+          .segments
+          .push(PathSegment::ambiguous_name(name, data.disambiguator));
+        /* CHANGE: if verbose && data.disambiguator != 0 {
+          write!(writer, "{}#{}", name, data.disambiguator)
+        } else {
+          writer.write_str(name.as_str())
+        } */
+      }
+      DefPathDataName::Anon { namespace } => {
+        todo!();
+        // write!(writer, "{{{}#{}}}", namespace, data.disambiguator)
+      }
     }
-}
-
+  }
 }
 
 // pub trait Printer<'tcx>: Sized {
@@ -300,5 +306,5 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
 //       _args: &'tcx [GenericArg<'tcx>],
 //       self_ty: Ty<'tcx>,
 //       impl_trait_ref: Option<ty::TraitRef<'tcx>>,
-//   ) -> Result<(), PrintError>; 
+//   ) -> Result<(), PrintError>;
 // }

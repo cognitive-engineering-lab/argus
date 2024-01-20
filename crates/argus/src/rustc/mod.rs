@@ -4,7 +4,6 @@
 //! public within Rustc itself, but our needs may change so it hasn't
 //! happened yet.
 
-
 use rustc_hir_typeck::FnCtxt;
 use rustc_infer::{
   infer::error_reporting::TypeErrCtxt, traits::util::elaborate,

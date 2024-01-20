@@ -19,7 +19,7 @@ use serde::Serialize;
 use super::*;
 use crate::{
   ext::InferCtxtExt,
-  serialize::{serialize_to_value, ty::goal__predicate_def}
+  serialize::{serialize_to_value, ty::goal__predicate_def},
 };
 
 pub struct SerializedTreeVisitor<'tcx> {
@@ -78,8 +78,7 @@ impl<'tcx> Node<'tcx> {
 
     let w = &Wrapper(goal.goal());
     let v =
-      serialize_to_value(goal.infcx(), w)
-      .expect("failed to serialize goal");
+      serialize_to_value(goal.infcx(), w).expect("failed to serialize goal");
 
     let string = goal.goal().predicate.pretty(goal.infcx(), def_id);
     log::debug!("PRETTY {}", string);

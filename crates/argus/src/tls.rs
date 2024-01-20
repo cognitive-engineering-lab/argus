@@ -1,23 +1,9 @@
 //! Thread local storage for storing data processed in rustc.
 use std::cell::RefCell;
 
-
-
-
-
-
 use rustc_hir::def_id::LocalDefId;
 
-
-
-
-
-
-
-use crate::{
-  // ext::{FnCtxtExt as ArgusFnCtxtExt, InferCtxtExt},
-  types::{Obligation, AmbiguityError, TraitError},
-};
+use crate::types::{AmbiguityError, Obligation, TraitError};
 
 // NOTE: we use thread local storage to accumulate obligations
 // accross call to the obligation inspector in `typeck_inspect`.

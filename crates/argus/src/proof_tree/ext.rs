@@ -1,12 +1,9 @@
-
-use rustc_hir::{
-  def::Namespace, def_id::DefId, definitions::DefPathData,
-};
+use rustc_hir::{def::Namespace, def_id::DefId, definitions::DefPathData};
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::ty::{
-  print::{FmtPrinter, Print}, TyCtxt,
+  print::{FmtPrinter, Print},
+  TyCtxt,
 };
-
 use rustc_trait_selection::{
   solve::inspect::InspectCandidate,
   traits::{
@@ -124,4 +121,3 @@ fn guess_def_namespace(tcx: TyCtxt<'_>, def_id: DefId) -> Namespace {
     _ => Namespace::TypeNS,
   }
 }
-

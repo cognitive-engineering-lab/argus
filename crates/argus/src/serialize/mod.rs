@@ -55,7 +55,7 @@ fn get_dynamic_ctx<'a, 'tcx: 'a>() -> &'a InferCtxt<'tcx> {
 }
 
 trait InferCtxtSerializeExt {
-  fn should_print_verbose(&self) -> bool; 
+  fn should_print_verbose(&self) -> bool;
 }
 
 impl<'tcx> InferCtxtSerializeExt for InferCtxt<'tcx> {
