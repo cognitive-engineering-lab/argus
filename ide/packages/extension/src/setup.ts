@@ -8,19 +8,16 @@ import vscode from "vscode";
 import { log } from "./logging";
 import { Ctx } from "./ctx";
 
-// TODO: read the version from rust-toolchain.toml
+// TODO: before release
+// [ ] make argus_cli a published crate.
+// [ ] make argus binaries available for download.
+
 declare const VERSION: string;
-
-// TODO: read the version from rust-toolchain.toml
-// declare const TOOLCHAIN: {
-//   channel: string;
-//   components: string[];
-// };
-
-const TOOLCHAIN = {
-  channel: "stage1",
-  components: ["rust-std", "rustc-dev", "llvm-tools-preview"],
+declare const TOOLCHAIN: {
+  channel: string;
+  components: string[];
 };
+
 
 const LIBRARY_PATHS: Partial<Record<NodeJS.Platform, string>> = {
   darwin: "DYLD_LIBRARY_PATH",
@@ -73,6 +70,7 @@ export const getArgusOpts = async (cwd: string) => {
   return opts;
 };
 
+
 let execNotifyBinary = async (
   cmd: string,
   args: string[],
@@ -111,6 +109,7 @@ let execNotifyBinary = async (
   });
 };
 
+
 export let execNotify = async (
   cmd: string,
   args: string[],
@@ -122,16 +121,19 @@ export let execNotify = async (
   return text.trimEnd();
 };
 
+
 export let cargoBin = () => {
   let cargo_home = process.env.CARGO_HOME || path.join(os.homedir(), ".cargo");
   return path.join(cargo_home, "bin");
 };
+
 
 export let cargoCommand = (): [string, string[]] => {
   let cargo = "cargo";
   let toolchain = `+${TOOLCHAIN.channel}`;
   return [cargo, [toolchain]];
 };
+
 
 let findWorkspaceRoot = async (): Promise<string | null> => {
   let folders = vscode.workspace.workspaceFolders;
@@ -178,12 +180,92 @@ let findWorkspaceRoot = async (): Promise<string | null> => {
   return folderSubdirTil(entry.idx);
 };
 
+
+const checkVersionAndInstall = async (workspaceRoot: string, cargo: string, cargoArgs: string[]): Promise<boolean> => {
+  let version;
+  try {
+    version = await execNotify(
+      cargo,
+      [...cargoArgs, "argus", "-V"],
+      "Waiting for Argus...",
+      { cwd: workspaceRoot }
+    );
+  } catch (e) {
+    version = "";
+  }
+
+  if (version !== VERSION) {
+    throw new Error(`TODO: INSTALL SCRIPTS AND STUFF {version} {VERSION}`);
+    // log(
+    //   `Argus binary version ${version} does not match expected IDE version ${VERSION}`
+    // );
+    // let components = TOOLCHAIN.components.map((c) => ["-c", c]).flat();
+    // try {
+    //   await exec_notify(
+    //     "rustup",
+    //     [
+    //       "toolchain",
+    //       "install",
+    //       TOOLCHAIN.channel,
+    //       "--profile",
+    //       "minimal",
+    //       ...components,
+    //     ],
+    //     "Installing nightly Rust..."
+    //   );
+    // } catch (e: any) {
+    //   let choice = await vscode.window.showErrorMessage(
+    //     'Argus failed to install because rustup failed. Click "Show fix" to resolve, or click "Dismiss to attempt installation later.',
+    //     "Show fix",
+    //     "Dismiss"
+    //   );
+
+    //   if (choice === "Show fix") {
+    //     await vscode.window.showInformationMessage(
+    //       'Click "Continue" once you have completed the fix.',
+    //       "Continue"
+    //     );
+    //   } else {
+    //     return null;
+    //   }
+    // }
+
+    // try {
+    //   await download();
+    // } catch (e: any) {
+    //   log("Install script failed with error:", e.toString());
+
+    //   await exec_notify(
+    //     cargo,
+    //     [
+    //       ...cargo_args,
+    //       "install",
+    //       "argus_cli",
+    //       "--version",
+    //       VERSION,
+    //       "--force",
+    //     ],
+    //     "Argus binaries not available, instead installing the Argus crate from source... (this may take a minute)"
+    //   );
+    // }
+
+    // if (version === "") {
+    //   vscode.window.showInformationMessage(
+    //     "Argus has successfully installed!"
+    //   );
+    // }
+  }
+
+  return true;
+};
+
+
 export async function setup(
   context: Ctx,
 ): Promise<CallArgus | null> {
   log("Getting workspace root");
 
-  let workspaceRoot = await findWorkspaceRoot();
+  const workspaceRoot = await findWorkspaceRoot();
 
   if (workspaceRoot === null) {
     log("Failed to find workspace root!");
@@ -192,10 +274,14 @@ export async function setup(
 
   log("Workspace root", workspaceRoot);
 
-  let [cargo, cargoArgs] = cargoCommand();
+  const [cargo, cargoArgs] = cargoCommand();
+  const isArgusInstalled = await checkVersionAndInstall(workspaceRoot, cargo, cargoArgs);
 
-  let argusOpts = await getArgusOpts(workspaceRoot);
+  if (!isArgusInstalled) {
+    throw new Error("TODO: SETUP FAILED");
+  }
 
+  const argusOpts = await getArgusOpts(workspaceRoot);
   return async <T>(args: ArgusArgs, noOutput: boolean = false) => {
     log("Calling backend with args", args);
 
