@@ -28,5 +28,4 @@ mod ext;
 mod proof_tree;
 mod rustc;
 mod serialize;
-mod tls;
 pub mod types;

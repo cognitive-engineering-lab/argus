@@ -52,7 +52,9 @@ export class ViewLoader {
     });
 
     // Set the webview's initial html content
-    this.panel.webview.html = this.getHtmlForWebview(globals.ctx.visibleEditors);
+    this.panel.webview.html = this.getHtmlForWebview(
+      globals.ctx.visibleEditors
+    );
 
     // Listen for when the panel is disposed
     // This happens when the user closes the panel or when the panel is closed programatically
@@ -98,12 +100,7 @@ export class ViewLoader {
         return;
       }
       case "tree": {
-        this.getTree(
-          requestId,
-          payload.file,
-          payload.predicate,
-          payload.range
-        );
+        this.getTree(requestId, payload.file, payload.predicate, payload.range);
         return;
       }
 
@@ -140,7 +137,10 @@ export class ViewLoader {
     // For each of the returned bodies, we need to register the trait errors
     // in the editor context. TODO: register ambiguity errors when we have them.
     const traitErrors = _.flatMap(obligations, oib => oib.traitErrors);
+    const ambiguityErrors = _.flatMap(obligations, oib => oib.ambiguityErrors);
+
     globals.ctx.setTraitErrors(host, traitErrors);
+    globals.ctx.setAmbiguityErrors(host, ambiguityErrors);
 
     this.messageWebview<ObligationOutput[]>(requestId, {
       type: "FROM_EXTENSION",

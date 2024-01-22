@@ -1,11 +1,19 @@
 use rustc_data_structures::stable_hasher::{Hash64, HashStable, StableHasher};
-use rustc_hir::{def_id::LocalDefId, LangItem};
-use rustc_hir_analysis::astconv::AstConv;
-use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
+use rustc_hir::{
+  def_id::LocalDefId, intravisit::Visitor, BodyId, Expr, HirId, LangItem,
+};
+use rustc_hir_typeck::inspect_typeck;
+use rustc_infer::{
+  infer::InferCtxt,
+  traits::{ObligationInspector, PredicateObligation},
+};
 use rustc_middle::ty::{
   self, Predicate, Ty, TyCtxt, TypeFoldable, TypeFolder, TypeSuperFoldable,
+  TypeckResults,
 };
 use rustc_query_system::ich::StableHashingContext;
+use rustc_span::Span;
+use rustc_trait_selection::traits::error_reporting::FindExprBySpan;
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 
@@ -28,6 +36,47 @@ pub trait StableHash<'__ctx, 'tcx>:
     infcx: &InferCtxt<'tcx>,
     ctx: &mut StableHashingContext<'__ctx>,
   ) -> Hash64;
+}
+
+pub trait TyExt<'tcx> {
+  fn is_error(&self) -> bool;
+}
+
+pub trait TyCtxtExt<'tcx> {
+  fn inspect_typeck(
+    self,
+    body_id: BodyId,
+    inspector: ObligationInspector<'tcx>,
+  ) -> &TypeckResults;
+
+  fn find_expr_by_span(
+    &self,
+    body_id: BodyId,
+    span: Span,
+  ) -> Option<&Expr<'tcx>>;
+}
+
+pub trait TypeckResultsExt<'tcx> {
+  fn error_nodes(&self) -> impl Iterator<Item = HirId>;
+}
+
+impl<'tcx> TypeckResultsExt<'tcx> for TypeckResults<'tcx> {
+  fn error_nodes(&self) -> impl Iterator<Item = HirId> {
+    self
+      .node_types()
+      .items_in_stable_order()
+      .into_iter()
+      .filter_map(|(id, ty)| {
+        if ty.is_error() {
+          Some(HirId {
+            owner: self.hir_owner,
+            local_id: id,
+          })
+        } else {
+          None
+        }
+      })
+  }
 }
 
 pub trait InferCtxtExt<'tcx> {
@@ -90,6 +139,35 @@ where
     // erase infer vars
     this.hash_stable(ctx, &mut h);
     h.finish()
+  }
+}
+
+impl<'tcx> TyExt<'tcx> for Ty<'tcx> {
+  fn is_error(&self) -> bool {
+    matches!(self.kind(), ty::TyKind::Error(..))
+  }
+}
+
+impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
+  fn inspect_typeck(
+    self,
+    body_id: BodyId,
+    inspector: ObligationInspector<'tcx>,
+  ) -> &TypeckResults {
+    let local_def_id = self.hir().body_owner_def_id(body_id);
+    // Typeck current body, accumulating inspected information in TLS.
+    inspect_typeck(self, local_def_id, inspector)
+  }
+
+  fn find_expr_by_span(
+    &self,
+    body_id: BodyId,
+    span: Span,
+  ) -> Option<&Expr<'tcx>> {
+    let hir = self.hir();
+    let mut expr_finder = FindExprBySpan::new(span);
+    expr_finder.visit_expr(hir.body(body_id).value);
+    expr_finder.result
   }
 }
 

@@ -11,6 +11,7 @@
 //! done first and stored as a `serde_json::Value`. This erasure isn't
 //! ideal but it's how we can currently use the `InferCtxt` used during
 //! trait resolution.
+
 use std::{ops::Deref, str::FromStr};
 
 use anyhow::Result;
@@ -54,7 +55,9 @@ index_vec::define_index_type! {
 #[derive(Serialize)]
 #[cfg_attr(feature = "ts-rs", derive(TS))]
 #[serde(rename_all = "camelCase")]
-pub struct AmbiguityError {}
+pub struct AmbiguityError {
+  pub range: CharRange,
+}
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "ts-rs", derive(TS))]
@@ -62,8 +65,7 @@ pub struct AmbiguityError {}
 pub struct TraitError {
   pub range: CharRange,
   pub candidates: Vec<ObligationHash>,
-  #[cfg_attr(feature = "ts-rs", ts(type = "any"))]
-  /// Actual type, `Predicate<'tcx>`
+  #[cfg_attr(feature = "ts-rs", ts(type = "Predicate"))]
   pub predicate: serde_json::Value,
 }
 
@@ -191,6 +193,7 @@ pub trait ToTarget {
 
 impl Deref for ObligationHash {
   type Target = u64;
+
   fn deref(&self) -> &Self::Target {
     &self.0
   }
@@ -198,6 +201,7 @@ impl Deref for ObligationHash {
 
 impl FromStr for ObligationHash {
   type Err = anyhow::Error;
+
   fn from_str(s: &str) -> Result<Self> {
     Ok(<u64 as FromStr>::from_str(s)?.into())
   }
@@ -225,6 +229,7 @@ impl<U: Into<ObligationHash>, T: ToSpan> ToTarget for (U, T) {
 }
 
 mod string {
+
   use std::{fmt::Display, str::FromStr};
 
   use serde::{de, Deserialize, Deserializer, Serializer};
@@ -253,6 +258,7 @@ mod string {
 // to build up intermediate information that *does not* need to
 // be stored in TLS.
 pub(super) mod intermediate {
+
   use super::*;
 
   pub type EvaluationResult = Result<Certainty, NoSolution>;

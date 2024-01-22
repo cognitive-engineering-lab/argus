@@ -23,3 +23,12 @@ export const traitErrorDecorate = vscode.window.createTextEditorDecorationType({
     borderColor: "#CF6679",
   },
 });
+
+export const ambigErrorDecorate = vscode.window.createTextEditorDecorationType({
+  light: {
+    textDecoration: "underline wavy #FF007F",
+  },
+  dark: {
+    textDecoration: "underline wavy white",
+  },
+});

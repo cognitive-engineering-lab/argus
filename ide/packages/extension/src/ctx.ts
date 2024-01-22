@@ -1,15 +1,29 @@
-import { CharRange, ObligationHash, TraitError } from "@argus/common/bindings";
+import {
+  AmbiguityError,
+  CharRange,
+  ObligationHash,
+  TraitError,
+} from "@argus/common/bindings";
 import { ArgusArgs, ArgusResult, Filename } from "@argus/common/lib";
 import _ from "lodash";
 import * as vscode from "vscode";
 
-import { rangeHighlight, traitErrorDecorate } from "./decorate";
+import {
+  ambigErrorDecorate,
+  rangeHighlight,
+  traitErrorDecorate,
+} from "./decorate";
 import { showErrorDialog } from "./errors";
 import { ArgusCtx } from "./main";
 import { setup } from "./setup";
-import { RustEditor, isRustDocument, isRustEditor, rustRangeToVscodeRange } from "./utils";
+import {
+  RustEditor,
+  isRustDocument,
+  isRustEditor,
+  rustRangeToVscodeRange,
+} from "./utils";
 
-// NOTE: much of this file was inspired (or taken) from the rust-analyzer extension. 
+// NOTE: much of this file was inspired (or taken) from the rust-analyzer extension.
 // See: https://github.com/rust-lang/rust-analyzer/blob/master/editors/code/src/ctx.ts#L1
 
 export type Workspace =
@@ -18,21 +32,21 @@ export type Workspace =
   | { kind: "detached-files"; files: vscode.TextDocument[] };
 
 export function fetchWorkspace(): Workspace {
-    const folders = (vscode.workspace.workspaceFolders || []).filter(
-        (folder) => folder.uri.scheme === "file",
-    );
-    const rustDocuments = vscode.workspace.textDocuments.filter((document) =>
-        isRustDocument(document),
-    );
+  const folders = (vscode.workspace.workspaceFolders || []).filter(
+    folder => folder.uri.scheme === "file"
+  );
+  const rustDocuments = vscode.workspace.textDocuments.filter(document =>
+    isRustDocument(document)
+  );
 
-    return folders.length === 0
-        ? rustDocuments.length === 0
-            ? { kind: "empty" }
-            : {
-                  kind: "detached-files",
-                  files: rustDocuments,
-              }
-        : { kind: "workspace-folder" };
+  return folders.length === 0
+    ? rustDocuments.length === 0
+      ? { kind: "empty" }
+      : {
+          kind: "detached-files",
+          files: rustDocuments,
+        }
+    : { kind: "workspace-folder" };
 }
 
 export interface Disposable {
@@ -42,8 +56,8 @@ export interface Disposable {
 export type Cmd = (...args: any[]) => unknown;
 
 export type CommandFactory = {
-    enabled: (ctx: CtxInit) => Cmd;
-    // disabled?: (ctx: Ctx) => Cmd;
+  enabled: (ctx: CtxInit) => Cmd;
+  // disabled?: (ctx: Ctx) => Cmd;
 };
 
 // We can modify this if the initializations state changes.
@@ -153,6 +167,31 @@ export class Ctx implements ArgusCtx {
 
     editor.setDecorations(
       traitErrorDecorate,
+      _.map(errors, e => {
+        return {
+          range: rustRangeToVscodeRange(e.range),
+          hoverMessage: renderErrorAction(e),
+        };
+      })
+    );
+  }
+
+  setAmbiguityErrors(filename: Filename, errors: AmbiguityError[]) {
+    const editor = this.findOpenEditorByName(filename);
+    if (editor === undefined) {
+      return;
+    }
+
+    const renderErrorAction = (err: AmbiguityError): vscode.MarkdownString => {
+      // TODO: make the hover message useful and structured.
+      const text = "This is **aMbiGuOuS** ¯\\_(ツ)_/¯";
+      const result = new vscode.MarkdownString(text);
+      result.isTrusted = true;
+      return result;
+    };
+
+    editor.setDecorations(
+      ambigErrorDecorate,
       _.map(errors, e => {
         return {
           range: rustRangeToVscodeRange(e.range),
