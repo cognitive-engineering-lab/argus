@@ -4,7 +4,8 @@
     never_type, // proof tree visitor
     min_specialization, // for rustc_index
     let_chains,
-    decl_macro // path serialize
+    decl_macro, // path serialize
+    extract_if
 )]
 
 extern crate rustc_data_structures;

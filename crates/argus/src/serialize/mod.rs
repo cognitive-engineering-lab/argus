@@ -16,17 +16,17 @@ pub mod path;
 pub mod term;
 pub mod ty;
 
-use r#const::*;
-use term::*;
-use ty::*;
+use std::cell::Cell;
 
+use r#const::*;
 use rustc_infer::infer::InferCtxt;
 use rustc_trait_selection::traits::solve::Goal;
 use serde::Serialize;
-use std::cell::Cell;
+use term::*;
+use ty::*;
 
 /// Entry function to serialize anything from rustc.
-pub fn serialize_to_value<'tcx, T: Serialize + 'tcx>(
+pub fn serialize_to_value<'a, 'tcx: 'a, T: Serialize + 'a>(
   infcx: &InferCtxt<'tcx>,
   value: &T,
 ) -> Result<serde_json::Value, serde_json::Error> {
@@ -77,7 +77,6 @@ macro_rules! serialize_custom_seq {
 }
 
 pub(crate) use serialize_custom_seq;
-
 
 // ----------------------------------------
 // Parameters

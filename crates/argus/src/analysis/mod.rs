@@ -1,4 +1,9 @@
-//! ProofTree analysis.
+mod ambiguous;
+mod bounds;
+mod entry;
+mod hir;
+mod tls;
+
 use std::{
   fmt::{self, Debug, Formatter},
   hash::{Hash, Hasher},
@@ -7,28 +12,14 @@ use std::{
 
 use anyhow::{anyhow, Result};
 use fluid_let::fluid_let;
-use rustc_hir::{def_id::LocalDefId, hir_id::HirId, BodyId};
-use rustc_infer::{
-  infer::InferCtxt,
-  traits::{ObligationInspector, PredicateObligation},
-};
+use rustc_hir::{hir_id::HirId, BodyId};
 use rustc_middle::ty::TyCtxt;
-use rustc_trait_selection::traits::solve::Goal;
-use rustc_utils::source_map::range::CharRange;
-
-mod ambiguous;
-mod entry;
-mod tls;
+use rustc_span::Span;
 
 pub(crate) use crate::types::intermediate::{
   EvaluationResult, FulfillmentData,
 };
-use crate::{
-  ext::{InferCtxtExt, TyCtxtExt},
-  proof_tree::serialize::serialize_proof_tree,
-  serialize::serialize_to_value,
-  types::{ObligationsInBody, Target},
-};
+use crate::{ext::TyCtxtExt, types::Target};
 
 fluid_let! {
   pub static OBLIGATION_TARGET: Target;
@@ -70,7 +61,20 @@ pub(crate) struct Provenance<T: Sized> {
   // expression.
   originating_expression: HirId,
 
+  // Index into the full provenance data, this is stored for interesting obligations.
+  full_data: Option<tls::UODIdx>,
+
   it: T,
+}
+
+impl<T: Sized> Provenance<T> {
+  fn map<U: Sized>(&self, f: impl FnOnce(&T) -> U) -> Provenance<U> {
+    Provenance {
+      it: f(&self.it),
+      originating_expression: self.originating_expression,
+      full_data: self.full_data,
+    }
+  }
 }
 
 impl<T: Sized> Deref for Provenance<T> {
@@ -85,8 +89,21 @@ impl<T: Sized> Provenance<T> {
     self.it
   }
 
-  pub(super) fn is_nested<U: Sized>(&self, other: Provenance<U>) -> bool {
-    todo!()
+  pub fn contained_in(&self, tcx: &TyCtxt, span: Span) -> bool {
+    tcx
+      .hir()
+      .opt_span(self.originating_expression)
+      .map(|this| span.contains(this))
+      .unwrap_or(false)
+  }
+
+  pub fn child_of(&self, tcx: &TyCtxt, other: HirId) -> bool {
+    self.originating_expression == other
+      || tcx
+        .hir()
+        .parent_iter(self.originating_expression)
+        .find(|(id, _)| *id == other)
+        .is_some()
   }
 }
 

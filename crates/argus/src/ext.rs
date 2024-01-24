@@ -1,6 +1,8 @@
 use rustc_data_structures::stable_hasher::{Hash64, HashStable, StableHasher};
 use rustc_hir::{
-  def_id::LocalDefId, intravisit::Visitor, BodyId, Expr, HirId, LangItem,
+  def_id::{DefId, LocalDefId},
+  intravisit::Visitor,
+  BodyId, Expr, HirId, LangItem,
 };
 use rustc_hir_typeck::inspect_typeck;
 use rustc_infer::{
@@ -49,34 +51,19 @@ pub trait TyCtxtExt<'tcx> {
     inspector: ObligationInspector<'tcx>,
   ) -> &TypeckResults;
 
-  fn find_expr_by_span(
+  fn is_trait_pred_rhs(
     &self,
-    body_id: BodyId,
-    span: Span,
-  ) -> Option<&Expr<'tcx>>;
+    predicate: &Predicate<'tcx>,
+    hir_id: DefId,
+  ) -> bool;
 }
 
 pub trait TypeckResultsExt<'tcx> {
   fn error_nodes(&self) -> impl Iterator<Item = HirId>;
 }
 
-impl<'tcx> TypeckResultsExt<'tcx> for TypeckResults<'tcx> {
-  fn error_nodes(&self) -> impl Iterator<Item = HirId> {
-    self
-      .node_types()
-      .items_in_stable_order()
-      .into_iter()
-      .filter_map(|(id, ty)| {
-        if ty.is_error() {
-          Some(HirId {
-            owner: self.hir_owner,
-            local_id: id,
-          })
-        } else {
-          None
-        }
-      })
-  }
+pub trait EvaluationResultExt {
+  fn is_certain(&self) -> bool;
 }
 
 pub trait InferCtxtExt<'tcx> {
@@ -122,6 +109,13 @@ impl CharRangeExt for CharRange {
   }
 }
 
+impl EvaluationResultExt for EvaluationResult {
+  fn is_certain(&self) -> bool {
+    use rustc_trait_selection::traits::solve::Certainty;
+    matches!(self, EvaluationResult::Ok(Certainty::Yes))
+  }
+}
+
 impl<'__ctx, 'tcx, T> StableHash<'__ctx, 'tcx> for T
 where
   T: HashStable<StableHashingContext<'__ctx>>,
@@ -159,15 +153,30 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
     inspect_typeck(self, local_def_id, inspector)
   }
 
-  fn find_expr_by_span(
-    &self,
-    body_id: BodyId,
-    span: Span,
-  ) -> Option<&Expr<'tcx>> {
-    let hir = self.hir();
-    let mut expr_finder = FindExprBySpan::new(span);
-    expr_finder.visit_expr(hir.body(body_id).value);
-    expr_finder.result
+  fn is_trait_pred_rhs(&self, p: &Predicate<'tcx>, def_id: DefId) -> bool {
+    matches!(p.kind().skip_binder(),
+    ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
+      trait_predicate.def_id() == def_id
+    })
+  }
+}
+
+impl<'tcx> TypeckResultsExt<'tcx> for TypeckResults<'tcx> {
+  fn error_nodes(&self) -> impl Iterator<Item = HirId> {
+    self
+      .node_types()
+      .items_in_stable_order()
+      .into_iter()
+      .filter_map(|(id, ty)| {
+        if ty.is_error() {
+          Some(HirId {
+            owner: self.hir_owner,
+            local_id: id,
+          })
+        } else {
+          None
+        }
+      })
   }
 }
 
@@ -180,10 +189,14 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
   }
 
   fn is_ty_impl_sized(&self, p: &Predicate<'tcx>) -> bool {
-    matches!(p.kind().skip_binder(),
-    ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
-        trait_predicate.def_id() == self.tcx.require_lang_item(LangItem::Sized, None)
-    })
+    self.tcx.is_trait_pred_rhs(
+      p,
+      self
+        .tcx
+        .lang_items()
+        .sized_trait()
+        .unwrap_or_else(|| self.tcx.require_lang_item(LangItem::Sized, None)),
+    )
   }
 
   // TODO: I'm not 100% that this is the correct metric.

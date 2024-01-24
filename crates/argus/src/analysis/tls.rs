@@ -1,15 +1,21 @@
 //! Thread local storage for storing data processed in rustc.
 use std::cell::RefCell;
 
+use index_vec::IndexVec;
 use rustc_data_structures::fx::{
   FxHashMap as HashMap, FxHashSet as HashSet, FxIndexMap as IMap,
 };
 use rustc_hir::{def_id::LocalDefId, hir_id::HirId, BodyId};
-use rustc_infer::infer::InferCtxt;
+use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::ty::TyCtxt;
 use rustc_span::Span;
 use rustc_utils::source_map::range::CharRange;
+pub use unsafe_tls::{
+  store as unsafe_store_data, take as unsafe_take_data, FullObligationData,
+  UODIdx,
+};
 
+use super::EvaluationResult;
 use crate::{
   analysis::Provenance,
   ext::InferCtxtExt,
@@ -18,35 +24,99 @@ use crate::{
   },
 };
 
+pub type RawTraitErrInfo =
+  IMap<Span, (serde_json::Value, HashSet<Provenance<ObligationHash>>)>;
+
 // NOTE: we use thread local storage to accumulate obligations
 // accross call to the obligation inspector in `typeck_inspect`.
 // DO NOT set this directly, make sure to use the function `push_obligaion`.
 //
 // TODO: documentation
 thread_local! {
-  static OBLIGATIONS: RefCell<HashMap<ObligationHash, Provenance<Obligation>>> = Default::default();
+  static OBLIGATIONS: RefCell<Vec<Provenance<Obligation>>> = Default::default();
 
   static TREE: RefCell<Option<serde_json::Value>> = Default::default();
 
-  // Map< Span -> (Predicate, Vec<Candidate>) >
-  static TRAIT_ERRORS: RefCell<IMap<Span, (serde_json::Value, HashSet<Provenance<ObligationHash>>)>> = Default::default();
+  static TRAIT_ERRORS: RefCell<RawTraitErrInfo> = Default::default();
+}
 
-  static AMBIG_ERRORS: RefCell<IMap<Span, HashSet<Provenance<ObligationHash>>>> = Default::default();
+// This is for complex obligations and their inference contexts.
+// We don't want to store the entire inference context and obligation for
+// every query, so we do it sparingly, things that make the cut:
+// - "necessary" obligations, essentially trait predicates that don't
+//   don't have a solution, and don't involve built-in traits or simple
+//   types (e.g., unit `()`).
+mod unsafe_tls {
+  use super::*;
+  use crate::analysis::EvaluationResult;
+
+  thread_local! {
+    static OBLIGATION_DATA: RefCell<IndexVec<UODIdx, Option<FullObligationData<'static>>>> =
+      Default::default();
+  }
+
+  index_vec::define_index_type! {
+    pub struct UODIdx = usize;
+  }
+
+  pub struct FullObligationData<'tcx> {
+    pub infcx: InferCtxt<'tcx>,
+    pub obligation: PredicateObligation<'tcx>,
+    pub result: EvaluationResult,
+  }
+
+  pub fn store<'tcx>(
+    infer_ctxt: &InferCtxt<'tcx>,
+    obligation: &PredicateObligation<'tcx>,
+    result: EvaluationResult,
+  ) -> UODIdx {
+    OBLIGATION_DATA.with(|data| {
+      let infcx = infer_ctxt.fork();
+      let obl = obligation.clone();
+
+      let infcx: InferCtxt<'static> = unsafe { std::mem::transmute(infcx) };
+      let obligation: PredicateObligation<'static> =
+        unsafe { std::mem::transmute(obl) };
+
+      data.borrow_mut().push(Some(FullObligationData {
+        infcx,
+        obligation,
+        result,
+      }))
+    })
+  }
+
+  pub fn take<'tcx>(idx: UODIdx) -> Option<FullObligationData<'tcx>> {
+    OBLIGATION_DATA.with(|data| {
+      let udata = data.borrow_mut()[idx].take()?;
+      let data: FullObligationData<'tcx> =
+        unsafe { std::mem::transmute(udata) };
+      Some(data)
+    })
+  }
 }
 
 // ------------------------------------------------
 // Obligation processing functions
 
-/// Store an obligation obtained from rustc.
+/// Clone the inference context and obligation for later use.
+///
+/// NOTE: that this is an expensive operation, and should only be done
+/// when necessary, an ultimate goal should be to get rid of it entirely.
 pub fn store_obligation(_ldef_id: LocalDefId, obl: Provenance<Obligation>) {
   OBLIGATIONS.with(|obls| {
-    let hash = obl.hash;
-    let old = obls.borrow_mut().insert(hash, obl);
-    assert!(old.is_none())
+    if obls
+      .borrow()
+      .iter()
+      .find(|o| *o.hash == *obl.hash)
+      .is_none()
+    {
+      obls.borrow_mut().push(obl)
+    }
   })
 }
 
-pub fn take_obligations() -> HashMap<ObligationHash, Provenance<Obligation>> {
+pub fn take_obligations() -> Vec<Provenance<Obligation>> {
   OBLIGATIONS.with(|obls| obls.take())
 }
 
@@ -72,25 +142,8 @@ pub fn maybe_add_trait_error(
   })
 }
 
-pub fn assemble_trait_errors(tcx: &TyCtxt) -> Vec<TraitError> {
-  TRAIT_ERRORS.with(|errs| {
-    let source_map = tcx.sess.source_map();
-    errs
-      .take()
-      .into_iter()
-      .map(|(span, (pv, cans))| {
-        let range = CharRange::from_span(span, source_map)
-          .expect("couldn't get trait error range");
-        let candidates =
-          cans.into_iter().map(|p| p.forget()).collect::<Vec<_>>();
-        TraitError {
-          range,
-          candidates,
-          predicate: pv,
-        }
-      })
-      .collect::<Vec<_>>()
-  })
+pub fn take_trait_error_info() -> RawTraitErrInfo {
+  TRAIT_ERRORS.with(|errs| errs.take())
 }
 
 // ------------------------------------------------

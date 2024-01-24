@@ -22,7 +22,7 @@ use rustc_data_structures::{
 use rustc_infer::traits::PredicateObligation;
 use rustc_middle::{
   traits::{query::NoSolution, solve::Certainty},
-  ty::TyCtxt,
+  ty::{Ty, TyCtxt},
 };
 use rustc_span::{symbol::Symbol, Span};
 use rustc_utils::source_map::range::{CharRange, ToSpan};
@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "ts-rs")]
 use ts_rs::TS;
 
-use crate::serialize::ty::SymbolDef;
+use crate::serialize::ty::{SymbolDef, TyDef};
 
 // -----------------
 
@@ -57,6 +57,30 @@ index_vec::define_index_type! {
 #[serde(rename_all = "camelCase")]
 pub struct AmbiguityError {
   pub range: CharRange,
+  pub lookup: MethodLookup,
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct MethodLookup {
+  #[cfg_attr(feature = "ts-rs", ts(type = "MethodStep[]"))]
+  pub table: serde_json::Value,
+  pub unmarked: Vec<ObligationHash>,
+}
+
+#[derive(Serialize)]
+pub struct MethodStep<'tcx> {
+  pub step: ReceiverAdjStep<'tcx>,
+  pub deref_query: Option<ObligationHash>,
+  pub relate_query: Option<ObligationHash>,
+  pub trait_predicates: Vec<ObligationHash>,
+}
+
+#[derive(Serialize)]
+pub struct ReceiverAdjStep<'tcx> {
+  #[serde(with = "TyDef")]
+  pub ty: Ty<'tcx>,
 }
 
 #[derive(Serialize)]
@@ -99,7 +123,8 @@ pub struct ObligationsInBody {
 // TODO: it may also be interesting to include information such as:
 // - trait visibility, which traits are currently visible.
 // - ...
-#[derive(Serialize)]
+#[derive(Serialize, Default)]
+#[cfg_attr(feature = "ts-rs", derive(TS))]
 pub struct Relations {
   /// Bounds errors : TraitError -> [Obligation]
   ///
