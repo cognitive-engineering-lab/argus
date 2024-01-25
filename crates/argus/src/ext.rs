@@ -266,12 +266,9 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     #[derive(Serialize)]
     struct Wrapper<'tcx>(#[serde(with = "PredicateDef")] Predicate<'tcx>);
 
-    let predicate = if is_necessary {
-      let w = Wrapper(obl.predicate.clone());
-      serialize_to_value(self, &w).expect("could not serialize predicate")
-    } else {
-      serialize_to_value(self, &()).expect("could not serialize predicate")
-    };
+    let w = Wrapper(obl.predicate.clone());
+    let predicate =
+      serialize_to_value(self, &w).expect("could not serialize predicate");
 
     Obligation {
       predicate,
@@ -279,6 +276,7 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
       range,
       kind: fdata.kind(),
       is_necessary,
+      result: fdata.result,
     }
   }
 

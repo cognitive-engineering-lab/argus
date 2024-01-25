@@ -8,18 +8,18 @@ import { TreeContext } from "./Context";
 import "./Directory.css";
 import { Node } from "./Node";
 
-export const DirNode = ({
-  idx,
-  styleEdge,
-  children,
-}: PropsWithChildren<{ idx: number; styleEdge: boolean }>) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const tree = useContext(TreeContext)!;
-  const node = tree.nodes[idx];
+export type ElementPair = [React.ReactElement, React.ReactElement];
 
-  const arrows = [<IcoTriangleDown />, <IcoTriangleRight />];
-  const dots = [<IcoDot />, <IcoDot />];
-  const [openIco, closedIco] = node.type === "result" ? dots : arrows;
+export const CollapsibleElement = ({
+  icos,
+  info,
+  children,
+}: PropsWithChildren<{
+  icos: ElementPair;
+  info: React.ReactElement;
+}>) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [openIco, closedIco] = icos;
 
   const toggleCollapse = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
@@ -30,14 +30,32 @@ export const DirNode = ({
     <>
       <div className="DirNode" onClick={toggleCollapse}>
         {isOpen ? openIco : closedIco}
-        <span className="information">
-          <Node node={node} />
-        </span>
+        <span className="information">{info}</span>
       </div>
       <div id="Collapsible" className={isOpen ? "" : "collapsed"}>
         {children}
       </div>
     </>
+  );
+};
+
+export const DirNode = ({
+  idx,
+  styleEdge,
+  children,
+}: PropsWithChildren<{ idx: number; styleEdge: boolean }>) => {
+  const tree = useContext(TreeContext)!;
+  const node = tree.nodes[idx];
+
+  const arrows: ElementPair = [<IcoTriangleDown />, <IcoTriangleRight />];
+  const dots: ElementPair = [<IcoDot />, <IcoDot />];
+  const icos = node.type === "result" ? dots : arrows;
+  const info = <Node node={node} />;
+
+  return (
+    <CollapsibleElement info={info} icos={icos}>
+      {children}
+    </CollapsibleElement>
   );
 };
 

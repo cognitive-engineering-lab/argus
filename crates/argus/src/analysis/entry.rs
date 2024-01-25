@@ -20,7 +20,7 @@ use crate::{
   analysis::{
     ambiguous, hir,
     tls::{self, FullObligationData, UODIdx},
-    EvaluationResult, Provenance, OBLIGATION_TARGET,
+    EvaluationResult, ForgetProvenance, Provenance, OBLIGATION_TARGET,
   },
   ext::{EvaluationResultExt, InferCtxtExt, TyCtxtExt},
   proof_tree::serialize::serialize_proof_tree,
@@ -218,10 +218,8 @@ pub fn build_obligations_output<'tcx>(
 
   let trait_errors = ctx.assemble_bound_errors(bound_info);
   let ambiguity_errors = ctx.assemble_ambiguous_errors();
-  let obligations = obligations
-    .into_iter()
-    .map(|p| p.forget())
-    .collect::<Vec<_>>();
+  let obligations = obligations.forget();
+  let unclassified = ctx.obligations.forget();
 
   let oib = ObligationsInBody {
     name,
@@ -229,6 +227,7 @@ pub fn build_obligations_output<'tcx>(
     ambiguity_errors,
     trait_errors,
     obligations,
+    unclassified,
   };
 
   serde_json::to_value(&oib).map_err(|e| anyhow!(e))

@@ -7,7 +7,7 @@ import { log } from "./logging";
 
 export interface ArgusCtx {
   backend<T>(_args: ArgusArgs, _no_output?: boolean): Promise<ArgusResult<T>>;
-};
+}
 
 export let globals: {
   ctx: Ctx;
@@ -36,7 +36,7 @@ export function deactivate() {
 
 async function activateBackend(ctx: Ctx): Promise<Ctx> {
   // TODO: anything that needs to get registered on the window should be done here.
-  
+
   // Initialize backend API for the workspace.
   await ctx.setupBackend();
 
@@ -44,11 +44,12 @@ async function activateBackend(ctx: Ctx): Promise<Ctx> {
 }
 
 function createCommands(): Record<string, CommandFactory> {
-  return { 
+  return {
     // Public commands taht appear in the command palette and thus need to be listed in package.json.
-    inspectWorkspace: { enabled: commands.launchArgus, },
+    inspectWorkspace: { enabled: commands.launchArgus },
 
     // Private commands used internally, these should not appear in the command palette.
-    blingObligation: { enabled: commands.blingObligation, }
+    blingObligation: { enabled: commands.blingObligation },
+    openError: { enabled: commands.openError },
   };
 }

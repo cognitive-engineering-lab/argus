@@ -3,4 +3,11 @@ import type { CharRange } from "./CharRange";
 import { ObligationHash } from "./ObligationHash";
 import type { ObligationKind } from "./ObligationKind";
 
-export type Obligation = { range: CharRange, predicate: any, hash: ObligationHash, kind: ObligationKind };
+export type Obligation = {
+  range: CharRange;
+  predicate: any;
+  hash: ObligationHash;
+  kind: ObligationKind;
+  isNecessary: boolean;
+  result: "yes" | "maybe-overflow" | "maybe-ambiguity" | "no";
+};

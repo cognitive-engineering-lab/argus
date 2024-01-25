@@ -1,6 +1,7 @@
 import { AmbiguityError } from "./AmbiguityError";
 import type { CharRange } from "./CharRange";
 import { Obligation } from "./Obligation";
+import { ObligationHash } from "./ObligationHash";
 import { TraitError } from "./TraitError";
 
 export type ObligationsInBody = {
@@ -9,4 +10,5 @@ export type ObligationsInBody = {
   ambiguityErrors: AmbiguityError[];
   range: CharRange;
   obligations: Obligation[];
+  unclassified: ObligationHash[];
 };

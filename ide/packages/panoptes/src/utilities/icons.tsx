@@ -23,3 +23,15 @@ export const IcoChevronDown = () => {
 export const IcoChevronUp = () => {
   return <i className="codicon codicon-chevron-up" />;
 };
+
+export const IcoCheck = () => {
+  return <i className="codicon codicon-check" />;
+};
+
+export const IcoError = () => {
+  return <i className="codicon codicon-error" />;
+};
+
+export const IcoAmbiguous = () => {
+  return <i className="codicon codicon-question" />;
+};

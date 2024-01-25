@@ -2,10 +2,12 @@ import {
   AmbiguityError,
   CharRange,
   ObligationHash,
+  ObligationsInBody,
   TraitError,
 } from "@argus/common/bindings";
 import { ArgusArgs, ArgusResult, Filename } from "@argus/common/lib";
 import _ from "lodash";
+import { render } from "react-dom";
 import * as vscode from "vscode";
 
 import {
@@ -65,10 +67,12 @@ export type CtxInit = Ctx;
 
 export class Ctx implements ArgusCtx {
   // Ranges used for highlighting code in the current Rust Editor.
-  private _highlightRanges: CharRange[] = [];
-  private _commandDisposables: Disposable[];
-  private _commandFactories: Record<string, CommandFactory>;
-  private _workspace: Workspace;
+  private highlightRanges: CharRange[] = [];
+  private commandDisposables: Disposable[];
+  private commandFactories: Record<string, CommandFactory>;
+  private workspace: Workspace;
+  private errorCollection;
+
   private _backend: <T>(
     _args: ArgusArgs,
     _no_output?: boolean
@@ -85,14 +89,15 @@ export class Ctx implements ArgusCtx {
     commandFactories: Record<string, CommandFactory>,
     workspace: Workspace
   ) {
-    this._commandDisposables = [];
-    this._commandFactories = commandFactories;
-    this._workspace = workspace;
+    this.commandDisposables = [];
+    this.commandFactories = commandFactories;
+    this.workspace = workspace;
+    this.errorCollection = vscode.languages.createDiagnosticCollection("argus");
   }
 
   dispose() {
     // TODO: all disposables should be disposed of here.
-    _.forEach(this._commandDisposables, d => d.dispose());
+    _.forEach(this.commandDisposables, d => d.dispose());
   }
 
   backend<T>(args: ArgusArgs, no_output?: boolean): Promise<ArgusResult<T>> {
@@ -117,7 +122,7 @@ export class Ctx implements ArgusCtx {
     // TODO: add some sort of "status loading" indicator.
     // Compile the workspace with the Argus version of rustc.
     await b(["preload"], true);
-    this._backend = b;
+    this.backend = b;
 
     // Register the commands with VSCode after the backend is setup.
     this._updateCommands();
@@ -137,66 +142,101 @@ export class Ctx implements ArgusCtx {
     return _.find(this.visibleEditors, e => e.document.fileName === name);
   }
 
-  setTraitErrors(filename: Filename, errors: TraitError[]) {
+  // TODO: we will want to save the obligations info per file,
+  // so changing editors doesn't require a 'reload' of the info.
+  registerBodyInfo(filename: Filename, info: ObligationsInBody[]) {
     const editor = this.findOpenEditorByName(filename);
     if (editor === undefined) {
       return;
     }
 
-    const renderBlingCommand = (oblHash: ObligationHash) => {
-      const blingCommandUri = vscode.Uri.parse(
-        `command:argus.blingObligation?${encodeURIComponent(
-          JSON.stringify([filename, oblHash])
-        )}`
-      );
-      return `[Jump to](${blingCommandUri})`;
-    };
+    this.setTraitErrors(editor, info);
+    this.setAmbiguityErrors(editor, info);
+  }
 
-    const renderErrorAction = (err: TraitError): vscode.MarkdownString => {
+  // ------------------------------------
+  // Diagnostic helpers
+
+  private buildOpenErrorItemCmd(
+    filename: Filename,
+    bodyidx: number,
+    erroridx: number,
+    type: "trait" | "ambig"
+  ): string {
+    const blingCommandUri = vscode.Uri.parse(
+      `command:argus.openError?${encodeURIComponent(
+        JSON.stringify([filename, type, bodyidx, erroridx])
+      )}`
+    );
+    return `[Debug error in window](${blingCommandUri})`;
+  }
+
+  private setTraitErrors(editor: RustEditor, oib: ObligationsInBody[]) {
+    const renderErrorAction = (
+      err: TraitError,
+      bIdx: number,
+      eIdx: number
+    ): vscode.MarkdownString => {
       // TODO: make the hover message useful and structured.
-      const text = _.join(
-        _.map(err.candidates, candHash => {
-          return "Candidate obligation: " + renderBlingCommand(candHash) + "\n";
-        }),
-        "___"
+      const jumpToDebug = this.buildOpenErrorItemCmd(
+        editor.document.fileName,
+        bIdx,
+        eIdx,
+        "trait"
       );
-      const result = new vscode.MarkdownString(text);
+      const innerText: string[] = _.map(err.candidates, candHash => {
+        return `- Candidate obligation: **TODO** ${candHash}`;
+      });
+      const lines: string[] = [
+        `Trait bound not satisfied : ${jumpToDebug}`,
+        ...innerText,
+      ];
+      const result = new vscode.MarkdownString(lines.join("\n"));
       result.isTrusted = true;
       return result;
     };
 
     editor.setDecorations(
       traitErrorDecorate,
-      _.map(errors, e => {
-        return {
-          range: rustRangeToVscodeRange(e.range),
-          hoverMessage: renderErrorAction(e),
-        };
+      _.flatMap(oib, (ob, bodyIdx) => {
+        return _.map(ob.traitErrors, (e, errIdx) => {
+          return {
+            range: rustRangeToVscodeRange(e.range),
+            hoverMessage: renderErrorAction(e, bodyIdx, errIdx),
+          };
+        });
       })
     );
   }
 
-  setAmbiguityErrors(filename: Filename, errors: AmbiguityError[]) {
-    const editor = this.findOpenEditorByName(filename);
-    if (editor === undefined) {
-      return;
-    }
-
-    const renderErrorAction = (err: AmbiguityError): vscode.MarkdownString => {
+  private setAmbiguityErrors(editor: RustEditor, oib: ObligationsInBody[]) {
+    const renderErrorAction = (
+      err: AmbiguityError,
+      bIdx: number,
+      eIdx: number
+    ): vscode.MarkdownString => {
       // TODO: make the hover message useful and structured.
-      const text = "This is **aMbiGuOuS** ¯\\_(ツ)_/¯";
-      const result = new vscode.MarkdownString(text);
+      const jumpToDebug = this.buildOpenErrorItemCmd(
+        editor.document.fileName,
+        bIdx,
+        eIdx,
+        "ambig"
+      );
+      const lines = ["This method call is ambiguous", "", jumpToDebug];
+      const result = new vscode.MarkdownString(lines.join("\n"));
       result.isTrusted = true;
       return result;
     };
 
     editor.setDecorations(
       ambigErrorDecorate,
-      _.map(errors, e => {
-        return {
-          range: rustRangeToVscodeRange(e.range),
-          hoverMessage: renderErrorAction(e),
-        };
+      _.flatMap(oib, (oi, bIdx) => {
+        return _.map(oi.ambiguityErrors, (e, eIdx) => {
+          return {
+            range: rustRangeToVscodeRange(e.range),
+            hoverMessage: renderErrorAction(e, bIdx, eIdx),
+          };
+        });
       })
     );
   }
@@ -207,7 +247,7 @@ export class Ctx implements ArgusCtx {
       return;
     }
 
-    this._highlightRanges.push(range);
+    this.highlightRanges.push(range);
     await this._refreshHighlights(editor);
   }
 
@@ -217,8 +257,8 @@ export class Ctx implements ArgusCtx {
       return;
     }
 
-    this._highlightRanges = _.filter(
-      this._highlightRanges,
+    this.highlightRanges = _.filter(
+      this.highlightRanges,
       r => !_.isEqual(r, range)
     );
     await this._refreshHighlights(editor);
@@ -227,17 +267,17 @@ export class Ctx implements ArgusCtx {
   private async _refreshHighlights(editor: RustEditor) {
     editor.setDecorations(
       rangeHighlight,
-      _.map(this._highlightRanges, r => rustRangeToVscodeRange(r))
+      _.map(this.highlightRanges, r => rustRangeToVscodeRange(r))
     );
   }
 
   private _updateCommands() {
-    this._commandDisposables.forEach(disposable => disposable.dispose());
-    this._commandDisposables = [];
-    for (const [name, factory] of Object.entries(this._commandFactories)) {
+    this.commandDisposables.forEach(disposable => disposable.dispose());
+    this.commandDisposables = [];
+    for (const [name, factory] of Object.entries(this.commandFactories)) {
       const fullName = `argus.${name}`;
       let callback = factory.enabled(this);
-      this._commandDisposables.push(
+      this.commandDisposables.push(
         vscode.commands.registerCommand(fullName, callback)
       );
     }

@@ -10,23 +10,17 @@ export const rangeHighlight = vscode.window.createTextEditorDecorationType({
 });
 
 export const traitErrorDecorate = vscode.window.createTextEditorDecorationType({
-  borderWidth: "1px",
-  borderStyle: "solid",
-  overviewRulerColor: "blue",
-  overviewRulerLane: vscode.OverviewRulerLane.Right,
   light: {
-    // this color will be used in light color themes
-    borderColor: "#F47174",
+    textDecoration: "underline wavy #FF007F",
   },
   dark: {
-    // this color will be used in dark color themes
-    borderColor: "#CF6679",
+    textDecoration: "underline wavy white",
   },
 });
 
 export const ambigErrorDecorate = vscode.window.createTextEditorDecorationType({
   light: {
-    textDecoration: "underline wavy #FF007F",
+    textDecoration: "underline wavy  #D1A023",
   },
   dark: {
     textDecoration: "underline wavy white",

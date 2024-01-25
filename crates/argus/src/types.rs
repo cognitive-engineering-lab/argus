@@ -70,14 +70,18 @@ pub struct MethodLookup {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MethodStep<'tcx> {
   pub step: ReceiverAdjStep<'tcx>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub deref_query: Option<ObligationHash>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub relate_query: Option<ObligationHash>,
   pub trait_predicates: Vec<ObligationHash>,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ReceiverAdjStep<'tcx> {
   #[serde(with = "TyDef")]
   pub ty: Ty<'tcx>,
@@ -117,6 +121,8 @@ pub struct ObligationsInBody {
 
   #[cfg_attr(feature = "ts-rs", ts(type = "Obligation[]"))]
   pub obligations: Vec<Obligation>,
+
+  pub unclassified: Vec<ObligationHash>,
 }
 
 /// The set of relations between obligation data.
@@ -168,7 +174,7 @@ pub struct Relations {
 
 #[derive(Serialize, Clone, Debug)]
 #[cfg_attr(feature = "ts-rs", derive(TS))]
-#[serde(tag = "type")]
+#[serde(rename_all = "camelCase", tag = "type")]
 pub struct Obligation {
   #[cfg_attr(feature = "ts-rs", ts(type = "any"))]
   /// Actual type: Predicate<'tcx>,
@@ -177,6 +183,8 @@ pub struct Obligation {
   pub range: CharRange,
   pub kind: ObligationKind,
   pub is_necessary: bool,
+  #[serde(with = "intermediate::EvaluationResultDef")]
+  pub result: intermediate::EvaluationResult,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -284,9 +292,28 @@ mod string {
 // be stored in TLS.
 pub(super) mod intermediate {
 
+  use rustc_middle::traits::solve::MaybeCause;
+
   use super::*;
 
   pub type EvaluationResult = Result<Certainty, NoSolution>;
+
+  pub struct EvaluationResultDef;
+  impl EvaluationResultDef {
+    pub fn serialize<S: serde::Serializer>(
+      value: &EvaluationResult,
+      s: S,
+    ) -> Result<S::Ok, S::Error> {
+      let string = match value {
+        Ok(Certainty::Yes) => "yes",
+        Ok(Certainty::Maybe(MaybeCause::Overflow)) => "maybe-overflow",
+        Ok(Certainty::Maybe(MaybeCause::Ambiguity)) => "maybe-ambiguity",
+        Err(..) => "no",
+      };
+
+      string.serialize(s)
+    }
+  }
 
   pub struct FulfillmentData<'a, 'tcx: 'a> {
     pub hash: Hash64,

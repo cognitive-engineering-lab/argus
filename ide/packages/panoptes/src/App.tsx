@@ -3,13 +3,22 @@ import { ExtensionToWebViewMsg, Filename } from "@argus/common/lib";
 import _ from "lodash";
 import React, { RefObject, useEffect, useState } from "react";
 
-
-
-import File, { ObligationHookContext, obligationCardId } from "./File";
+import File, { errorCardId, obligationCardId } from "./File";
 import Workspace from "./Workspace";
 import { WaitingOn } from "./utilities/WaitingOn";
 import { requestFromExtension } from "./utilities/vscode";
 
+function highlightIntoView(id: string) {
+  const elem = document.getElementById(id);
+  const className = "bling";
+  if (elem !== null) {
+    elem.scrollIntoView();
+    elem.classList.add(className);
+    setTimeout(() => elem.classList.remove(className), 1000); // Let the emphasis stay for 1 second.
+  } else {
+    console.error(`Couldn't find element with id ${id} to highlight`);
+  }
+}
 
 const OpenFile = ({ filename }: { filename: Filename }) => {
   const [obligations, setObligations] = useState<
@@ -48,18 +57,6 @@ const App = ({ initialFiles }: { initialFiles: Filename[] }) => {
     })
   );
 
-  const briefHighlight = (file: Filename, hash: ObligationHash) => {
-    const elem = document.getElementById(obligationCardId(file, hash));
-    const className = "bling";
-    if (elem !== null) {
-      elem.scrollIntoView();
-      elem.classList.add(className);
-      setTimeout(() => elem.classList.remove(className), 1000); // Let the emphasis stay for 1 second.
-    } else {
-      console.error("Couldn't find element to highlight at", file, hash);
-    }
-  };
-
   // NOTE: this listener should only listen for posted messages, not
   // for things that could be an expected response from a webview request.
   const listener = (e: MessageEvent) => {
@@ -74,22 +71,32 @@ const App = ({ initialFiles }: { initialFiles: Filename[] }) => {
       return;
     }
 
-    // TODO: none of these messages are actually getting sent yet.
     switch (payload.command) {
+      case "open-error": {
+        highlightIntoView(
+          errorCardId(
+            payload.file,
+            payload.bodyIdx,
+            payload.errIdx,
+            payload.errType
+          )
+        );
+        return;
+      }
       case "bling": {
-        briefHighlight(payload.file, payload.oblHash);
+        highlightIntoView(obligationCardId(payload.file, payload.oblHash));
         return;
       }
 
       case "open-file": {
-        setOpenFiles((currFiles) => [
+        setOpenFiles(currFiles => [
           [payload.file, <OpenFile filename={payload.file} />],
           ...currFiles,
         ]);
         return;
       }
       case "close-file": {
-        setOpenFiles((currFiles) =>
+        setOpenFiles(currFiles =>
           _.filter(currFiles, ([filename, _]) => filename !== payload.file)
         );
         return;

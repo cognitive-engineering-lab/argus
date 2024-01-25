@@ -134,13 +134,14 @@ export class ViewLoader {
     }
     const obligations = res.value;
 
+    globals.ctx.registerBodyInfo(host, obligations);
+
     // For each of the returned bodies, we need to register the trait errors
     // in the editor context. TODO: register ambiguity errors when we have them.
-    const traitErrors = _.flatMap(obligations, oib => oib.traitErrors);
-    const ambiguityErrors = _.flatMap(obligations, oib => oib.ambiguityErrors);
-
-    globals.ctx.setTraitErrors(host, traitErrors);
-    globals.ctx.setAmbiguityErrors(host, ambiguityErrors);
+    // const traitErrors = _.flatMap(obligations, oib => oib.traitErrors);
+    // const ambiguityErrors = _.flatMap(obligations, oib => oib.ambiguityErrors);
+    // globals.ctx.setTraitErrors(host, traitErrors);
+    // globals.ctx.setAmbiguityErrors(host, ambiguityErrors);
 
     this.messageWebview<ObligationOutput[]>(requestId, {
       type: "FROM_EXTENSION",
@@ -195,6 +196,26 @@ export class ViewLoader {
       command: "bling",
       file,
       oblHash: obligation,
+    });
+  }
+
+  public static async openError(
+    file: Filename,
+    type: "ambig" | "trait",
+    bodyIdx: number,
+    errIdx: number
+  ) {
+    this.currentPanel?.messageWebview<{
+      errType: "ambig" | "trait";
+      bodyIdx: number;
+      errIdx: number;
+    }>("open-error", {
+      type: "FROM_EXTENSION",
+      command: "open-error",
+      file,
+      errType: type,
+      bodyIdx,
+      errIdx,
     });
   }
 

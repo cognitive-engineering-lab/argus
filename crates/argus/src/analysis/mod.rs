@@ -126,3 +126,15 @@ impl<T: Hash> Hash for Provenance<T> {
     self.it.hash(state)
   }
 }
+
+pub trait ForgetProvenance {
+  type Target;
+  fn forget(self) -> Self::Target;
+}
+
+impl<T: Sized> ForgetProvenance for Vec<Provenance<T>> {
+  type Target = Vec<T>;
+  fn forget(self) -> Self::Target {
+    self.into_iter().map(|f| f.forget()).collect()
+  }
+}

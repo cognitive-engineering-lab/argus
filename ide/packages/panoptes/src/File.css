@@ -1,13 +1,40 @@
+div {
+    transition: background-color 1s ease-out;
+}
+
 .ObligationCard {
     display: block;
     width: 100%;
     padding: 1em;
     margin-bottom: 1em;
-    transition: background-color 1s ease-out;
 }
 
-.ObligationCard.bling {
-    background-color: yellow;
+.ObligationCard.yes > .result.yes {
+    color: green;
+}
+
+.ObligationCard.yes > .result.no {
+    color: #FF6961;
+}
+
+.ObligationCard.yes > .result.maybe-overflow {
+    color: yellow;
+}
+
+.ObligationCard.yes > .result.maybe-ambiguous {
+    color: yellow;
+}
+
+.NoInfoError {
+    background: #FF6961;
+    color: white;
+    font-weight: bold;
+    overflow-y: scroll;
+    padding: 1em;
+}
+
+div.bling {
+    background-color: olive;
     transition: background-color 0s;
 }
 

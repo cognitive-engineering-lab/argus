@@ -4,17 +4,14 @@ import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
 import { fnInputsAndOutput, intersperse, tyIsUnit } from "./utilities";
 
-
 export const PrintBinder = ({ binder, innerF }) => {
   return innerF(binder.value);
 };
-
 
 export const PrintTy = ({ o }) => {
   console.log("Printing Ty", o);
   return <PrintTyKind o={o} />;
 };
-
 
 export const PrintFnSig = ({ inputs, output, cVariadic }) => {
   const doTy = (ty, i) => {
@@ -36,7 +33,6 @@ export const PrintFnSig = ({ inputs, output, cVariadic }) => {
     </span>
   );
 };
-
 
 // TODO: enums that don't have an inner object need to use a
 // comparison, instead of the `in` operator.
@@ -136,10 +132,9 @@ export const PrintTyKind = ({ o }) => {
     return <PrintParamTy o={o.Param} />;
   } else if ("Bound" in o) {
     return <PrintBoundTy o={o.Bound} />;
-
-  // TODO:  unimplemented types
   } else if ("Alias" in o) {
-    throw new Error("NYI");
+    return <PrintAliasTyKind o={o.Alias} />;
+    // TODO:  unimplemented types
   } else if ("Dynamic" in o) {
     throw new Error("NYI");
   } else if ("Coroutine" in o) {
@@ -151,6 +146,33 @@ export const PrintTyKind = ({ o }) => {
   }
 };
 
+export const PrintAliasTyKind = ({ o }) => {
+  switch (o.type) {
+    case "opaqueImplType": {
+      return <PrintOpaqueImplType o={o.data} />;
+    }
+    case "aliasTy": {
+      return <PrintAliasTy o={o.data} />;
+    }
+    case "defPath": {
+      return <PrintDefPath o={o.data} />;
+    }
+    default: {
+      throw new Error("Unknown alias ty kind", o);
+    }
+  }
+};
+
+export const PrintAliasTy = ({ o }) => {
+  // TODO: this isn't quite accurate, the serialization code needs to get
+  // updated, see AliasTyDef::serialize for up-to-date info.
+  // The case for 'inherent projections' is missing.
+  return <PrintDefPath o={o} />;
+};
+
+export const PrintOqaqueImplType = ({ o }) => {
+  throw new Error("NYI");
+};
 
 export const PrintFnDef = ({ o }) => {
   // NOTE: `FnDef`s have both a path and a signature.
@@ -158,21 +180,17 @@ export const PrintFnDef = ({ o }) => {
   return <PrintDefPath o={o.path} />;
 };
 
-
 export const PrintParamTy = ({ o }) => {
   return <PrintSymbol o={o.name} />;
 };
-
 
 export const PrintSymbol = ({ o }) => {
   return o;
 };
 
-
 export const PrintBoundTy = ({ o }) => {
   throw new Error("TODO");
 };
-
 
 export const PrintPlaceholderTy = ({ o }) => {
   switch (o.bound.kind) {
@@ -188,7 +206,6 @@ export const PrintPlaceholderTy = ({ o }) => {
   }
 };
 
-
 // TODO: infer types are not yet "done"
 export const PrintInferTy = ({ o }) => {
   if (o === "Unresolved") {
@@ -198,7 +215,6 @@ export const PrintInferTy = ({ o }) => {
   }
 };
 
-
 export const PrintTyVar = ({ o }) => {
   if (typeof o === "string" || o instanceof String) {
     return o;
@@ -206,7 +222,6 @@ export const PrintTyVar = ({ o }) => {
     return <PrintTy o={o} />;
   }
 };
-
 
 export const PrintTypeAndMut = ({ o }) => {
   return (
@@ -216,7 +231,6 @@ export const PrintTypeAndMut = ({ o }) => {
     </span>
   );
 };
-
 
 export const PrintGenericArg = ({ o }) => {
   console.log("GenericArg", o);
@@ -232,7 +246,6 @@ export const PrintGenericArg = ({ o }) => {
   }
 };
 
-
 // --------------------------
 // Numeric types
 
@@ -240,11 +253,9 @@ export const PrintFloatTy = ({ o }) => {
   return o.toLowerCase();
 };
 
-
 export const PrintUintTy = ({ o }) => {
   return o.toLowerCase();
 };
-
 
 export const PrintIntTy = ({ o }) => {
   return o.toLowerCase();
