@@ -3,20 +3,33 @@ import classNames from "classnames";
 import _ from "lodash";
 import React, { PropsWithChildren, useContext, useState } from "react";
 
-import { IcoDot, IcoTriangleDown, IcoTriangleRight } from "../utilities/icons";
+import {
+  IcoChevronDown,
+  IcoChevronRight,
+  IcoDot,
+  IcoTriangleDown,
+  IcoTriangleRight,
+} from "../utilities/icons";
 import { TreeContext } from "./Context";
 import "./Directory.css";
 import { Node } from "./Node";
 
 export type ElementPair = [React.ReactElement, React.ReactElement];
 
+const defaultCollapseArrows: ElementPair = [
+  <IcoChevronDown />,
+  <IcoChevronRight />,
+];
+
 export const CollapsibleElement = ({
-  icos,
   info,
+  icos = defaultCollapseArrows,
+  indentChildren = false,
   children,
 }: PropsWithChildren<{
-  icos: ElementPair;
   info: React.ReactElement;
+  icos?: ElementPair;
+  indentChildren?: boolean;
 }>) => {
   const [isOpen, setIsOpen] = useState(false);
   const [openIco, closedIco] = icos;
@@ -26,13 +39,18 @@ export const CollapsibleElement = ({
     setIsOpen(!isOpen);
   };
 
+  const collapseCN = classNames({
+    indent: indentChildren,
+    collapsed: !isOpen,
+  });
+
   return (
     <>
       <div className="DirNode" onClick={toggleCollapse}>
         {isOpen ? openIco : closedIco}
         <span className="information">{info}</span>
       </div>
-      <div id="Collapsible" className={isOpen ? "" : "collapsed"}>
+      <div id="Collapsible" className={collapseCN}>
         {children}
       </div>
     </>
@@ -53,7 +71,7 @@ export const DirNode = ({
   const info = <Node node={node} />;
 
   return (
-    <CollapsibleElement info={info} icos={icos}>
+    <CollapsibleElement info={info} icos={icos} indentChildren={true}>
       {children}
     </CollapsibleElement>
   );

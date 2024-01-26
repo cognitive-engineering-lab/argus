@@ -12,8 +12,11 @@
 }
 
 #Collapsible {
-    padding-left: 1em;
     height: auto;
+}
+
+#Collapsible.indent {
+    padding-left: 1em;
 }
 
 #Collapsible.collapsed {

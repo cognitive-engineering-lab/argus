@@ -30,10 +30,9 @@ import {
   IcoAmbiguous,
   IcoCheck,
   IcoChevronDown,
+  IcoChevronRight,
   IcoChevronUp,
   IcoError,
-  IcoTriangleDown,
-  IcoTriangleRight,
 } from "./utilities/icons";
 import { postToExtension, requestFromExtension } from "./utilities/vscode";
 
@@ -232,7 +231,6 @@ const TraitErrorComponent = ({
 };
 
 const MethodLookupTable = ({ error }: { error: AmbiguityError }) => {
-  const arrows: ElementPair = [<IcoTriangleDown />, <IcoTriangleRight />];
   const table = _.map(error.lookup.table, (step, idx) => {
     const tyComp = (
       <span>
@@ -240,7 +238,7 @@ const MethodLookupTable = ({ error }: { error: AmbiguityError }) => {
       </span>
     );
     return (
-      <CollapsibleElement info={tyComp} icos={arrows} key={idx}>
+      <CollapsibleElement info={tyComp} key={idx}>
         {step.derefQuery === undefined ? (
           ""
         ) : (
@@ -275,7 +273,7 @@ const MethodLookupTable = ({ error }: { error: AmbiguityError }) => {
 
   const unmarked =
     error.lookup.unmarked.length > 0 ? (
-      <CollapsibleElement info={<b>Uncategorized obligations</b>} icos={arrows}>
+      <CollapsibleElement info={<b>Uncategorized obligations</b>}>
         {_.map(error.lookup.unmarked, (oblHash, idx) => {
           return <ObligationFromHash hash={oblHash} key={idx} />;
         })}
@@ -319,7 +317,6 @@ const ObligationBody = ({
 }) => {
   const bodyName = osib.name;
   const bodyInfo = new BodyInfo(osib, idx);
-  const arrows: ElementPair = [<IcoTriangleDown />, <IcoTriangleRight />];
   const errCount = bodyInfo.numErrors;
   const numUnclassified = bodyInfo.numUnclassified;
   const header = (
@@ -331,7 +328,7 @@ const ObligationBody = ({
 
   return (
     <BodyInfoContext.Provider value={bodyInfo}>
-      <CollapsibleElement info={header} icos={arrows}>
+      <CollapsibleElement info={header}>
         {_.map(osib.traitErrors, (error, idx) => {
           return <TraitErrorComponent error={error} errIdx={idx} />;
         })}
@@ -341,10 +338,7 @@ const ObligationBody = ({
         {numUnclassified == 0 ? (
           ""
         ) : (
-          <CollapsibleElement
-            info={<b>Uncategorized obligations</b>}
-            icos={arrows}
-          >
+          <CollapsibleElement info={<b>Uncategorized obligations</b>}>
             {_.map(osib.unclassified, (oblHash, idx) => {
               return <ObligationFromHash hash={oblHash} key={idx} />;
             })}

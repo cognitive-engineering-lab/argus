@@ -24,6 +24,14 @@ export const IcoChevronUp = () => {
   return <i className="codicon codicon-chevron-up" />;
 };
 
+export const IcoChevronLeft = () => {
+  return <i className="codicon codicon-chevron-left" />;
+};
+
+export const IcoChevronRight = () => {
+  return <i className="codicon codicon-chevron-right" />;
+};
+
 export const IcoCheck = () => {
   return <i className="codicon codicon-check" />;
 };
