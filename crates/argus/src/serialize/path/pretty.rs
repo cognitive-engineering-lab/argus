@@ -7,7 +7,7 @@
 //! 2. Instead of writing to a buffer, we keep a structured
 //!    version of path segments in the `segments` field.
 //!    This is then serialized and "pretty printed" in the ide.
-use std::cell::Cell;
+
 
 use default::PathBuilderDefault;
 use log::debug;
@@ -18,9 +18,9 @@ use rustc_hir::{
     DefKey, DefPathData, DefPathDataName, DisambiguatedDefPathData,
   },
 };
-use rustc_middle::ty::{self, print as rustc_print, *};
+use rustc_middle::ty::{self, *};
 use rustc_session::cstore::{ExternCrate, ExternCrateSource};
-use rustc_span::symbol::{kw, Ident, Symbol};
+use rustc_span::symbol::{kw, Ident};
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 
@@ -547,7 +547,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
   /// Prints comma-separated elements.
   fn comma_sep<T>(
     &mut self,
-    mut elems: impl Iterator<Item = T>,
+    elems: impl Iterator<Item = T>,
     kind: CommaSeparatedKind,
   ) where
     T: Serialize,

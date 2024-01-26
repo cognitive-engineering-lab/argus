@@ -1,9 +1,9 @@
 use std::num::*;
 
 use rustc_hir::{def::DefKind, def_id::DefId, Unsafety};
-use rustc_infer::infer::type_variable::TypeVariableOriginKind;
+
 use rustc_middle::ty::{self, *};
-use rustc_span::symbol::{kw, Symbol};
+use rustc_span::symbol::{Symbol};
 use rustc_target::spec::abi::Abi;
 use rustc_type_ir as ir;
 use serde::{ser::SerializeSeq, Serialize};
@@ -284,7 +284,7 @@ pub struct DynamicTyKindDef<'tcx> {
 }
 
 impl<'tcx> Serialize for DynamicTyKindDef<'tcx> {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+  fn serialize<S>(&self, _s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -302,7 +302,7 @@ pub struct CoroutineTyKindDef<'tcx> {
 }
 
 impl<'tcx> Serialize for CoroutineTyKindDef<'tcx> {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+  fn serialize<S>(&self, _s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -320,7 +320,7 @@ pub struct CoroutineWitnessTyKindDef<'tcx> {
 }
 
 impl<'tcx> Serialize for CoroutineWitnessTyKindDef<'tcx> {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+  fn serialize<S>(&self, _s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -501,8 +501,8 @@ pub enum AbiDef {
 pub struct ExistentialProjectionDef;
 impl ExistentialProjectionDef {
   fn serialize<'tcx, S>(
-    value: &ExistentialProjection<'tcx>,
-    s: S,
+    _value: &ExistentialProjection<'tcx>,
+    _s: S,
   ) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
@@ -661,7 +661,7 @@ pub struct AdtDefDef;
 impl AdtDefDef {
   pub fn serialize<'tcx, S>(
     _value: &AdtDef<'tcx>,
-    s: S,
+    _s: S,
   ) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
@@ -783,7 +783,7 @@ pub enum GenericArgKindDef<'tcx> {
 // TODO: gavinleroy
 pub struct InferTyDef;
 impl InferTyDef {
-  pub fn serialize<'tcx, S>(value: &InferTy, s: S) -> Result<S::Ok, S::Error>
+  pub fn serialize<'tcx, S>(_value: &InferTy, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -795,7 +795,7 @@ impl InferTyDef {
 pub struct TyVidDef;
 impl TyVidDef {
   pub fn serialize<'a, 'tcx: 'a, S>(
-    value: &TyVid,
+    _value: &TyVid,
     s: S,
   ) -> Result<S::Ok, S::Error>
   where

@@ -1,22 +1,21 @@
 //! Default implementaitons from rustc_middle::ty::print
-use std::cell::Cell;
+
 
 use log::debug;
 use rustc_data_structures::sso::SsoHashSet;
 use rustc_hir::{
-  def::DefKind,
-  def_id::{CrateNum, DefId, ModDefId, LOCAL_CRATE},
+  def_id::{DefId},
   definitions::{
-    DefKey, DefPathData, DefPathDataName, DisambiguatedDefPathData,
+    DefPathData,
   },
 };
-use rustc_middle::ty::{self, print as rustc_print, *};
-use rustc_session::cstore::{ExternCrate, ExternCrateSource};
-use rustc_span::symbol::{kw, Ident, Symbol};
-use rustc_utils::source_map::range::CharRange;
-use serde::Serialize;
+use rustc_middle::ty::{self, *};
 
-use super::{super::*, *};
+
+
+
+
+use super::{*};
 
 pub trait PathBuilderDefault<'tcx> {
   fn default_print_def_path(

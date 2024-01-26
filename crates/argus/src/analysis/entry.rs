@@ -1,33 +1,32 @@
 //! Code that relates two pieces of data, or computes the
 //! rleationships between large structures.
-use std::sync::Arc;
+
 
 use anyhow::{anyhow, Result};
 use fluid_let::fluid_let;
-use index_vec::IndexVec;
+
 use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_hir::{
-  def_id::LocalDefId, hir_id::HirId, intravisit::Visitor as HirVisitor, BodyId,
+  BodyId,
 };
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::ty::{Predicate, TyCtxt, TypeckResults};
-use rustc_span::Span;
+
 use rustc_trait_selection::traits::solve::Goal;
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 
 use crate::{
   analysis::{
-    ambiguous, hir,
+    hir,
     tls::{self, FullObligationData, UODIdx},
     EvaluationResult, ForgetProvenance, Provenance, OBLIGATION_TARGET,
   },
-  ext::{EvaluationResultExt, InferCtxtExt, TyCtxtExt},
+  ext::{InferCtxtExt},
   proof_tree::serialize::serialize_proof_tree,
   serialize::{serialize_to_value, ty::PredicateDef},
   types::{
-    AmbiguityError, Obligation, ObligationHash, ObligationsInBody, Target,
-    TraitError,
+    ObligationHash, ObligationsInBody,
   },
 };
 
@@ -236,8 +235,8 @@ pub fn build_obligations_output<'tcx>(
 // --------------------------------
 
 pub fn build_tree_output<'tcx>(
-  tcx: TyCtxt<'tcx>,
-  body_id: BodyId,
+  _tcx: TyCtxt<'tcx>,
+  _body_id: BodyId,
 ) -> Option<serde_json::Value> {
   tls::take_tree()
 }

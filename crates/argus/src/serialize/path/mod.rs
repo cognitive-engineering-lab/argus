@@ -1,16 +1,15 @@
-use std::cell::Cell;
 
-use log::debug;
+
+
 use rustc_hir::{
-  def::DefKind,
-  def_id::{CrateNum, DefId, ModDefId, LOCAL_CRATE},
+  def_id::{DefId},
   definitions::{
-    DefKey, DefPathData, DefPathDataName, DisambiguatedDefPathData,
+    DefPathDataName, DisambiguatedDefPathData,
   },
 };
-use rustc_middle::ty::{self, print as rustc_print, *};
-use rustc_session::cstore::{ExternCrate, ExternCrateSource};
-use rustc_span::symbol::{kw, Ident, Symbol};
+use rustc_middle::ty::{*};
+
+use rustc_span::symbol::{Symbol};
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 
@@ -88,7 +87,7 @@ impl<'tcx> OpaqueImplType<'tcx> {
 }
 
 impl<'tcx> Serialize for OpaqueImplType<'tcx> {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+  fn serialize<S>(&self, _s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -234,7 +233,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
   pub fn fmt_maybe_verbose(
     &mut self,
     data: &DisambiguatedDefPathData,
-    verbose: bool,
+    _verbose: bool,
   ) {
     match data.data.name() {
       DefPathDataName::Named(name) => {

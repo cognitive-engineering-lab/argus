@@ -3,24 +3,23 @@ use std::cell::RefCell;
 
 use index_vec::IndexVec;
 use rustc_data_structures::fx::{
-  FxHashMap as HashMap, FxHashSet as HashSet, FxIndexMap as IMap,
+  FxHashSet as HashSet, FxIndexMap as IMap,
 };
-use rustc_hir::{def_id::LocalDefId, hir_id::HirId, BodyId};
+use rustc_hir::{def_id::LocalDefId};
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
-use rustc_middle::ty::TyCtxt;
+
 use rustc_span::Span;
-use rustc_utils::source_map::range::CharRange;
+
 pub use unsafe_tls::{
   store as unsafe_store_data, take as unsafe_take_data, FullObligationData,
   UODIdx,
 };
 
-use super::EvaluationResult;
+
 use crate::{
   analysis::Provenance,
-  ext::InferCtxtExt,
   types::{
-    AmbiguityError, Obligation, ObligationHash, ObligationsInBody, TraitError,
+    Obligation, ObligationHash,
   },
 };
 
@@ -149,7 +148,7 @@ pub fn take_trait_error_info() -> RawTraitErrInfo {
 // ------------------------------------------------
 // Tree processing functions
 
-pub fn store_tree(json: serde_json::Value) {
+pub fn store_tree(_json: serde_json::Value) {
   todo!()
   // TREE.with(|tree| {
   //   let prev = tree.replace(Some(json));

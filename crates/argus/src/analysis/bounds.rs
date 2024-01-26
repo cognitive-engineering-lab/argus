@@ -25,7 +25,7 @@ impl<'a, 'tcx: 'a> ErrorAssemblyCtx<'a, 'tcx> {
     &mut self,
     mut errs: RawTraitErrInfo,
   ) -> Vec<TraitError> {
-    let hir = self.tcx.hir();
+    let _hir = self.tcx.hir();
     let source_map = self.tcx.sess.source_map();
     let sz = |s: Span| s.hi() - s.lo();
 

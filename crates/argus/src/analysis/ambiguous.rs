@@ -3,11 +3,11 @@
 //! This file "simulates" what `rustc_hir_typeck` does for type-checking
 //! method call expressions. Only, that we want to keep around *a lot*
 //! more information.
-use rustc_hir::{self as hir, HirId, LangItem};
+use rustc_hir::{self as hir, LangItem};
 use rustc_middle::{
   traits::query::CandidateStep,
   ty::{
-    ClauseKind, Predicate, PredicateKind, TraitPredicate, Ty, TyCtxt,
+    Predicate, PredicateKind, TraitPredicate, Ty, TyCtxt,
     TypeckResults,
   },
 };

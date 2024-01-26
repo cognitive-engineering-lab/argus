@@ -1,8 +1,7 @@
 use rustc_data_structures::stable_hasher::{Hash64, HashStable, StableHasher};
 use rustc_hir::{
   def_id::{DefId, LocalDefId},
-  intravisit::Visitor,
-  BodyId, Expr, HirId, LangItem,
+  BodyId, HirId, LangItem,
 };
 use rustc_hir_typeck::inspect_typeck;
 use rustc_infer::{
@@ -14,8 +13,8 @@ use rustc_middle::ty::{
   TypeckResults,
 };
 use rustc_query_system::ich::StableHashingContext;
-use rustc_span::Span;
-use rustc_trait_selection::traits::error_reporting::FindExprBySpan;
+
+
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 
