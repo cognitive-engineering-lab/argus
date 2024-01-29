@@ -1,17 +1,12 @@
 //! Code that relates two pieces of data, or computes the
 //! rleationships between large structures.
 
-
 use anyhow::{anyhow, Result};
 use fluid_let::fluid_let;
-
 use rustc_data_structures::fx::FxHashMap as HashMap;
-use rustc_hir::{
-  BodyId,
-};
+use rustc_hir::BodyId;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::ty::{Predicate, TyCtxt, TypeckResults};
-
 use rustc_trait_selection::traits::solve::Goal;
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
@@ -22,12 +17,10 @@ use crate::{
     tls::{self, FullObligationData, UODIdx},
     EvaluationResult, ForgetProvenance, Provenance, OBLIGATION_TARGET,
   },
-  ext::{InferCtxtExt},
+  ext::InferCtxtExt,
   proof_tree::serialize::serialize_proof_tree,
   serialize::{serialize_to_value, ty::PredicateDef},
-  types::{
-    ObligationHash, ObligationsInBody,
-  },
+  types::{ObligationHash, ObligationsInBody},
 };
 
 fluid_let! {
@@ -67,11 +60,6 @@ pub fn process_obligation<'tcx>(
   let hir = infcx.tcx.hir();
   let fdata = infcx.bless_fulfilled(ldef_id, obl, result);
 
-  // find enclosing HIR Expression
-
-  // If the obligation is a TraitRef, ie.e., `TY: TRAIT`,
-  // - get the self type
-  log::debug!("Searching for predicate {:?}", fdata.obligation.predicate);
   let body_id = hir.body_owned_by(ldef_id);
   let hir_id = hir::find_most_enclosing_node(
     &infcx.tcx,
@@ -183,6 +171,8 @@ pub fn build_obligations_output<'tcx>(
   body_id: BodyId,
   typeck_results: &'tcx TypeckResults<'tcx>,
 ) -> Result<serde_json::Value> {
+  use crate::ext::PredicateObligationExt;
+
   let hir = tcx.hir();
   let source_map = tcx.sess.source_map();
   let name = hir.opt_name(hir.body_owner(body_id));
@@ -190,12 +180,21 @@ pub fn build_obligations_output<'tcx>(
   let body_range = CharRange::from_span(body.value.span, source_map)
     .expect("Couldn't get body range");
 
-  let obligations = tls::take_obligations();
+  let mut obligations = tls::take_obligations();
   let obligation_data = obligations
-    .iter()
+    .iter_mut()
     .filter_map(|o| {
       let idx = o.full_data?;
-      let v = tls::unsafe_take_data(idx)?;
+      let mut v = tls::unsafe_take_data(idx)?;
+
+      // HACK: we sanitize the obligation, this includes spans etc.
+      // This is the same "adjustment" process that rustc does, although
+      // I'd like to get rid of this, TODO.
+      v.obligation =
+        v.infcx
+          .sanitize_obligation(typeck_results, &v.obligation, v.result);
+      o.it.range = v.obligation.range(&tcx);
+
       Some((idx, v))
     })
     .collect::<HashMap<_, _>>();

@@ -2,25 +2,18 @@
 use std::cell::RefCell;
 
 use index_vec::IndexVec;
-use rustc_data_structures::fx::{
-  FxHashSet as HashSet, FxIndexMap as IMap,
-};
-use rustc_hir::{def_id::LocalDefId};
+use rustc_data_structures::fx::{FxHashSet as HashSet, FxIndexMap as IMap};
+use rustc_hir::def_id::LocalDefId;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
-
 use rustc_span::Span;
-
 pub use unsafe_tls::{
   store as unsafe_store_data, take as unsafe_take_data, FullObligationData,
   UODIdx,
 };
 
-
 use crate::{
   analysis::Provenance,
-  types::{
-    Obligation, ObligationHash,
-  },
+  types::{Obligation, ObligationHash},
 };
 
 pub type RawTraitErrInfo =
@@ -148,15 +141,13 @@ pub fn take_trait_error_info() -> RawTraitErrInfo {
 // ------------------------------------------------
 // Tree processing functions
 
-pub fn store_tree(_json: serde_json::Value) {
-  todo!()
-  // TREE.with(|tree| {
-  //   let prev = tree.replace(Some(json));
-  //   debug_assert!(prev.is_none(), "replaced proof tree");
-  // })
+pub fn store_tree(json: serde_json::Value) {
+  TREE.with(|tree| {
+    let prev = tree.replace(Some(json));
+    debug_assert!(prev.is_none(), "replaced proof tree");
+  })
 }
 
 pub fn take_tree() -> Option<serde_json::Value> {
-  todo!()
-  // TREE.with(|tree| tree.take())
+  TREE.with(|tree| tree.take())
 }

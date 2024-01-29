@@ -1,27 +1,20 @@
-import { Candidate as CandidateTy, Node as NodeTy } from "@argus/common/bindings";
+import {
+  Candidate as CandidateTy,
+  Node as NodeTy,
+} from "@argus/common/bindings";
 import React from "react";
 
-import { PrintDefPath } from "../Ty/private/path";
-import { PrintGoalPredicate } from "../Ty/private/predicate";
-import { PrintTy } from "../Ty/private/ty";
+import { PrintImpl } from "../print/private/hir";
+import { PrintDefPath } from "../print/private/path";
+import { PrintGoalPredicate } from "../print/private/predicate";
+import { PrintTy } from "../print/private/ty";
 
 export const Candidate = ({ candidate }: { candidate: CandidateTy }) => {
   switch (candidate.type) {
     case "any":
       return <span>{candidate.data}</span>;
     case "impl":
-      const implTrait =
-        candidate.traitRef !== undefined ? (
-          <PrintDefPath o={candidate.traitRef} />
-        ) : (
-          "{anon}"
-        );
-      const candidateTy = <PrintTy o={candidate.ty} />;
-      return (
-        <span>
-          impl {implTrait} for {candidateTy}
-        </span>
-      );
+      return <PrintImpl impl={candidate.data} />;
     default:
       throw new Error(`Unexpected candidate type ${candidate}`);
   }

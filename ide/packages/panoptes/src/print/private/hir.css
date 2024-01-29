@@ -1,0 +1,16 @@
+.WhereConstraintArea {
+    display: flex;
+    flex-direction: column;
+    padding: 0.25em;
+}
+
+span.where {
+    padding: 0.15em;
+    border: 1px solid gray;
+    border-radius: 5px;
+}
+
+span.where:hover {
+    font-weight: bold;
+    opacity: 0.75;
+}

@@ -5,9 +5,12 @@
     min_specialization, // for rustc_index
     let_chains,
     decl_macro, // path serialize
-    extract_if
+    extract_if,
+    box_patterns,
+    control_flow_enum
 )]
 
+extern crate rustc_ast;
 extern crate rustc_data_structures;
 extern crate rustc_hash;
 extern crate rustc_hir;

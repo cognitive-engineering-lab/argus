@@ -2,7 +2,7 @@ use std::{collections::HashSet, ops::ControlFlow};
 
 use ext::*;
 use index_vec::IndexVec;
-use rustc_hir::def_id::DefId;
+use rustc_hir::{self as hir, def_id::DefId};
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::ty::Predicate;
 use rustc_trait_selection::{
@@ -69,7 +69,7 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
 }
 
 impl<'tcx> Node<'tcx> {
-  fn from_goal(goal: &InspectGoal<'_, 'tcx>, def_id: DefId) -> Self {
+  fn from_goal(goal: &InspectGoal<'_, 'tcx>, _def_id: DefId) -> Self {
     #[derive(Serialize)]
     struct Wrapper<'tcx>(
       #[serde(serialize_with = "goal__predicate_def")]
@@ -79,11 +79,6 @@ impl<'tcx> Node<'tcx> {
     let w = &Wrapper(goal.goal());
     let v =
       serialize_to_value(goal.infcx(), w).expect("failed to serialize goal");
-
-    let string = goal.goal().predicate.pretty(goal.infcx(), def_id);
-    log::debug!("PRETTY {}", string);
-    // let v = crate::ty::serialize_to_value(&string, goal.infcx())
-    //     .expect("failed to serialize goal");
 
     Node::Goal {
       data: v,
@@ -112,19 +107,48 @@ impl<'tcx> Node<'tcx> {
         // The only two we really care about.
         CandidateSource::ParamEnv(_idx) => "param-env".into(),
         CandidateSource::Impl(def_id) => {
-          let tr = candidate
-            .infcx()
-            .tcx
-            .impl_trait_ref(def_id)
-            .unwrap()
-            .skip_binder();
-          let ty = tr.self_ty();
-          Candidate::Impl { ty, trait_ref: tr }
+          Self::from_impl(candidate.infcx(), def_id)
         }
       },
     };
 
     Node::Candidate { data: can }
+  }
+
+  fn from_impl<'a>(infcx: &'a InferCtxt<'tcx>, def_id: DefId) -> Candidate<'tcx>
+  where
+    'tcx: 'a,
+  {
+    // FIXME: this function is DEPRECATED ... or, at least it will be.
+    // We may have to do another serialization pass at the HIR types
+    // if this proves insufficient for now.
+    use rustc_hir_analysis::hir_ty_to_ty;
+
+    let impl_string = infcx
+      .tcx
+      .span_of_impl(def_id)
+      .map(|sp| {
+        infcx
+          .tcx
+          .sess
+          .source_map()
+          .span_to_snippet(sp)
+          .expect("could not get impl snippet")
+      })
+      .unwrap_or_else(|symb| symb.as_str().to_string());
+
+    let Some(hir::Node::Item(item)) = infcx.tcx.hir().get_if_local(def_id)
+    else {
+      todo!();
+    };
+
+    let impl_ = item.expect_impl();
+
+    Candidate::Impl {
+      data: impl_,
+
+      fallback: impl_string,
+    }
   }
 
   fn from_result(result: &Result<Certainty, NoSolution>) -> Self {
@@ -151,7 +175,6 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
       return ControlFlow::Continue(());
     }
 
-    log::debug!("Inserting: {:#?}", goal.goal());
     let here_node = Node::from_goal(goal, self.def_id);
     let here_idx = self.nodes.push(here_node.clone());
 

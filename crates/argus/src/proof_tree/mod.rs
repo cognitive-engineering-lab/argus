@@ -11,19 +11,23 @@ pub(super) mod serialize;
 use std::collections::HashSet;
 
 use index_vec::IndexVec;
+use rustc_hir as hir;
 use rustc_middle::ty::{TraitRef, Ty};
 use serde::Serialize;
 pub use topology::*;
 #[cfg(feature = "ts-rs")]
 use ts_rs::TS;
 
-use crate::serialize::ty::{TraitRefPrintOnlyTraitPathDef, TyDef};
+use crate::serialize::{
+  hir::ImplDef,
+  ty::{TraitRefPrintOnlyTraitPathDef, TyDef},
+};
 
 crate::define_usize_idx! {
   ProofNodeIdx
 }
 
-#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Debug, Clone)]
 #[cfg_attr(featutre = "ts-rs", derive(TS))]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Node<'tcx> {
@@ -36,20 +40,20 @@ pub enum Node<'tcx> {
   Goal {
     #[cfg_attr(featutre = "ts-rs", ts(type = "any"))]
     data: serde_json::Value,
+
     #[serde(skip)]
     _marker: std::marker::PhantomData<&'tcx ()>,
   },
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug)]
 #[serde(tag = "type", rename_all = "camelCase")]
-pub enum Candidate<'tcx> {
+pub enum Candidate<'hir> {
   Impl {
-    #[serde(with = "TyDef")]
-    ty: Ty<'tcx>,
-    #[serde(with = "TraitRefPrintOnlyTraitPathDef")]
-    trait_ref: TraitRef<'tcx>,
-    // range: CharRange,
+    #[serde(with = "ImplDef")]
+    data: &'hir hir::Impl<'hir>,
+
+    fallback: String,
   },
 
   // TODO(gavinleroy) when everything is structured
@@ -66,7 +70,7 @@ impl From<&'static str> for Candidate<'_> {
   }
 }
 
-#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Debug, Clone)]
 #[cfg_attr(feature = "ts-rs", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct SerializedTree<'tcx> {

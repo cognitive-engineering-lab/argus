@@ -3,13 +3,10 @@
 //! This file "simulates" what `rustc_hir_typeck` does for type-checking
 //! method call expressions. Only, that we want to keep around *a lot*
 //! more information.
-use rustc_hir::{self as hir, LangItem};
+use rustc_hir::{self as hir, intravisit::Map, LangItem};
 use rustc_middle::{
   traits::query::CandidateStep,
-  ty::{
-    Predicate, PredicateKind, TraitPredicate, Ty, TyCtxt,
-    TypeckResults,
-  },
+  ty::{Predicate, PredicateKind, TraitPredicate, Ty, TyCtxt, TypeckResults},
 };
 use rustc_span::Span;
 use rustc_utils::source_map::range::CharRange;
@@ -59,7 +56,11 @@ fn get_ambiguous_trait_method_exprs<'tcx>(
   typeck_results
     .error_nodes()
     .filter_map(|hir_id| {
-      let expr = hir.expect_expr(hir_id);
+      log::debug!("Getting expression for {:?}", hir.node_to_string(hir_id));
+
+      let Some(hir::Node::Expr(expr)) = hir.find(hir_id) else {
+        return None;
+      };
 
       let hir::ExprKind::MethodCall(segment, recvr, args, span) = &expr.kind
       else {

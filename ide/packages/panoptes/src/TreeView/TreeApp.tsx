@@ -29,8 +29,8 @@ const TreeApp = ({ tree }: { tree: SerializedTree | undefined }) => {
 
   let tabs: [string, React.ReactNode][] = [
     // ["Graph", <TreeArea tree={attempt} />],
-    ["TopDown", <TopDown tree={tree} />],
     ["BottomUp", <BottomUp tree={tree} />],
+    ["TopDown", <TopDown tree={tree} />],
     ["JSON", <ReactJson src={tree} />],
   ];
 

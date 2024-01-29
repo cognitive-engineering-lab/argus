@@ -13,8 +13,7 @@ use rustc_middle::ty::{
   TypeckResults,
 };
 use rustc_query_system::ich::StableHashingContext;
-
-
+use rustc_span::Span;
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 
@@ -65,7 +64,37 @@ pub trait EvaluationResultExt {
   fn is_certain(&self) -> bool;
 }
 
+pub trait PredicateObligationExt {
+  fn range(&self, tcx: &TyCtxt) -> CharRange;
+}
+
+impl PredicateObligationExt for PredicateObligation<'_> {
+  fn range(&self, tcx: &TyCtxt) -> CharRange {
+    let source_map = tcx.sess.source_map();
+    let original_span = Span::source_callsite(self.cause.span);
+    CharRange::from_span(original_span, source_map).unwrap_or_else(|_| {
+      log::warn!("Scrambling to find range for span {:?}", original_span);
+
+      let def_id = self.cause.body_id.to_def_id();
+      let s = tcx
+        .hir()
+        .span_if_local(def_id)
+        .unwrap_or(rustc_span::DUMMY_SP);
+
+      CharRange::from_span(s, source_map)
+        .expect("failed to get range from local span")
+    })
+  }
+}
+
 pub trait InferCtxtExt<'tcx> {
+  fn sanitize_obligation(
+    &self,
+    typeck_results: &'tcx ty::TypeckResults<'tcx>,
+    obligation: &PredicateObligation<'tcx>,
+    result: EvaluationResult,
+  ) -> PredicateObligation<'tcx>;
+
   fn bless_fulfilled<'a>(
     &self,
     ldef_id: LocalDefId,
@@ -79,9 +108,16 @@ pub trait InferCtxtExt<'tcx> {
   ) -> Obligation;
 
   fn is_necessary_predicate(&self, p: &Predicate<'tcx>) -> bool;
-  fn is_unit_impl_trait(&self, p: &Predicate<'tcx>) -> bool;
-  fn is_ty_impl_sized(&self, p: &Predicate<'tcx>) -> bool;
-  fn is_ty_unknown(&self, p: &Predicate<'tcx>) -> bool;
+
+  /// Is the `self_ty` of the predicate `()`?
+  fn is_lhs_unit(&self, p: &Predicate<'tcx>) -> bool;
+
+  /// Is the trait bound a lang item? (E.g., `Sized`, `Deref`, ...)
+  fn is_rhs_lang_item(&self, p: &Predicate<'tcx>) -> bool;
+
+  /// Is the `self_ty` an type or inference variable?
+  fn is_lhs_unknown(&self, p: &Predicate<'tcx>) -> bool;
+
   fn is_trait_predicate(&self, p: &Predicate<'tcx>) -> bool;
 
   fn body_id(&self) -> Option<LocalDefId>;
@@ -180,26 +216,23 @@ impl<'tcx> TypeckResultsExt<'tcx> for TypeckResults<'tcx> {
 }
 
 impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
-  fn is_unit_impl_trait(&self, p: &Predicate<'tcx>) -> bool {
+  fn is_lhs_unit(&self, p: &Predicate<'tcx>) -> bool {
     matches!(p.kind().skip_binder(),
     ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
         trait_predicate.self_ty().is_unit()
     })
   }
 
-  fn is_ty_impl_sized(&self, p: &Predicate<'tcx>) -> bool {
-    self.tcx.is_trait_pred_rhs(
-      p,
-      self
-        .tcx
-        .lang_items()
-        .sized_trait()
-        .unwrap_or_else(|| self.tcx.require_lang_item(LangItem::Sized, None)),
-    )
+  fn is_rhs_lang_item(&self, p: &Predicate<'tcx>) -> bool {
+    self
+      .tcx
+      .lang_items()
+      .iter()
+      .any(|(_lang_item, def_id)| self.tcx.is_trait_pred_rhs(p, def_id))
   }
 
   // TODO: I'm not 100% that this is the correct metric.
-  fn is_ty_unknown(&self, p: &Predicate<'tcx>) -> bool {
+  fn is_lhs_unknown(&self, p: &Predicate<'tcx>) -> bool {
     matches!(p.kind().skip_binder(),
     ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
         trait_predicate.self_ty().is_ty_var()
@@ -218,9 +251,30 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     // any information about the type of the Self var, and I've never understood why the latter
     // occurs so frequently.
     self.is_trait_predicate(p)
-      && !(self.is_unit_impl_trait(p)
-        || self.is_ty_unknown(p)
-        || self.is_ty_impl_sized(p))
+      && !(self.is_lhs_unit(p)
+        || self.is_lhs_unknown(p)
+        || self.is_rhs_lang_item(p))
+  }
+
+  fn sanitize_obligation(
+    &self,
+    typeck_results: &'tcx ty::TypeckResults<'tcx>,
+    obligation: &PredicateObligation<'tcx>,
+    result: EvaluationResult,
+  ) -> PredicateObligation<'tcx> {
+    use crate::rustc::{
+      fn_ctx::{FnCtxtExt as RustcFnCtxtExt, FnCtxtSimulator},
+      InferCtxtExt as RustcInferCtxtExt,
+    };
+
+    match self.to_fulfillment_error(obligation, result) {
+      None => obligation.clone(),
+      Some(ref mut fe) => {
+        let fnctx = FnCtxtSimulator::new(typeck_results, self);
+        fnctx.adjust_fulfillment_error_for_expr_obligation(fe);
+        fe.obligation.clone()
+      }
+    }
   }
 
   // TODO there has to be a better way to do this, right?
@@ -257,9 +311,8 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     fdata: FulfillmentData<'_, 'tcx>,
   ) -> Obligation {
     let obl = &fdata.obligation;
-    let source_map = self.tcx.sess.source_map();
-    let range = CharRange::from_span(obl.cause.span, source_map)
-      .expect("couldn't convert obligation span to range");
+
+    let range = obl.range(&self.tcx);
     let is_necessary = self.is_necessary_predicate(&obl.predicate);
 
     #[derive(Serialize)]
@@ -278,192 +331,7 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
       result: fdata.result,
     }
   }
-
-  //   fn build_trait_errors(
-  //     &self,
-  //     obligations: &[Obligation<'tcx>],
-  //   ) -> Vec<TraitError<'tcx>> {
-  //     let tcx = &self.tcx;
-  //     let source_map = tcx.sess.source_map();
-  //     self
-  //       .reported_trait_errors
-  //       .borrow()
-  //       .iter()
-  //       .flat_map(|(span, predicates)| {
-  //         let range = CharRange::from_span(*span, source_map)
-  //           .expect("Couldn't get trait bound range");
-
-  //         predicates.iter().map(move |predicate| {
-  //           // TODO: these simple comparisons are not going to cut it ...
-  //           // We can always take a similar approach to the ambiguity errors and
-  //           // just recompute the errors that rustc does.
-  //           //
-  //           // Another idea would be to use the "X implies Y" mechanism from the
-  //           // diagnostic system. This will collapse all implied errors into the one reported.
-  //           let candidates = obligations
-  //             .iter()
-  //             .filter_map(|obl| {
-  //               if !range.overlaps(obl.range) || obl.predicate != *predicate {
-  //                 return None;
-  //               }
-  //               Some(obl.hash)
-  //             })
-  //             .collect::<Vec<_>>();
-
-  //           TraitError {
-  //             range,
-  //             predicate: predicate.clone(),
-  //             candidates,
-  //           }
-  //         })
-  //       })
-  //       .collect::<Vec<_>>()
-  //   }
-
-  //   fn build_ambiguity_errors(
-  //     &self,
-  //     _obligations: &[Obligation<'tcx>],
-  //   ) -> Vec<AmbiguityError<'tcx>> {
-  //     todo!()
-  //   }
-  // }
 }
-
-// impl<'tcx> FnCtxtExt<'tcx> for FnCtxt<'_, 'tcx> {
-//   fn get_obligations(&self, ldef_id: LocalDefId) -> Vec<Obligation<'tcx>> {
-//     todo!()
-//     // let fulfilled = self.get_fulfilled(ldef_id);
-//     // let (mut errors, _sucesses): (Vec<_>, Vec<_>) = fulfilled.into_iter()
-//     //     .partition(FulfillmentData::is_error);
-//     // self.adjust_fulfillment_errors_for_expr_obligation(&mut errors);
-//     // self.convert_fulfilled(errors)
-//   }
-
-//   fn get_fulfilled(
-//     &self,
-//     ldef_id: LocalDefId,
-//   ) -> Vec<FulfillmentData<'tcx>> {
-//     todo!()
-
-//     // let infcx = self.infcx().unwrap();
-
-//     // let return_with_hashes = |v: Vec<(FulfillmentError<'tcx>, InferCtxt<'tcx>)>| {
-//     //   self.tcx().with_stable_hashing_context(|mut hcx| {
-//     //     v.into_iter()
-//     //       .map(|(e, infcx)| {
-//     //         FulfillmentData {
-//     //           // NOTE: the shadowing of the infcx, is this actually what we want?
-//     //           hash: e.stable_hash(&infcx, &mut hcx),
-//     //           infcx,
-//     //           data: FulfilledDataKind::Err(e)
-//     //         }
-//     //       })
-//     //       .unique_by(FulfillmentData::get_hash)
-//     //       .collect::<Vec<_>>()
-//     //   })
-//     // };
-
-//     // // ------------------------------
-//     // // NON-Updated code (with-probes)
-//     // // TODO: once this is stable make sure this reduces
-//     // // cloning (which it currently does not).
-//     // let mut result = Vec::new();
-//     // let _def_id = ldef_id.to_def_id();
-//     // if let Some(infcx) = self.infcx() {
-//     //   let fulfilled_obligations = infcx.fulfilled_obligations.borrow();
-//     //   result.extend(fulfilled_obligations.iter().flat_map(|obl| match obl {
-//     //     FulfilledObligation::Failed { data, infcx } => {
-//     //       data.into_iter().map(|e| (e.clone(), infcx.clone())).collect::<Vec<_>>()
-
-//     //     },
-//     //     FulfilledObligation::Success { .. } => vec![],
-//     //   }));
-//     // }
-//     // // ------------------------------
-
-//     // let tcx = &self.tcx();
-//     // // NOTE: this will remove everything that is not "necessary,"
-//     // // below might be a better strategy. The best is ordering them by
-//     // // relevance and then hiding unnecessary obligations unless the
-//     // // user wants to see them.
-//     // retain_fixpoint(&mut result, |(error, _)| {
-//     //   error.obligation.predicate.is_necessary(tcx)
-//     // });
-
-//     // // Iteratively filter out elements unless there's only one thing
-//     // // left; we don't want to remove the last remaining query.
-//     // // Queries in order of *least* importance:
-//     // // 1. (): TRAIT
-//     // // 2. TY: Sized
-//     // // 3. _: TRAIT
-//     // // retain_fixpoint(&mut result, |error| {
-//     // //   !error.obligation.predicate.is_unit_impl_trait(tcx)
-//     // // });
-
-//     // // retain_fixpoint(&mut result, |error| {
-//     // //   !error.obligation.predicate.is_ty_impl_sized(tcx)
-//     // // });
-
-//     // // retain_fixpoint(&mut result, |error| {
-//     // //   !error.obligation.predicate.is_ty_unknown(tcx)
-//     // // });
-
-//     // return_with_hashes(result)
-//   }
-
-//   fn convert_fulfilled(
-//     &self,
-//     errors: Vec<FulfillmentData<'tcx>>,
-//   ) -> Vec<Obligation<'tcx>> {
-//     todo!()
-//   //   if errors.is_empty() {
-//   //     return Vec::new();
-//   //   }
-//   //   let source_map = self.tcx().sess.source_map();
-//   //   let _infcx = self.infcx().unwrap();
-
-//   //   errors
-//   //     .into_iter()
-//   //     .map(|fdata| {
-//   //       let predicate = fdata.get_obligation().predicate;
-//   //       let range =
-//   //         CharRange::from_span(fdata.get_cause_span(), source_map)
-//   //           .unwrap();
-//   //       Obligation {
-//   //         predicate,
-//   //         hash: fdata.get_hash().into(),
-//   //         range,
-//   //         kind: ObligationKind::Failure,
-//   //       }
-//   //     })
-//   //     .collect::<Vec<_>>()
-//   }
-// }
-
-// pub fn retain_fixpoint<T, F: FnMut(&T) -> bool>(v: &mut Vec<T>, mut pred: F) {
-//   // NOTE: the original intent was to keep a single element, but that doesn't seem
-//   // to be ideal. Perhaps it's best to remove all elements and then allow users to
-//   // toggle these "hidden elements" should they choose to.
-//   let keep_n_elems = 0;
-//   let mut did_change = true;
-//   let start_size = v.len();
-//   let mut removed_es = 0usize;
-//   // While things have changed, keep iterating, except
-//   // when we have a single element left.
-//   while did_change && start_size - removed_es > keep_n_elems {
-//     did_change = false;
-//     v.retain(|e| {
-//       let r = pred(e);
-//       did_change |= !r;
-//       if !r && start_size - removed_es > keep_n_elems {
-//         removed_es += 1;
-//         r
-//       } else {
-//         true
-//       }
-//     });
-//   }
-// }
 
 mod ty_eraser {
   use super::*;

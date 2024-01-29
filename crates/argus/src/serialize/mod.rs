@@ -12,6 +12,7 @@
 
 pub mod compound;
 pub mod r#const;
+pub mod hir;
 pub mod path;
 pub mod term;
 pub mod ty;
@@ -68,6 +69,7 @@ impl<'tcx> InferCtxtSerializeExt for InferCtxt<'tcx> {
 
 macro_rules! serialize_custom_seq {
   ($wrap:ident, $serializer:expr, $value:expr) => {{
+    use serde::ser::SerializeSeq;
     let mut seq = $serializer.serialize_seq(Some($value.len()))?;
     for e in $value.iter() {
       seq.serialize_element(&$wrap(e))?;

@@ -8,7 +8,6 @@
 //!    version of path segments in the `segments` field.
 //!    This is then serialized and "pretty printed" in the ide.
 
-
 use default::PathBuilderDefault;
 use log::debug;
 use rustc_hir::{
@@ -68,8 +67,6 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
         // constructing a `DisambiguatedDefPathData`.
         if !self.empty_path {
           self.segments.push(PathSegment::Colons);
-        
-
         }
 
         // CHANGE: write!(
@@ -80,11 +77,11 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
         //     self.tcx.sess.source_map().span_to_embeddable_string(span)
         // )?;
         let impl_range =
-            CharRange::from_span(span, self.tcx().sess.source_map())
-                .expect("impl span not converted to `CharRange`");
+          CharRange::from_span(span, self.tcx().sess.source_map())
+            .expect("impl span not converted to `CharRange`");
         self
-            .segments
-            .push(PathSegment::AnonImpl { range: impl_range });
+          .segments
+          .push(PathSegment::AnonImpl { range: impl_range });
 
         self.empty_path = false;
         return;
@@ -104,13 +101,13 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
       && !with_no_trimmed_paths()
       && !with_crate_prefix()
       && let Some(symbol) = self.tcx().trimmed_def_paths(()).get(&def_id)
-  {
+    {
       // CHANGE: write!(self, "{}", Ident::with_dummy_span(*symbol))?;
       self.segments.push(PathSegment::unambiguous_name(*symbol));
       true
-  } else {
+    } else {
       false
-  }
+    }
   }
 
   /// Does the work of `try_print_visible_def_path`, building the
@@ -336,68 +333,87 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
 
     let get_local_name = |this: &Self, name, def_id, key: DefKey| {
       if let Some(visible_parent) = visible_parent_map.get(&def_id)
-              && let actual_parent = this.tcx().opt_parent(def_id)
-              && let DefPathData::TypeNs(_) = key.disambiguated_data.data
-              && Some(*visible_parent) != actual_parent
-          {
-              this.tcx()
-                  // FIXME(typed_def_id): Further propagate ModDefId
-                  .module_children(ModDefId::new_unchecked(*visible_parent))
-                  .iter()
-                  .filter(|child| child.res.opt_def_id() == Some(def_id))
-                  .find(|child| child.vis.is_public() && child.ident.name != kw::Underscore)
-                  .map(|child| child.ident.name)
-                  .unwrap_or(name)
-          } else {
-              name
-          }
+        && let actual_parent = this.tcx().opt_parent(def_id)
+        && let DefPathData::TypeNs(_) = key.disambiguated_data.data
+        && Some(*visible_parent) != actual_parent
+      {
+        this
+          .tcx()
+          // FIXME(typed_def_id): Further propagate ModDefId
+          .module_children(ModDefId::new_unchecked(*visible_parent))
+          .iter()
+          .filter(|child| child.res.opt_def_id() == Some(def_id))
+          .find(|child| {
+            child.vis.is_public() && child.ident.name != kw::Underscore
+          })
+          .map(|child| child.ident.name)
+          .unwrap_or(name)
+      } else {
+        name
+      }
     };
     if let DefKind::Variant = kind
-          && let Some(symbol) = self.tcx().trimmed_def_paths(()).get(&def_id)
-      {
-          // If `Assoc` is unique, we don't want to talk about `Trait::Assoc`.
-          // CHANGE: self.write_str(get_local_name(self, *symbol, def_id, key).as_str())?;
-          self.segments.push(PathSegment::unambiguous_name(get_local_name(self, *symbol, def_id, key)));
-          return true;
-      }
+      && let Some(symbol) = self.tcx().trimmed_def_paths(()).get(&def_id)
+    {
+      // If `Assoc` is unique, we don't want to talk about `Trait::Assoc`.
+      // CHANGE: self.write_str(get_local_name(self, *symbol, def_id, key).as_str())?;
+      self
+        .segments
+        .push(PathSegment::unambiguous_name(get_local_name(
+          self, *symbol, def_id, key,
+        )));
+      return true;
+    }
     if let Some(symbol) = key.get_opt_name() {
       if let DefKind::AssocConst | DefKind::AssocFn | DefKind::AssocTy = kind
-              && let Some(parent) = self.tcx().opt_parent(def_id)
-              && let parent_key = self.tcx().def_key(parent)
-              && let Some(symbol) = parent_key.get_opt_name()
-          {
-              // CHANGE: Trait
-              // self.write_str(get_local_name(self, symbol, parent, parent_key).as_str())?;
-              // self.write_str("::")?;
-              self.segments.push(PathSegment::unambiguous_name(get_local_name(self, symbol, parent, parent_key)));
-              self.segments.push(PathSegment::Colons);
-          } else if let DefKind::Variant = kind
-              && let Some(parent) = self.tcx().opt_parent(def_id)
-              && let parent_key = self.tcx().def_key(parent)
-              && let Some(symbol) = parent_key.get_opt_name()
-          {
-              // CHANGE: Enum
-              // For associated items and variants, we want the "full" path, namely, include
-              // the parent type in the path. For example, `Iterator::Item`.
-              // self.write_str(get_local_name(self, symbol, parent, parent_key).as_str())?;
-              // self.write_str("::")?;
-              self.segments.push(PathSegment::unambiguous_name(get_local_name(self, symbol, parent, parent_key)));
-              self.segments.push(PathSegment::Colons);
-          } else if let DefKind::Struct
-          | DefKind::Union
-          | DefKind::Enum
-          | DefKind::Trait
-          | DefKind::TyAlias
-          | DefKind::Fn
-          | DefKind::Const
-          | DefKind::Static(_) = kind
-          {
-          } else {
-              // If not covered above, like for example items out of `impl` blocks, fallback.
-              return false;
-          }
+        && let Some(parent) = self.tcx().opt_parent(def_id)
+        && let parent_key = self.tcx().def_key(parent)
+        && let Some(symbol) = parent_key.get_opt_name()
+      {
+        // CHANGE: Trait
+        // self.write_str(get_local_name(self, symbol, parent, parent_key).as_str())?;
+        // self.write_str("::")?;
+        self
+          .segments
+          .push(PathSegment::unambiguous_name(get_local_name(
+            self, symbol, parent, parent_key,
+          )));
+        self.segments.push(PathSegment::Colons);
+      } else if let DefKind::Variant = kind
+        && let Some(parent) = self.tcx().opt_parent(def_id)
+        && let parent_key = self.tcx().def_key(parent)
+        && let Some(symbol) = parent_key.get_opt_name()
+      {
+        // CHANGE: Enum
+        // For associated items and variants, we want the "full" path, namely, include
+        // the parent type in the path. For example, `Iterator::Item`.
+        // self.write_str(get_local_name(self, symbol, parent, parent_key).as_str())?;
+        // self.write_str("::")?;
+        self
+          .segments
+          .push(PathSegment::unambiguous_name(get_local_name(
+            self, symbol, parent, parent_key,
+          )));
+        self.segments.push(PathSegment::Colons);
+      } else if let DefKind::Struct
+      | DefKind::Union
+      | DefKind::Enum
+      | DefKind::Trait
+      | DefKind::TyAlias
+      | DefKind::Fn
+      | DefKind::Const
+      | DefKind::Static(_) = kind
+      {
+      } else {
+        // If not covered above, like for example items out of `impl` blocks, fallback.
+        return false;
+      }
       // CHANGE: self.write_str(get_local_name(self, symbol, def_id, key).as_str())?;
-      self.segments.push(PathSegment::unambiguous_name(get_local_name(self, symbol, def_id, key)));
+      self
+        .segments
+        .push(PathSegment::unambiguous_name(get_local_name(
+          self, symbol, def_id, key,
+        )));
       return true;
     }
     false
@@ -600,6 +616,8 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
     trait_ref: Option<ty::TraitRef<'tcx>>,
   ) {
     print_prefix(self);
+
+    log::debug!("pretty_path_append_impl {:?} {:?}", self_ty, trait_ref);
 
     self.generic_delimiters(|cx| {
       // CHANGE: define_scoped_cx!(cx);

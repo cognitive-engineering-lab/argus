@@ -3,15 +3,30 @@ import { ExtensionToWebViewMsg, Filename } from "@argus/common/lib";
 import _ from "lodash";
 import React, { RefObject, useEffect, useState } from "react";
 
+
+
 import File, { errorCardId, obligationCardId } from "./File";
 import Workspace from "./Workspace";
 import { WaitingOn } from "./utilities/WaitingOn";
 import { requestFromExtension } from "./utilities/vscode";
 
+
+// FIXME: this needs to be a more "reacty" solution, because expanding 
+// the nodes doesn't cause a re-render.
 function highlightIntoView(id: string) {
   const elem = document.getElementById(id);
   const className = "bling";
   if (elem !== null) {
+
+    // Expand each parent collapsible element.
+    var a = elem.parentElement;
+    while (a) {
+      if (a.id === "Collapsible") {
+        a.classList.remove("collapsed");
+      }
+      a = a.parentElement;
+    }
+
     elem.scrollIntoView();
     elem.classList.add(className);
     setTimeout(() => elem.classList.remove(className), 1000); // Let the emphasis stay for 1 second.

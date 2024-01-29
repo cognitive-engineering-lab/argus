@@ -1,0 +1,11 @@
+.HoverMainInfo {
+  display: inline;
+}
+
+.floating {
+    background-color: rgba(0, 0, 0, 0.6);
+    border-radius: 4px;
+    color: #ffffff;
+    padding: 0.15em;
+    pointer-events: none;
+  }

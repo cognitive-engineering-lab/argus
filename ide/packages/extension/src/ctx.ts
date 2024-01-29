@@ -184,12 +184,8 @@ export class Ctx implements ArgusCtx {
         eIdx,
         "trait"
       );
-      const innerText: string[] = _.map(err.candidates, candHash => {
-        return `- Candidate obligation: **TODO** ${candHash}`;
-      });
       const lines: string[] = [
         `Trait bound not satisfied : ${jumpToDebug}`,
-        ...innerText,
       ];
       const result = new vscode.MarkdownString(lines.join("\n"));
       result.isTrusted = true;
