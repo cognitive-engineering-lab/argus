@@ -18,6 +18,19 @@ export function isRustEditor(editor: vscode.TextEditor): editor is RustEditor {
   return isRustDocument(editor.document);
 }
 
+export function isDocumentInWorkspace(document: RustDocument): boolean {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders) {
+    return false;
+  }
+  for (const folder of workspaceFolders) {
+    if (document.uri.fsPath.startsWith(folder.uri.fsPath)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function rustRangeToVscodeRange(range: CharRange): vscode.Range {
   return new vscode.Range(
     new vscode.Position(range.start.line, range.start.column),

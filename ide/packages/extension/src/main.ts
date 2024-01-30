@@ -5,10 +5,6 @@ import * as commands from "./commands";
 import { CommandFactory, Ctx, fetchWorkspace } from "./ctx";
 import { log } from "./logging";
 
-export interface ArgusCtx {
-  backend<T>(_args: ArgusArgs, _no_output?: boolean): Promise<ArgusResult<T>>;
-}
-
 export let globals: {
   ctx: Ctx;
 };

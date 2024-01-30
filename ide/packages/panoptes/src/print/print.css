@@ -7,27 +7,10 @@
 }
 
 .DefPathContainer {
-    position: relative;
     display: inline-block;
 }
 
-/* .DefPathContainer .DefPathShort {
-    max-width: 250px;
-    transition: max-width 1s ease-out;
+.ImplFallback > h1 {
+    font-size: 0.5em;
+    font-style: italic;
 }
-
-.DefPathContainer .DefPathFull {
-    max-width: 0;
-    display: none;
-    transition: max-width 1s ease-in;
-}
-
-.DefPathContainer:hover .DefPathFull {
-    max-width: 250px;
-    display: inline-block;
-}
-
-.DefPathContainer:hover .DefPathShort {
-    max-width: 0;
-    display: none;
-} */

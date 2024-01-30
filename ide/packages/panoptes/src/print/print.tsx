@@ -1,10 +1,12 @@
 import { Obligation } from "@argus/common/bindings";
+import { Impl } from "@argus/common/bindings/serialization/hir/types";
 import _ from "lodash";
 import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import ReactJson from "react-json-view";
 
 import "./print.css";
+import { PrintImpl } from "./private/hir";
 //@ts-ignore
 import { PrintBinderPredicateKind } from "./private/predicate";
 
@@ -46,6 +48,30 @@ const ErrorFactory = (o: Obligation) => {
         <p>Whoops! Something went wrong while printing:</p>
         <ReactJson src={o} />
         <pre>{error.message}</pre>
+      </div>
+    );
+  };
+};
+
+export const PrintHirImplWithFallback = ({
+  impl,
+  fallback,
+}: {
+  impl: Impl;
+  fallback: string;
+}) => {
+  const FallbackFromError = ({
+    error,
+    resetErrorBoundary,
+  }: {
+    error: any;
+    resetErrorBoundary: (...args: any[]) => void;
+  }) => {
+    return (
+      <div className="ImplFallback">
+        <h1>Printing failed, fallback info</h1>
+
+        <p>fallback</p>
       </div>
     );
   };

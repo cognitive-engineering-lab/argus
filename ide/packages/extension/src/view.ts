@@ -3,6 +3,7 @@ import {
   Obligation,
   ObligationHash,
   ObligationOutput,
+  ObligationsInBody,
   SerializedTree,
   TreeOutput,
 } from "@argus/common/bindings";
@@ -26,24 +27,20 @@ type BlessedMessage = {
   payload: WebViewToExtensionMsg;
 };
 
-export class ViewLoader {
-  private static currentPanel: ViewLoader | undefined;
-  private readonly panel: vscode.WebviewPanel;
+// TODO: instead of having a single view, with a static panel,
+// we should have a view field on the Ctx, this makes all commands
+// routed through the Ctx and we don't have to play the static
+// shenanigans.
+export class View {
+  public readonly panel: vscode.WebviewPanel;
   private readonly extensionUri: vscode.Uri;
   private disposables: vscode.Disposable[] = [];
 
-  public static createOrShow(extensionUri: vscode.Uri) {
-    if (ViewLoader.currentPanel) {
-      ViewLoader.currentPanel.panel.reveal();
-    } else {
-      ViewLoader.currentPanel = new ViewLoader(
-        extensionUri,
-        vscode.ViewColumn.Beside
-      );
-    }
-  }
-
-  private constructor(extensionUri: vscode.Uri, column: vscode.ViewColumn) {
+  constructor(
+    extensionUri: vscode.Uri,
+    initialData: [Filename, ObligationsInBody[]][],
+    column: vscode.ViewColumn = vscode.ViewColumn.Beside
+  ) {
     console.log(`Creating view in ${extensionUri}`);
     this.extensionUri = extensionUri;
     this.panel = vscode.window.createWebviewPanel("argus", "Argus", column, {
@@ -52,9 +49,7 @@ export class ViewLoader {
     });
 
     // Set the webview's initial html content
-    this.panel.webview.html = this.getHtmlForWebview(
-      globals.ctx.visibleEditors
-    );
+    this.panel.webview.html = this.getHtmlForWebview(initialData);
 
     // Listen for when the panel is disposed
     // This happens when the user closes the panel or when the panel is closed programatically
@@ -69,7 +64,6 @@ export class ViewLoader {
   }
 
   public dispose() {
-    ViewLoader.currentPanel = undefined;
     // Clean up our resources
     this.panel.dispose();
     while (this.disposables.length) {
@@ -78,6 +72,54 @@ export class ViewLoader {
         x.dispose();
       }
     }
+  }
+
+  // Public API, using static methods >:(
+
+  public async reset(newData: [Filename, ObligationOutput[]][]) {
+    this.messageWebview<[Filename, ObligationOutput[]][]>("invalidate", {
+      type: "FROM_EXTENSION",
+      command: "reset",
+      data: newData,
+    });
+  }
+
+  public async blingObligation(file: Filename, obligation: ObligationHash) {
+    this.messageWebview<ObligationHash>("bling", {
+      type: "FROM_EXTENSION",
+      command: "bling",
+      file,
+      oblHash: obligation,
+    });
+  }
+
+  public async openError(
+    file: Filename,
+    type: "ambig" | "trait",
+    bodyIdx: number,
+    errIdx: number
+  ) {
+    this.messageWebview<{
+      errType: "ambig" | "trait";
+      bodyIdx: number;
+      errIdx: number;
+    }>("open-error", {
+      type: "FROM_EXTENSION",
+      command: "open-error",
+      file,
+      errType: type,
+      bodyIdx,
+      errIdx,
+    });
+  }
+
+  public async openEditor(editor: RustEditor, data: ObligationOutput[]) {
+    this.messageWebview<Filename>("open-file", {
+      type: "FROM_EXTENSION",
+      command: "open-file",
+      file: editor.document.fileName,
+      data,
+    });
   }
 
   private async handleMessage(message: BlessedMessage) {
@@ -123,100 +165,32 @@ export class ViewLoader {
   }
 
   private async getObligations(requestId: string, host: Filename) {
-    const res = await globals.ctx.backend<ObligationOutput[]>([
-      "obligations",
-      host,
-    ]);
-
-    if (res.type !== "output") {
-      vscode.window.showErrorMessage(res.error);
-      return;
+    const obligations = await globals.ctx.getObligations(host);
+    if (obligations !== undefined) {
+      this.messageWebview<ObligationOutput[]>(requestId, {
+        type: "FROM_EXTENSION",
+        file: host,
+        command: "obligations",
+        obligations: obligations,
+      });
     }
-    const obligations = res.value;
-
-    globals.ctx.registerBodyInfo(host, obligations);
-
-    // For each of the returned bodies, we need to register the trait errors
-    // in the editor context. TODO: register ambiguity errors when we have them.
-    // const traitErrors = _.flatMap(obligations, oib => oib.traitErrors);
-    // const ambiguityErrors = _.flatMap(obligations, oib => oib.ambiguityErrors);
-    // globals.ctx.setTraitErrors(host, traitErrors);
-    // globals.ctx.setAmbiguityErrors(host, ambiguityErrors);
-
-    this.messageWebview<ObligationOutput[]>(requestId, {
-      type: "FROM_EXTENSION",
-      file: host,
-      command: "obligations",
-      obligations: obligations,
-    });
   }
 
   private async getTree(
     requestId: string,
-    host: Filename,
+    file: Filename,
     obl: Obligation,
     range: CharRange
   ) {
-    const res = await globals.ctx.backend<TreeOutput[]>([
-      "tree",
-      host,
-      obl.hash,
-      range.start.line,
-      range.start.column,
-      range.end.line,
-      range.end.column,
-    ]);
-
-    if (res.type !== "output") {
-      vscode.window.showErrorMessage(res.error);
-      return;
+    const tree = await globals.ctx.getTree(file, obl, range);
+    if (tree !== undefined) {
+      this.messageWebview<SerializedTree>(requestId, {
+        type: "FROM_EXTENSION",
+        file,
+        command: "tree",
+        tree,
+      });
     }
-
-    // NOTE: the returned value should be an array of a single tree, however,
-    // it is possible that no tree is returned. (Yes, but I'm working on it.)
-    const tree = _.filter(res.value, t => t !== undefined) as Array<
-      SerializedTree | undefined
-    >;
-    const tree0 = tree[0];
-
-    this.messageWebview<SerializedTree>(requestId, {
-      type: "FROM_EXTENSION",
-      file: host,
-      command: "tree",
-      tree: tree0,
-    });
-  }
-
-  public static async blingObligation(
-    file: Filename,
-    obligation: ObligationHash
-  ) {
-    this.currentPanel?.messageWebview<ObligationHash>("bling", {
-      type: "FROM_EXTENSION",
-      command: "bling",
-      file,
-      oblHash: obligation,
-    });
-  }
-
-  public static async openError(
-    file: Filename,
-    type: "ambig" | "trait",
-    bodyIdx: number,
-    errIdx: number
-  ) {
-    this.currentPanel?.messageWebview<{
-      errType: "ambig" | "trait";
-      bodyIdx: number;
-      errIdx: number;
-    }>("open-error", {
-      type: "FROM_EXTENSION",
-      command: "open-error",
-      file,
-      errType: type,
-      bodyIdx,
-      errIdx,
-    });
   }
 
   // FIXME: the type T here is wrong, it should be a response message similar to
@@ -229,7 +203,9 @@ export class ViewLoader {
     } as MessageHandlerData<T>);
   }
 
-  private getHtmlForWebview(openEditors: RustEditor[] = []) {
+  private getHtmlForWebview(
+    initialData: [Filename, ObligationsInBody[]][] = []
+  ) {
     const panoptesDir = vscode.Uri.joinPath(
       this.extensionUri,
       "node_modules",
@@ -255,11 +231,6 @@ export class ViewLoader {
       )
     );
 
-    const initialFiles: Filename[] = _.map(
-      openEditors,
-      e => e.document.fileName
-    );
-
     return `
       <!DOCTYPE html>
       <html lang="en">
@@ -269,7 +240,7 @@ export class ViewLoader {
           <title>Argus Inspector</title>
           <link rel="stylesheet" type="text/css" href=${styleUri}>
           <link rel="stylesheet" type="text/css" href=${codiconsUri}>
-          <script>window.initialData = ${JSON.stringify(initialFiles)};</script>
+          <script>window.initialData = ${JSON.stringify(initialData)};</script>
       </head>
       <body>
           <div id="root"></div>

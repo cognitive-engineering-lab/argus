@@ -1,13 +1,16 @@
 import {
   AmbiguityError,
   CharRange,
+  Obligation,
   ObligationHash,
+  ObligationOutput,
   ObligationsInBody,
+  SerializedTree,
   TraitError,
+  TreeOutput,
 } from "@argus/common/bindings";
 import { ArgusArgs, ArgusResult, Filename } from "@argus/common/lib";
 import _ from "lodash";
-import { render } from "react-dom";
 import * as vscode from "vscode";
 
 import {
@@ -16,14 +19,15 @@ import {
   traitErrorDecorate,
 } from "./decorate";
 import { showErrorDialog } from "./errors";
-import { ArgusCtx } from "./main";
 import { setup } from "./setup";
 import {
   RustEditor,
+  isDocumentInWorkspace,
   isRustDocument,
   isRustEditor,
   rustRangeToVscodeRange,
 } from "./utils";
+import { View } from "./view";
 
 // NOTE: much of this file was inspired (or taken) from the rust-analyzer extension.
 // See: https://github.com/rust-lang/rust-analyzer/blob/master/editors/code/src/ctx.ts#L1
@@ -65,24 +69,20 @@ export type CommandFactory = {
 // We can modify this if the initializations state changes.
 export type CtxInit = Ctx;
 
-export class Ctx implements ArgusCtx {
+type CallBackend = <T>(
+  _args: ArgusArgs,
+  _no_output?: boolean
+) => Promise<ArgusResult<T>>;
+
+export class Ctx {
   // Ranges used for highlighting code in the current Rust Editor.
   private highlightRanges: CharRange[] = [];
   private commandDisposables: Disposable[];
   private commandFactories: Record<string, CommandFactory>;
   private workspace: Workspace;
   private errorCollection;
-
-  private _backend: <T>(
-    _args: ArgusArgs,
-    _no_output?: boolean
-  ) => Promise<ArgusResult<T>> = () => {
-    throw new Error(
-      "The Argus backend in not available. " +
-        // TODO: make sure this links to some sort of installation documentation.
-        "Please ensure that it has been [properly installed](https://github.com/gavinleroy/argus)."
-    );
-  };
+  private cache: BackendCache;
+  public view: View | undefined;
 
   constructor(
     readonly extCtx: vscode.ExtensionContext,
@@ -93,6 +93,13 @@ export class Ctx implements ArgusCtx {
     this.commandFactories = commandFactories;
     this.workspace = workspace;
     this.errorCollection = vscode.languages.createDiagnosticCollection("argus");
+    this.cache = new BackendCache(() => {
+      throw new Error(`
+        Argus backend was not initialized.
+
+        This is a bug, please report it!
+      `);
+    });
   }
 
   dispose() {
@@ -100,8 +107,13 @@ export class Ctx implements ArgusCtx {
     _.forEach(this.commandDisposables, d => d.dispose());
   }
 
-  backend<T>(args: ArgusArgs, no_output?: boolean): Promise<ArgusResult<T>> {
-    return this._backend(args, no_output);
+  async createOrShowView() {
+    if (this.view) {
+      this.view.panel.reveal();
+    } else {
+      const initialData = await this.getFreshWebViewData();
+      this.view = new View(this.extCtx.extensionUri, initialData);
+    }
   }
 
   get activeRustEditor(): RustEditor | undefined {
@@ -122,34 +134,72 @@ export class Ctx implements ArgusCtx {
     // TODO: add some sort of "status loading" indicator.
     // Compile the workspace with the Argus version of rustc.
     await b(["preload"], true);
-    this.backend = b;
+    // this.backend = b;
+
+    this.cache = new BackendCache(b);
 
     // Register the commands with VSCode after the backend is setup.
     this._updateCommands();
+
+    vscode.window.onDidChangeActiveTextEditor(async editor => {
+      if (
+        editor &&
+        isRustEditor(editor) &&
+        isDocumentInWorkspace(editor.document)
+      ) {
+        // Load the obligations in the file, while we have the editor.
+        const obl = await this.loadObligations(editor);
+        if (obl) {
+          return this.view?.openEditor(editor, obl);
+        }
+      }
+    });
+
+    vscode.workspace.onDidSaveTextDocument(async document => {
+      const editor = vscode.window.activeTextEditor;
+      if (
+        editor &&
+        isRustEditor(editor) &&
+        editor.document === document &&
+        isDocumentInWorkspace(editor.document)
+      ) {
+        this.cache.havoc();
+        this.view!.reset(await this.getFreshWebViewData());
+      }
+    });
   }
 
   get visibleEditors(): RustEditor[] {
-    let editors = [];
-    for (let editor of vscode.window.visibleTextEditors) {
-      if (isRustEditor(editor)) {
-        editors.push(editor);
-      }
-    }
-    return editors;
+    return _.filter(vscode.window.visibleTextEditors, isRustEditor);
   }
 
-  public findOpenEditorByName(name: Filename): RustEditor | undefined {
+  private findVisibleEditorByName(name: Filename): RustEditor | undefined {
     return _.find(this.visibleEditors, e => e.document.fileName === name);
   }
 
-  // TODO: we will want to save the obligations info per file,
-  // so changing editors doesn't require a 'reload' of the info.
-  registerBodyInfo(filename: Filename, info: ObligationsInBody[]) {
-    const editor = this.findOpenEditorByName(filename);
-    if (editor === undefined) {
+  // Here we load the obligations for a file, and cache the results,
+  // there's a distinction between having an editor and not because
+  // we only have definitive access to the editor when it's visible.
+  private async loadObligations(editor: RustEditor) {
+    const obligations = await this.cache.getObligationsInBody(
+      editor.document.fileName
+    );
+    if (obligations === undefined) {
       return;
     }
+    this.registerBodyInfo(editor, obligations);
+    return obligations;
+  }
 
+  async getObligations(filename: Filename) {
+    return this.cache.getObligationsInBody(filename);
+  }
+
+  async getTree(filename: Filename, obligation: Obligation, range: CharRange) {
+    return this.cache.getTreeForObligation(filename, obligation, range);
+  }
+
+  private registerBodyInfo(editor: RustEditor, info: ObligationsInBody[]) {
     this.setTraitErrors(editor, info);
     this.setAmbiguityErrors(editor, info);
   }
@@ -184,9 +234,7 @@ export class Ctx implements ArgusCtx {
         eIdx,
         "trait"
       );
-      const lines: string[] = [
-        `Trait bound not satisfied : ${jumpToDebug}`,
-      ];
+      const lines: string[] = [`Trait bound not satisfied : ${jumpToDebug}`];
       const result = new vscode.MarkdownString(lines.join("\n"));
       result.isTrusted = true;
       return result;
@@ -238,26 +286,22 @@ export class Ctx implements ArgusCtx {
   }
 
   async addHighlightRange(filename: Filename, range: CharRange) {
-    const editor = this.findOpenEditorByName(filename);
-    if (editor === undefined) {
-      return;
+    const editor = this.findVisibleEditorByName(filename);
+    if (editor) {
+      this.highlightRanges.push(range);
+      await this._refreshHighlights(editor);
     }
-
-    this.highlightRanges.push(range);
-    await this._refreshHighlights(editor);
   }
 
   async removeHighlightRange(filename: Filename, range: CharRange) {
-    const editor = this.findOpenEditorByName(filename);
-    if (editor === undefined) {
-      return;
+    const editor = this.findVisibleEditorByName(filename);
+    if (editor) {
+      this.highlightRanges = _.filter(
+        this.highlightRanges,
+        r => !_.isEqual(r, range)
+      );
+      await this._refreshHighlights(editor);
     }
-
-    this.highlightRanges = _.filter(
-      this.highlightRanges,
-      r => !_.isEqual(r, range)
-    );
-    await this._refreshHighlights(editor);
   }
 
   private async _refreshHighlights(editor: RustEditor) {
@@ -265,6 +309,19 @@ export class Ctx implements ArgusCtx {
       rangeHighlight,
       _.map(this.highlightRanges, r => rustRangeToVscodeRange(r))
     );
+  }
+
+  private async getFreshWebViewData(): Promise<
+    [Filename, ObligationOutput[]][]
+  > {
+    const initialData = await Promise.all(
+      _.map(this.visibleEditors, async e => [
+        e.document.fileName,
+        await this.cache.getObligationsInBody(e.document.fileName),
+      ])
+    );
+    // FIXME: how to make TS figure this out?
+    return _.filter(initialData, ([_, obl]) => obl !== undefined) as any;
   }
 
   private _updateCommands() {
@@ -277,5 +334,84 @@ export class Ctx implements ArgusCtx {
         vscode.commands.registerCommand(fullName, callback)
       );
     }
+  }
+}
+
+class BackendCache {
+  private obligationCache: Record<Filename, ObligationsInBody[]>;
+  private treeCache: Record<Filename, Record<ObligationHash, SerializedTree>>;
+  private backend: CallBackend;
+
+  constructor(backend: CallBackend) {
+    this.obligationCache = {};
+    this.treeCache = {};
+    this.backend = backend;
+  }
+
+  havoc() {
+    this.obligationCache = {};
+    this.treeCache = {};
+  }
+
+  async getObligationsInBody(filename: Filename) {
+    if (this.obligationCache[filename] !== undefined) {
+      return this.obligationCache[filename];
+    }
+
+    const res = await this.backend<ObligationOutput[]>([
+      "obligations",
+      filename,
+    ]);
+
+    if (res.type !== "output") {
+      vscode.window.showErrorMessage(res.error);
+      return;
+    }
+
+    this.obligationCache[filename] = res.value;
+    return res.value;
+  }
+
+  async getTreeForObligation(
+    filename: Filename,
+    obl: Obligation,
+    range: CharRange
+  ) {
+    if (this.treeCache[filename] !== undefined) {
+      if (this.treeCache[filename][obl.hash] !== undefined) {
+        return this.treeCache[filename][obl.hash];
+      }
+    } else {
+      this.treeCache[filename] = {};
+    }
+
+    const res = await this.backend<TreeOutput[]>([
+      "tree",
+      filename,
+      obl.hash,
+      range.start.line,
+      range.start.column,
+      range.end.line,
+      range.end.column,
+    ]);
+
+    if (res.type !== "output") {
+      vscode.window.showErrorMessage(res.error);
+      return;
+    }
+
+    // NOTE: the returned value should be an array of a single tree, however,
+    // it is possible that no tree is returned. (Yes, but I'm working on it.)
+    const tree = _.filter(res.value, t => t !== undefined) as Array<
+      SerializedTree | undefined
+    >;
+
+    const tree0 = tree[0];
+    if (tree0 === undefined) {
+      return;
+    }
+
+    this.treeCache[filename][obl.hash] = tree0;
+    return tree0;
   }
 }

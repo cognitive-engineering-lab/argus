@@ -1,3 +1,4 @@
+import { ObligationsInBody } from "@argus/common/bindings";
 import { Filename } from "@argus/common/lib";
 import {
   VSCodePanelTab,
@@ -8,6 +9,7 @@ import _ from "lodash";
 import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
+import File from "./File";
 import "./Workspace.css";
 
 // TODO: the workspace should manage a set of files. Currently the App is doing
@@ -37,7 +39,7 @@ const Workspace = ({
   files,
   reset,
 }: {
-  files: [Filename, React.ReactElement][];
+  files: [Filename, ObligationsInBody[]][];
   reset: () => void;
 }) => {
   return (
@@ -49,7 +51,7 @@ const Workspace = ({
           </VSCodePanelTab>
         );
       })}
-      {_.map(files, ([_, content], idx) => {
+      {_.map(files, ([filename, content], idx) => {
         return (
           <ErrorBoundary
             key={idx}
@@ -57,7 +59,7 @@ const Workspace = ({
             onReset={reset}
           >
             <VSCodePanelView key={idx} id={`view-${idx}`}>
-              {content}
+              <File file={filename} osibs={content} />
             </VSCodePanelView>
           </ErrorBoundary>
         );

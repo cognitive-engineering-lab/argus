@@ -3,6 +3,7 @@ import {
   Obligation,
   ObligationHash,
   ObligationOutput,
+  ObligationsInBody,
   TreeOutput,
 } from "./bindings";
 
@@ -29,7 +30,7 @@ export type ExtensionReturn<T extends ExtensionToWebViewMsg["command"]> =
     : {};
 
 export type ExtensionToWebViewMsg = { type: FROM_EXT } & (
-  | { command: "invalidate" }
+  | { command: "reset"; data: [Filename, ObligationsInBody[]][] }
   | (CommonData &
       (
         | { command: "bling"; oblHash: ObligationHash }
@@ -39,8 +40,7 @@ export type ExtensionToWebViewMsg = { type: FROM_EXT } & (
             bodyIdx: number;
             errIdx: number;
           }
-        | { command: "open-file" }
-        | { command: "close-file" }
+        | { command: "open-file"; data: ObligationOutput[] }
         | { command: "obligations"; obligations: ObligationOutput[] }
         | { command: "tree"; tree: TreeOutput }
       ))

@@ -227,7 +227,7 @@ const PrintTraitRef = ({ traitRef }: { traitRef: TraitRef }) => {
 
 const PrintPath = ({
   path,
-  colonsBefore = true,
+  colonsBefore = false,
 }: {
   path: Path;
   colonsBefore?: boolean;
@@ -322,7 +322,12 @@ const PrintGenericArgs = ({
                 })}
               />
             );
-            return commsep;
+            return (
+              <span>
+                {prefix}
+                {commsep}
+              </span>
+            );
           })();
 
       const bindings = _.map(uArgs.bindings, (binding, idx) => (
@@ -390,7 +395,7 @@ const PrintBounds = ({
   return (
     <span>
       {_.map(bounds, (bound, idx) => {
-        const prfx = idx == 0 ? prefix : "+ ";
+        const prfx = idx == 0 ? (prefix.length > 0 ? prefix + " " : "") : "+ ";
         if ("Trait" in bound) {
           const mb = bound.Trait[1] === "Maybe" ? "?" : "";
           return (
