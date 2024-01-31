@@ -17,11 +17,13 @@ export const PrintDefPath = ({ o }) => {
   return (
     <div className="DefPathContainer">
       <HoverInfo
-        content={
-          <span className="DefPathFull">
-            <PrintDefPathFull o={o} />
-          </span>
-        }
+        Content={() => (
+          <div className="DirNode">
+            <span className="DefPathFull">
+              <PrintDefPathFull o={o} />
+            </span>
+          </div>
+        )}
       >
         <span className="DefPathShort">
           <PrintDefPathShort o={o} />
@@ -33,7 +35,7 @@ export const PrintDefPath = ({ o }) => {
 
 // PathSegment[]
 export const PrintDefPathShort = ({ o }) => {
-  console.log("Printing def path short: ", o);
+  console.debug("Printing def path short: ", o);
   const prefix = takeRightUntil(o, segment => {
     return (
       segment.type === "crate" ||
@@ -43,7 +45,7 @@ export const PrintDefPathShort = ({ o }) => {
       segment.type === "implAs"
     );
   });
-  console.log("Prefix", prefix);
+  console.debug("Prefix", prefix);
 
   return (
     <span>
@@ -66,7 +68,7 @@ export const PrintDefPathFull = ({ o }) => {
 };
 
 export const PrintPathSegment = ({ o }) => {
-  console.log("Printing path segment", o);
+  console.debug("Printing path segment", o);
   switch (o.type) {
     case "colons": {
       return "::";
@@ -127,7 +129,7 @@ export const PrintPathSegment = ({ o }) => {
           : (_e, _i) => {
               throw new Error("Unknown comma separated kind", o);
             };
-      console.log("CommaSeparated", o);
+      console.debug("CommaSeparated", o);
       return <>{intersperse(o.entries, ", ", doInner)}</>;
     }
     default: {

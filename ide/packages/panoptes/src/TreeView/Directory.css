@@ -1,6 +1,5 @@
 .DirRecursive {
     line-height: 2;
-    padding-left: 0.5em;
 }
 
 .DirRecursive.is-candidate {
@@ -11,24 +10,32 @@
     border-left: 1.5px solid #aaa;
 }
 
-#Collapsible {
+.Collapsible {
     height: auto;
 }
 
-#Collapsible.indent {
+.Collapsible.indent {
     padding-left: 1em;
 }
 
-#Collapsible.collapsed {
+.Collapsible.collapsed {
     height: 0;
     overflow: hidden;
 }
 
 .DirNode {
-    font-family: monospace;
+    font-family: Menlo, Monaco, "Courier New", monospace;
+}
+
+.DirNode > .toggle {
+    display: inline-block;
+    width: 12px;
+}
+
+.DirNode > .toggle > .codicon {
+    font-size: 12px;
 }
 
 .information::before {
     content: ' ';
-    padding-right: 1em;
 }

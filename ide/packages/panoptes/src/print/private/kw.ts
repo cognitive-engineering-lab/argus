@@ -1,5 +1,7 @@
 import { Ident } from "@argus/common/bindings/serialization/hir/types";
 
+import "./kw.css";
+
 // See https://doc.rust-lang.org/stable/nightly-rustc/rustc_span/symbol/kw/index.html
 
 export const UnderscoreLifetime: Ident = { name: "'_" };

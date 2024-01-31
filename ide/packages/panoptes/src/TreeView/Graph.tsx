@@ -156,7 +156,7 @@ const TreeArea = observer(({ tree }: { tree: SerializedTree }) => {
     if (sid !== undefined) {
       let idx = +sid as number;
       activeContext.setActiveNode(idx);
-      console.log("Hovered node name", idx);
+      console.debug("Hovered node name", idx);
     } else {
       console.warn("Hovered node name is undefined", evnt.currentTarget);
     }

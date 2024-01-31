@@ -9,7 +9,7 @@ export const PrintBinder = ({ binder, innerF }) => {
 };
 
 export const PrintTy = ({ o }) => {
-  console.log("Printing Ty", o);
+  console.debug("Printing Ty", o);
   return <PrintTyKind o={o} />;
 };
 
@@ -233,7 +233,7 @@ export const PrintTypeAndMut = ({ o }) => {
 };
 
 export const PrintGenericArg = ({ o }) => {
-  console.log("GenericArg", o);
+  console.debug("GenericArg", o);
 
   if ("Type" in o) {
     return <PrintTy o={o.Type} />;

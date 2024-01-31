@@ -39,20 +39,16 @@ const TreeApp = ({ tree }: { tree: SerializedTree | undefined }) => {
       <ActiveContext.Provider value={new ActiveState()}>
         <div className="App">
           <VSCodePanels>
-            {_.map(tabs, ([name, _], idx) => {
-              return (
-                <VSCodePanelTab key={idx} id={`tab-${idx}`}>
-                  {name}
-                </VSCodePanelTab>
-              );
-            })}
-            {_.map(tabs, ([_, component], idx) => {
-              return (
-                <VSCodePanelView key={idx} id={`tab-${idx}`}>
-                  {component}
-                </VSCodePanelView>
-              );
-            })}
+            {_.map(tabs, ([name, _], idx) => (
+              <VSCodePanelTab key={idx} id={`tab-${idx}`}>
+                {name}
+              </VSCodePanelTab>
+            ))}
+            {_.map(tabs, ([_, component], idx) => (
+              <VSCodePanelView key={idx} id={`tab-${idx}`}>
+                {component}
+              </VSCodePanelView>
+            ))}
           </VSCodePanels>
         </div>
       </ActiveContext.Provider>

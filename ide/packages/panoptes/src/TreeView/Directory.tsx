@@ -39,20 +39,22 @@ export const CollapsibleElement = ({
     setIsOpen(!isOpen);
   };
 
-  const collapseCN = classNames({
+  const collapseCN = classNames("Collapsible", {
     indent: indentChildren,
     collapsed: !isOpen,
   });
 
+  let numChildren = React.Children.count(children);
+
   return (
     <>
       <div className="DirNode" onClick={toggleCollapse}>
-        {isOpen ? openIco : closedIco}
+        <span className="toggle">
+          {numChildren > 0 ? (isOpen ? openIco : closedIco) : null}
+        </span>
         <span className="information">{info}</span>
       </div>
-      <div id="Collapsible" className={collapseCN}>
-        {children}
-      </div>
+      <div className={collapseCN}>{children}</div>
     </>
   );
 };
@@ -88,8 +90,7 @@ export const DirRecursive = ({
 }) => {
   const tree = useContext(TreeContext)!;
   const node = tree.nodes[level[0]];
-  const className = classNames({
-    DirRecursive: true,
+  const className = classNames("DirRecursive", {
     "is-candidate": styleEdges && node?.type === "candidate",
     "is-subgoal": styleEdges && node?.type === "goal",
   });
@@ -100,11 +101,13 @@ export const DirRecursive = ({
         const next = getNext(tree, current);
         return (
           <DirNode key={i} idx={current} styleEdge={styleEdges}>
-            <DirRecursive
-              level={next}
-              getNext={getNext}
-              styleEdges={styleEdges}
-            />
+            {next.length > 0 ? (
+              <DirRecursive
+                level={next}
+                getNext={getNext}
+                styleEdges={styleEdges}
+              />
+            ) : null}
           </DirNode>
         );
       })}

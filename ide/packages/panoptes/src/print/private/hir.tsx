@@ -42,7 +42,7 @@ const CommaSeparated = ({ children }: { children: React.ReactNode[] }) => {
   return (
     <span>
       {_.map(children, (child, i) => (
-        <span>
+        <span key={i}>
           {i > 0 ? ", " : ""}
           {child}
         </span>
@@ -69,7 +69,7 @@ function paramName(param: ParamName): Ident {
 }
 
 export const PrintImpl = ({ impl }: { impl: Impl }) => {
-  console.log("Printing Impl", impl);
+  console.debug("Printing Impl", impl);
 
   const generics =
     impl.generics.params.length === 0 ? (
@@ -85,8 +85,8 @@ export const PrintImpl = ({ impl }: { impl: Impl }) => {
   const ofTrait =
     impl.of_trait !== undefined ? (
       <span>
-        <PrintTraitRef traitRef={impl.of_trait} />
-        {" for "}
+        <PrintTraitRef traitRef={impl.of_trait} />{" "}
+        <span className="kw">for</span>{" "}
       </span>
     ) : (
       ""
@@ -98,7 +98,8 @@ export const PrintImpl = ({ impl }: { impl: Impl }) => {
   // TODO: the where clauses need to go in a tooltip
   return (
     <span>
-      impl{generics}
+      <span className="kw">impl</span>
+      {generics}
       {polarity}
       {ofTrait}
       {ty}
@@ -112,15 +113,8 @@ const PrintWhereClause = ({ generics }: { generics: Generics }) => {
     return "";
   }
 
-  const whereContent = (
-    <span>
-      {" "}
-      <span className="where">where ...</span>
-    </span>
-  );
-
-  const whereHoverContent = (
-    <div className="WhereConstraintArea">
+  const whereHoverContent = () => (
+    <div className="DirNode WhereConstraintArea">
       {_.map(generics.predicates, (pred, idx) => {
         const innerContent =
           "BoundPredicate" in pred ? (
@@ -160,7 +154,15 @@ const PrintWhereClause = ({ generics }: { generics: Generics }) => {
     </div>
   );
 
-  return <HoverInfo content={whereHoverContent}>{whereContent}</HoverInfo>;
+  return (
+    <span>
+      {" "}
+      <span className="kw">where</span>{" "}
+      <HoverInfo Content={whereHoverContent}>
+        <span className="where">...</span>
+      </HoverInfo>
+    </span>
+  );
 };
 
 const PrintGenericsParams = ({ generics }: { generics: Generics }) => {
@@ -399,7 +401,7 @@ const PrintBounds = ({
         if ("Trait" in bound) {
           const mb = bound.Trait[1] === "Maybe" ? "?" : "";
           return (
-            <span>
+            <span key={idx}>
               {prfx}
               {mb}
               <PrintPolyTraitRef pTraitRef={bound.Trait[0]} />
@@ -407,7 +409,7 @@ const PrintBounds = ({
           );
         } else if ("Outlives" in bound) {
           return (
-            <span>
+            <span key={idx}>
               {prfx}
               <PrintLifetime lifetime={bound.Outlives} />
             </span>

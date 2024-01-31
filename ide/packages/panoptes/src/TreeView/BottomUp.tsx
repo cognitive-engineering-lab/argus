@@ -19,20 +19,14 @@ let BottomUp = ({ tree }: { tree: SerializedTree }) => {
     return p != undefined ? [p] : [];
   };
 
-  return (
-    <>
-      {_.map(leaves, (leaf, i) => {
-        return (
-          <DirRecursive
-            key={i}
-            level={[leaf]}
-            getNext={getParent}
-            styleEdges={false}
-          />
-        );
-      })}
-    </>
-  );
+  return _.map(leaves, (leaf, i) => (
+    <DirRecursive
+      key={i}
+      level={[leaf]}
+      getNext={getParent}
+      styleEdges={false}
+    />
+  ));
 };
 
 export default BottomUp;

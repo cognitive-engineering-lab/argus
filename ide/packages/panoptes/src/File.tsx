@@ -14,7 +14,14 @@ import { Filename } from "@argus/common/lib";
 import { VSCodeButton, VSCodeDivider } from "@vscode/webview-ui-toolkit/react";
 import classNames from "classnames";
 import _ from "lodash";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  Fragment,
+  RefObject,
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 
 import "./File.css";
 import { CollapsibleElement } from "./TreeView/Directory";
@@ -345,10 +352,10 @@ const File = ({
   return (
     <FileContext.Provider value={file}>
       {_.map(osibs, (osib, idx) => (
-        <>
-          <VSCodeDivider />
-          <ObligationBody osib={osib} idx={idx} key={idx} />
-        </>
+        <Fragment key={idx}>
+          {idx > 0 ? <VSCodeDivider /> : null}
+          <ObligationBody osib={osib} idx={idx} />
+        </Fragment>
       ))}
     </FileContext.Provider>
   );

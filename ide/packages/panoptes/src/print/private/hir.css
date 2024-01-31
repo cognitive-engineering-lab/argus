@@ -6,7 +6,7 @@
 
 span.where {
     padding: 0.15em;
-    border: 1px solid gray;
+    border: 1px solid var(--vscode-widget-border);
     border-radius: 5px;
 }
 

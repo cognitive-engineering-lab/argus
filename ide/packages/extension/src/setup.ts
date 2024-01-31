@@ -5,8 +5,8 @@ import os from "os";
 import path from "path";
 import vscode from "vscode";
 
-import { log } from "./logging";
 import { Ctx } from "./ctx";
+import { log } from "./logging";
 
 // TODO: before release
 // [ ] make argus_cli a published crate.
@@ -17,7 +17,6 @@ declare const TOOLCHAIN: {
   channel: string;
   components: string[];
 };
-
 
 const LIBRARY_PATHS: Partial<Record<NodeJS.Platform, string>> = {
   darwin: "DYLD_LIBRARY_PATH",
@@ -70,7 +69,6 @@ export const getArgusOpts = async (cwd: string) => {
   return opts;
 };
 
-
 let execNotifyBinary = async (
   cmd: string,
   args: string[],
@@ -109,7 +107,6 @@ let execNotifyBinary = async (
   });
 };
 
-
 export let execNotify = async (
   cmd: string,
   args: string[],
@@ -121,19 +118,16 @@ export let execNotify = async (
   return text.trimEnd();
 };
 
-
 export let cargoBin = () => {
   let cargo_home = process.env.CARGO_HOME || path.join(os.homedir(), ".cargo");
   return path.join(cargo_home, "bin");
 };
-
 
 export let cargoCommand = (): [string, string[]] => {
   let cargo = "cargo";
   let toolchain = `+${TOOLCHAIN.channel}`;
   return [cargo, [toolchain]];
 };
-
 
 let findWorkspaceRoot = async (): Promise<string | null> => {
   let folders = vscode.workspace.workspaceFolders;
@@ -180,8 +174,11 @@ let findWorkspaceRoot = async (): Promise<string | null> => {
   return folderSubdirTil(entry.idx);
 };
 
-
-const checkVersionAndInstall = async (workspaceRoot: string, cargo: string, cargoArgs: string[]): Promise<boolean> => {
+const checkVersionAndInstall = async (
+  workspaceRoot: string,
+  cargo: string,
+  cargoArgs: string[]
+): Promise<boolean> => {
   let version;
   try {
     version = await execNotify(
@@ -259,10 +256,7 @@ const checkVersionAndInstall = async (workspaceRoot: string, cargo: string, carg
   return true;
 };
 
-
-export async function setup(
-  context: Ctx,
-): Promise<CallArgus | null> {
+export async function setup(context: Ctx): Promise<CallArgus | null> {
   log("Getting workspace root");
 
   const workspaceRoot = await findWorkspaceRoot();
@@ -275,7 +269,11 @@ export async function setup(
   log("Workspace root", workspaceRoot);
 
   const [cargo, cargoArgs] = cargoCommand();
-  const isArgusInstalled = await checkVersionAndInstall(workspaceRoot, cargo, cargoArgs);
+  const isArgusInstalled = await checkVersionAndInstall(
+    workspaceRoot,
+    cargo,
+    cargoArgs
+  );
 
   if (!isArgusInstalled) {
     throw new Error("TODO: SETUP FAILED");
