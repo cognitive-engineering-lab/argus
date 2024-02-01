@@ -6,22 +6,21 @@
 //!
 //! The goal is that each copied block of code is modified minimally,
 //! making replacement easier in the future.
-use std::mem;
+
 
 use rustc_infer::{
   infer::InferCtxt,
   traits::{
-    query::NoSolution, solve::MaybeCause, FulfillmentError,
-    FulfillmentErrorCode, MismatchedProjectionTypes, Obligation,
-    PredicateObligation, SelectionError, TraitEngine,
+    query::NoSolution, FulfillmentError,
+    FulfillmentErrorCode, MismatchedProjectionTypes,
+    PredicateObligation, SelectionError,
   },
 };
 use rustc_middle::{
-  traits::solve::{Certainty, Goal},
   ty,
   ty::error::{ExpectedFound, TypeError},
 };
-use rustc_trait_selection::solve::InferCtxtEvalExt;
+
 
 use crate::types::intermediate::EvaluationResult;
 

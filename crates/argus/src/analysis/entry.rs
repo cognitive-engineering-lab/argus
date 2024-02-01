@@ -15,13 +15,13 @@ use crate::{
   analysis::{
     hir,
     tls::{self, FullObligationData, UODIdx},
-    transform, EvaluationResult, ForgetProvenance, Provenance,
+    transform, EvaluationResult, Provenance,
     OBLIGATION_TARGET,
   },
   ext::InferCtxtExt,
   proof_tree::serialize::serialize_proof_tree,
   serialize::{serialize_to_value, ty::PredicateDef},
-  types::{Obligation, ObligationHash, ObligationsInBody},
+  types::{Obligation},
 };
 
 fluid_let! {
@@ -51,7 +51,7 @@ pub fn process_obligation<'tcx>(
 ) {
   guard_inspection! {}
 
-  let Some(ldef_id) = infcx.body_id() else {
+  let Some(_ldef_id) = infcx.body_id() else {
     log::warn!("Skipping obligation unassociated with local body {obl:?}");
     return;
   };
@@ -137,13 +137,13 @@ pub fn build_obligations_output<'tcx>(
   body_id: BodyId,
   typeck_results: &'tcx TypeckResults<'tcx>,
 ) -> Result<serde_json::Value> {
-  use crate::ext::PredicateObligationExt;
+  
 
   let hir = tcx.hir();
   let source_map = tcx.sess.source_map();
-  let name = hir.opt_name(hir.body_owner(body_id));
+  let _name = hir.opt_name(hir.body_owner(body_id));
   let body = hir.body(body_id);
-  let body_range = CharRange::from_span(body.value.span, source_map)
+  let _body_range = CharRange::from_span(body.value.span, source_map)
     .expect("Couldn't get body range");
 
   let mut obligations = tls::take_obligations();

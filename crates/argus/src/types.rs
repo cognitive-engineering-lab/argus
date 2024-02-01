@@ -17,7 +17,7 @@ use std::{ops::Deref, str::FromStr};
 use anyhow::Result;
 use index_vec::IndexVec;
 use rustc_data_structures::{
-  fx::{FxHashMap as HashMap, FxHashSet as HashSet},
+  fx::{FxHashSet as HashSet},
   stable_hasher::Hash64,
 };
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};

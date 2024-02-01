@@ -3,22 +3,18 @@ use itertools::Itertools;
 use rustc_data_structures::fx::FxHashSet as HashSet;
 use rustc_hir::{
   self as hir,
-  def_id::{DefId, LocalDefId},
   intravisit::Map,
-  BodyId, HirId, LangItem,
+  BodyId, HirId,
 };
 use rustc_infer::{
   infer::{canonical::OriginalQueryValues, InferCtxt, InferOk},
   traits::{self, ObligationCauseCode, PredicateObligation},
 };
 use rustc_middle::ty::{
-  self, ParamEnvAnd, ToPredicate, Ty, TyCtxt, TyKind, TypeckResults,
+  self, ParamEnvAnd, ToPredicate, Ty, TyCtxt, TypeckResults,
 };
 use rustc_span::Span;
-use rustc_trait_selection::{
-  solve::{GenerateProofTree, InferCtxtEvalExt},
-  traits::query::NoSolution,
-};
+
 use rustc_utils::source_map::range::CharRange;
 
 use super::{
@@ -213,7 +209,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
   fn relate_method_call<'hir>(
     &mut self,
     // Id of the call e xpression (for debugging only)
-    hir_id: HirId,
+    _hir_id: HirId,
     // The method segment
     _segment: &'hir hir::PathSegment<'hir>,
     // Call receiver
@@ -225,7 +221,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     // FIXME: type the `usize` here,
     obligations: &[usize],
   ) -> Option<(MethodLookupIdx, bool)> {
-    let hir = self.tcx.hir();
+    let _hir = self.tcx.hir();
 
     // Given that the receiver is of type error, we can tell users
     // to annotate the receiver type if they want to get "better"

@@ -12,7 +12,7 @@ use std::collections::HashSet;
 
 use index_vec::IndexVec;
 use rustc_hir as hir;
-use rustc_middle::ty::{TraitRef, Ty};
+
 use serde::Serialize;
 pub use topology::*;
 #[cfg(feature = "ts-rs")]
@@ -20,7 +20,6 @@ use ts_rs::TS;
 
 use crate::serialize::{
   hir::Option__ImplDef,
-  ty::{TraitRefPrintOnlyTraitPathDef, TyDef},
 };
 
 crate::define_usize_idx! {

@@ -1,7 +1,7 @@
 use rustc_data_structures::stable_hasher::{Hash64, HashStable, StableHasher};
 use rustc_hir::{
   def_id::{DefId, LocalDefId},
-  BodyId, HirId, LangItem,
+  BodyId, HirId,
 };
 use rustc_hir_typeck::inspect_typeck;
 use rustc_infer::{
