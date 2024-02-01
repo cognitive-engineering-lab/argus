@@ -1,29 +1,42 @@
-import { AmbiguityError, CharRange, Obligation, ObligationHash, ObligationsInBody, SerializedTree, TraitError } from "@argus/common/bindings";
+import {
+  CharRange,
+  Expr,
+  ExprKind,
+  MethodLookup,
+  MethodLookupIdx,
+  Obligation,
+  ObligationHash,
+  ObligationIdx,
+  ObligationsInBody,
+  SerializedTree,
+} from "@argus/common/bindings";
 import { Filename } from "@argus/common/lib";
 import { VSCodeButton, VSCodeDivider } from "@vscode/webview-ui-toolkit/react";
 import classNames from "classnames";
 import _ from "lodash";
-import React, { RefObject, createContext, useContext, useEffect, useState } from "react";
-
-
+import React, {
+  RefObject,
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 
 import "./File.css";
 import { CollapsibleElement, ElementPair } from "./TreeView/Directory";
 import TreeApp from "./TreeView/TreeApp";
 // @ts-ignore
-import { PrettyObligation } from "./print/print";
-import { PrintTy } from "./print/private/ty";
+import { PrintImpl, PrintObligation, PrintTy } from "./print/print";
 import { WaitingOn } from "./utilities/WaitingOn";
 import {
   IcoAmbiguous,
   IcoCheck,
   IcoChevronDown,
-  IcoChevronRight,
   IcoChevronUp,
   IcoError,
+  IcoLoop,
 } from "./utilities/icons";
 import { postToExtension, requestFromExtension } from "./utilities/vscode";
-
 
 const FileContext = createContext<Filename | undefined>(undefined);
 const BodyInfoContext = createContext<BodyInfo | undefined>(undefined);
@@ -34,27 +47,37 @@ class BodyInfo {
     readonly idx: number,
     readonly viewHiddenObligations: boolean = false
   ) {}
-  obligation(hash: ObligationHash): Obligation | undefined {
-    return this.oib.obligations.find(o => o.hash === hash);
-  }
   get showHidden(): boolean {
     return this.viewHiddenObligations;
   }
   get numErrors(): number {
     return this.oib.ambiguityErrors.length + this.oib.traitErrors.length;
   }
-  get numUnclassified(): number {
-    return this.oib.unclassified.length;
+  get exprs(): Expr[] {
+    return this.oib.exprs;
   }
-  get allObligations(): Obligation[] {
-    return _.filter(this.oib.obligations, o => o.isNecessary);
+
+  byHash(hash: ObligationHash): Obligation | undefined {
+    return this.oib.obligations.find(o => o.hash === hash);
+  }
+  getObligation(idx: ObligationIdx): Obligation {
+    return this.oib.obligations[idx];
+  }
+  getMethodLookup(idx: MethodLookupIdx): MethodLookup {
+    console.debug(
+      "Method lookups: ",
+      this.oib.methodLookups.length,
+      idx,
+      this.oib.methodLookups
+    );
+    return this.oib.methodLookups[idx];
   }
   notHidden(hash: ObligationHash): boolean {
-    const o = this.obligation(hash);
+    const o = this.byHash(hash);
     if (o === undefined) {
       return false;
     }
-    return o.isNecessary || this.showHidden;
+    return o.necessity === "Yes" || this.showHidden;
   }
 }
 
@@ -73,11 +96,33 @@ export function errorCardId(
   return `err--${name}-${bodyIdx}-${errType}-${errIdx}`;
 }
 
+function makeHighlightPosters(range: CharRange, file: Filename) {
+  const addHighlight = () => {
+    postToExtension({
+      type: "FROM_WEBVIEW",
+      file,
+      command: "add-highlight",
+      range,
+    });
+  };
+
+  const removeHighlight = () => {
+    postToExtension({
+      type: "FROM_WEBVIEW",
+      file,
+      command: "remove-highlight",
+      range,
+    });
+  };
+
+  return [addHighlight, removeHighlight];
+}
+
 const NoTreeFound = ({ obligation }: { obligation: Obligation }) => {
   return (
     <div>
       <h3>Couldn't find a proof tree for this obligation</h3>
-      <PrettyObligation obligation={obligation} />
+      <PrintObligation obligation={obligation} />
 
       <p>This is a bug, please report it!</p>
     </div>
@@ -143,23 +188,10 @@ const ObligationCard = ({
   const file = useContext(FileContext)!;
   const id = obligationCardId(file, obligation.hash);
 
-  const addHighlight = () => {
-    postToExtension({
-      type: "FROM_WEBVIEW",
-      file: file,
-      command: "add-highlight",
-      range: obligation.range,
-    });
-  };
-
-  const removeHighlight = () => {
-    postToExtension({
-      type: "FROM_WEBVIEW",
-      file: file,
-      command: "remove-highlight",
-      range: obligation.range,
-    });
-  };
+  const [addHighlight, removeHighlight] = makeHighlightPosters(
+    obligation.range,
+    file
+  );
 
   const handleClick = () => {
     setIsInfoVisible(!isInfoVisible);
@@ -170,6 +202,8 @@ const ObligationCard = ({
       <IcoCheck />
     ) : obligation.result === "no" ? (
       <IcoError />
+    ) : obligation.result === "maybe-overflow" ? (
+      <IcoLoop />
     ) : (
       <IcoAmbiguous />
     );
@@ -186,7 +220,7 @@ const ObligationCard = ({
         <span className={classNames("result", obligation.result)}>
           {resultIco}
         </span>{" "}
-        <PrettyObligation obligation={obligation} />
+        <PrintObligation obligation={obligation} />
       </div>
       <VSCodeButton
         className="ObligationButton"
@@ -202,96 +236,63 @@ const ObligationCard = ({
   );
 };
 
-const ObligationFromHash = ({ hash }: { hash: ObligationHash }) => {
+const ObligationFromIdx = ({ idx }: { idx: ObligationIdx }) => {
   const bodyInfo = useContext(BodyInfoContext)!;
-  const o = bodyInfo.obligation(hash);
-
-  if (o === undefined) {
-    return <NoObligationFound hash={hash} />;
-  }
+  const o = bodyInfo.getObligation(idx);
 
   return <ObligationCard range={o.range} obligation={o} />;
 };
 
-const TraitErrorComponent = ({
-  error,
-  errIdx,
-}: {
-  error: TraitError;
-  errIdx: number;
-}) => {
+const MethodLookupTable = ({ lookup }: { lookup: MethodLookupIdx }) => {
   const bodyInfo = useContext(BodyInfoContext)!;
-  const file = useContext(FileContext)!;
-  const errorId = errorCardId(file, bodyInfo.idx, errIdx, "trait");
-  const visibleCandidates = _.filter(error.candidates, c => bodyInfo.notHidden(c));
-  return (
-    <div id={errorId}>
-      <h4>Trait bound unsatisfied</h4>
-      {_.map(visibleCandidates, (candidate, idx) => (
-        <ObligationFromHash hash={candidate} key={idx} />
-      ))}
-    </div>
-  );
-};
-
-const MethodLookupTable = ({ error }: { error: AmbiguityError }) => {
-  const bodyInfo = useContext(BodyInfoContext)!;
-  const table = _.map(error.lookup.table, (step, idx) => {
+  const lookupInfo = bodyInfo.getMethodLookup(lookup);
+  const table = _.map(lookupInfo.table, (step, idx) => {
     const tyComp = (
       <span>
-        Receiver type <PrintTy o={step.step.ty} key={idx} />
+        Receiver type <PrintTy ty={step.recvrTy.ty} key={idx} />
       </span>
     );
 
-    const obligationsAtStep = _.filter(
-      [step.derefQuery, step.relateQuery, ...step.traitPredicates],
-      o => o !== undefined && bodyInfo.notHidden(o)
-    );
+    const obligationsAtStep = step.traitPredicates;
 
     return (
       <CollapsibleElement info={tyComp} key={idx}>
         <h4>Queries on receiver</h4>
         {_.map(obligationsAtStep, (query, idx) => (
-          <ObligationFromHash hash={query!} key={idx} />
+          <ObligationFromIdx idx={query!} key={idx} />
         ))}
       </CollapsibleElement>
     );
   });
 
-  const unmarkedToShow = _.filter(error.lookup.unmarked, o => bodyInfo.notHidden(o));
-  const unmarked =
-    error.lookup.unmarked.length > 0 ? (
-      <CollapsibleElement info={<b>Uncategorized obligations</b>}>
-        {_.map(unmarkedToShow, (oblHash, idx) => (
-          <ObligationFromHash hash={oblHash} key={idx} />
-        ))}
-      </CollapsibleElement>
+  return table;
+};
+
+const InExpr = ({ expr }: { expr: Expr }) => {
+  const file = useContext(FileContext)!;
+  const [addHighlight, removeHighlight] = makeHighlightPosters(
+    expr.range,
+    file
+  );
+
+  const belowContent =
+    expr.kind === "misc" ? (
+      ""
+    ) : expr.kind.type === "methodCall" ? (
+      <MethodLookupTable lookup={expr.kind.data} />
     ) : (
       ""
     );
 
+  const header = <span>Expression</span>;
   return (
-    <>
-      {table}
-      {unmarked}
-    </>
-  );
-};
-
-const AmbiguityErrorComponent = ({
-  error,
-  errIdx,
-}: {
-  error: AmbiguityError;
-  errIdx: number;
-}) => {
-  const bodyInfo = useContext(BodyInfoContext)!;
-  const file = useContext(FileContext)!;
-  const errorId = errorCardId(file, bodyInfo.idx, errIdx, "ambig");
-  return (
-    <div id={errorId}>
-      <h4>Ambiguous method call</h4>
-      <MethodLookupTable error={error} />
+    <div onMouseEnter={addHighlight} onMouseLeave={removeHighlight}>
+      <CollapsibleElement info={header}>
+        {_.map(expr.obligations, (oi, i) => (
+          <ObligationFromIdx idx={oi} key={i} />
+        ))}
+        {belowContent}
+      </CollapsibleElement>
     </div>
   );
 };
@@ -306,41 +307,19 @@ const ObligationBody = ({
   const bodyName = osib.name;
   const bodyInfo = new BodyInfo(osib, idx);
   const errCount = bodyInfo.numErrors;
-  const numUnclassified = bodyInfo.numUnclassified;
   const header = (
     <span>
-      Body <code>{bodyName}</code> (
-      <span style={{ color: "red" }}>{errCount}</span>)
+      Body <code>{bodyName}</code>
+      {errCount > 0 ? <span style={{ color: "red" }}>({errCount})</span> : ""}
     </span>
   );
-
-  const unclassifiedFiltered = _.filter(osib.unclassified, o => bodyInfo.notHidden(o));
-  const unclassifiedElements =
-    numUnclassified == 0 ? (
-      ""
-    ) : (
-      <CollapsibleElement info={<b>Uncategorized obligations</b>}>
-        {_.map(unclassifiedFiltered, (oblHash, idx) => (
-          <ObligationFromHash hash={oblHash} key={idx} />
-        ))}
-      </CollapsibleElement>
-    );
 
   return (
     <BodyInfoContext.Provider value={bodyInfo}>
       <CollapsibleElement info={header}>
-        {_.map(osib.traitErrors, (error, idx) => (
-          <TraitErrorComponent error={error} errIdx={idx} />
+        {_.map(bodyInfo.exprs, (expr, idx) => (
+          <InExpr expr={expr} key={idx} />
         ))}
-        {_.map(osib.ambiguityErrors, (error, idx) => (
-          <AmbiguityErrorComponent error={error} errIdx={idx} />
-        ))}
-        {unclassifiedElements}
-        <CollapsibleElement info={<b>All obligation in body</b>}>
-          {_.map(bodyInfo.allObligations, (obl, idx) => (
-            <ObligationCard range={obl.range} obligation={obl} key={idx} />
-          ))}
-        </CollapsibleElement>
       </CollapsibleElement>
     </BodyInfoContext.Provider>
   );

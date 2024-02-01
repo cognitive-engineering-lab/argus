@@ -51,6 +51,7 @@ enum ArgusCommand {
     start_column: usize,
     end_line: usize,
     end_column: usize,
+    is_synthetic: Option<bool>,
   },
 }
 
@@ -160,6 +161,9 @@ impl RustcPlugin for ArgusPlugin {
         start_column,
         end_line,
         end_column,
+
+        // TODO: we dono't yet handle synthetic queries in Argus.
+        is_synthetic: _,
       } => {
         let compute_target = || {
           Some((id, CharRange {

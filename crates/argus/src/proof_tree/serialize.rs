@@ -20,6 +20,7 @@ use super::*;
 use crate::{
   ext::InferCtxtExt,
   serialize::{serialize_to_value, ty::goal__predicate_def},
+  types::ObligationNecessity,
 };
 
 pub struct SerializedTreeVisitor<'tcx> {
@@ -119,11 +120,6 @@ impl<'tcx> Node<'tcx> {
   where
     'tcx: 'a,
   {
-    // FIXME: this function is DEPRECATED ... or, at least it will be.
-    // We may have to do another serialization pass at the HIR types
-    // if this proves insufficient for now.
-    use rustc_hir_analysis::hir_ty_to_ty;
-
     let impl_string = infcx
       .tcx
       .span_of_impl(def_id)
@@ -133,20 +129,25 @@ impl<'tcx> Node<'tcx> {
           .sess
           .source_map()
           .span_to_snippet(sp)
-          .expect("could not get impl snippet")
+          .unwrap_or_else(|_| "{failed to find impl}".to_string())
       })
       .unwrap_or_else(|symb| symb.as_str().to_string());
 
-    let Some(hir::Node::Item(item)) = infcx.tcx.hir().get_if_local(def_id)
-    else {
-      todo!();
-    };
-
-    let impl_ = item.expect_impl();
+    let impl_ =
+      infcx
+        .tcx
+        .hir()
+        .get_if_local(def_id)
+        .and_then(|item| match item {
+          hir::Node::Item(hir::Item {
+            kind: hir::ItemKind::Impl(impl_),
+            ..
+          }) => Some(*impl_),
+          _ => None,
+        });
 
     Candidate::Impl {
       data: impl_,
-
       fallback: impl_string,
     }
   }
@@ -171,7 +172,10 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
     // The frontend doesn't use them, but eventually we will!
     // self.unnecessary_roots.insert(n);
 
-    if !infcx.is_necessary_predicate(&goal.goal().predicate) {
+    if !matches!(
+      infcx.guess_predicate_necessity(&goal.goal().predicate),
+      ObligationNecessity::Yes
+    ) {
       return ControlFlow::Continue(());
     }
 

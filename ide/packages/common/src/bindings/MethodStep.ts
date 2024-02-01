@@ -1,9 +1,7 @@
-import { ObligationHash } from "./ObligationHash";
+import { ObligationIdx } from "./ObligationIdx";
 import { ReceiverAdjStep } from "./ReceiverAdjStep";
 
 export type MethodStep = {
-  step: ReceiverAdjStep;
-  derefQuery: ObligationHash | undefined;
-  relateQuery: ObligationHash | undefined;
-  traitPredicates: ObligationHash[];
+  recvrTy: ReceiverAdjStep;
+  traitPredicates: ObligationIdx[];
 };

@@ -1,8 +1,7 @@
-mod ambiguous;
-mod bounds;
 mod entry;
 mod hir;
 mod tls;
+mod transform;
 
 use std::{
   fmt::{self, Debug, Formatter},
@@ -59,7 +58,7 @@ pub(crate) struct Provenance<T: Sized> {
   // The expression from whence `it` came, the
   // referenced element is expected to be an
   // expression.
-  originating_expression: HirId,
+  hir_id: HirId,
 
   // Index into the full provenance data, this is stored for interesting obligations.
   full_data: Option<tls::UODIdx>,
@@ -71,7 +70,7 @@ impl<T: Sized> Provenance<T> {
   fn map<U: Sized>(&self, f: impl FnOnce(&T) -> U) -> Provenance<U> {
     Provenance {
       it: f(&self.it),
-      originating_expression: self.originating_expression,
+      hir_id: self.hir_id,
       full_data: self.full_data,
     }
   }
@@ -92,16 +91,16 @@ impl<T: Sized> Provenance<T> {
   pub fn contained_in(&self, tcx: &TyCtxt, span: Span) -> bool {
     tcx
       .hir()
-      .opt_span(self.originating_expression)
+      .opt_span(self.hir_id)
       .map(|this| span.contains(this))
       .unwrap_or(false)
   }
 
   pub fn child_of(&self, tcx: &TyCtxt, other: HirId) -> bool {
-    self.originating_expression == other
+    self.hir_id == other
       || tcx
         .hir()
-        .parent_iter(self.originating_expression)
+        .parent_iter(self.hir_id)
         .find(|(id, _)| *id == other)
         .is_some()
   }

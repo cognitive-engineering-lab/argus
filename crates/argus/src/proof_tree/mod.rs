@@ -19,7 +19,7 @@ pub use topology::*;
 use ts_rs::TS;
 
 use crate::serialize::{
-  hir::ImplDef,
+  hir::Option__ImplDef,
   ty::{TraitRefPrintOnlyTraitPathDef, TyDef},
 };
 
@@ -50,8 +50,9 @@ pub enum Node<'tcx> {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Candidate<'hir> {
   Impl {
-    #[serde(with = "ImplDef")]
-    data: &'hir hir::Impl<'hir>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(with = "Option__ImplDef")]
+    data: Option<&'hir hir::Impl<'hir>>,
 
     fallback: String,
   },

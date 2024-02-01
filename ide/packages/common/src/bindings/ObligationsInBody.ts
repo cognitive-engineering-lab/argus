@@ -1,14 +1,15 @@
-import { AmbiguityError } from "./AmbiguityError";
 import type { CharRange } from "./CharRange";
+import { Expr } from "./Expr";
+import { ExprIdx } from "./ExprIdx";
+import { MethodLookup } from "./MethodLookup";
 import { Obligation } from "./Obligation";
-import { ObligationHash } from "./ObligationHash";
-import { TraitError } from "./TraitError";
 
 export type ObligationsInBody = {
   name: string | undefined;
-  traitErrors: TraitError[];
-  ambiguityErrors: AmbiguityError[];
   range: CharRange;
+  ambiguityErrors: ExprIdx[];
+  traitErrors: ExprIdx[];
   obligations: Obligation[];
-  unclassified: ObligationHash[];
+  exprs: Expr[];
+  methodLookups: MethodLookup[];
 };

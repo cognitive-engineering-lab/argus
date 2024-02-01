@@ -6,7 +6,7 @@ import { PrintTerm } from "./term";
 import { PrintBinder, PrintGenericArg, PrintTy } from "./ty";
 
 export const PrintGoalPredicate = ({ o }) => {
-  // NOTE: by default just prin the predicate, not the env.
+  // NOTE: by default just print the predicate, not the env.
   return <PrintBinderPredicateKind o={o.predicate} />;
 };
 

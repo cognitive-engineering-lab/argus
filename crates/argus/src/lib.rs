@@ -6,6 +6,7 @@
     let_chains,
     decl_macro, // path serialize
     extract_if,
+    hash_extract_if,
     box_patterns,
     control_flow_enum
 )]

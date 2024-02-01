@@ -2,12 +2,13 @@
 import type { CharRange } from "./CharRange";
 import { ObligationHash } from "./ObligationHash";
 import type { ObligationKind } from "./ObligationKind";
+import type { ObligationNecessity } from "./ObligationNecessity";
 
 export type Obligation = {
   range: CharRange;
   predicate: any;
   hash: ObligationHash;
   kind: ObligationKind;
-  isNecessary: boolean;
+  necessity: ObligationNecessity;
   result: "yes" | "maybe-overflow" | "maybe-ambiguity" | "no";
 };

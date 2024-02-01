@@ -20,12 +20,43 @@ use serde::Serialize;
 use crate::{
   analysis::{EvaluationResult, FulfillmentData},
   serialize::{serialize_to_value, ty::PredicateDef},
-  types::Obligation,
+  types::{Obligation, ObligationNecessity},
 };
 
 pub trait CharRangeExt: Copy + Sized {
   /// Returns true if this range touches the `other`.
   fn overlaps(self, other: Self) -> bool;
+}
+
+pub trait PredicateExt {
+  fn is_trait_predicate(&self) -> bool;
+
+  fn is_rhs_lang_item(&self, tcx: &TyCtxt) -> bool;
+
+  fn is_trait_pred_rhs(&self, def_id: DefId) -> bool;
+}
+
+impl PredicateExt for Predicate<'_> {
+  fn is_trait_predicate(&self) -> bool {
+    matches!(
+      self.kind().skip_binder(),
+      ty::PredicateKind::Clause(ty::ClauseKind::Trait(..))
+    )
+  }
+
+  fn is_rhs_lang_item(&self, tcx: &TyCtxt) -> bool {
+    tcx
+      .lang_items()
+      .iter()
+      .any(|(_lang_item, def_id)| self.is_trait_pred_rhs(def_id))
+  }
+
+  fn is_trait_pred_rhs(&self, def_id: DefId) -> bool {
+    matches!(self.kind().skip_binder(),
+    ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
+      trait_predicate.def_id() == def_id
+    })
+  }
 }
 
 pub trait StableHash<'__ctx, 'tcx>:
@@ -48,12 +79,6 @@ pub trait TyCtxtExt<'tcx> {
     body_id: BodyId,
     inspector: ObligationInspector<'tcx>,
   ) -> &TypeckResults;
-
-  fn is_trait_pred_rhs(
-    &self,
-    predicate: &Predicate<'tcx>,
-    hir_id: DefId,
-  ) -> bool;
 }
 
 pub trait TypeckResultsExt<'tcx> {
@@ -74,13 +99,11 @@ impl PredicateObligationExt for PredicateObligation<'_> {
     let original_span = Span::source_callsite(self.cause.span);
     CharRange::from_span(original_span, source_map).unwrap_or_else(|_| {
       log::warn!("Scrambling to find range for span {:?}", original_span);
-
       let def_id = self.cause.body_id.to_def_id();
       let s = tcx
         .hir()
         .span_if_local(def_id)
         .unwrap_or(rustc_span::DUMMY_SP);
-
       CharRange::from_span(s, source_map)
         .expect("failed to get range from local span")
     })
@@ -107,32 +130,24 @@ pub trait InferCtxtExt<'tcx> {
     fdata: FulfillmentData<'_, 'tcx>,
   ) -> Obligation;
 
-  fn is_necessary_predicate(&self, p: &Predicate<'tcx>) -> bool;
+  fn guess_predicate_necessity(
+    &self,
+    p: &Predicate<'tcx>,
+  ) -> ObligationNecessity;
 
-  /// Is the `self_ty` of the predicate `()`?
-  fn is_lhs_unit(&self, p: &Predicate<'tcx>) -> bool;
-
-  /// Is the trait bound a lang item? (E.g., `Sized`, `Deref`, ...)
-  fn is_rhs_lang_item(&self, p: &Predicate<'tcx>) -> bool;
-
-  /// Is the `self_ty` an type or inference variable?
-  fn is_lhs_unknown(&self, p: &Predicate<'tcx>) -> bool;
-
-  fn is_trait_predicate(&self, p: &Predicate<'tcx>) -> bool;
+  fn obligation_necessity(
+    &self,
+    obligation: &PredicateObligation<'tcx>,
+  ) -> ObligationNecessity;
 
   fn body_id(&self) -> Option<LocalDefId>;
 
   fn predicate_hash(&self, p: &Predicate<'tcx>) -> Hash64;
 
-  //   fn build_trait_errors(
-  //     &self,
-  //     obligations: &[Obligation<'tcx>],
-  //   ) -> Vec<TraitError<'tcx>>;
-
-  //   fn build_ambiguity_errors(
-  //     &self,
-  //     obligations: &[Obligation<'tcx>],
-  //   ) -> Vec<AmbiguityError>;
+  fn evaluate_obligation(
+    &self,
+    obligation: &PredicateObligation<'tcx>,
+  ) -> EvaluationResult;
 }
 
 // -----------------------------------------------
@@ -187,13 +202,6 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
     // Typeck current body, accumulating inspected information in TLS.
     inspect_typeck(self, local_def_id, inspector)
   }
-
-  fn is_trait_pred_rhs(&self, p: &Predicate<'tcx>, def_id: DefId) -> bool {
-    matches!(p.kind().skip_binder(),
-    ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
-      trait_predicate.def_id() == def_id
-    })
-  }
 }
 
 impl<'tcx> TypeckResultsExt<'tcx> for TypeckResults<'tcx> {
@@ -216,44 +224,59 @@ impl<'tcx> TypeckResultsExt<'tcx> for TypeckResults<'tcx> {
 }
 
 impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
-  fn is_lhs_unit(&self, p: &Predicate<'tcx>) -> bool {
-    matches!(p.kind().skip_binder(),
-    ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
+  fn guess_predicate_necessity(
+    &self,
+    p: &Predicate<'tcx>,
+  ) -> ObligationNecessity {
+    use ObligationNecessity::*;
+
+    let is_rhs_lang_item = || {
+      self
+        .tcx
+        .lang_items()
+        .iter()
+        .any(|(_lang_item, def_id)| p.is_trait_pred_rhs(def_id))
+    };
+
+    if !p.is_trait_predicate() {
+      ForProfessionals
+    } else if is_rhs_lang_item() {
+      OnError
+    } else {
+      Yes
+    }
+  }
+
+  /// Determine what level of "necessity" an obligation has.
+  ///
+  /// For example, obligations with a cause `SizedReturnType`,
+  /// with a self_ty `()` (unit), is *unecessary*. Obligations whose
+  /// kind is not a Trait Clause, are generally deemed `ForProfessionals`
+  /// (that is, you can get them when interested), and others are shown
+  /// `OnError`. Necessary obligations are trait predicates where the
+  /// type and trait are not `LangItems`.
+  fn obligation_necessity(
+    &self,
+    obligation: &PredicateObligation<'tcx>,
+  ) -> ObligationNecessity {
+    use rustc_infer::traits::ObligationCauseCode::*;
+    use ObligationNecessity::*;
+
+    let p = &obligation.predicate;
+    let code = obligation.cause.code();
+
+    let is_lhs_unit = || {
+      matches!(p.kind().skip_binder(),
+      ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
         trait_predicate.self_ty().is_unit()
-    })
-  }
+      })
+    };
 
-  fn is_rhs_lang_item(&self, p: &Predicate<'tcx>) -> bool {
-    self
-      .tcx
-      .lang_items()
-      .iter()
-      .any(|(_lang_item, def_id)| self.tcx.is_trait_pred_rhs(p, def_id))
-  }
-
-  // TODO: I'm not 100% that this is the correct metric.
-  fn is_lhs_unknown(&self, p: &Predicate<'tcx>) -> bool {
-    matches!(p.kind().skip_binder(),
-    ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
-        trait_predicate.self_ty().is_ty_var()
-    })
-  }
-
-  fn is_trait_predicate(&self, p: &Predicate<'tcx>) -> bool {
-    matches!(
-      p.kind().skip_binder(),
-      ty::PredicateKind::Clause(ty::ClauseKind::Trait(..))
-    )
-  }
-
-  fn is_necessary_predicate(&self, p: &Predicate<'tcx>) -> bool {
-    // NOTE: predicates of the form `_: TRAIT` and `(): TRAIT` are useless. The first doesn't have
-    // any information about the type of the Self var, and I've never understood why the latter
-    // occurs so frequently.
-    self.is_trait_predicate(p)
-      && !(self.is_lhs_unit(p)
-        || self.is_lhs_unknown(p)
-        || self.is_rhs_lang_item(p))
+    if matches!(code, SizedReturnType) && is_lhs_unit() {
+      No
+    } else {
+      self.guess_predicate_necessity(p)
+    }
   }
 
   fn sanitize_obligation(
@@ -311,9 +334,8 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     fdata: FulfillmentData<'_, 'tcx>,
   ) -> Obligation {
     let obl = &fdata.obligation;
-
     let range = obl.range(&self.tcx);
-    let is_necessary = self.is_necessary_predicate(&obl.predicate);
+    let necessity = self.obligation_necessity(&obl);
 
     #[derive(Serialize)]
     struct Wrapper<'tcx>(#[serde(with = "PredicateDef")] Predicate<'tcx>);
@@ -327,8 +349,26 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
       hash: fdata.hash.into(),
       range,
       kind: fdata.kind(),
-      is_necessary,
+      necessity,
       result: fdata.result,
+    }
+  }
+
+  fn evaluate_obligation(
+    &self,
+    obligation: &PredicateObligation<'tcx>,
+  ) -> EvaluationResult {
+    use rustc_trait_selection::{
+      solve::{GenerateProofTree, InferCtxtEvalExt},
+      traits::query::NoSolution,
+    };
+
+    match self
+      .evaluate_root_goal(obligation.clone().into(), GenerateProofTree::Never)
+      .0
+    {
+      Ok((_, c, _)) => Ok(c),
+      _ => Err(NoSolution),
     }
   }
 }

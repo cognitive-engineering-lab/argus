@@ -43,3 +43,7 @@ export const IcoError = () => {
 export const IcoAmbiguous = () => {
   return <i className="codicon codicon-question" />;
 };
+
+export const IcoLoop = () => {
+  return <i className="codicon codicon-sync" />;
+};

@@ -15,12 +15,13 @@ use crate::{
   analysis::{
     hir,
     tls::{self, FullObligationData, UODIdx},
-    EvaluationResult, ForgetProvenance, Provenance, OBLIGATION_TARGET,
+    transform, EvaluationResult, ForgetProvenance, Provenance,
+    OBLIGATION_TARGET,
   },
   ext::InferCtxtExt,
   proof_tree::serialize::serialize_proof_tree,
   serialize::{serialize_to_value, ty::PredicateDef},
-  types::{ObligationHash, ObligationsInBody},
+  types::{Obligation, ObligationHash, ObligationsInBody},
 };
 
 fluid_let! {
@@ -51,64 +52,29 @@ pub fn process_obligation<'tcx>(
   guard_inspection! {}
 
   let Some(ldef_id) = infcx.body_id() else {
-    todo!()
+    log::warn!("Skipping obligation unassociated with local body {obl:?}");
+    return;
   };
 
-  // FIXME: we really need to figure out when to save the full data.
+  // TODO: we need to figure out when to save the full data.
+  // Saving it for every obligation will consume a ton of memory
+  // and make the tool relatively slow, but I don't have a tight
+  // enough metric as to when it should be ignored. NOTE: that
+  // if the full data doesn't get stored for every obligation, make
+  // sure that usages of `provenance.full_data` are guarded, as
+  // some currently use `.unwrap()`.
   let dataid = Some(tls::unsafe_store_data(infcx, obl, result));
 
-  let hir = infcx.tcx.hir();
-  let fdata = infcx.bless_fulfilled(ldef_id, obl, result);
+  let obligation = transform::compute_provenance(infcx, obl, result, dataid);
 
-  let body_id = hir.body_owned_by(ldef_id);
-  let hir_id = hir::find_most_enclosing_node(
-    &infcx.tcx,
-    body_id,
-    fdata.obligation.cause.span,
-  )
-  .unwrap_or_else(|| hir.body_owner(body_id));
-
-  log::debug!(
-    r#"
-    Found enclosing expression
-      for PRED: {:#?}
-      in  EXPR: {}
-    "#,
-    fdata.obligation.predicate,
-    hir.node_to_string(hir_id)
-  );
-
-  let o = infcx.erase_non_local_data(fdata);
-  let o = Provenance {
-    originating_expression: hir_id,
-    full_data: dataid,
-    it: o,
-  };
-
-  // TODO: HACK: this is a quick fix to get the trait errors working,
-  // we should do this more incremental / smarter.
-  // TODO: The serialized predicate is also off, but we don't use that currently
-  // in the ide, so not an issue (yet).
-  for (span, preds) in infcx.reported_trait_errors.borrow().iter() {
-    for pred in preds.iter() {
-      let hash: ObligationHash = infcx.predicate_hash(pred).into();
-      let hir_id = hir::find_most_enclosing_node(&infcx.tcx, body_id, *span)
-        .unwrap_or_else(|| hir.body_owner(body_id));
-      let value = serialize_to_value(infcx, &PredWrapper(&*pred))
-        .expect("failed to serialize predicate");
-      tls::maybe_add_trait_error(*span, value, Provenance {
-        originating_expression: hir_id,
-        full_data: None,
-        it: hash,
-      })
-    }
-  }
-
-  tls::store_obligation(ldef_id, o);
+  tls::store_obligation(obligation);
 }
 
-// --------------------------------
-
+// TODO: we now need to handle synthetic predicates, those
+// are the predicates we simulate for method lookup. If the
+// target is synthetic we'll just have to handle all obligations
+// as from the previous case, and then search through the associated
+// method calls for the obligation.
 pub fn process_obligation_for_tree<'tcx>(
   infcx: &InferCtxt<'tcx>,
   obl: &PredicateObligation<'tcx>,
@@ -151,7 +117,7 @@ pub struct ErrorAssemblyCtx<'a, 'tcx: 'a> {
   pub tcx: TyCtxt<'tcx>,
   pub body_id: BodyId,
   pub typeck_results: &'tcx TypeckResults<'tcx>,
-  pub obligations: Vec<Provenance<ObligationHash>>,
+  pub obligations: &'a Vec<Provenance<Obligation>>,
   pub obligation_data: &'a ObligationQueriesInBody<'tcx>,
 }
 
@@ -185,54 +151,37 @@ pub fn build_obligations_output<'tcx>(
     .iter_mut()
     .filter_map(|o| {
       let idx = o.full_data?;
-      let mut v = tls::unsafe_take_data(idx)?;
-
-      // HACK: we sanitize the obligation, this includes spans etc.
-      // This is the same "adjustment" process that rustc does, although
-      // I'd like to get rid of this, TODO.
-      v.obligation =
-        v.infcx
-          .sanitize_obligation(typeck_results, &v.obligation, v.result);
-      o.it.range = v.obligation.range(&tcx);
-
+      let v = tls::unsafe_take_data(idx)?;
       Some((idx, v))
     })
     .collect::<HashMap<_, _>>();
+
   let obligation_data = ObligationQueriesInBody(obligation_data);
 
-  let obligations_hash_only = obligations
-    .iter()
-    .map(|obl| obl.map(|o| o.hash))
-    .collect::<Vec<_>>();
-
-  let bound_info = tls::take_trait_error_info();
-  let mut ctx = ErrorAssemblyCtx {
+  // let bound_info = tls::take_trait_error_info();
+  let ctx = ErrorAssemblyCtx {
     tcx,
     body_id,
     typeck_results,
-    obligations: obligations_hash_only,
+    obligations: &obligations,
     obligation_data: &obligation_data,
   };
 
-  let trait_errors = ctx.assemble_bound_errors(bound_info);
-  let ambiguity_errors = ctx.assemble_ambiguous_errors();
-  let obligations = obligations.forget();
-  let unclassified = ctx.obligations.forget();
-
-  let oib = ObligationsInBody {
-    name,
-    range: body_range,
-    ambiguity_errors,
-    trait_errors,
+  let bins = hir::associate_obligations_nodes(&ctx);
+  let oib = transform::transform(
+    tcx,
+    body_id,
+    typeck_results,
     obligations,
-    unclassified,
-  };
+    &obligation_data,
+    bins,
+  );
 
   serde_json::to_value(&oib).map_err(|e| anyhow!(e))
 }
 
-// --------------------------------
-
+// TODO: if we are looking for the tree of a synthetic obligation
+// then we will actually need to do some computation here.
 pub fn build_tree_output<'tcx>(
   _tcx: TyCtxt<'tcx>,
   _body_id: BodyId,

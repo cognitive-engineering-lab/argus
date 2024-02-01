@@ -26,3 +26,12 @@ export const ambigErrorDecorate = vscode.window.createTextEditorDecorationType({
     textDecoration: "underline wavy white",
   },
 });
+
+export const exprRangeDecorate = vscode.window.createTextEditorDecorationType({
+  light: {
+    textDecoration: "underline wavy #008DD1",
+  },
+  dark: {
+    textDecoration: "underline wavy #CAF0F8",
+  },
+});

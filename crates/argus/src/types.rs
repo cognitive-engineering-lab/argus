@@ -15,11 +15,12 @@
 use std::{ops::Deref, str::FromStr};
 
 use anyhow::Result;
+use index_vec::IndexVec;
 use rustc_data_structures::{
   fx::{FxHashMap as HashMap, FxHashSet as HashSet},
   stable_hasher::Hash64,
 };
-use rustc_infer::traits::PredicateObligation;
+use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::{
   traits::{query::NoSolution, solve::Certainty},
   ty::{Ty, TyCtxt},
@@ -30,71 +31,81 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "ts-rs")]
 use ts_rs::TS;
 
-use crate::serialize::ty::{SymbolDef, TyDef};
+use self::intermediate::EvaluationResult;
+use crate::serialize::{
+  serialize_to_value,
+  ty::{SymbolDef, TyDef},
+};
 
 // -----------------
 
-type IdxSize = u32;
-
 index_vec::define_index_type! {
-    pub struct ObligationIdx = IdxSize;
+  pub struct ObligationIdx = u32;
 }
 
 index_vec::define_index_type! {
-    pub struct TraitErrorIdx = IdxSize;
+  pub struct ExprIdx = u32;
 }
 
 index_vec::define_index_type! {
-    pub struct AmbiguousErrorIdx = IdxSize;
-}
-
-index_vec::define_index_type! {
-    pub struct TyIdx = IdxSize;
-}
-
-#[derive(Serialize)]
-#[cfg_attr(feature = "ts-rs", derive(TS))]
-#[serde(rename_all = "camelCase")]
-pub struct AmbiguityError {
-  pub range: CharRange,
-  pub lookup: MethodLookup,
+  pub struct MethodLookupIdx = u32;
 }
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "ts-rs", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct MethodLookup {
-  #[cfg_attr(feature = "ts-rs", ts(type = "MethodStep[]"))]
-  pub table: serde_json::Value,
-  pub unmarked: Vec<ObligationHash>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MethodStep<'tcx> {
-  pub step: ReceiverAdjStep<'tcx>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub deref_query: Option<ObligationHash>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub relate_query: Option<ObligationHash>,
-  pub trait_predicates: Vec<ObligationHash>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ReceiverAdjStep<'tcx> {
-  #[serde(with = "TyDef")]
-  pub ty: Ty<'tcx>,
+  pub table: Vec<MethodStep>,
 }
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "ts-rs", derive(TS))]
 #[serde(rename_all = "camelCase")]
-pub struct TraitError {
+pub struct MethodStep {
+  pub recvr_ty: ReceiverAdjStep,
+  pub trait_predicates: Vec<ObligationIdx>,
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct ReceiverAdjStep {
+  #[cfg_attr(feature = "ts-rs", ts(type = "any"))]
+  ty: serde_json::Value,
+}
+
+impl ReceiverAdjStep {
+  pub fn new<'tcx>(infcx: &InferCtxt<'tcx>, ty: Ty<'tcx>) -> Self {
+    #[derive(Serialize)]
+    struct Wrapper<'tcx>(#[serde(with = "TyDef")] Ty<'tcx>);
+    let value =
+      serialize_to_value(infcx, &Wrapper(ty)).expect("failed to serialize ty");
+    ReceiverAdjStep { ty: value }
+  }
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct Expr {
   pub range: CharRange,
-  pub candidates: Vec<ObligationHash>,
-  #[cfg_attr(feature = "ts-rs", ts(type = "Predicate"))]
-  pub predicate: serde_json::Value,
+  pub obligations: HashSet<ObligationIdx>,
+  pub kind: ExprKind,
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum ExprKind {
+  Misc,
+  CallableExpr,
+  MethodReceiver,
+  Call,
+  CallArg,
+  MethodCall {
+    data: MethodLookupIdx,
+    error_recvr: bool,
+  },
 }
 
 #[derive(Serialize)]
@@ -112,64 +123,18 @@ pub struct ObligationsInBody {
   /// All ambiguous expression in the body. These *could* involve
   /// trait errors, so it's important that we can map the specific
   /// obligations to these locations. (That is, if they occur.)
-  pub ambiguity_errors: Vec<AmbiguityError>,
+  pub ambiguity_errors: HashSet<ExprIdx>,
 
   /// Concrete trait errors, this would be when the compiler
   /// can say for certainty that a specific trait bound was required
   /// but not satisfied.
-  pub trait_errors: Vec<TraitError>,
+  pub trait_errors: HashSet<ExprIdx>,
 
-  #[cfg_attr(feature = "ts-rs", ts(type = "Obligation[]"))]
-  pub obligations: Vec<Obligation>,
+  pub obligations: IndexVec<ObligationIdx, Obligation>,
 
-  pub unclassified: Vec<ObligationHash>,
-}
+  pub exprs: IndexVec<ExprIdx, Expr>,
 
-/// The set of relations between obligation data.
-// TODO: it may also be interesting to include information such as:
-// - trait visibility, which traits are currently visible.
-// - ...
-#[derive(Serialize, Default)]
-#[cfg_attr(feature = "ts-rs", derive(TS))]
-pub struct Relations {
-  /// Bounds errors : TraitError -> [Obligation]
-  ///
-  /// When a hard trait bound occurs, e.g., `Vec<(i32, i32)>: Clone`,
-  /// there is 'generally' a single corresponding proof tree.
-  /// `TraitErrors` are shown in the editor and we want to
-  /// point users to the tree in the explorer window.
-  bounds_map: HashMap<TraitErrorIdx, HashSet<ObligationIdx>>,
-
-  /// Ambiguity : AmbiguityError -> [Obligation]
-  ///
-  /// An ambiguous expression may arise when a term such as
-  /// `obj.frobnicate()`, resolving this happens in "three steps."
-  ///
-  /// 1. Find the monomorphized type of the variable `obj`. Let's
-  ///    call this `T_0`.
-  ///
-  /// 2. Enumerate all visible traits `C_0, C_1, ..., C_m`
-  ///    that contain a trait method `frobnicate`.
-  ///
-  /// 3. Find all pairs `(T_i, C_j)` such that `T_i: T_j`.
-  ///    The types `T_0, T_1, ..., T_n` are such that
-  ///    `∀ i. 0 ≤ i < n - 1 ⟹  *T_i == T_i+1`
-  ///    (that is, `T_i` dereferences to `T_i+1`).
-  ///
-  /// Step 3 is generally where confusion creeps in.
-  ambiguity_map: HashMap<TraitErrorIdx, HashSet<ObligationIdx>>,
-
-  /// Derefs : Ty -> Ty
-  ///
-  /// This is important for knowing which obligations are sort of
-  /// "nested" in others. For example, the two obligations
-  ///
-  /// - Vec<(i32, i32)>: Clone
-  /// - &[(i32, i32)]: Clone
-  ///
-  /// Are related by the fact that `Vec<(i32, i32)>: Deref` and
-  /// `<Vec<(i32, i32)> as Deref>::Target == &[(i32, i32)]`.
-  deref_map: HashMap<TraitErrorIdx, ObligationIdx>,
+  pub method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -182,9 +147,28 @@ pub struct Obligation {
   pub hash: ObligationHash,
   pub range: CharRange,
   pub kind: ObligationKind,
-  pub is_necessary: bool,
+  pub necessity: ObligationNecessity,
   #[serde(with = "intermediate::EvaluationResultDef")]
   pub result: intermediate::EvaluationResult,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "ts-rs", derive(TS))]
+pub enum ObligationNecessity {
+  No,
+  ForProfessionals,
+  OnError,
+  Yes,
+}
+
+impl ObligationNecessity {
+  pub fn is_necessary(&self, res: EvaluationResult) -> bool {
+    use ObligationNecessity::*;
+    matches!(
+      (self, res),
+      (Yes, _) // TODO: | (OnError, Err(..))
+    )
+  }
 }
 
 #[derive(Serialize, Clone, Debug)]

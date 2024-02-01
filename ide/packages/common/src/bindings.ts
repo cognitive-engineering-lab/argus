@@ -1,17 +1,24 @@
-import { AmbiguityError } from "./bindings/AmbiguityError";
 import { Candidate } from "./bindings/Candidate";
 import { CharPos } from "./bindings/CharPos";
 import { CharRange } from "./bindings/CharRange";
+import { Expr } from "./bindings/Expr";
+import { ExprIdx } from "./bindings/ExprIdx";
+import { ExprKind } from "./bindings/ExprKind";
 import { FilenameIndex } from "./bindings/FilenameIndex";
+import { Goal } from "./bindings/Goal";
+import { MethodLookup } from "./bindings/MethodLookup";
+import { MethodLookupIdx } from "./bindings/MethodLookupIdx";
+import { MethodStep } from "./bindings/MethodStep";
 import { Node } from "./bindings/Node";
 import { Obligation } from "./bindings/Obligation";
 import { ObligationHash } from "./bindings/ObligationHash";
+import { ObligationIdx } from "./bindings/ObligationIdx";
 import { ObligationsInBody } from "./bindings/ObligationsInBody";
 import { SerializedTree } from "./bindings/SerializedTree";
-import { TraitError } from "./bindings/TraitError";
 import { TreeTopology } from "./bindings/TreeTopology";
 
 export {
+  MethodLookup,
   SerializedTree,
   Node,
   TreeTopology,
@@ -21,9 +28,14 @@ export {
   CharRange,
   FilenameIndex,
   Candidate,
-  TraitError,
   ObligationHash,
-  AmbiguityError,
+  ObligationIdx,
+  Expr,
+  ExprKind,
+  ExprIdx,
+  MethodLookupIdx,
+  MethodStep,
+  Goal,
 };
 
 export type ObligationOutput = ObligationsInBody;

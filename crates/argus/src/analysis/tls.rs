@@ -2,22 +2,13 @@
 use std::cell::RefCell;
 
 use index_vec::IndexVec;
-use rustc_data_structures::fx::{FxHashSet as HashSet, FxIndexMap as IMap};
-use rustc_hir::def_id::LocalDefId;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
-use rustc_span::Span;
 pub use unsafe_tls::{
   store as unsafe_store_data, take as unsafe_take_data, FullObligationData,
   UODIdx,
 };
 
-use crate::{
-  analysis::Provenance,
-  types::{Obligation, ObligationHash},
-};
-
-pub type RawTraitErrInfo =
-  IMap<Span, (serde_json::Value, HashSet<Provenance<ObligationHash>>)>;
+use crate::{analysis::Provenance, types::Obligation};
 
 // NOTE: we use thread local storage to accumulate obligations
 // accross call to the obligation inspector in `typeck_inspect`.
@@ -28,16 +19,11 @@ thread_local! {
   static OBLIGATIONS: RefCell<Vec<Provenance<Obligation>>> = Default::default();
 
   static TREE: RefCell<Option<serde_json::Value>> = Default::default();
-
-  static TRAIT_ERRORS: RefCell<RawTraitErrInfo> = Default::default();
 }
 
 // This is for complex obligations and their inference contexts.
 // We don't want to store the entire inference context and obligation for
-// every query, so we do it sparingly, things that make the cut:
-// - "necessary" obligations, essentially trait predicates that don't
-//   don't have a solution, and don't involve built-in traits or simple
-//   types (e.g., unit `()`).
+// every query, so we do it sparingly.
 mod unsafe_tls {
   use super::*;
   use crate::analysis::EvaluationResult;
@@ -91,11 +77,7 @@ mod unsafe_tls {
 // ------------------------------------------------
 // Obligation processing functions
 
-/// Clone the inference context and obligation for later use.
-///
-/// NOTE: that this is an expensive operation, and should only be done
-/// when necessary, an ultimate goal should be to get rid of it entirely.
-pub fn store_obligation(_ldef_id: LocalDefId, obl: Provenance<Obligation>) {
+pub fn store_obligation(obl: Provenance<Obligation>) {
   OBLIGATIONS.with(|obls| {
     if obls
       .borrow()
@@ -110,32 +92,6 @@ pub fn store_obligation(_ldef_id: LocalDefId, obl: Provenance<Obligation>) {
 
 pub fn take_obligations() -> Vec<Provenance<Obligation>> {
   OBLIGATIONS.with(|obls| obls.take())
-}
-
-// ------------------------------------------------
-// Trait error processing functions
-
-pub fn maybe_add_trait_error(
-  span: Span,
-  predicate: serde_json::Value,
-  o: Provenance<ObligationHash>,
-) {
-  TRAIT_ERRORS.with(|errs| {
-    log::debug!("CURRENT TRAIT ERRORS: {:#?}", errs.borrow());
-
-    if let Some((_, ref mut errs)) = errs.borrow_mut().get_mut(&span) {
-      errs.insert(o);
-      return;
-    }
-
-    errs
-      .borrow_mut()
-      .insert(span, (predicate, Default::default()));
-  })
-}
-
-pub fn take_trait_error_info() -> RawTraitErrInfo {
-  TRAIT_ERRORS.with(|errs| errs.take())
 }
 
 // ------------------------------------------------
