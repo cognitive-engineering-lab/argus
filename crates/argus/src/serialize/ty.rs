@@ -1,9 +1,8 @@
 use std::num::*;
 
 use rustc_hir::{def::DefKind, def_id::DefId, Unsafety};
-
 use rustc_middle::ty::{self, *};
-use rustc_span::symbol::{Symbol};
+use rustc_span::symbol::Symbol;
 use rustc_target::spec::abi::Abi;
 use rustc_type_ir as ir;
 use serde::{ser::SerializeSeq, Serialize};
@@ -186,7 +185,7 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
       DefPath {
         data: path::PathDefWithArgs<'tcx>,
       },
-    };
+    }
 
     let infcx = get_dynamic_ctx();
     match self.kind {
@@ -197,14 +196,13 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
           && infcx.tcx.is_impl_trait_in_trait(data.def_id)
         {
           // CHANGE: return self.pretty_print_opaque_impl_type(data.def_id, data.args);
-          AliasTyKindWrapper::OpaqueImplType { 
-            data: path::OpaqueImplType::new(data.def_id, data.args) 
-          }.serialize(s)
+          AliasTyKindWrapper::OpaqueImplType {
+            data: path::OpaqueImplType::new(data.def_id, data.args),
+          }
+          .serialize(s)
         } else {
           // CHANGE: p!(print(data))
-          AliasTyKindWrapper::AliasTy { 
-            data,
-          }.serialize(s)
+          AliasTyKindWrapper::AliasTy { data }.serialize(s)
         }
       }
       AliasKind::Opaque => {
@@ -221,12 +219,13 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
           // FIXME(eddyb) print this with `print_def_path`.
           // CHANGE: p!(write("Opaque({:?}, {})", def_id, args.print_as_list()));
           // return Ok(())
-          // NOTE: I'm taking the risk of using print_def_path here 
-          // as indicated by the above comment. If things break, look here 
+          // NOTE: I'm taking the risk of using print_def_path here
+          // as indicated by the above comment. If things break, look here
           // first.
           return AliasTyKindWrapper::DefPath {
             data: path::PathDefWithArgs::new(def_id, args),
-          }.serialize(s);
+          }
+          .serialize(s);
         }
 
         let parent = infcx.tcx.parent(def_id);
@@ -244,28 +243,32 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
                 // return Ok(())
                 return AliasTyKindWrapper::DefPath {
                   data: path::PathDefWithArgs::new(parent, args),
-                }.serialize(s);
+                }
+                .serialize(s);
               }
             }
             // Complex opaque type, e.g. `type Foo = (i32, impl Debug);`
             // CHANGE: p!(print_def_path(def_id, args));
             // return Ok(())
-            return AliasTyKindWrapper::DefPath { 
-              data: path::PathDefWithArgs::new(def_id, args) 
-            }.serialize(s);
+            return AliasTyKindWrapper::DefPath {
+              data: path::PathDefWithArgs::new(def_id, args),
+            }
+            .serialize(s);
           }
           _ => {
             if with_no_queries() {
               // CHANGE: p!(print_def_path(def_id, &[]));
               // return Ok(())
-             AliasTyKindWrapper::DefPath {
-              data: path::PathDefWithArgs::new(def_id, &[]),
-             }.serialize(s)
+              AliasTyKindWrapper::DefPath {
+                data: path::PathDefWithArgs::new(def_id, &[]),
+              }
+              .serialize(s)
             } else {
               // CHANGE: return self.pretty_print_opaque_impl_type(def_id, args);
-              AliasTyKindWrapper::OpaqueImplType { 
-                data: path::OpaqueImplType::new(def_id, args) 
-              }.serialize(s)
+              AliasTyKindWrapper::OpaqueImplType {
+                data: path::OpaqueImplType::new(def_id, args),
+              }
+              .serialize(s)
             }
           }
         }

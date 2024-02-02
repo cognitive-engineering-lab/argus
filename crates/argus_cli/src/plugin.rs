@@ -163,20 +163,25 @@ impl RustcPlugin for ArgusPlugin {
         end_column,
 
         // TODO: we dono't yet handle synthetic queries in Argus.
-        is_synthetic: _,
+        is_synthetic,
       } => {
+        let is_synthetic = is_synthetic.unwrap_or(false);
         let compute_target = || {
-          Some((id, CharRange {
-            start: CharPos {
-              line: start_line,
-              column: start_column,
+          Some((
+            id,
+            CharRange {
+              start: CharPos {
+                line: start_line,
+                column: start_column,
+              },
+              end: CharPos {
+                line: end_line,
+                column: end_column,
+              },
+              filename: Filename::intern(&file),
             },
-            end: CharPos {
-              line: end_line,
-              column: end_column,
-            },
-            filename: Filename::intern(&file),
-          }))
+            is_synthetic,
+          ))
         };
 
         let v = run(

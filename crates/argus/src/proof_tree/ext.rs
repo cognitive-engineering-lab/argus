@@ -12,17 +12,6 @@ use rustc_trait_selection::{
   },
 };
 
-/// Pretty printing for things that can already be printed.
-pub trait PrettyPrintExt<'a, 'tcx>: Print<'tcx, FmtPrinter<'a, 'tcx>> {
-  fn pretty(&self, infcx: &'a InferCtxt<'tcx>, def_id: DefId) -> String {
-    let tcx = infcx.tcx;
-    let namespace = guess_def_namespace(tcx, def_id);
-    let mut fmt = FmtPrinter::new(tcx, namespace);
-    self.print(&mut fmt).unwrap();
-    fmt.into_buffer()
-  }
-}
-
 /// Pretty printing for results.
 pub trait PrettyResultExt {
   fn pretty(&self) -> String;
@@ -39,11 +28,11 @@ pub trait CandidateExt {
 // -----------------------------------------------
 // Impls
 
-impl<'a, 'tcx, T: Print<'tcx, FmtPrinter<'a, 'tcx>>> PrettyPrintExt<'a, 'tcx>
-  for T
-{
-  /* intentionally blank */
-}
+// impl<'a, 'tcx, T: Print<'tcx, FmtPrinter<'a, 'tcx>>> PrettyPrintExt<'a, 'tcx>
+//   for T
+// {
+//   /* intentionally blank */
+// }
 
 /// Pretty printer for results
 impl PrettyResultExt for Result<Certainty, NoSolution> {
@@ -65,7 +54,6 @@ impl PrettyResultExt for Result<Certainty, NoSolution> {
 
 impl CandidateExt for InspectCandidate<'_, '_> {
   fn pretty(&self, _infcx: &InferCtxt, _def_id: DefId) -> String {
-    // TODO: gavinleroy
     match self.kind() {
       ProbeKind::Root { .. } => "root".to_string(),
       ProbeKind::NormalizedSelfTyAssembly => {
@@ -99,25 +87,5 @@ impl CandidateExt for InspectCandidate<'_, '_> {
         ..
       }
     )
-  }
-}
-
-// -----------------------------------------------
-// Helpers
-
-fn guess_def_namespace(tcx: TyCtxt<'_>, def_id: DefId) -> Namespace {
-  match tcx.def_key(def_id).disambiguated_data.data {
-    DefPathData::TypeNs(..)
-    | DefPathData::CrateRoot
-    | DefPathData::OpaqueTy => Namespace::TypeNS,
-
-    DefPathData::ValueNs(..)
-    | DefPathData::AnonConst
-    | DefPathData::Closure
-    | DefPathData::Ctor => Namespace::ValueNS,
-
-    DefPathData::MacroNs(..) => Namespace::MacroNS,
-
-    _ => Namespace::TypeNS,
   }
 }

@@ -399,6 +399,7 @@ class BackendCache {
       range.start.column,
       range.end.line,
       range.end.column,
+      obl.isSynthetic,
     ]);
 
     if (res.type !== "output") {

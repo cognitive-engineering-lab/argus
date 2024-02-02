@@ -5,7 +5,7 @@ use index_vec::IndexVec;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 pub use unsafe_tls::{
   store as unsafe_store_data, take as unsafe_take_data, FullObligationData,
-  UODIdx,
+  SynIdx, UODIdx,
 };
 
 use crate::{analysis::Provenance, types::Obligation};
@@ -36,6 +36,9 @@ mod unsafe_tls {
   index_vec::define_index_type! {
     pub struct UODIdx = usize;
   }
+  index_vec::define_index_type! {
+    pub struct SynIdx = usize;
+  }
 
   pub struct FullObligationData<'tcx> {
     pub infcx: InferCtxt<'tcx>,
@@ -64,12 +67,17 @@ mod unsafe_tls {
     })
   }
 
-  pub fn take<'tcx>(idx: UODIdx) -> Option<FullObligationData<'tcx>> {
+  pub fn take<'tcx>() -> IndexVec<UODIdx, FullObligationData<'tcx>> {
     OBLIGATION_DATA.with(|data| {
-      let udata = data.borrow_mut()[idx].take()?;
-      let data: FullObligationData<'tcx> =
-        unsafe { std::mem::transmute(udata) };
-      Some(data)
+      data
+        .take()
+        .into_iter()
+        .map(|udata| {
+          let data: FullObligationData<'tcx> =
+            unsafe { std::mem::transmute(udata) };
+          data
+        })
+        .collect()
     })
   }
 }

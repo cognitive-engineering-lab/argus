@@ -2,27 +2,23 @@
 
 pub mod ext;
 // FIXME: update topology module for current needs
+pub(super) mod serialize;
 #[allow(dead_code, unused_assignments, unused_variables)]
 pub mod topology;
-#[macro_use]
-mod macros;
-pub(super) mod serialize;
 
 use std::collections::HashSet;
 
 use index_vec::IndexVec;
 use rustc_hir as hir;
-
 use serde::Serialize;
 pub use topology::*;
 #[cfg(feature = "ts-rs")]
 use ts_rs::TS;
 
-use crate::serialize::{
-  hir::Option__ImplDef,
-};
+use crate::serialize::hir::Option__ImplDef;
 
-crate::define_usize_idx! {
+crate::define_idx! {
+  usize,
   ProofNodeIdx
 }
 

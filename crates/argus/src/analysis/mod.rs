@@ -13,7 +13,7 @@ use anyhow::{anyhow, Result};
 use fluid_let::fluid_let;
 use rustc_hir::{hir_id::HirId, BodyId};
 use rustc_middle::ty::TyCtxt;
-use rustc_span::Span;
+pub(crate) use tls::{FullObligationData, SynIdx, UODIdx};
 
 pub(crate) use crate::types::intermediate::{
   EvaluationResult, FulfillmentData,
@@ -40,8 +40,9 @@ pub fn tree<'tcx>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
 ) -> Result<serde_json::Value> {
-  tcx.inspect_typeck(body_id, entry::process_obligation_for_tree);
-  entry::build_tree_output(tcx, body_id).ok_or_else(|| {
+  let typeck_results =
+    tcx.inspect_typeck(body_id, entry::process_obligation_for_tree);
+  entry::build_tree_output(tcx, body_id, typeck_results).ok_or_else(|| {
     OBLIGATION_TARGET.get(|target| {
       anyhow!("failed to locate proof tree with target {:?}", target)
     })
@@ -59,10 +60,9 @@ pub(crate) struct Provenance<T: Sized> {
   // referenced element is expected to be an
   // expression.
   hir_id: HirId,
-
   // Index into the full provenance data, this is stored for interesting obligations.
   full_data: Option<tls::UODIdx>,
-
+  synthetic_data: Option<tls::SynIdx>,
   it: T,
 }
 
@@ -72,6 +72,7 @@ impl<T: Sized> Provenance<T> {
       it: f(&self.it),
       hir_id: self.hir_id,
       full_data: self.full_data,
+      synthetic_data: self.synthetic_data,
     }
   }
 }
@@ -86,23 +87,6 @@ impl<T: Sized> Deref for Provenance<T> {
 impl<T: Sized> Provenance<T> {
   pub(super) fn forget(self) -> T {
     self.it
-  }
-
-  pub fn contained_in(&self, tcx: &TyCtxt, span: Span) -> bool {
-    tcx
-      .hir()
-      .opt_span(self.hir_id)
-      .map(|this| span.contains(this))
-      .unwrap_or(false)
-  }
-
-  pub fn child_of(&self, tcx: &TyCtxt, other: HirId) -> bool {
-    self.hir_id == other
-      || tcx
-        .hir()
-        .parent_iter(self.hir_id)
-        .find(|(id, _)| *id == other)
-        .is_some()
   }
 }
 

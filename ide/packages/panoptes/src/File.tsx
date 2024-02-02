@@ -1,7 +1,7 @@
 import {
   CharRange,
   Expr,
-  ExprKind,
+  ExprIdx,
   MethodLookup,
   MethodLookupIdx,
   Obligation,
@@ -14,19 +14,13 @@ import { Filename } from "@argus/common/lib";
 import { VSCodeButton, VSCodeDivider } from "@vscode/webview-ui-toolkit/react";
 import classNames from "classnames";
 import _ from "lodash";
-import React, {
-  RefObject,
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
 import "./File.css";
-import { CollapsibleElement, ElementPair } from "./TreeView/Directory";
+import { CollapsibleElement } from "./TreeView/Directory";
 import TreeApp from "./TreeView/TreeApp";
 // @ts-ignore
-import { PrintImpl, PrintObligation, PrintTy } from "./print/print";
+import { PrintObligation, PrintTy } from "./print/print";
 import { WaitingOn } from "./utilities/WaitingOn";
 import {
   IcoAmbiguous,
@@ -53,15 +47,20 @@ class BodyInfo {
   get numErrors(): number {
     return this.oib.ambiguityErrors.length + this.oib.traitErrors.length;
   }
-  get exprs(): Expr[] {
-    return this.oib.exprs;
+  get exprs(): ExprIdx[] {
+    return _.map(this.oib.exprs, (_, idx) => idx);
   }
-
   byHash(hash: ObligationHash): Obligation | undefined {
     return this.oib.obligations.find(o => o.hash === hash);
   }
   getObligation(idx: ObligationIdx): Obligation {
     return this.oib.obligations[idx];
+  }
+  getExpr(idx: ExprIdx): Expr {
+    return this.oib.exprs[idx];
+  }
+  exprObligations(idx: ExprIdx): ObligationIdx[] {
+    return _.filter(this.oib.exprs[idx].obligations, i => this.notHidden(i));
   }
   getMethodLookup(idx: MethodLookupIdx): MethodLookup {
     console.debug(
@@ -72,13 +71,17 @@ class BodyInfo {
     );
     return this.oib.methodLookups[idx];
   }
-  notHidden(hash: ObligationHash): boolean {
-    const o = this.byHash(hash);
+  notHidden(hash: ObligationIdx): boolean {
+    const o = this.getObligation(hash);
     if (o === undefined) {
       return false;
     }
     return o.necessity === "Yes" || this.showHidden;
   }
+}
+
+function isObject(x: any): x is object {
+  return typeof x === "object" && x !== null;
 }
 
 export function obligationCardId(file: Filename, hash: ObligationHash) {
@@ -268,31 +271,38 @@ const MethodLookupTable = ({ lookup }: { lookup: MethodLookupIdx }) => {
   return table;
 };
 
-const InExpr = ({ expr }: { expr: Expr }) => {
+// NOTE: don't access the expression obligations directly, use the BodyInfo
+// to get the obligations that are currently visible.
+const InExpr = ({ idx }: { idx: ExprIdx }) => {
+  const bodyInfo = useContext(BodyInfoContext)!;
   const file = useContext(FileContext)!;
+  const expr = bodyInfo.getExpr(idx);
   const [addHighlight, removeHighlight] = makeHighlightPosters(
     expr.range,
     file
   );
 
-  const belowContent =
-    expr.kind === "misc" ? (
-      ""
-    ) : expr.kind.type === "methodCall" ? (
+  if (
+    isObject(expr.kind) &&
+    expr.kind.type !== "methodCall" &&
+    bodyInfo.exprObligations(idx).length === 0
+  ) {
+    return null;
+  }
+
+  const content =
+    isObject(expr.kind) && expr.kind.type === "methodCall" ? (
       <MethodLookupTable lookup={expr.kind.data} />
     ) : (
-      ""
+      _.map(bodyInfo.exprObligations(idx), (oi, i) => (
+        <ObligationFromIdx idx={oi} key={i} />
+      ))
     );
 
   const header = <span>Expression</span>;
   return (
     <div onMouseEnter={addHighlight} onMouseLeave={removeHighlight}>
-      <CollapsibleElement info={header}>
-        {_.map(expr.obligations, (oi, i) => (
-          <ObligationFromIdx idx={oi} key={i} />
-        ))}
-        {belowContent}
-      </CollapsibleElement>
+      <CollapsibleElement info={header}>{content}</CollapsibleElement>
     </div>
   );
 };
@@ -317,8 +327,8 @@ const ObligationBody = ({
   return (
     <BodyInfoContext.Provider value={bodyInfo}>
       <CollapsibleElement info={header}>
-        {_.map(bodyInfo.exprs, (expr, idx) => (
-          <InExpr expr={expr} key={idx} />
+        {_.map(bodyInfo.exprs, (i, idx) => (
+          <InExpr idx={i} key={idx} />
         ))}
       </CollapsibleElement>
     </BodyInfoContext.Provider>

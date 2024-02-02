@@ -11,4 +11,5 @@ export type Obligation = {
   kind: ObligationKind;
   necessity: ObligationNecessity;
   result: "yes" | "maybe-overflow" | "maybe-ambiguity" | "no";
+  isSynthetic: boolean;
 };

@@ -1,13 +1,11 @@
 use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_hir::{
-  self as hir,
-  intravisit::{Map, Visitor as HirVisitor},
-  BodyId, HirId,
+  self as hir, intravisit::Visitor as HirVisitor, BodyId, HirId,
 };
 use rustc_middle::ty::TyCtxt;
 use rustc_span::Span;
 
-use super::entry::ErrorAssemblyCtx;
+use crate::types::intermediate::ErrorAssemblyCtx;
 
 pub fn associate_obligations_nodes(ctx: &ErrorAssemblyCtx) -> Vec<Bin> {
   let mut grouped: HashMap<_, Vec<_>> = HashMap::default();

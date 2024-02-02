@@ -131,7 +131,7 @@ impl<'tcx> Node<'tcx> {
           .span_to_snippet(sp)
           .unwrap_or_else(|_| "{failed to find impl}".to_string())
       })
-      .unwrap_or_else(|symb| symb.as_str().to_string());
+      .unwrap_or_else(|symb| format!("foreign impl from: {}", symb.as_str()));
 
     let impl_ =
       infcx

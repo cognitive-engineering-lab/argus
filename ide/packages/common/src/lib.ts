@@ -48,7 +48,11 @@ export type ExtensionToWebViewMsg = { type: FROM_EXT } & (
 
 export type WebViewToExtensionMsg = CommonData & { type: FROM_WV } & (
     | { command: "obligations" }
-    | { command: "tree"; predicate: Obligation; range: CharRange }
+    | {
+        command: "tree";
+        predicate: Obligation;
+        range: CharRange;
+      }
     | { command: "add-highlight"; range: CharRange }
     | { command: "remove-highlight"; range: CharRange }
   );
@@ -87,4 +91,4 @@ export type ArgusArgs =
   | ["preload"] // => void
   | ["obligations", Filename] // => ObligationsInBody[]
   // NOTE: the hashes need to remain a string, otherwise JS cuts off the higher bits on bignums.
-  | ["tree", Filename, string, number, number, number, number]; // => [SerializedTree | undefined]
+  | ["tree", Filename, string, number, number, number, number, boolean]; // => [SerializedTree | undefined]

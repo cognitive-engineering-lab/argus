@@ -20,57 +20,55 @@ use rustc_data_structures::{
   fx::{FxHashSet as HashSet},
   stable_hasher::Hash64,
 };
+use rustc_hir::BodyId;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::{
-  traits::{query::NoSolution, solve::Certainty},
-  ty::{Ty, TyCtxt},
+  traits::{
+    query::NoSolution,
+    solve::{Certainty, MaybeCause},
+  },
+  ty::{Ty, TyCtxt, TypeckResults},
 };
 use rustc_span::{symbol::Symbol, Span};
 use rustc_utils::source_map::range::{CharRange, ToSpan};
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "ts-rs")]
 use ts_rs::TS;
 
 use self::intermediate::EvaluationResult;
-use crate::serialize::{
-  serialize_to_value,
-  ty::{SymbolDef, TyDef},
+use crate::{
+  analysis::{FullObligationData, Provenance, SynIdx, UODIdx},
+  serialize::{
+    serialize_to_value,
+    ty::{SymbolDef, TyDef},
+  },
 };
 
 // -----------------
 
-index_vec::define_index_type! {
-  pub struct ObligationIdx = u32;
+crate::define_idx! {
+  u32,
+  ObligationIdx,
+  ExprIdx,
+  MethodLookupIdx
 }
 
-index_vec::define_index_type! {
-  pub struct ExprIdx = u32;
-}
-
-index_vec::define_index_type! {
-  pub struct MethodLookupIdx = u32;
-}
-
-#[derive(Serialize)]
-#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MethodLookup {
   pub table: Vec<MethodStep>,
 }
 
-#[derive(Serialize)]
-#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MethodStep {
   pub recvr_ty: ReceiverAdjStep,
   pub trait_predicates: Vec<ObligationIdx>,
 }
 
-#[derive(Serialize)]
-#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ReceiverAdjStep {
-  #[cfg_attr(feature = "ts-rs", ts(type = "any"))]
+  #[ts(type = "any")] // type Ty
   ty: serde_json::Value,
 }
 
@@ -84,17 +82,16 @@ impl ReceiverAdjStep {
   }
 }
 
-#[derive(Serialize)]
-#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct Expr {
   pub range: CharRange,
+  #[ts(type = "ObligationIdx[]")]
   pub obligations: HashSet<ObligationIdx>,
   pub kind: ExprKind,
 }
 
-#[derive(Serialize)]
-#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum ExprKind {
   Misc,
@@ -108,13 +105,12 @@ pub enum ExprKind {
   },
 }
 
-#[derive(Serialize)]
-#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ObligationsInBody {
   #[serde(skip_serializing_if = "Option::is_none")]
   #[serde(serialize_with = "serialize_option")]
-  #[cfg_attr(feature = "ts-rs", ts(type = "SymbolDef | undefined"))]
+  #[ts(type = "SymbolDef | undefined")]
   pub name: Option<Symbol>,
 
   /// Range of the represented body.
@@ -123,11 +119,13 @@ pub struct ObligationsInBody {
   /// All ambiguous expression in the body. These *could* involve
   /// trait errors, so it's important that we can map the specific
   /// obligations to these locations. (That is, if they occur.)
+  #[ts(type = "ExprIdx[]")]
   pub ambiguity_errors: HashSet<ExprIdx>,
 
   /// Concrete trait errors, this would be when the compiler
   /// can say for certainty that a specific trait bound was required
   /// but not satisfied.
+  #[ts(type = "ExprIdx[]")]
   pub trait_errors: HashSet<ExprIdx>,
 
   pub obligations: IndexVec<ObligationIdx, Obligation>,
@@ -137,23 +135,22 @@ pub struct ObligationsInBody {
   pub method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,
 }
 
-#[derive(Serialize, Clone, Debug)]
-#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[derive(Serialize, TS, Clone, Debug)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub struct Obligation {
-  #[cfg_attr(feature = "ts-rs", ts(type = "any"))]
-  /// Actual type: Predicate<'tcx>,
+  #[ts(type = "any")] // type: Predicate
   pub predicate: serde_json::Value,
   pub hash: ObligationHash,
   pub range: CharRange,
   pub kind: ObligationKind,
   pub necessity: ObligationNecessity,
   #[serde(with = "intermediate::EvaluationResultDef")]
+  #[ts(type = "EvaluationResult")]
   pub result: intermediate::EvaluationResult,
+  pub is_synthetic: bool,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[derive(Serialize, TS, Clone, Debug, PartialEq, Eq)]
 pub enum ObligationNecessity {
   No,
   ForProfessionals,
@@ -171,8 +168,7 @@ impl ObligationNecessity {
   }
 }
 
-#[derive(Serialize, Clone, Debug)]
-#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[derive(Serialize, TS, Clone, Debug)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ObligationKind {
   Success,
@@ -192,14 +188,16 @@ fn serialize_option<S: serde::Serializer>(
   SymbolDef::serialize(symb, s)
 }
 
-#[derive(Deserialize, Serialize, Copy, Clone, Debug, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "ts-rs", derive(TS))]
+#[derive(
+  Deserialize, TS, Serialize, Copy, Clone, Debug, Hash, PartialEq, Eq,
+)]
 pub struct ObligationHash(#[serde(with = "string")] u64);
 
 #[derive(Debug)]
 pub struct Target {
   pub hash: ObligationHash,
   pub span: Span,
+  pub is_synthetic: bool,
 }
 
 pub trait ToTarget {
@@ -241,6 +239,17 @@ impl<U: Into<ObligationHash>, T: ToSpan> ToTarget for (U, T) {
     self.1.to_span(tcx).map(|span| Target {
       hash: self.0.into(),
       span,
+      is_synthetic: false,
+    })
+  }
+}
+
+impl<U: Into<ObligationHash>, T: ToSpan> ToTarget for (U, T, bool) {
+  fn to_target(self, tcx: TyCtxt) -> Result<Target> {
+    self.1.to_span(tcx).map(|span| Target {
+      hash: self.0.into(),
+      span,
+      is_synthetic: self.2,
     })
   }
 }
@@ -276,8 +285,6 @@ mod string {
 // be stored in TLS.
 pub(super) mod intermediate {
 
-  use rustc_middle::traits::solve::MaybeCause;
-
   use super::*;
 
   pub type EvaluationResult = Result<Certainty, NoSolution>;
@@ -303,6 +310,7 @@ pub(super) mod intermediate {
     pub hash: Hash64,
     pub obligation: &'a PredicateObligation<'tcx>,
     pub result: EvaluationResult,
+    pub is_synthetic: bool,
   }
 
   impl FulfillmentData<'_, '_> {
@@ -312,6 +320,53 @@ pub(super) mod intermediate {
         Ok(..) => ObligationKind::Ambiguous,
         Err(..) => ObligationKind::Failure,
       }
+    }
+  }
+
+  pub struct ErrorAssemblyCtx<'a, 'tcx: 'a> {
+    pub tcx: TyCtxt<'tcx>,
+    pub body_id: BodyId,
+    pub typeck_results: &'tcx TypeckResults<'tcx>,
+    pub obligations: &'a Vec<Provenance<Obligation>>,
+    pub obligation_data: &'a ObligationQueriesInBody<'tcx>,
+  }
+
+  pub(crate) struct SyntheticData<'tcx> {
+    // points to the used `InferCtxt`
+    pub full_data: UODIdx,
+    pub obligation: PredicateObligation<'tcx>,
+    pub result: EvaluationResult,
+  }
+
+  pub(crate) struct SyntheticQueriesInBody<'tcx>(
+    IndexVec<SynIdx, SyntheticData<'tcx>>,
+  );
+
+  impl<'tcx> SyntheticQueriesInBody<'tcx> {
+    pub fn new() -> Self {
+      SyntheticQueriesInBody(Default::default())
+    }
+
+    pub fn into_iter(self) -> impl Iterator<Item = SyntheticData<'tcx>> {
+      self.0.into_iter()
+    }
+
+    pub fn add(&mut self, data: SyntheticData<'tcx>) -> SynIdx {
+      self.0.push(data)
+    }
+  }
+
+  pub(crate) struct ObligationQueriesInBody<'tcx>(
+    IndexVec<UODIdx, FullObligationData<'tcx>>,
+  );
+
+  impl<'tcx> ObligationQueriesInBody<'tcx> {
+    pub fn new(v: IndexVec<UODIdx, FullObligationData<'tcx>>) -> Self {
+      ObligationQueriesInBody(v)
+    }
+
+    pub fn get(&self, idx: UODIdx) -> &FullObligationData<'tcx> {
+      &self.0[idx]
     }
   }
 }
