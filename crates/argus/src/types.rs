@@ -1,25 +1,8 @@
-//! Argus binding and interface types.
-//!
-//! NOTE: (1) Auto-generated bindings aren't used currently due to deficiencies in
-//! ts-rs functionality. This will hopefully catch up in the near future
-//! so everything can once again be automatically generated. If *any*
-//! binding or interface type is changed, this must be manually updated
-//! in the [frontend](../../../ide/packages/common).
-//!
-//! NOTE: (2) All types in this file must *erase* values coming from
-//! an inference context. This means any type serialization must be
-//! done first and stored as a `serde_json::Value`. This erasure isn't
-//! ideal but it's how we can currently use the `InferCtxt` used during
-//! trait resolution.
-
 use std::{ops::Deref, str::FromStr};
 
 use anyhow::Result;
 use index_vec::IndexVec;
-use rustc_data_structures::{
-  fx::{FxHashSet as HashSet},
-  stable_hasher::Hash64,
-};
+use rustc_data_structures::{fx::FxHashSet as HashSet, stable_hasher::Hash64};
 use rustc_hir::BodyId;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::{
@@ -45,11 +28,10 @@ use crate::{
 
 // -----------------
 
-crate::define_idx! {
-  u32,
-  ObligationIdx,
+crate::define_idx! { usize,
   ExprIdx,
-  MethodLookupIdx
+  MethodLookupIdx,
+  ObligationIdx
 }
 
 #[derive(Serialize, TS)]
@@ -110,7 +92,7 @@ pub enum ExprKind {
 pub struct ObligationsInBody {
   #[serde(skip_serializing_if = "Option::is_none")]
   #[serde(serialize_with = "serialize_option")]
-  #[ts(type = "SymbolDef | undefined")]
+  #[ts(type = "Symbol | undefined")]
   pub name: Option<Symbol>,
 
   /// Range of the represented body.
@@ -191,7 +173,11 @@ fn serialize_option<S: serde::Serializer>(
 #[derive(
   Deserialize, TS, Serialize, Copy, Clone, Debug, Hash, PartialEq, Eq,
 )]
-pub struct ObligationHash(#[serde(with = "string")] u64);
+pub struct ObligationHash(
+  #[serde(with = "string")]
+  #[ts(type = "string")]
+  u64,
+);
 
 #[derive(Debug)]
 pub struct Target {
@@ -367,34 +353,6 @@ pub(super) mod intermediate {
 
     pub fn get(&self, idx: UODIdx) -> &FullObligationData<'tcx> {
       &self.0[idx]
-    }
-  }
-}
-
-#[cfg(test)]
-mod tests {
-
-  macro_rules! ts {
-      ($($ty:ty,)*) => {
-        $({
-          let error_msg = format!("Failed to export TS binding for type '{}'", stringify!($ty));
-          <$ty as TS>::export().expect(error_msg.as_ref());
-        })*
-      };
-    }
-
-  #[test]
-  fn export_bindings_all_tys() {
-    ts! {
-      // proof_tree::SerializedTree,
-      // proof_tree::Node,
-      // proof_tree::Obligation,
-      // proof_tree::TreeTopology<proof_tree::ProofNodeIdx>,
-
-      // From rustc_utils
-      // range::CharRange,
-      // range::CharPos,
-      // filename::FilenameIndex,
     }
   }
 }

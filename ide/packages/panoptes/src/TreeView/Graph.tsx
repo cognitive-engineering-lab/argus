@@ -125,7 +125,7 @@ const TreeNode = observer(
 );
 
 const topologyToTreeData = (
-  topology: TreeTopology<number>,
+  topology: TreeTopology,
   idx: number
 ): TreeNodeDatum => {
   let kids = topology.children[idx];

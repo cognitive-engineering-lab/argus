@@ -3,7 +3,8 @@ name = "argus"
 version = "0.0.1"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+testing = []
 
 [dependencies]
 rustc_utils = { version = "=0.7.4-nightly-2023-08-25", features = ["serde", "ts-rs"] }
@@ -22,6 +23,9 @@ itertools = "0.12.0"
 serde_json = "1.0.108"
 serde_as = "0.0.1"
 serde_with = "3.5.1"
+
+[dev-dependencies]
+argus = { path = ".", features = ["testing"] }
 
 [package.metadata.rust-analyzer]
 # This crate uses #[feature(rustc_private)].

@@ -9,31 +9,23 @@ use rustc_trait_selection::{
   solve::inspect::{
     InspectCandidate, InspectGoal, ProofTreeInferCtxtExt, ProofTreeVisitor,
   },
-  traits::{
-    query::NoSolution,
-    solve::{Certainty, Goal},
-  },
+  traits::{query::NoSolution, solve},
 };
-use serde::Serialize;
 
 use super::*;
-use crate::{
-  ext::InferCtxtExt,
-  serialize::{serialize_to_value, ty::goal__predicate_def},
-  types::ObligationNecessity,
-};
+use crate::{ext::InferCtxtExt, types::ObligationNecessity};
 
-pub struct SerializedTreeVisitor<'tcx> {
+pub struct SerializedTreeVisitor {
   pub def_id: DefId,
   pub root: Option<ProofNodeIdx>,
   pub previous: Option<ProofNodeIdx>,
-  pub nodes: IndexVec<ProofNodeIdx, Node<'tcx>>,
-  pub topology: TreeTopology<ProofNodeIdx>,
+  pub nodes: IndexVec<ProofNodeIdx, Node>,
+  pub topology: TreeTopology,
   pub error_leaves: Vec<ProofNodeIdx>,
   pub unnecessary_roots: HashSet<ProofNodeIdx>,
 }
 
-impl<'tcx> SerializedTreeVisitor<'tcx> {
+impl SerializedTreeVisitor {
   pub fn new(def_id: DefId) -> Self {
     SerializedTreeVisitor {
       def_id,
@@ -46,7 +38,7 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
     }
   }
 
-  pub fn into_tree(self) -> Option<SerializedTree<'tcx>> {
+  pub fn into_tree(self) -> Option<SerializedTree> {
     let SerializedTreeVisitor {
       root: Some(root),
       nodes,
@@ -69,25 +61,16 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
   }
 }
 
-impl<'tcx> Node<'tcx> {
-  fn from_goal(goal: &InspectGoal<'_, 'tcx>, _def_id: DefId) -> Self {
-    #[derive(Serialize)]
-    struct Wrapper<'tcx>(
-      #[serde(serialize_with = "goal__predicate_def")]
-      Goal<'tcx, Predicate<'tcx>>,
-    );
-
-    let w = &Wrapper(goal.goal());
-    let v =
-      serialize_to_value(goal.infcx(), w).expect("failed to serialize goal");
-
+impl Node {
+  fn from_goal<'tcx>(goal: &InspectGoal<'_, 'tcx>, _def_id: DefId) -> Self {
+    let infcx = goal.infcx();
+    let goal = goal.goal();
     Node::Goal {
-      data: v,
-      _marker: std::marker::PhantomData,
+      data: Goal::new(infcx, &goal),
     }
   }
 
-  fn from_candidate(
+  fn from_candidate<'tcx>(
     candidate: &InspectCandidate<'_, 'tcx>,
     _def_id: DefId,
   ) -> Self {
@@ -116,10 +99,7 @@ impl<'tcx> Node<'tcx> {
     Node::Candidate { data: can }
   }
 
-  fn from_impl<'a>(infcx: &'a InferCtxt<'tcx>, def_id: DefId) -> Candidate<'tcx>
-  where
-    'tcx: 'a,
-  {
+  fn from_impl(infcx: &InferCtxt, def_id: DefId) -> Candidate {
     let impl_string = infcx
       .tcx
       .span_of_impl(def_id)
@@ -146,20 +126,17 @@ impl<'tcx> Node<'tcx> {
           _ => None,
         });
 
-    Candidate::Impl {
-      data: impl_,
-      fallback: impl_string,
-    }
+    Candidate::new_impl(infcx, impl_, impl_string)
   }
 
-  fn from_result(result: &Result<Certainty, NoSolution>) -> Self {
+  fn from_result(result: &Result<solve::Certainty, NoSolution>) -> Self {
     Node::Result {
       data: result.pretty(),
     }
   }
 }
 
-impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
+impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
   type BreakTy = !;
 
   fn visit_goal(
@@ -225,10 +202,10 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
 }
 
 pub fn serialize_proof_tree<'tcx>(
-  goal: Goal<'tcx, Predicate<'tcx>>,
+  goal: solve::Goal<'tcx, Predicate<'tcx>>,
   infcx: &InferCtxt<'tcx>,
   def_id: DefId,
-) -> Option<SerializedTree<'tcx>> {
+) -> Option<SerializedTree> {
   infcx.probe(|_| {
     let mut visitor = SerializedTreeVisitor::new(def_id);
     infcx.visit_proof_tree(goal, &mut visitor);

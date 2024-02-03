@@ -2,12 +2,16 @@ import {
   CharRange,
   Obligation,
   ObligationHash,
-  ObligationOutput,
   ObligationsInBody,
   SerializedTree,
-  TreeOutput,
 } from "@argus/common/bindings";
-import { ArgusArgs, ArgusResult, Filename } from "@argus/common/lib";
+import {
+  ArgusArgs,
+  ArgusResult,
+  Filename,
+  ObligationOutput,
+  TreeOutput,
+} from "@argus/common/lib";
 import _ from "lodash";
 import * as vscode from "vscode";
 

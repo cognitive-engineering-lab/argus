@@ -34,6 +34,7 @@ name = "argus"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "argus",
  "fluid-let",
  "index_vec",
  "itertools",

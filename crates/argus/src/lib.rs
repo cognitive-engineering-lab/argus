@@ -33,37 +33,49 @@ mod ext;
 mod proof_tree;
 mod rustc;
 mod serialize;
+#[cfg(test)]
+mod ts;
 pub mod types;
 
 #[macro_export]
 macro_rules! define_idx {
   ($t:ident, $($ty:tt),*) => {
-      crate::define_tsrs_alias!($($ty,)* => "number");
       $(
         index_vec::define_index_type! {
             pub struct $ty = $t;
         }
       )*
+      crate::define_tsrs_alias!($($ty,)* => $t);
   }
 }
 
 #[macro_export]
 macro_rules! define_tsrs_alias {
-    ($($($ty:ty,)* => $l:literal),*) => {$($(
+    ($($($ty:ty,)* => $l:ident),*) => {$($(
         impl ts_rs::TS for $ty {
+            const EXPORT_TO: Option<&'static str> =
+              Some(concat!("bindings/", stringify!($ty), ".ts"));
             fn name() -> String {
-                $l.to_owned()
+                stringify!($ty).to_owned()
             }
             fn name_with_type_args(args: Vec<String>) -> String {
-                assert!(
-                    args.is_empty(),
-                    "called name_with_type_args on {}",
-                    stringify!($ty)
-                );
-                $l.to_owned()
+              assert!(
+                  args.is_empty(),
+                  "called name_with_type_args on {}",
+                  stringify!($ty)
+              );
+              <$l as ts_rs::TS>::name()
+            }
+            fn decl() -> String {
+              format!(
+                "type {}{} = {};",
+                stringify!($ty),
+                "",
+                <$l as ts_rs::TS>::name()
+              )
             }
             fn inline() -> String {
-                $l.to_owned()
+              <$l as ts_rs::TS>::name()
             }
             fn dependencies() -> Vec<ts_rs::Dependency> {
                 vec![]

@@ -1,4 +1,6 @@
-import { Symbol } from "../common";
+// NOTE: this file needs to stay up to date with
+// the serializeid hir types, but don't remove me!
+export type Symbol = string;
 
 export type Impl = {
   polarity: ImplPolarity;

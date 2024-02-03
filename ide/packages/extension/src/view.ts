@@ -2,14 +2,13 @@ import {
   CharRange,
   Obligation,
   ObligationHash,
-  ObligationOutput,
   ObligationsInBody,
   SerializedTree,
-  TreeOutput,
 } from "@argus/common/bindings";
 import {
   ExtensionToWebViewMsg,
   Filename,
+  ObligationOutput,
   WebViewToExtensionMsg,
 } from "@argus/common/lib";
 import { MessageHandlerData } from "@estruyf/vscode";

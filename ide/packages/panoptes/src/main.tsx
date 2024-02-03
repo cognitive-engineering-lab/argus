@@ -1,4 +1,4 @@
-import { ObligationOutput } from "@argus/common/bindings";
+import { ObligationOutput } from "@argus/common/lib";
 import { Filename } from "@argus/common/lib";
 import * as React from "react";
 import * as ReactDOM from "react-dom";

@@ -2,10 +2,15 @@ import {
   CharRange,
   Obligation,
   ObligationHash,
-  ObligationOutput,
   ObligationsInBody,
-  TreeOutput,
+  SerializedTree,
 } from "./bindings";
+
+// TODO: we should probably just get rid of these,
+// don't think they'll be needed anymore.
+export type ObligationOutput = ObligationsInBody;
+export type TreeOutput = SerializedTree | undefined;
+export type ArgusOutputs = ObligationOutput | TreeOutput;
 
 // ----------------------------------------------------
 // Interface between the webview and extension

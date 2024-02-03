@@ -1,12 +1,13 @@
-import { ObligationOutput } from "@argus/common/bindings";
-import { ExtensionToWebViewMsg, Filename } from "@argus/common/lib";
+import {
+  ExtensionToWebViewMsg,
+  Filename,
+  ObligationOutput,
+} from "@argus/common/lib";
 import _ from "lodash";
 import React, { RefObject, useEffect, useState } from "react";
 
-import File, { errorCardId, obligationCardId } from "./File";
+import { errorCardId, obligationCardId } from "./File";
 import Workspace from "./Workspace";
-import { WaitingOn } from "./utilities/WaitingOn";
-import { requestFromExtension } from "./utilities/vscode";
 
 // FIXME: this is wrong, expanding the nodes with JS doesn't cause
 // a re-render in React. Better to have a signal that collapsible

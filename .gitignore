@@ -21,4 +21,5 @@ sample-book/
 # Rust things
 target/
 debug/
+bindings/
 *.txt

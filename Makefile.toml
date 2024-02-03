@@ -15,6 +15,5 @@ parallel = true
 [tasks.init-bindings]
 script = """
 cargo test -p argus --lib export_bindings --locked
-mkdir -p ide/packages/common/src/bindings
-cp crates/**/bindings/* ide/packages/common/src/bindings
+./scripts/ts-rs.scm
 """
