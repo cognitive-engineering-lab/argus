@@ -24,8 +24,13 @@ serde_json = "1.0.108"
 serde_as = "0.0.1"
 serde_with = "3.5.1"
 
+# testing utils
+lazy_static = { version = "1.4" }
+
 [dev-dependencies]
 argus = { path = ".", features = ["testing"] }
+test-log = "0.2.11"
+env_logger = "0.9.3"
 
 [package.metadata.rust-analyzer]
 # This crate uses #[feature(rustc_private)].

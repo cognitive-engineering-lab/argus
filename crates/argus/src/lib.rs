@@ -13,11 +13,17 @@
 
 extern crate rustc_ast;
 extern crate rustc_data_structures;
+#[cfg(feature = "testing")]
+extern crate rustc_driver;
+#[cfg(feature = "testing")]
+extern crate rustc_errors;
 extern crate rustc_hash;
 extern crate rustc_hir;
 extern crate rustc_hir_analysis;
 extern crate rustc_hir_typeck;
 extern crate rustc_infer;
+#[cfg(feature = "testing")]
+extern crate rustc_interface;
 extern crate rustc_macros;
 extern crate rustc_middle;
 extern crate rustc_query_system;
@@ -33,6 +39,8 @@ mod ext;
 mod proof_tree;
 mod rustc;
 mod serialize;
+#[cfg(feature = "testing")]
+pub mod test_utils;
 #[cfg(test)]
 mod ts;
 pub mod types;
