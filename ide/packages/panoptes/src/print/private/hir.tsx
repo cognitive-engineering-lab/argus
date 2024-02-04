@@ -1,4 +1,3 @@
-import Symbol from "@argus/common/bindings/serialization/common";
 import {
   AnonConst,
   GenericArgs,
@@ -15,12 +14,13 @@ import {
   PathSegment,
   PolyTraitRef,
   QPath,
+  Symbol,
   Term,
   TraitRef,
   Ty,
   TyKind,
   TypeBinding,
-} from "@argus/common/bindings/serialization/hir/types";
+} from "@argus/common/bindings";
 import _ from "lodash";
 import React from "react";
 

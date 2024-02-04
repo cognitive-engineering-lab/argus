@@ -1,6 +1,5 @@
 .DS_Store
 .idea
-.vscode/
 *.log
 .cache/
 .parcel-cache/

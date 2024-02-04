@@ -1,4 +1,4 @@
-import { Ident } from "@argus/common/bindings/serialization/hir/types";
+import { Ident } from "@argus/common/bindings";
 
 import "./kw.css";
 

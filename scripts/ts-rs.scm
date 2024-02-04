@@ -1,4 +1,4 @@
-#!/usr/local/bin/guile -s
+#!/usr/local/bin/guile --no-auto-compile -s
 !#
 
 (use-modules (ice-9 ftw)

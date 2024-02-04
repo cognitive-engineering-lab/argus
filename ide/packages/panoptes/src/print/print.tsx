@@ -1,5 +1,4 @@
-import { Obligation } from "@argus/common/bindings";
-import { Impl } from "@argus/common/bindings/serialization/hir/types";
+import { Impl, Obligation } from "@argus/common/bindings";
 import _ from "lodash";
 import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
