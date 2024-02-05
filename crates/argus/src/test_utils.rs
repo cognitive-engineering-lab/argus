@@ -1,28 +1,23 @@
-use std::{
-  collections::HashMap, env, fs, io, panic, path::Path, process::Command,
-  sync::Arc,
-};
+use std::{env, fs, io, panic, path::Path, process::Command, sync::Arc};
 
-use anyhow::{bail, Context, Result};
-use fluid_let::fluid_set;
-use itertools::Itertools;
+use anyhow::{Context, Result};
 use rustc_errors::DiagCtxt;
 use rustc_hir::BodyId;
-use rustc_middle::{
-  mir::{Rvalue, StatementKind},
-  ty::TyCtxt,
-};
+use rustc_middle::ty::TyCtxt;
 use rustc_span::source_map::FileLoader;
 use rustc_utils::{
   errors::silent_emitter::SilentEmitter,
   source_map::{
     filename::{Filename, FilenameIndex},
     find_bodies::{find_bodies, find_enclosing_bodies},
-    range::{self, CharPos, CharRange, ToSpan},
-    spanner::Spanner,
+    range::{CharRange, ToSpan},
   },
-  timer::elapsed,
-  BodyExt, OperandExt,
+};
+
+use crate::{
+  analysis,
+  proof_tree::SerializedTree,
+  types::{intermediate::FullData, ObligationHash, ObligationsInBody, Target},
 };
 
 lazy_static::lazy_static! {
@@ -35,8 +30,6 @@ lazy_static::lazy_static! {
     String::from_utf8(rustc_output).unwrap().trim().to_owned()
   };
 }
-
-static CFG_HASH: &str = "////!";
 
 pub const DUMMY_FILE_NAME: &str = "dummy.rs";
 
@@ -77,22 +70,73 @@ pub(crate) fn load_test_from_file(
   let source = String::from_utf8(c)
     .with_context(|| format!("UTF8 parse error in file: {path:?}"))?;
 
-  let mut cfg = TestFileConfig::default();
+  let cfg = TestFileConfig::default();
 
   Ok((source, cfg))
 }
 
 pub fn test_obligations_no_crash(
   path: &Path,
-  assert_pass: impl Fn() + Send + Sync + Copy,
+  assert_pass: impl for<'tcx> Fn(FullData<'tcx>, ObligationsInBody)
+    + Send
+    + Sync
+    + Copy,
 ) {
   let inner = || -> Result<()> {
-    let (source, cfg) = load_test_from_file(path)?;
+    let (source, _cfg) = load_test_from_file(path)?;
     compile_normal(source, move |tcx| {
-      for_each_body(tcx, |body_id, _body_with_facts| {
-        // TODO: actually generate the obligations in the file.
-        assert_pass();
+      for_each_body(tcx, |body_id, tcx| {
+        let (full_data, obligations_in_body) =
+          analysis::body_data(tcx, body_id).expect("failed to get obligations");
+        assert_pass(full_data, obligations_in_body);
       })
+    });
+    Ok(())
+  };
+
+  inner().unwrap()
+}
+
+pub fn test_locate_tree<'a, 'tcx: 'a>(
+  hash: ObligationHash,
+  needs_search: bool,
+  thunk: impl FnOnce() -> &'a (FullData<'tcx>, ObligationsInBody),
+) -> Result<SerializedTree> {
+  analysis::entry::pick_tree(hash, needs_search, thunk)
+}
+
+pub fn test_tree_for_target(
+  path: &Path,
+  mut range: CharRange,
+  hash: ObligationHash,
+  is_synthetic: bool,
+  mut assert_pass: impl FnMut(Result<SerializedTree>) + Send + Sync,
+) {
+  let inner = || -> Result<()> {
+    let (source, _cfg) = load_test_from_file(path)?;
+    compile_normal(source, move |tcx| {
+      range.filename = DUMMY_FILE.with(|fidx| *fidx);
+      let body_span = range
+        .to_span(tcx)
+        .expect("couldn't find span for body range");
+
+      let bodies = find_enclosing_bodies(tcx, body_span).collect::<Vec<_>>();
+      assert!(
+        bodies.len() == 1,
+        "only one body must match a body range {:?}",
+        body_span
+      );
+
+      let body_id = bodies.first().unwrap();
+      let target = Target {
+        span: body_span,
+        hash,
+        is_synthetic,
+      };
+
+      let tree_opt = analysis::OBLIGATION_TARGET
+        .set(target, || analysis::tree(tcx, *body_id));
+      assert_pass(tree_opt);
     });
     Ok(())
   };
@@ -125,15 +169,9 @@ pub fn run_in_dir(
 
       let res = panic::catch_unwind(|| test_fn(&path));
 
-      if let Err(e) = res {
+      if let Err(_) = res {
         failed = true;
-        eprintln!(
-          r#"
-
-          !! \x1b[31m{test_name}\x1b[0m\n\t{e:?}
-
-          "#
-        );
+        eprintln!("\n\n\x1b[31m!! {test_name}\x1b[0m\n\n");
       } else {
         passed += 1;
       }
@@ -141,10 +179,7 @@ pub fn run_in_dir(
     }
 
     log::info!(
-      r#"
-      · {} / {} succeeded in {:?}
-
-      "#,
+      "\n\n{} / {} succeeded in {:?}\n\n",
       passed,
       total,
       dir.as_ref(),
@@ -171,7 +206,6 @@ pub fn compile_normal(
   compile(
     input,
     &format!("--crate-type lib --sysroot {}", &*SYSROOT),
-    false,
     callbacks,
   )
 }
@@ -180,7 +214,6 @@ pub fn compile_normal(
 pub fn compile(
   input: impl Into<String>,
   args: &str,
-  is_interpreter: bool,
   callback: impl FnOnce(TyCtxt<'_>) + Send,
 ) {
   let mut callbacks = TestCallbacks {

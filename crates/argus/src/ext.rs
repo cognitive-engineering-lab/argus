@@ -90,23 +90,28 @@ pub trait EvaluationResultExt {
 }
 
 pub trait PredicateObligationExt {
-  fn range(&self, tcx: &TyCtxt) -> CharRange;
+  fn range(&self, tcx: &TyCtxt, body_id: BodyId) -> CharRange;
 }
 
 impl PredicateObligationExt for PredicateObligation<'_> {
-  fn range(&self, tcx: &TyCtxt) -> CharRange {
+  fn range(&self, tcx: &TyCtxt, body_id: BodyId) -> CharRange {
     let source_map = tcx.sess.source_map();
+    let hir = tcx.hir();
+
+    let hir_id = hir.body_owner(body_id);
+    let body_span = hir.span(hir_id);
+
+    // Backup span of the DefId
+
     let original_span = Span::source_callsite(self.cause.span);
-    CharRange::from_span(original_span, source_map).unwrap_or_else(|_| {
-      log::warn!("Scrambling to find range for span {:?}", original_span);
-      let def_id = self.cause.body_id.to_def_id();
-      let s = tcx
-        .hir()
-        .span_if_local(def_id)
-        .unwrap_or(rustc_span::DUMMY_SP);
-      CharRange::from_span(s, source_map)
-        .expect("failed to get range from local span")
-    })
+    let span = if original_span.is_dummy() {
+      body_span
+    } else {
+      original_span
+    };
+
+    CharRange::from_span(span, source_map)
+      .expect("failed to get range from span")
   }
 }
 
@@ -120,7 +125,6 @@ pub trait InferCtxtExt<'tcx> {
 
   fn bless_fulfilled<'a>(
     &self,
-    ldef_id: LocalDefId,
     obligation: &'a PredicateObligation<'tcx>,
     result: EvaluationResult,
     is_synthetic: bool,
@@ -128,6 +132,7 @@ pub trait InferCtxtExt<'tcx> {
 
   fn erase_non_local_data(
     &self,
+    body_id: BodyId,
     fdata: FulfillmentData<'_, 'tcx>,
   ) -> Obligation;
 
@@ -319,13 +324,12 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
 
   fn bless_fulfilled<'a>(
     &self,
-    _ldef_id: LocalDefId,
     obligation: &'a PredicateObligation<'tcx>,
     result: EvaluationResult,
     is_synthetic: bool,
   ) -> FulfillmentData<'a, 'tcx> {
     FulfillmentData {
-      hash: self.predicate_hash(&obligation.predicate),
+      hash: self.predicate_hash(&obligation.predicate).into(),
       obligation,
       result,
       is_synthetic,
@@ -334,10 +338,11 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
 
   fn erase_non_local_data(
     &self,
+    body_id: BodyId,
     fdata: FulfillmentData<'_, 'tcx>,
   ) -> Obligation {
     let obl = &fdata.obligation;
-    let range = obl.range(&self.tcx);
+    let range = obl.range(&self.tcx, body_id);
     let necessity = self.obligation_necessity(&obl);
 
     #[derive(Serialize)]

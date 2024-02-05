@@ -8,7 +8,6 @@ use std::{
 };
 
 use serde::Serialize;
-use smallvec::SmallVec;
 use ts_rs::TS;
 
 use super::ProofNodeIdx;

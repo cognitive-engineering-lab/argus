@@ -1,0 +1,51 @@
+use std::rc::Rc;
+use traits::IntoString;
+
+fn static_test() {
+    fn is_into_string<T: IntoString>() {}
+    // fail: &str: IntoString unsatisfied
+    is_into_string::<Vec<&str>>();
+}
+
+fn non_impl_check() {
+    let v = vec![(0, 1.), (2, 3.)];
+    // fail: (integer, float): IntoString unsatisfied
+    format!("{}", v.to_string());
+}
+
+fn coerce_check(v: Rc<Box<[(i32, i32); 3]>>) {
+    // ok
+    format!("{}", v.to_string());
+}
+
+fn coerce_check_bad(v: Rc<Box<[(i32, f32); 3]>>) {
+    // fail: (integer, float): IntoString unsatisfied
+    format!("{}", v.to_string());
+}
+
+fn main() { }
+
+mod traits {
+
+    pub trait IntoString {
+        fn to_string(&self) -> String;
+    }
+
+    impl IntoString for (i32, i32) {
+        fn to_string(&self) -> String {
+            String::from("(...)")
+        }
+    }
+
+    impl<T: IntoString> IntoString for Vec<T> {
+        fn to_string(&self) -> String {
+            String::from("Vec<T>")
+        }
+    }
+
+    impl<T: IntoString> IntoString for [T] {
+        fn to_string(&self) -> String {
+            String::from("[T]")
+        }
+    }
+}

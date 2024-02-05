@@ -1,5 +1,6 @@
 use std::{collections::HashSet, ops::ControlFlow};
 
+use anyhow::{anyhow, bail, Result};
 use ext::*;
 use index_vec::IndexVec;
 use rustc_hir::{self as hir, def_id::DefId};
@@ -38,7 +39,7 @@ impl SerializedTreeVisitor {
     }
   }
 
-  pub fn into_tree(self) -> Option<SerializedTree> {
+  pub fn into_tree(self) -> Result<SerializedTree> {
     let SerializedTreeVisitor {
       root: Some(root),
       nodes,
@@ -48,10 +49,10 @@ impl SerializedTreeVisitor {
       ..
     } = self
     else {
-      return None;
+      bail!("missing root node!");
     };
 
-    Some(SerializedTree {
+    Ok(SerializedTree {
       root,
       nodes,
       topology,
@@ -149,12 +150,13 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
     // The frontend doesn't use them, but eventually we will!
     // self.unnecessary_roots.insert(n);
 
-    if !matches!(
-      infcx.guess_predicate_necessity(&goal.goal().predicate),
-      ObligationNecessity::Yes
-    ) {
-      return ControlFlow::Continue(());
-    }
+    // TODO: skip unnecessary predicates again, but not the root goal.
+    // if !matches!(
+    //   infcx.guess_predicate_necessity(&goal.goal().predicate),
+    //   ObligationNecessity::Yes
+    // ) {
+    //   return ControlFlow::Continue(());
+    // }
 
     let here_node = Node::from_goal(goal, self.def_id);
     let here_idx = self.nodes.push(here_node.clone());
@@ -205,7 +207,7 @@ pub fn serialize_proof_tree<'tcx>(
   goal: solve::Goal<'tcx, Predicate<'tcx>>,
   infcx: &InferCtxt<'tcx>,
   def_id: DefId,
-) -> Option<SerializedTree> {
+) -> Result<SerializedTree> {
   infcx.probe(|_| {
     let mut visitor = SerializedTreeVisitor::new(def_id);
     infcx.visit_proof_tree(goal, &mut visitor);

@@ -8,7 +8,10 @@ pub use unsafe_tls::{
   SynIdx, UODIdx,
 };
 
-use crate::{analysis::Provenance, types::Obligation};
+use crate::{
+  proof_tree::SerializedTree,
+  types::{intermediate::Provenance, Obligation},
+};
 
 // NOTE: we use thread local storage to accumulate obligations
 // accross call to the obligation inspector in `typeck_inspect`.
@@ -18,7 +21,7 @@ use crate::{analysis::Provenance, types::Obligation};
 thread_local! {
   static OBLIGATIONS: RefCell<Vec<Provenance<Obligation>>> = Default::default();
 
-  static TREE: RefCell<Option<serde_json::Value>> = Default::default();
+  static TREE: RefCell<Option<SerializedTree>> = Default::default();
 }
 
 // This is for complex obligations and their inference contexts.
@@ -105,13 +108,13 @@ pub fn take_obligations() -> Vec<Provenance<Obligation>> {
 // ------------------------------------------------
 // Tree processing functions
 
-pub fn store_tree(json: serde_json::Value) {
+pub fn store_tree(new_tree: SerializedTree) {
   TREE.with(|tree| {
-    let prev = tree.replace(Some(json));
-    debug_assert!(prev.is_none(), "replaced proof tree");
+    let prev = tree.replace(Some(new_tree));
+    log::warn!("replacing tree with {:?}", prev);
   })
 }
 
-pub fn take_tree() -> Option<serde_json::Value> {
+pub fn take_tree() -> Option<SerializedTree> {
   TREE.with(|tree| tree.take())
 }

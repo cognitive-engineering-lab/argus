@@ -3,7 +3,7 @@ use std::{ops::Deref, str::FromStr};
 use anyhow::Result;
 use index_vec::IndexVec;
 use rustc_data_structures::{fx::FxHashSet as HashSet, stable_hasher::Hash64};
-use rustc_hir::BodyId;
+use rustc_hir::{BodyId, HirId};
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::{
   traits::{
@@ -19,7 +19,7 @@ use ts_rs::TS;
 
 use self::intermediate::EvaluationResult;
 use crate::{
-  analysis::{FullObligationData, Provenance, SynIdx, UODIdx},
+  analysis::{FullObligationData, SynIdx, UODIdx},
   serialize::{
     serialize_to_value,
     ty::{SymbolDef, TyDef},
@@ -179,7 +179,7 @@ pub struct ObligationHash(
   u64,
 );
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Target {
   pub hash: ObligationHash,
   pub span: Span,
@@ -271,7 +271,87 @@ mod string {
 // be stored in TLS.
 pub(super) mod intermediate {
 
+  use std::{
+    fmt::{self, Debug, Formatter},
+    hash::{Hash, Hasher},
+    ops::Deref,
+  };
+
+  use anyhow::Result;
+  use rustc_hir::{hir_id::HirId, BodyId};
+
   use super::*;
+
+  // The provenance about where an element came from,
+  // or was "spawned from," in the HIR. This type is intermediate
+  // but stored in the TLS, it shouldn't capture lifetimes but
+  // can capture unstable hashes.
+  pub(crate) struct Provenance<T: Sized> {
+    // The expression from whence `it` came, the
+    // referenced element is expected to be an
+    // expression.
+    pub hir_id: HirId,
+    // Index into the full provenance data, this is stored for interesting obligations.
+    pub full_data: Option<UODIdx>,
+    pub synthetic_data: Option<SynIdx>,
+    pub it: T,
+  }
+
+  impl<T: Sized> Provenance<T> {
+    pub fn map<U: Sized>(&self, f: impl FnOnce(&T) -> U) -> Provenance<U> {
+      Provenance {
+        it: f(&self.it),
+        hir_id: self.hir_id,
+        full_data: self.full_data,
+        synthetic_data: self.synthetic_data,
+      }
+    }
+  }
+
+  impl<T: Sized> Deref for Provenance<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+      &self.it
+    }
+  }
+
+  impl<T: Sized> Provenance<T> {
+    pub fn forget(self) -> T {
+      self.it
+    }
+  }
+
+  impl<T: Debug> Debug for Provenance<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+      write!(f, "Provenance<{:?}>", self.it)
+    }
+  }
+
+  impl<T: PartialEq> PartialEq for Provenance<T> {
+    fn eq(&self, other: &Self) -> bool {
+      self.it == other.it
+    }
+  }
+
+  impl<T: Eq> Eq for Provenance<T> {}
+
+  impl<T: Hash> Hash for Provenance<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+      self.it.hash(state)
+    }
+  }
+
+  pub trait ForgetProvenance {
+    type Target;
+    fn forget(self) -> Self::Target;
+  }
+
+  impl<T: Sized> ForgetProvenance for Vec<Provenance<T>> {
+    type Target = Vec<T>;
+    fn forget(self) -> Self::Target {
+      self.into_iter().map(|f| f.forget()).collect()
+    }
+  }
 
   pub type EvaluationResult = Result<Certainty, NoSolution>;
 
@@ -293,7 +373,7 @@ pub(super) mod intermediate {
   }
 
   pub struct FulfillmentData<'a, 'tcx: 'a> {
-    pub hash: Hash64,
+    pub hash: ObligationHash,
     pub obligation: &'a PredicateObligation<'tcx>,
     pub result: EvaluationResult,
     pub is_synthetic: bool,
@@ -317,6 +397,34 @@ pub(super) mod intermediate {
     pub obligation_data: &'a ObligationQueriesInBody<'tcx>,
   }
 
+  pub struct FullData<'tcx> {
+    pub(crate) obligations: ObligationQueriesInBody<'tcx>,
+    pub(crate) synthetic: SyntheticQueriesInBody<'tcx>,
+  }
+
+  impl<'tcx> FullData<'tcx> {
+    pub(crate) fn iter<'me>(
+      &'me self,
+    ) -> impl Iterator<
+      Item = (&PredicateObligation<'tcx>, &FullObligationData<'tcx>),
+    > + 'me {
+      self
+        .synthetic
+        .iter()
+        .map(|sdata| {
+          let fdata = &*self.obligations.get(sdata.full_data);
+          let obligation = &sdata.obligation;
+          (obligation, fdata)
+        })
+        .chain(
+          self
+            .obligations
+            .iter()
+            .map(|fdata| (&fdata.obligation, fdata)),
+        )
+    }
+  }
+
   pub(crate) struct SyntheticData<'tcx> {
     // points to the used `InferCtxt`
     pub full_data: UODIdx,
@@ -333,11 +441,11 @@ pub(super) mod intermediate {
       SyntheticQueriesInBody(Default::default())
     }
 
-    pub fn into_iter(self) -> impl Iterator<Item = SyntheticData<'tcx>> {
-      self.0.into_iter()
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &SyntheticData<'tcx>> {
+      self.0.iter()
     }
 
-    pub fn add(&mut self, data: SyntheticData<'tcx>) -> SynIdx {
+    pub(crate) fn add(&mut self, data: SyntheticData<'tcx>) -> SynIdx {
       self.0.push(data)
     }
   }
@@ -347,12 +455,18 @@ pub(super) mod intermediate {
   );
 
   impl<'tcx> ObligationQueriesInBody<'tcx> {
-    pub fn new(v: IndexVec<UODIdx, FullObligationData<'tcx>>) -> Self {
+    pub(crate) fn new(v: IndexVec<UODIdx, FullObligationData<'tcx>>) -> Self {
       ObligationQueriesInBody(v)
     }
 
-    pub fn get(&self, idx: UODIdx) -> &FullObligationData<'tcx> {
+    pub(crate) fn get(&self, idx: UODIdx) -> &FullObligationData<'tcx> {
       &self.0[idx]
+    }
+
+    pub(crate) fn iter(
+      &self,
+    ) -> impl Iterator<Item = &FullObligationData<'tcx>> {
+      self.0.iter()
     }
   }
 }

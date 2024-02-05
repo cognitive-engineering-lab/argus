@@ -1,7 +1,7 @@
 //! Code that relates two pieces of data, or computes the
 //! rleationships between large structures.
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use fluid_let::fluid_let;
 use rustc_hir::BodyId;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
@@ -17,12 +17,14 @@ use crate::{
     transform, EvaluationResult, OBLIGATION_TARGET,
   },
   ext::InferCtxtExt,
-  proof_tree::serialize::serialize_proof_tree,
-  serialize::{serialize_to_value, ty::PredicateDef},
+  proof_tree::{serialize::serialize_proof_tree, SerializedTree},
+  serialize::ty::PredicateDef,
   types::{
     intermediate::{
-      ErrorAssemblyCtx, ObligationQueriesInBody, SyntheticQueriesInBody,
-    }, ObligationsInBody,
+      ErrorAssemblyCtx, FullData, ObligationQueriesInBody,
+      SyntheticQueriesInBody,
+    },
+    ObligationHash, ObligationsInBody,
   },
 };
 
@@ -35,6 +37,7 @@ macro_rules! guard_inspection {
     if INSPECTING.copied().unwrap_or(false) {
       return;
     }
+    fluid_let::fluid_set!(INSPECTING, true);
   }};
 }
 
@@ -73,11 +76,6 @@ pub fn process_obligation<'tcx>(
   tls::store_obligation(obligation);
 }
 
-// TODO: we now need to handle synthetic predicates, those
-// are the predicates we simulate for method lookup. If the
-// target is synthetic we'll just have to handle all obligations
-// as from the previous case, and then search through the associated
-// method calls for the obligation.
 pub fn process_obligation_for_tree<'tcx>(
   infcx: &InferCtxt<'tcx>,
   obl: &PredicateObligation<'tcx>,
@@ -96,14 +94,17 @@ pub fn process_obligation_for_tree<'tcx>(
     // Must go after the synthetic check.
     guard_inspection! {}
 
-    let hash = infcx.predicate_hash(&obl.predicate);
+    let fdata = infcx.bless_fulfilled(obl, result, false);
 
-    if hash.as_u64() != *target.hash {
+    if fdata.hash != target.hash {
       return;
     }
 
-    if let Some(stree) = generate_tree(infcx, obl) {
-      tls::store_tree(stree);
+    match generate_tree(infcx, obl) {
+      Ok(stree) => tls::store_tree(stree),
+      Err(e) => {
+        log::error!("matching target tree not generated {e:?}");
+      }
     }
   });
 }
@@ -116,9 +117,8 @@ pub fn build_obligations_output<'tcx>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
   typeck_results: &'tcx TypeckResults<'tcx>,
-) -> Result<serde_json::Value> {
-  let oib = build_obligations_in_body(tcx, body_id, typeck_results).1;
-  serde_json::to_value(&oib).map_err(|e| anyhow!(e))
+) -> Result<ObligationsInBody> {
+  Ok(build_obligations_in_body(tcx, body_id, typeck_results).1)
 }
 
 // TODO: if we are looking for the tree of a synthetic obligation
@@ -127,53 +127,59 @@ pub fn build_tree_output<'tcx>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
   typeck_results: &'tcx TypeckResults<'tcx>,
-) -> Option<serde_json::Value> {
+) -> Result<SerializedTree> {
   OBLIGATION_TARGET.get(|target| {
-    let target = target?;
-    match (tls::take_tree(), target.is_synthetic) {
-      (o @ Some(_), false) => o,
-      (o @ None, false) => {
-        log::error!("failed to find tree for obligation target {:?}", target);
-        o
-      }
-      (_, true) => {
-        let (data, _) = build_obligations_in_body(tcx, body_id, typeck_results);
-
-        data.synthetic.into_iter().find_map(|sdata| {
-          let full_data = &data.obligations.get(sdata.full_data);
-          let infcx = &full_data.infcx;
-          let hash = infcx.predicate_hash(&sdata.obligation.predicate);
-          if hash.as_u64() == *target.hash {
-            generate_tree(infcx, &sdata.obligation)
-          } else {
-            None
-          }
-        })
-      }
-    }
+    let target = target.ok_or(anyhow!("missing target"))?;
+    let results = build_obligations_in_body(tcx, body_id, typeck_results);
+    pick_tree(target.hash, target.is_synthetic, || &results)
   })
+}
+
+pub(crate) fn pick_tree<'a, 'tcx: 'a>(
+  hash: ObligationHash,
+  needs_search: bool,
+  thunk: impl FnOnce() -> &'a (FullData<'tcx>, ObligationsInBody),
+) -> Result<SerializedTree> {
+  if !needs_search {
+    return tls::take_tree().ok_or(anyhow!(
+      "failed to find tree for obligation target {hash:?}"
+    ));
+  }
+
+  let (data, _) = thunk();
+
+  let res: Result<SerializedTree> = data
+    .iter()
+    .find_map(|(obligation, full_data)| {
+      let infcx = &full_data.infcx;
+      let fdata = infcx.bless_fulfilled(obligation, full_data.result, false);
+      if fdata.hash == hash {
+        Some(generate_tree(infcx, &obligation))
+      } else {
+        None
+      }
+    })
+    .unwrap_or_else(|| bail!("could not find tree with full search"));
+
+  res
 }
 
 fn generate_tree<'tcx>(
   infcx: &InferCtxt<'tcx>,
   obligation: &PredicateObligation<'tcx>,
-) -> Option<serde_json::Value> {
+) -> Result<SerializedTree> {
   let goal = Goal {
     predicate: obligation.predicate,
     param_env: obligation.param_env,
   };
-
-  let item_def_id = infcx.body_id()?.to_def_id();
+  let item_def_id = infcx
+    .body_id()
+    .ok_or(anyhow!("body not local"))?
+    .to_def_id();
   serialize_proof_tree(goal, infcx, item_def_id)
-    .and_then(|serial_tree| serialize_to_value(infcx, &serial_tree).ok())
 }
 
-struct FullData<'tcx> {
-  obligations: ObligationQueriesInBody<'tcx>,
-  synthetic: SyntheticQueriesInBody<'tcx>,
-}
-
-fn build_obligations_in_body<'tcx>(
+pub(in crate::analysis) fn build_obligations_in_body<'tcx>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
   typeck_results: &'tcx TypeckResults<'tcx>,
@@ -191,7 +197,6 @@ fn build_obligations_in_body<'tcx>(
   let obligation_data = ObligationQueriesInBody::new(obligation_data);
   let mut synthetic_data = SyntheticQueriesInBody::new();
 
-  // let bound_info = tls::take_trait_error_info();
   let ctx = ErrorAssemblyCtx {
     tcx,
     body_id,

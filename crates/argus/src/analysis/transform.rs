@@ -1,5 +1,4 @@
 use index_vec::IndexVec;
-
 use rustc_data_structures::fx::FxHashSet as HashSet;
 use rustc_hir::{self as hir, intravisit::Map, BodyId, HirId};
 use rustc_infer::{
@@ -15,7 +14,7 @@ use rustc_utils::source_map::range::CharRange;
 use super::{
   hir::{self as hier_hir, Bin, BinKind},
   tls::{SynIdx, UODIdx},
-  EvaluationResult, Provenance,
+  EvaluationResult,
 };
 use crate::{
   ext::{InferCtxtExt, PredicateExt},
@@ -34,8 +33,7 @@ pub fn compute_provenance<'tcx>(
   };
 
   let hir = infcx.tcx.hir();
-  let fdata =
-    infcx.bless_fulfilled(ldef_id, obligation, result, synid.is_some());
+  let fdata = infcx.bless_fulfilled(obligation, result, synid.is_some());
 
   // If the span is coming from a macro, point to the callsite.
   let callsite_cause_span = fdata.obligation.cause.span.source_callsite();
@@ -51,7 +49,7 @@ pub fn compute_provenance<'tcx>(
     hir_id,
     full_data: dataid,
     synthetic_data: synid,
-    it: infcx.erase_non_local_data(fdata),
+    it: infcx.erase_non_local_data(body_id, fdata),
   }
 }
 
@@ -182,7 +180,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
 
         let obligations = obligations
           .into_iter()
-          .map(|idx| self.obligations[idx].it)
+          .map(|idx| *self.obligations[idx])
           .collect::<HashSet<_>>();
 
         self.exprs.push(Expr {
