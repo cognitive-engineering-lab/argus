@@ -1,9 +1,8 @@
-import { useFloating, useHover, useInteractions } from "@floating-ui/react";
 import _ from "lodash";
-import React, { useState } from "react";
+import React from "react";
 
 import { HoverInfo } from "../../utilities/HoverInfo";
-import { PrintGenericArg, PrintSymbol, PrintTy } from "./ty";
+import { PrintGenericArg, PrintTy } from "./ty";
 import { intersperse, takeRightUntil } from "./utilities";
 
 // NOTE: when we aren't hovering over the path, we just
@@ -163,7 +162,7 @@ export const PrintImplAs = ({ o }) => {
       ""
     ) : (
       <span>
-        as
+        {" as "}
         <PrintDefPathFull o={o.path} />
       </span>
     );

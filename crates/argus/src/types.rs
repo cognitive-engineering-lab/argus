@@ -10,9 +10,9 @@ use rustc_middle::{
     query::NoSolution,
     solve::{Certainty, MaybeCause},
   },
-  ty::{Ty, TyCtxt, TypeckResults},
+  ty::{self, Ty, TyCtxt, TypeckResults},
 };
-use rustc_span::{symbol::Symbol, Span};
+use rustc_span::{def_id::DefId, symbol::Symbol, Span};
 use rustc_utils::source_map::range::{CharRange, ToSpan};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -21,6 +21,7 @@ use self::intermediate::EvaluationResult;
 use crate::{
   analysis::{FullObligationData, SynIdx, UODIdx},
   serialize::{
+    path::PathDefNoArgs,
     serialize_to_value,
     ty::{SymbolDef, TyDef},
   },
@@ -37,7 +38,32 @@ crate::define_idx! { usize,
 #[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MethodLookup {
+  pub candidates: ExtensionCandidates,
   pub table: Vec<MethodStep>,
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtensionCandidates {
+  #[ts(type = "any")]
+  // Type: Vec<TraitRefPrintOnlyTraitPath>
+  data: serde_json::Value,
+}
+
+impl ExtensionCandidates {
+  pub fn new<'tcx>(
+    infcx: &InferCtxt<'tcx>,
+    traits: Vec<ty::TraitRef<'tcx>>,
+  ) -> Self {
+    use crate::serialize::ty::TraitRefPrintOnlyTraitPathDefWrapper;
+    let wrapped = traits
+      .into_iter()
+      .map(TraitRefPrintOnlyTraitPathDefWrapper)
+      .collect::<Vec<_>>();
+    let json = serialize_to_value(infcx, &wrapped)
+      .expect("failed to serialied trait refs for method lookup");
+    ExtensionCandidates { data: json }
+  }
 }
 
 #[derive(Serialize, TS)]
@@ -68,6 +94,7 @@ impl ReceiverAdjStep {
 #[serde(rename_all = "camelCase")]
 pub struct Expr {
   pub range: CharRange,
+  pub snippet: String,
   #[ts(type = "ObligationIdx[]")]
   pub obligations: HashSet<ObligationIdx>,
   pub kind: ExprKind,
@@ -91,9 +118,9 @@ pub enum ExprKind {
 #[serde(rename_all = "camelCase")]
 pub struct ObligationsInBody {
   #[serde(skip_serializing_if = "Option::is_none")]
-  #[serde(serialize_with = "serialize_option")]
-  #[ts(type = "Symbol | undefined")]
-  pub name: Option<Symbol>,
+  #[ts(type = "any | undefined")]
+  // type: DefPath
+  name: Option<serde_json::Value>,
 
   /// Range of the represented body.
   pub range: CharRange,
@@ -115,6 +142,31 @@ pub struct ObligationsInBody {
   pub exprs: IndexVec<ExprIdx, Expr>,
 
   pub method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,
+}
+
+impl ObligationsInBody {
+  pub fn new(
+    id: Option<(&InferCtxt, DefId)>,
+    range: CharRange,
+    ambiguity_errors: HashSet<ExprIdx>,
+    trait_errors: HashSet<ExprIdx>,
+    obligations: IndexVec<ObligationIdx, Obligation>,
+    exprs: IndexVec<ExprIdx, Expr>,
+    method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,
+  ) -> Self {
+    let json_name = id.and_then(|(infcx, id)| {
+      serialize_to_value(infcx, &PathDefNoArgs::new(id)).ok()
+    });
+    ObligationsInBody {
+      name: json_name,
+      range,
+      ambiguity_errors,
+      trait_errors,
+      obligations,
+      exprs,
+      method_lookups,
+    }
+  }
 }
 
 #[derive(Serialize, TS, Clone, Debug)]

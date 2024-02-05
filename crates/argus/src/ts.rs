@@ -18,31 +18,32 @@ macro_rules! ts {
 #[test]
 fn export_bindings_all_tys() {
   ts! {
-      uty::CharPos,
-      uty::CharRange,
-      fty::FilenameIndex,
+    uty::CharPos,
+    uty::CharRange,
+    fty::FilenameIndex,
 
-  ty::ObligationIdx,
+    pty::Node,
+    pty::Candidate,
+    pty::Goal,
+    pty::SerializedTree,
+    pty::TreeTopology,
+    pty::ProofNodeIdx,
+    pty::ProofCycle,
 
-      pty::Node,
-      pty::Candidate,
-      pty::Goal,
-      pty::SerializedTree,
-      pty::TreeTopology,
-      pty::ProofNodeIdx,
+    ty::ObligationIdx,
+    ty::Expr,
+    ty::ExprIdx,
+    ty::ExprKind,
+    ty::MethodLookup,
+    ty::ExtensionCandidates,
+    ty::MethodLookupIdx,
+    ty::MethodStep,
+    ty::Obligation,
+    ty::ObligationHash,
 
-      ty::Expr,
-      ty::ExprIdx,
-      ty::ExprKind,
-      ty::MethodLookup,
-      ty::MethodLookupIdx,
-      ty::MethodStep,
-      ty::Obligation,
-      ty::ObligationHash,
-
-      ty::ObligationKind,
-      ty::ObligationNecessity,
-      ty::ObligationsInBody,
-      ty::ReceiverAdjStep,
-    }
+    ty::ObligationKind,
+    ty::ObligationNecessity,
+    ty::ObligationsInBody,
+    ty::ReceiverAdjStep,
+  }
 }

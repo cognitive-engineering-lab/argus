@@ -16,7 +16,7 @@ pub use topology::*;
 use ts_rs::TS;
 
 use crate::serialize::{
-  hir::Option__ImplDef, serialize_to_value, ty::goal__predicate_def,
+  hir::Option__ImplDef, serialize_to_value, ty::Goal__PredicateDef,
 };
 
 crate::define_idx! {
@@ -24,7 +24,7 @@ crate::define_idx! {
   ProofNodeIdx
 }
 
-#[derive(Serialize, TS, Debug, Clone)]
+#[derive(Serialize, TS, Debug, Clone, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Node {
   Result { data: String },
@@ -32,14 +32,16 @@ pub enum Node {
   Goal { data: Goal },
 }
 
-#[derive(Serialize, TS, Clone, Debug)]
+// FIXME: this shouldn't be EQ
+#[derive(Serialize, TS, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Goal {
   #[ts(type = "any")]
   goal: serde_json::Value,
 }
 
-#[derive(Serialize, TS, Clone, Debug)]
+// FIXME: this shouldn't be EQ
+#[derive(Serialize, TS, Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Candidate {
   Impl {
@@ -62,7 +64,12 @@ pub struct SerializedTree {
   pub topology: TreeTopology,
   pub error_leaves: Vec<ProofNodeIdx>,
   pub unnecessary_roots: HashSet<ProofNodeIdx>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub cycle: Option<ProofCycle>,
 }
+
+#[derive(Serialize, TS, Debug, Clone)]
+pub struct ProofCycle(Vec<ProofNodeIdx>);
 
 // ----------------------------------------
 // impls
@@ -74,7 +81,7 @@ impl Goal {
   ) -> Self {
     #[derive(Serialize)]
     struct Wrapper<'a, 'tcx: 'a>(
-      #[serde(serialize_with = "goal__predicate_def")]
+      #[serde(with = "Goal__PredicateDef")]
       &'a solve::Goal<'tcx, ty::Predicate<'tcx>>,
     );
 

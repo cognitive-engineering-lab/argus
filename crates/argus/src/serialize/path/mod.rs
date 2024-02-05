@@ -1,15 +1,9 @@
-
-
-
 use rustc_hir::{
-  def_id::{DefId},
-  definitions::{
-    DefPathDataName, DisambiguatedDefPathData,
-  },
+  def_id::DefId,
+  definitions::{DefPathDataName, DisambiguatedDefPathData},
 };
-use rustc_middle::ty::{*};
-
-use rustc_span::symbol::{Symbol};
+use rustc_middle::ty::*;
+use rustc_span::symbol::Symbol;
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 
@@ -17,6 +11,25 @@ use super::*;
 
 mod default;
 mod pretty;
+
+pub struct PathDefNoArgs {
+  def_id: DefId,
+}
+
+impl PathDefNoArgs {
+  pub fn new(def_id: DefId) -> Self {
+    Self { def_id }
+  }
+}
+
+impl Serialize for PathDefNoArgs {
+  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    path_def_no_args(&self.def_id, s)
+  }
+}
 
 pub(super) fn path_def_no_args<S>(
   def_id: &DefId,
@@ -70,7 +83,6 @@ impl<'tcx> Serialize for ValuePathWithArgs<'tcx> {
     PathBuilder::compile_value_path(self.def_id, self.args, s)
   }
 }
-
 
 // --------------------------------------------------------
 // Opaque impl types
@@ -248,7 +260,9 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
       }
       DefPathDataName::Anon { namespace } => {
         // CHANGE: write!(writer, "{{{}#{}}}", namespace, data.disambiguator)
-        self.segments.push(PathSegment::ambiguous_name(namespace, data.disambiguator));
+        self
+          .segments
+          .push(PathSegment::ambiguous_name(namespace, data.disambiguator));
       }
     }
   }

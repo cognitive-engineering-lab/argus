@@ -1,4 +1,4 @@
-import { SerializedTree } from "@argus/common/bindings";
+import { ProofNodeIdx, SerializedTree } from "@argus/common/bindings";
 import classNames from "classnames";
 import _ from "lodash";
 import React, { PropsWithChildren, useContext, useState } from "react";
@@ -84,8 +84,8 @@ export const DirRecursive = ({
   getNext,
   styleEdges,
 }: {
-  level: number[];
-  getNext: (tree: SerializedTree, idx: number) => number[];
+  level: ProofNodeIdx[];
+  getNext: (idx: ProofNodeIdx) => ProofNodeIdx[];
   styleEdges: boolean;
 }) => {
   const tree = useContext(TreeContext)!;
@@ -98,7 +98,7 @@ export const DirRecursive = ({
   return (
     <div className={className}>
       {_.map(level, (current, i) => {
-        const next = getNext(tree, current);
+        const next = getNext(current);
         return (
           <DirNode key={i} idx={current} styleEdge={styleEdges}>
             {next.length > 0 ? (

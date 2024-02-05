@@ -1,21 +1,11 @@
 //! Default implementaitons from rustc_middle::ty::print
 
-
 use log::debug;
 use rustc_data_structures::sso::SsoHashSet;
-use rustc_hir::{
-  def_id::{DefId},
-  definitions::{
-    DefPathData,
-  },
-};
+use rustc_hir::{def_id::DefId, definitions::DefPathData};
 use rustc_middle::ty::{self, *};
 
-
-
-
-
-use super::{*};
+use super::*;
 
 pub trait PathBuilderDefault<'tcx> {
   fn default_print_def_path(

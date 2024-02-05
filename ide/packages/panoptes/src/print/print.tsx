@@ -1,4 +1,9 @@
-import { Impl, Obligation } from "@argus/common/bindings";
+import {
+  ExtensionCandidates,
+  Goal,
+  Impl,
+  Obligation,
+} from "@argus/common/bindings";
 import _ from "lodash";
 import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -6,6 +11,10 @@ import ReactJson from "react-json-view";
 
 import "./print.css";
 import { PrintImpl as UnsafePrintImpl } from "./private/hir";
+import {
+  PrintDefPath as UnsafePrintDefPath,
+  PrintDefPathFull as UnsafePrintDefPathFull,
+} from "./private/path";
 import {
   PrintBinderPredicateKind,
   PrintGoalPredicate as UnsafePrintGoalPredicate,
@@ -78,11 +87,39 @@ export const PrintImpl = ({ impl }: { impl: Impl }) => {
   );
 };
 
-export const PrintGoal = ({ o }: { o: any }) => {
+export const PrintGoal = ({ o }: { o: Goal }) => {
   return (
     <PrintWithFallback
       object={o}
-      Content={() => <UnsafePrintGoalPredicate o={o} />}
+      Content={() => <UnsafePrintGoalPredicate o={o.goal} />}
+    />
+  );
+};
+
+// The individual components aren't typed, so we'll require passing the entire array for now.
+export const PrintExtensionCandidate = ({
+  candidates,
+  idx,
+}: {
+  candidates: ExtensionCandidates;
+  idx: number;
+}) => {
+  const o = candidates.data[idx];
+  return o === undefined ? (
+    "?"
+  ) : (
+    <PrintWithFallback
+      object={o}
+      Content={() => <UnsafePrintDefPath o={o} />}
+    />
+  );
+};
+
+export const PrintBodyName = ({ defPath }: { defPath: any }) => {
+  return (
+    <PrintWithFallback
+      object={defPath}
+      Content={() => <UnsafePrintDefPathFull o={defPath} />}
     />
   );
 };

@@ -1,5 +1,6 @@
 import {
   CharRange,
+  EvaluationResult,
   Expr,
   ExprIdx,
   MethodLookup,
@@ -16,7 +17,6 @@ import classNames from "classnames";
 import _ from "lodash";
 import React, {
   Fragment,
-  RefObject,
   createContext,
   useContext,
   useEffect,
@@ -26,8 +26,12 @@ import React, {
 import "./File.css";
 import { CollapsibleElement } from "./TreeView/Directory";
 import TreeApp from "./TreeView/TreeApp";
-// @ts-ignore
-import { PrintObligation, PrintTy } from "./print/print";
+import {
+  PrintBodyName,
+  PrintExtensionCandidate,
+  PrintObligation,
+  PrintTy,
+} from "./print/print";
 import { WaitingOn } from "./utilities/WaitingOn";
 import {
   IcoAmbiguous,
@@ -56,6 +60,9 @@ class BodyInfo {
   }
   get exprs(): ExprIdx[] {
     return _.map(this.oib.exprs, (_, idx) => idx);
+  }
+  hasVisibleExprs() {
+    return _.some(this.exprs, idx => this.exprObligations(idx).length > 0);
   }
   byHash(hash: ObligationHash): Obligation | undefined {
     return this.oib.obligations.find(o => o.hash === hash);
@@ -187,6 +194,18 @@ const ObligationTreeWrapper = ({
   return content;
 };
 
+const ObligationResult = ({ result }: { result: EvaluationResult }) => {
+  return result === "yes" ? (
+    <IcoCheck />
+  ) : result === "no" ? (
+    <IcoError />
+  ) : result === "maybe-overflow" ? (
+    <IcoLoop />
+  ) : (
+    <IcoAmbiguous />
+  );
+};
+
 const ObligationCard = ({
   range,
   obligation,
@@ -207,16 +226,6 @@ const ObligationCard = ({
     setIsInfoVisible(!isInfoVisible);
   };
 
-  const resultIco =
-    obligation.result === "yes" ? (
-      <IcoCheck />
-    ) : obligation.result === "no" ? (
-      <IcoError />
-    ) : obligation.result === "maybe-overflow" ? (
-      <IcoLoop />
-    ) : (
-      <IcoAmbiguous />
-    );
   const cname = classNames("ObligationCard", obligation.result);
 
   return (
@@ -228,7 +237,7 @@ const ObligationCard = ({
     >
       <div className="PrettyObligationArea">
         <span className={classNames("result", obligation.result)}>
-          {resultIco}
+          <ObligationResult result={obligation.result} />
         </span>{" "}
         <PrintObligation obligation={obligation} />
       </div>
@@ -253,29 +262,53 @@ const ObligationFromIdx = ({ idx }: { idx: ObligationIdx }) => {
   return <ObligationCard range={o.range} obligation={o} />;
 };
 
+const ObligationResultFromIdx = ({ idx }: { idx: ObligationIdx }) => {
+  const bodyInfo = useContext(BodyInfoContext)!;
+  const o = bodyInfo.getObligation(idx);
+  return <ObligationResult result={o.result} />;
+};
+
 const MethodLookupTable = ({ lookup }: { lookup: MethodLookupIdx }) => {
   const bodyInfo = useContext(BodyInfoContext)!;
   const lookupInfo = bodyInfo.getMethodLookup(lookup);
-  const table = _.map(lookupInfo.table, (step, idx) => {
-    const tyComp = (
-      <span>
-        Receiver type <PrintTy ty={step.recvrTy.ty} key={idx} />
-      </span>
-    );
+  const numCans = lookupInfo.candidates.data.length ?? 0;
 
-    const obligationsAtStep = step.traitPredicates;
+  const headingRow = (
+    <tr>
+      <th>Receiver Ty</th>
+      {_.map(_.range(numCans), (i, idx) => (
+        <th>
+          <PrintExtensionCandidate
+            idx={i}
+            candidates={lookupInfo.candidates}
+            key={idx}
+          />
+        </th>
+      ))}
+    </tr>
+  );
 
-    return (
-      <CollapsibleElement info={tyComp} key={idx}>
-        <h4>Queries on receiver</h4>
-        {_.map(obligationsAtStep, (query, idx) => (
-          <ObligationFromIdx idx={query!} key={idx} />
-        ))}
-      </CollapsibleElement>
-    );
-  });
+  // TODO: the ObligationResult should be interactive, showing the predicate
+  // on hover, and on click should extand an info box with the TreeApp.
+  const bodyRows = _.map(lookupInfo.table, (step, idx) => (
+    <tr key={idx}>
+      <td>
+        <PrintTy ty={step.recvrTy.ty} />
+      </td>
+      {_.map(step.traitPredicates, (queryIdx, idx) => (
+        <td key={idx}>
+          <ObligationResultFromIdx idx={queryIdx} />
+        </td>
+      ))}
+    </tr>
+  ));
 
-  return table;
+  return (
+    <table>
+      {headingRow}
+      {bodyRows}
+    </table>
+  );
 };
 
 // NOTE: don't access the expression obligations directly, use the BodyInfo
@@ -306,7 +339,12 @@ const InExpr = ({ idx }: { idx: ExprIdx }) => {
       ))
     );
 
-  const header = <span>Expression</span>;
+  // TODO: we should limit the length of the expression snippet.
+  const header = (
+    <span>
+      Expression <code>{expr.snippet}</code>
+    </span>
+  );
   return (
     <div onMouseEnter={addHighlight} onMouseLeave={removeHighlight}>
       <CollapsibleElement info={header}>{content}</CollapsibleElement>
@@ -314,22 +352,25 @@ const InExpr = ({ idx }: { idx: ExprIdx }) => {
   );
 };
 
-const ObligationBody = ({
-  osib,
-  idx,
-}: {
-  osib: ObligationsInBody;
-  idx: number;
-}) => {
-  const bodyName = osib.name;
-  const bodyInfo = new BodyInfo(osib, idx);
+const ObligationBody = ({ bodyInfo }: { bodyInfo: BodyInfo }) => {
+  const osib = bodyInfo.oib;
   const errCount = bodyInfo.numErrors;
+  const bodyName =
+    osib.name === undefined ? (
+      "{anon body}"
+    ) : (
+      <PrintBodyName defPath={osib.name} />
+    );
   const header = (
     <span>
-      Body <code>{bodyName}</code>
+      {bodyName}
       {errCount > 0 ? <span style={{ color: "red" }}>({errCount})</span> : ""}
     </span>
   );
+
+  if (!bodyInfo.hasVisibleExprs()) {
+    return null;
+  }
 
   return (
     <BodyInfoContext.Provider value={bodyInfo}>
@@ -349,12 +390,16 @@ const File = ({
   file: Filename;
   osibs: ObligationsInBody[];
 }) => {
+  const bodyInfos = _.map(osibs, (osib, idx) => new BodyInfo(osib, idx));
+  const bodiesWithVisibleExprs = _.filter(bodyInfos, bi =>
+    bi.hasVisibleExprs()
+  );
   return (
     <FileContext.Provider value={file}>
-      {_.map(osibs, (osib, idx) => (
+      {_.map(bodiesWithVisibleExprs, (bodyInfo, idx) => (
         <Fragment key={idx}>
           {idx > 0 ? <VSCodeDivider /> : null}
-          <ObligationBody osib={osib} idx={idx} />
+          <ObligationBody bodyInfo={bodyInfo} />
         </Fragment>
       ))}
     </FileContext.Provider>

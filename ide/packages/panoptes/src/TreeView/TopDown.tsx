@@ -1,11 +1,13 @@
-import { SerializedTree } from "@argus/common/bindings";
+import { ProofNodeIdx } from "@argus/common/bindings";
 import _ from "lodash";
-import React from "react";
+import React, { useContext } from "react";
 
+import { TreeContext } from "./Context";
 import { DirRecursive } from "./Directory";
 
-let TopDown = ({ tree }: { tree: SerializedTree }) => {
-  const getChildren = (tree: SerializedTree, idx: number) => {
+const TopDown = () => {
+  const tree = useContext(TreeContext)!;
+  const getChildren = (idx: ProofNodeIdx) => {
     return _.reject(tree.topology.children[idx] || [], idx =>
       tree.unnecessaryRoots.includes(idx)
     );

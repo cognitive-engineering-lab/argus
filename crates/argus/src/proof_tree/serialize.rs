@@ -24,6 +24,7 @@ pub struct SerializedTreeVisitor {
   pub topology: TreeTopology,
   pub error_leaves: Vec<ProofNodeIdx>,
   pub unnecessary_roots: HashSet<ProofNodeIdx>,
+  pub cycle: Option<ProofCycle>,
 }
 
 impl SerializedTreeVisitor {
@@ -36,6 +37,7 @@ impl SerializedTreeVisitor {
       topology: TreeTopology::new(),
       error_leaves: Vec::default(),
       unnecessary_roots: HashSet::default(),
+      cycle: None,
     }
   }
 
@@ -46,6 +48,7 @@ impl SerializedTreeVisitor {
       topology,
       error_leaves,
       unnecessary_roots,
+      cycle,
       ..
     } = self
     else {
@@ -58,7 +61,24 @@ impl SerializedTreeVisitor {
       topology,
       error_leaves,
       unnecessary_roots,
+      cycle,
     })
+  }
+
+  fn check_for_cycle_from(&mut self, from: ProofNodeIdx) {
+    if self.cycle.is_some() {
+      return;
+    }
+
+    let to_root = self.topology.path_to_root(from);
+
+    let node_start = &self.nodes[from];
+    if to_root.iter_exclusive().any(|idx| {
+      let n = &self.nodes[*idx];
+      n == node_start
+    }) {
+      self.cycle = Some(to_root.into());
+    }
   }
 }
 
@@ -150,13 +170,15 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
     // The frontend doesn't use them, but eventually we will!
     // self.unnecessary_roots.insert(n);
 
-    // TODO: skip unnecessary predicates again, but not the root goal.
-    // if !matches!(
-    //   infcx.guess_predicate_necessity(&goal.goal().predicate),
-    //   ObligationNecessity::Yes
-    // ) {
-    //   return ControlFlow::Continue(());
-    // }
+    // Skip unnecessary predicates, but not the root goal.
+    if self.root.is_some()
+      && !matches!(
+        infcx.guess_predicate_necessity(&goal.goal().predicate),
+        ObligationNecessity::Yes
+      )
+    {
+      return ControlFlow::Continue(());
+    }
 
     let here_node = Node::from_goal(goal, self.def_id);
     let here_idx = self.nodes.push(here_node.clone());
@@ -168,6 +190,11 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
     if let Some(prev) = self.previous {
       self.topology.add(prev, here_idx);
     }
+
+    // Check if there was an "overflow" from the freshly added node,
+    // XXX: this is largely a HACK for right now; it ignores
+    // how the solver actually works, and is ignorant of inference vars.
+    self.check_for_cycle_from(here_idx);
 
     let prev = self.previous.clone();
     self.previous = Some(here_idx);

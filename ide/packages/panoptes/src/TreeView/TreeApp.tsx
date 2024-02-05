@@ -10,9 +10,9 @@ import ReactJson from "react-json-view";
 
 import BottomUp from "./BottomUp";
 import { ActiveContext, ActiveState, TreeContext } from "./Context";
-import TreeArea from "./Graph";
 import TopDown from "./TopDown";
 import "./TreeApp.css";
+import TreeCycle from "./TreeCycle";
 
 const TreeApp = ({ tree }: { tree: SerializedTree | undefined }) => {
   // FIXME: this shouldn't ever happen, if a properly hashed
@@ -27,12 +27,16 @@ const TreeApp = ({ tree }: { tree: SerializedTree | undefined }) => {
     );
   }
 
-  let tabs: [string, React.ReactNode][] = [
-    // ["Graph", <TreeArea tree={attempt} />],
-    ["BottomUp", <BottomUp tree={tree} />],
-    ["TopDown", <TopDown tree={tree} />],
-    ["JSON", <ReactJson src={tree} />],
+  let tabs: [string, React.FC][] = [
+    ["Bottom Up", BottomUp],
+    ["Top Down", TopDown],
+    ["JSON", () => <ReactJson src={tree} />],
   ];
+
+  // FIXME: why do I need the '!' here? - - - - - - ---------  VVVVVVVV
+  if (tree.cycle !== undefined) {
+    tabs.unshift(["Cycle Detected", () => <TreeCycle path={tree.cycle!} />]);
+  }
 
   return (
     <TreeContext.Provider value={tree}>
@@ -44,9 +48,9 @@ const TreeApp = ({ tree }: { tree: SerializedTree | undefined }) => {
                 {name}
               </VSCodePanelTab>
             ))}
-            {_.map(tabs, ([_, component], idx) => (
+            {_.map(tabs, ([_, Component], idx) => (
               <VSCodePanelView key={idx} id={`tab-${idx}`}>
-                {component}
+                <Component />
               </VSCodePanelView>
             ))}
           </VSCodePanels>

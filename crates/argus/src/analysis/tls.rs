@@ -2,6 +2,7 @@
 use std::cell::RefCell;
 
 use index_vec::IndexVec;
+use rustc_hir::BodyId;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 pub use unsafe_tls::{
   store as unsafe_store_data, take as unsafe_take_data, FullObligationData,
@@ -10,6 +11,7 @@ pub use unsafe_tls::{
 
 use crate::{
   proof_tree::SerializedTree,
+  serialize::{path::PathDefNoArgs, serialize_to_value},
   types::{intermediate::Provenance, Obligation},
 };
 
@@ -19,6 +21,8 @@ use crate::{
 //
 // TODO: documentation
 thread_local! {
+  static BODY_DEF_PATH: RefCell<Option<serde_json::Value>> = Default::default();
+
   static OBLIGATIONS: RefCell<Vec<Provenance<Obligation>>> = Default::default();
 
   static TREE: RefCell<Option<SerializedTree>> = Default::default();
@@ -85,9 +89,6 @@ mod unsafe_tls {
   }
 }
 
-// ------------------------------------------------
-// Obligation processing functions
-
 pub fn store_obligation(obl: Provenance<Obligation>) {
   OBLIGATIONS.with(|obls| {
     if obls
@@ -105,13 +106,11 @@ pub fn take_obligations() -> Vec<Provenance<Obligation>> {
   OBLIGATIONS.with(|obls| obls.take())
 }
 
-// ------------------------------------------------
-// Tree processing functions
-
 pub fn store_tree(new_tree: SerializedTree) {
   TREE.with(|tree| {
-    let prev = tree.replace(Some(new_tree));
-    log::warn!("replacing tree with {:?}", prev);
+    if tree.borrow().is_none() {
+      tree.replace(Some(new_tree));
+    }
   })
 }
 

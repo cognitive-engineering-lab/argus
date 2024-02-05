@@ -93,20 +93,26 @@ pub fn transform<'tcx>(
 
   let hir = tcx.hir();
   let source_map = tcx.sess.source_map();
-  let name = hir.opt_name(hir.body_owner(body_id));
-  let body = hir.body(body_id);
-  let body_range = CharRange::from_span(body.value.span, source_map)
-    .expect("Couldn't get body range");
+  let body_range =
+    CharRange::from_span(hir.body(body_id).value.span, source_map)
+      .expect("Couldn't get body range");
 
-  return ObligationsInBody {
+  let name = obligation_data.iter().next().map(|fdata| {
+    (
+      &fdata.infcx,
+      tcx.hir().body_owner_def_id(body_id).to_def_id(),
+    )
+  });
+
+  ObligationsInBody::new(
     name,
-    range: body_range,
-    obligations: builder.raw_obligations,
-    ambiguity_errors: builder.ambiguity_errors,
-    trait_errors: builder.trait_errors,
-    exprs: builder.exprs,
-    method_lookups: builder.method_lookups,
-  };
+    body_range,
+    builder.ambiguity_errors,
+    builder.trait_errors,
+    builder.raw_obligations,
+    builder.exprs,
+    builder.method_lookups,
+  )
 }
 
 struct ObligationsBuilder<'a, 'tcx: 'a> {
@@ -138,10 +144,13 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       kind,
     } in bins
     {
-      if let Some(range) = hir
-        .opt_span(hir_id)
-        .and_then(|span| CharRange::from_span(span, source_map).ok())
-      {
+      if let Some((range, snippet)) = hir.opt_span(hir_id).and_then(|span| {
+        let r = CharRange::from_span(span, source_map).ok()?;
+        let snip = source_map
+          .span_to_snippet(span)
+          .unwrap_or_else(|_| String::from("{unknown snippet}"));
+        Some((r, snip))
+      }) {
         let kind = match kind {
           BinKind::Misc => Misc,
           BinKind::CallableExpr => CallableExpr,
@@ -185,6 +194,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
 
         self.exprs.push(Expr {
           range,
+          snippet,
           obligations,
           kind,
         });
@@ -323,6 +333,14 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     let ty_mutators: Vec<&dyn Fn(Ty<'tcx>) -> Ty<'tcx>> =
       vec![&ty_id, &ty_with_ref, &ty_with_mut_ref];
 
+    let trait_candidates = trait_candidates
+      .into_iter()
+      .map(|trait_def_id| {
+        let trait_args = infcx.fresh_args_for_item(call_span, trait_def_id);
+        ty::TraitRef::new(tcx, trait_def_id, trait_args)
+      })
+      .collect::<Vec<_>>();
+
     let mut table = Vec::default();
     for ty_adjust in ty_mutators.into_iter() {
       let mut method_steps = Vec::default();
@@ -343,10 +361,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         let step = ReceiverAdjStep::new(infcx, self_ty);
 
         let mut trait_predicates = Vec::default();
-        for trait_def_id in trait_candidates.iter() {
-          let trait_args = infcx.fresh_args_for_item(call_span, *trait_def_id);
-          let trait_ref = ty::TraitRef::new(tcx, *trait_def_id, trait_args);
-
+        for trait_ref in trait_candidates.iter() {
           let trait_ref = trait_ref.with_self_ty(tcx, self_ty);
 
           let predicate: ty::Predicate<'tcx> =
@@ -384,7 +399,10 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     }
 
     Some((
-      self.method_lookups.push(MethodLookup { table }),
+      self.method_lookups.push(MethodLookup {
+        table,
+        candidates: ExtensionCandidates::new(infcx, trait_candidates),
+      }),
       error_recvr,
     ))
   }

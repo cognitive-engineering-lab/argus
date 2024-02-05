@@ -819,30 +819,28 @@ impl TyVidDef {
 //   pub bound_region: BoundRegionKind,
 // }
 
-pub fn goal__predicate_def<'tcx, S>(
-  value: &Goal<'tcx, Predicate<'tcx>>,
-  s: S,
-) -> Result<S::Ok, S::Error>
-where
-  S: serde::Serializer,
-{
-  Goal__PredicateDef::from(value).serialize(s)
-}
-
-#[derive(Serialize)]
-pub struct Goal__PredicateDef<'tcx> {
-  #[serde(with = "PredicateDef")]
-  pub predicate: Predicate<'tcx>,
-  #[serde(with = "ParamEnvDef")]
-  pub param_env: ParamEnv<'tcx>,
-}
-
-impl<'tcx> From<&Goal<'tcx, Predicate<'tcx>>> for Goal__PredicateDef<'tcx> {
-  fn from(value: &Goal<'tcx, Predicate<'tcx>>) -> Self {
-    Goal__PredicateDef {
-      predicate: value.predicate.clone(),
-      param_env: value.param_env,
+pub struct Goal__PredicateDef;
+impl Goal__PredicateDef {
+  pub fn serialize<'tcx, S>(
+    value: &Goal<'tcx, Predicate<'tcx>>,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    #[derive(Serialize)]
+    pub struct Wrapper<'a, 'tcx: 'a> {
+      #[serde(with = "PredicateDef")]
+      pub predicate: &'a Predicate<'tcx>,
+      #[serde(with = "ParamEnvDef")]
+      pub param_env: &'a ParamEnv<'tcx>,
     }
+
+    Wrapper {
+      predicate: &value.predicate,
+      param_env: &value.param_env,
+    }
+    .serialize(s)
   }
 }
 
