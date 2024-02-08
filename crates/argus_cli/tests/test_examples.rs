@@ -59,10 +59,14 @@ macro_rules! mk_tests_for {
 }
 
 mk_tests_for! {
-    axum,
-    bevy,
-    diesel,
-    nalgebra
+  axum,
+  bevy,
+  // chumsky,
+  diesel,
+  easy_ml,
+  entrait,
+  nalgebra,
+  uom
 }
 
 // TODO: include individual test if we want to see a particular output

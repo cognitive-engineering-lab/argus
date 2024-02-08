@@ -528,6 +528,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
     };
 
     builder.print_def_path(def_id, args);
+
     builder.serialize(s)
   }
 

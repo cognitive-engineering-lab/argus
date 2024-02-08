@@ -6,7 +6,7 @@ mod transform;
 use anyhow::Result;
 use fluid_let::fluid_let;
 use rustc_hir::BodyId;
-use rustc_middle::ty::TyCtxt;
+use rustc_middle::ty::{print, TyCtxt};
 pub(crate) use tls::{FullObligationData, SynIdx, UODIdx};
 
 pub(crate) use crate::types::intermediate::{
@@ -26,6 +26,8 @@ pub fn obligations<'tcx>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
 ) -> Result<ObligationsInBody> {
+  log::debug!("Typeck'ing body {body_id:?}");
+
   let typeck_results = tcx.inspect_typeck(body_id, entry::process_obligation);
 
   // Construct the output from the stored data.

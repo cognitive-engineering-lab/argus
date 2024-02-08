@@ -13,7 +13,7 @@ use log::{debug, info};
 use rustc_errors::{emitter::HumanEmitter, DiagCtxt};
 use rustc_hir::BodyId;
 use rustc_interface::interface::Result as RustcResult;
-use rustc_middle::ty::TyCtxt;
+use rustc_middle::ty::{print, TyCtxt};
 use rustc_plugin::{CrateFilter, RustcPlugin, RustcPluginArgs, Utf8Path};
 use rustc_span::{FileName, RealFileName};
 use rustc_utils::{
@@ -234,9 +234,8 @@ pub fn run_with_callbacks(
   callbacks: &mut (dyn rustc_driver::Callbacks + Send),
 ) -> ArgusResult<()> {
   let mut args = args.to_vec();
-  // -Z identify-regions -Z track-diagnostics=yes
   args.extend(
-    "-Z next-solver -A warnings"
+    "-Z next-solver -Z trim-diagnostic-paths=true -A warnings"
       .split(' ')
       .map(|s| s.to_owned()),
   );
@@ -270,7 +269,6 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
       // Create a new emitter writer which consumes *silently* all
       // errors. There most certainly is a *better* way to do this,
       // if you, the reader, know what that is, please open an issue :)
-      // let emitter = SilentEmitter;
       let fallback_bundle = rustc_errors::fallback_fluent_bundle(
         rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
         false,
@@ -298,12 +296,13 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
           get_file_of_body(tcx, body)
         {
           if target_file.map(|f| f.ends_with(&p)).unwrap_or(true) {
-            match analysis.analyze(tcx, body) {
+            debug!("analyzing {:?}", body);
+            match print::with_no_trimmed_paths!(analysis.analyze(tcx, body)) {
               Ok(v) => Some(v),
               Err(_) => None,
             }
           } else {
-            log::info!("Skipping file {:?} as it isn't {:?}", p, self.file);
+            info!("Skipping file {:?} due to target {:?}", p, self.file);
             None
           }
         } else {

@@ -1,0 +1,8 @@
+[package]
+name = "easy-ml-tests"
+version = "0.0.1"
+authors = [ "gavinleroy <gavinleroy6@gmail.com>" ]
+edition = "2021"
+
+[dependencies]
+easy-ml = "1.8.1"

@@ -61,6 +61,8 @@ pub fn process_obligation<'tcx>(
     return;
   };
 
+  log::debug!("Processing obligation {obl:?}");
+
   // TODO: we need to figure out when to save the full data.
   // Saving it for every obligation will consume a ton of memory
   // and make the tool relatively slow, but I don't have a tight

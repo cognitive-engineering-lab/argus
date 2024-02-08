@@ -92,22 +92,24 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
   }
 
   pub fn try_print_trimmed_def_path(&mut self, def_id: DefId) -> bool {
-    if with_forced_trimmed_paths() && self.force_print_trimmed_def_path(def_id)
-    {
-      return true;
-    }
-    if self.tcx().sess.opts.unstable_opts.trim_diagnostic_paths
-      && self.tcx().sess.opts.trimmed_def_paths
-      && !with_no_trimmed_paths()
-      && !with_crate_prefix()
-      && let Some(symbol) = self.tcx().trimmed_def_paths(()).get(&def_id)
-    {
-      // CHANGE: write!(self, "{}", Ident::with_dummy_span(*symbol))?;
-      self.segments.push(PathSegment::unambiguous_name(*symbol));
-      true
-    } else {
-      false
-    }
+    return false; // FIXME:(gavinleroy)
+
+    // if with_forced_trimmed_paths() && self.force_print_trimmed_def_path(def_id)
+    // {
+    //   return true;
+    // }
+    // if self.tcx().sess.opts.unstable_opts.trim_diagnostic_paths
+    //   && self.tcx().sess.opts.trimmed_def_paths
+    //   && !with_no_trimmed_paths()
+    //   && !with_crate_prefix()
+    //   && let Some(symbol) = self.tcx().trimmed_def_paths(()).get(&def_id)
+    // {
+    //   // CHANGE: write!(self, "{}", Ident::with_dummy_span(*symbol))?;
+    //   self.segments.push(PathSegment::unambiguous_name(*symbol));
+    //   true
+    // } else {
+    //   false
+    // }
   }
 
   /// Does the work of `try_print_visible_def_path`, building the
@@ -327,6 +329,8 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
   // print the enum name and the variant name. Otherwise, we do not print anything and let the
   // caller use the `print_def_path` fallback.
   fn force_print_trimmed_def_path(&mut self, def_id: DefId) -> bool {
+    return false; // FIXME:(gavin);
+
     let key = self.tcx().def_key(def_id);
     let visible_parent_map = self.tcx().visible_parent_map(());
     let kind = self.tcx().def_kind(def_id);
@@ -352,18 +356,19 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
         name
       }
     };
-    if let DefKind::Variant = kind
-      && let Some(symbol) = self.tcx().trimmed_def_paths(()).get(&def_id)
-    {
-      // If `Assoc` is unique, we don't want to talk about `Trait::Assoc`.
-      // CHANGE: self.write_str(get_local_name(self, *symbol, def_id, key).as_str())?;
-      self
-        .segments
-        .push(PathSegment::unambiguous_name(get_local_name(
-          self, *symbol, def_id, key,
-        )));
-      return true;
-    }
+    // FIXME:(gavinleroy)
+    // if let DefKind::Variant = kind
+    //   && let Some(symbol) = self.tcx().trimmed_def_paths(()).get(&def_id)
+    // {
+    //   // If `Assoc` is unique, we don't want to talk about `Trait::Assoc`.
+    //   // CHANGE: self.write_str(get_local_name(self, *symbol, def_id, key).as_str())?;
+    //   self
+    //     .segments
+    //     .push(PathSegment::unambiguous_name(get_local_name(
+    //       self, *symbol, def_id, key,
+    //     )));
+    //   return true;
+    // }
     if let Some(symbol) = key.get_opt_name() {
       if let DefKind::AssocConst | DefKind::AssocFn | DefKind::AssocTy = kind
         && let Some(parent) = self.tcx().opt_parent(def_id)

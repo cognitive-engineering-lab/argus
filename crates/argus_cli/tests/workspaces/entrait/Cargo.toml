@@ -1,0 +1,8 @@
+[package]
+name = "entrait-tests"
+version = "0.0.1"
+authors = [ "gavinleroy <gavinleroy6@gmail.com>" ]
+edition = "2021"
+
+[dependencies]
+entrait = "0.4"

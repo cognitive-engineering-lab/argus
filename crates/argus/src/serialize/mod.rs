@@ -21,6 +21,7 @@ use std::cell::Cell;
 
 use r#const::*;
 use rustc_infer::infer::InferCtxt;
+use rustc_middle::ty::print as pretty_ty;
 use rustc_trait_selection::traits::solve::Goal;
 use serde::Serialize;
 use term::*;
@@ -35,7 +36,11 @@ pub fn serialize_to_value<'a, 'tcx: 'a, T: Serialize + 'a>(
   infcx: &InferCtxt<'tcx>,
   value: &T,
 ) -> Result<serde_json::Value, serde_json::Error> {
-  in_dynamic_ctx(infcx, || serde_json::to_value(&value))
+  in_dynamic_ctx(infcx, || {
+    pretty_ty::with_no_trimmed_paths!(with_no_trimmed_paths!(
+      serde_json::to_value(&value)
+    ))
+  })
 }
 
 // NOTE: setting the dynamic TCX should *only* happen

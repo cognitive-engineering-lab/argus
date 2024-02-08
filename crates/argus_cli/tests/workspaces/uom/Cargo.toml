@@ -1,0 +1,8 @@
+[package]
+name = "uom-tests"
+version = "0.0.1"
+authors = [ "gavinleroy <gavinleroy6@gmail.com>" ]
+edition = "2021"
+
+[dependencies]
+uom = "0.33.0"
