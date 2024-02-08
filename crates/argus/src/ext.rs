@@ -184,8 +184,9 @@ where
   ) -> Hash64 {
     let mut h = StableHasher::new();
     let sans_regions = infcx.tcx.erase_regions(self);
-    let this =
-      sans_regions.fold_with(&mut ty_eraser::TyVarEraserVisitor { infcx });
+    let mut freshener = rustc_infer::infer::TypeFreshener::new(infcx);
+    // let mut eraser = ty_eraser::TyVarEraserVisitor { infcx };
+    let this = sans_regions.fold_with(&mut freshener);
     // erase infer vars
     this.hash_stable(ctx, &mut h);
     h.finish()

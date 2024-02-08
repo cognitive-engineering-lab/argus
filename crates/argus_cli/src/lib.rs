@@ -1,4 +1,4 @@
-#![feature(rustc_private, trait_alias, associated_type_defaults)]
+#![feature(rustc_private, trait_alias, associated_type_defaults, let_chains)]
 
 extern crate rustc_data_structures;
 extern crate rustc_driver;

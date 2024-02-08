@@ -1,0 +1,10 @@
+[package]
+name = "axum-tests"
+version = "0.0.1"
+authors = [ "gavinleroy <gavinleroy6@gmail.com>" ]
+edition = "2021"
+
+[dependencies]
+axum = "0.7"
+axum-macros = "0.4"
+axum-server = "0.6"

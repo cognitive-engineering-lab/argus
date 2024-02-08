@@ -5,6 +5,10 @@ import { HoverInfo } from "../../utilities/HoverInfo";
 import { PrintGenericArg, PrintTy } from "./ty";
 import { intersperse, takeRightUntil } from "./utilities";
 
+export const PrintValuePath = ({ o }) => {
+  return <PrintDefPath o={o} />;
+};
+
 // NOTE: when we aren't hovering over the path, we just
 // want to show the last segment. On hover, it should be the fully
 // qualified path. (At least that's the current idea.)
@@ -128,7 +132,6 @@ export const PrintPathSegment = ({ o }) => {
           : (_e, _i) => {
               throw new Error("Unknown comma separated kind", o);
             };
-      console.debug("CommaSeparated", o);
       return <>{intersperse(o.entries, ", ", doInner)}</>;
     }
     default: {

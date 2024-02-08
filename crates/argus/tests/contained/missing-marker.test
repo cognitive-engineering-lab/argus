@@ -1,0 +1,23 @@
+trait Functionality<T> {
+    fn func(self, other: T);
+}
+
+trait Marker {}
+
+impl<'a, T: Marker> Functionality<&'a Vec<T>> for &'a Vec<T> {
+    fn func(self, other: &'a Vec<T>) {}
+}
+
+impl<'a, T> Functionality<&'a T> for &'a Vec<T> {
+    fn func(self, other: &'a T) {}
+}
+
+struct Elem;
+
+// Uncomment this impl for code to compile
+// impl Marker for Elem {}
+
+fn main() {
+    let v = vec![Elem];
+    v.func(&v);
+}

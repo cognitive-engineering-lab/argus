@@ -8,9 +8,11 @@
     extract_if,
     hash_extract_if,
     box_patterns,
-    control_flow_enum
+    control_flow_enum,
+    if_let_guard
 )]
 
+extern crate rustc_apfloat;
 extern crate rustc_ast;
 extern crate rustc_data_structures;
 #[cfg(feature = "testing")]

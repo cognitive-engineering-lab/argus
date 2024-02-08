@@ -1,8 +1,8 @@
 use std::num::*;
 
-use rustc_hir::{def::DefKind, def_id::DefId, Unsafety};
+use rustc_hir::{self as hir, def::DefKind, def_id::DefId, Unsafety};
 use rustc_middle::ty::{self, *};
-use rustc_span::symbol::Symbol;
+use rustc_span::symbol::{kw, Symbol};
 use rustc_target::spec::abi::Abi;
 use rustc_type_ir as ir;
 use serde::{ser::SerializeSeq, Serialize};
@@ -19,18 +19,32 @@ impl TyDef {
   }
 }
 
+pub type Slice__TyDef = TysDef;
 pub struct TysDef;
 impl TysDef {
+  pub fn serialize<'tcx, S>(value: &[Ty<'tcx>], s: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    #[derive(Serialize)]
+    struct Wrapper<'a, 'tcx: 'a>(#[serde(with = "TyDef")] &'a Ty<'tcx>);
+    serialize_custom_seq! { Wrapper, s, value }
+  }
+}
+
+pub struct Option__TyDef;
+impl Option__TyDef {
   pub fn serialize<'tcx, S>(
-    value: &List<Ty<'tcx>>,
+    value: &Option<Ty<'tcx>>,
     s: S,
   ) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    #[derive(Serialize)]
-    struct Wrapper<'tcx>(#[serde(with = "TyDef")] Ty<'tcx>);
-    serialize_custom_seq! { Wrapper, s, value }
+    match value {
+      None => NOOP.serialize(s),
+      Some(ty) => TyDef::serialize(ty, s),
+    }
   }
 }
 
@@ -134,7 +148,7 @@ impl<'tcx> From<&ir::TyKind<TyCtxt<'tcx>>> for TyKind__TyCtxt<'tcx> {
       ir::TyKind::Dynamic(bep, r, dy_kind) => {
         TyKind__TyCtxt::Dynamic(DynamicTyKindDef {
           predicates: bep,
-          regions: r.clone(),
+          region: r.clone(),
           kind: dy_kind.clone(),
         })
       }
@@ -282,17 +296,71 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
 
 pub struct DynamicTyKindDef<'tcx> {
   predicates: &'tcx List<Binder<'tcx, ExistentialPredicate<'tcx>>>,
-  regions: Region<'tcx>,
+  region: Region<'tcx>,
   kind: DynKind,
 }
 
 impl<'tcx> Serialize for DynamicTyKindDef<'tcx> {
-  fn serialize<S>(&self, _s: S) -> Result<S::Ok, S::Error>
+  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    // TODO: gavinleroy
-    todo!("dynamic ty kind")
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Wrapper<'tcx> {
+      #[serde(with = "Slice__Binder__ExistentialPredicateDef")]
+      data: &'tcx List<Binder<'tcx, ExistentialPredicate<'tcx>>>,
+      #[serde(with = "RegionDef")]
+      region: Region<'tcx>,
+      #[serde(with = "DynKindDef")]
+      kind: DynKind,
+    }
+
+    Wrapper {
+      data: self.predicates,
+      region: self.region,
+      kind: self.kind,
+    }
+    .serialize(s)
+  }
+}
+
+pub type Slice__PolyExistentialPredicateDef =
+  Slice__Binder__ExistentialPredicateDef;
+pub struct Slice__Binder__ExistentialPredicateDef;
+impl Slice__Binder__ExistentialPredicateDef {
+  pub fn serialize<'tcx, S>(
+    value: &List<PolyExistentialPredicate<'tcx>>,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Wrapper {
+      #[serde(skip_serializing_if = "Option::is_none")]
+      data: Option<path::PathDefNoArgs>,
+      auto_traits: Vec<path::PathDefNoArgs>,
+    }
+
+    let predicates = value;
+
+    let data = predicates.principal().map(|principal| {
+      // TODO: how to deal with binders
+      let principal = principal.skip_binder();
+
+      // TODO: see pretty_print_dyn_existential where
+      // they do some wonky special casing and re-sugaring...
+
+      path::PathDefNoArgs::new(principal.def_id)
+    });
+    let auto_traits: Vec<_> = predicates
+      .auto_traits()
+      .map(|def_id| path::PathDefNoArgs::new(def_id))
+      .collect::<Vec<_>>();
+
+    Wrapper { data, auto_traits }.serialize(s)
   }
 }
 
@@ -305,12 +373,44 @@ pub struct CoroutineTyKindDef<'tcx> {
 }
 
 impl<'tcx> Serialize for CoroutineTyKindDef<'tcx> {
-  fn serialize<S>(&self, _s: S) -> Result<S::Ok, S::Error>
+  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Wrapper<'tcx> {
+      path: path::PathDefWithArgs<'tcx>,
+      #[serde(with = "MovabilityDef")]
+      movability: Movability,
+      #[serde(with = "TyDef")]
+      upvar_tys: Ty<'tcx>,
+      #[serde(with = "TyDef")]
+      witness: Ty<'tcx>,
+      should_print_movability: bool,
+    }
+
+    let infcx = get_dynamic_ctx();
+    let tcx = infcx.tcx;
+    let CoroutineTyKindDef { def_id, args } = self;
+
+    let coroutine_kind = tcx.coroutine_kind(def_id).unwrap();
+    let upvar_tys = args.as_coroutine().tupled_upvars_ty();
+    let witness = args.as_coroutine().witness();
+    let movability = coroutine_kind.movability();
+
     // TODO: gavinleroy
-    todo!("coroutine ty kind")
+    Wrapper {
+      path: path::PathDefWithArgs::new(*def_id, args),
+      movability,
+      upvar_tys,
+      witness,
+      should_print_movability: matches!(
+        coroutine_kind,
+        hir::CoroutineKind::Coroutine(_)
+      ),
+    }
+    .serialize(s)
   }
 }
 
@@ -323,12 +423,11 @@ pub struct CoroutineWitnessTyKindDef<'tcx> {
 }
 
 impl<'tcx> Serialize for CoroutineWitnessTyKindDef<'tcx> {
-  fn serialize<S>(&self, _s: S) -> Result<S::Ok, S::Error>
+  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    // TODO: gavinleroy
-    todo!("coroutine ty kind")
+    path::PathDefWithArgs::new(self.def_id, self.args).serialize(s)
   }
 }
 
@@ -376,41 +475,26 @@ impl PlaceholderTyDef {
   where
     S: serde::Serializer,
   {
-    Placeholder__BoundTy::from(value).serialize(s)
-  }
-}
-
-#[derive(Serialize)]
-pub struct Placeholder__BoundTy {
-  #[serde(with = "UniverseIndexDef")]
-  pub universe: UniverseIndex,
-  #[serde(with = "BoundTyDef")]
-  pub bound: BoundTy,
-}
-
-impl From<&Placeholder<BoundTy>> for Placeholder__BoundTy {
-  fn from(value: &Placeholder<BoundTy>) -> Self {
-    Placeholder__BoundTy {
-      universe: value.universe.clone(),
-      bound: value.bound.clone(),
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase", tag = "type")]
+    enum PlaceholderTyBoundKind {
+      Named {
+        #[serde(with = "SymbolDef")]
+        data: Symbol,
+      },
+      Anon {
+        data: (),
+      },
     }
-  }
-}
 
-#[derive(Serialize)]
-pub struct Placeholder__BoundRegion {
-  #[serde(with = "UniverseIndexDef")]
-  pub universe: UniverseIndex,
-  #[serde(with = "BoundRegionDef")]
-  pub bound: BoundRegion,
-}
+    let serialize_kind = match value.bound.kind {
+      ty::BoundTyKind::Anon => PlaceholderTyBoundKind::Anon { data: () },
+      ty::BoundTyKind::Param(_, name) => {
+        PlaceholderTyBoundKind::Named { data: name }
+      }
+    };
 
-impl From<&Placeholder<BoundRegion>> for Placeholder__BoundRegion {
-  fn from(value: &Placeholder<BoundRegion>) -> Self {
-    Placeholder__BoundRegion {
-      universe: value.universe.clone(),
-      bound: value.bound.clone(),
-    }
+    serialize_kind.serialize(s)
   }
 }
 
@@ -561,14 +645,36 @@ impl AliasTyDef {
   }
 }
 
-#[derive(Serialize)]
-#[serde(remote = "BoundTy")]
-pub struct BoundTyDef {
-  #[serde(with = "BoundVarDef")]
-  pub var: BoundVar,
-  #[serde(with = "BoundTyKindDef")]
-  pub kind: BoundTyKind,
+pub struct BoundTyDef;
+impl BoundTyDef {
+  pub fn serialize<S>(value: &ty::BoundTy, s: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase", tag = "type")]
+    enum BoundTyKind {
+      Named {
+        #[serde(with = "SymbolDef")]
+        data: Symbol,
+      },
+    }
+
+    match value.kind {
+      ty::BoundTyKind::Anon => todo!("bound variables need to be expaaanded"),
+      ty::BoundTyKind::Param(_, name) => {
+        BoundTyKind::Named { data: name }.serialize(s)
+      }
+    }
+  }
 }
+
+// ----------------------------------------------------------------------
+// TODO: these "kinds" need to be changed before serializing the DefId...
+//
+// They are used in Binders, but maybe we shouldn't be printing binders
+// anyways...not sure the best way to handle that.
+// ----------------------------------------------------------------------
 
 #[derive(Serialize)]
 #[serde(remote = "BoundVariableKind")]
@@ -578,18 +684,11 @@ pub enum BoundVariableKindDef {
   Const,
 }
 
-// ----------------------------------------------------------------------
-// TODO: these "kinds" need to be changed before serializing the DefId...
-//
-// They're getting skipped for now.
-// ----------------------------------------------------------------------
-
-// TODO:
 #[derive(Serialize)]
 #[serde(remote = "BoundRegionKind")]
 pub enum BoundRegionKindDef {
   BrAnon,
-  BrNamed(#[serde(skip)] DefId, #[serde(skip)] Symbol),
+  BrNamed(#[serde(skip)] DefId, #[serde(with = "SymbolDef")] Symbol),
   BrEnv,
 }
 
@@ -670,7 +769,7 @@ impl AdtDefDef {
     S: serde::Serializer,
   {
     // TODO: gavinleroy
-    todo!("ADT def def")
+    todo!("ADT def def {:?}", _value)
   }
 }
 
@@ -690,6 +789,13 @@ pub enum MutabilityDef {
   Mut,
 }
 
+// NOTE: this follows the code for "concise printout" code from print::pretty,
+// but this isn't really all the information you'd want to diagnose a region error.
+// A stretch goal for Argus would be to explain regions in some way similar
+// to `note_and_explain_region`.
+// TODO: we should use some sort of "region highlight mode"
+// see: <https://doc.rust-lang.org/stable/nightly-rustc/rustc_middle/ty/print/pretty/struct.RegionHighlightMode.html>
+// to differentiate regions in the types, I guess not necessary now.
 pub struct RegionDef;
 impl RegionDef {
   pub fn serialize<'tcx, S>(
@@ -699,68 +805,85 @@ impl RegionDef {
   where
     S: serde::Serializer,
   {
-    RegionKind__TyCtxt::from(&value.kind()).serialize(s)
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase", tag = "type")]
+    enum RegionKindDef {
+      Named {
+        #[serde(with = "SymbolDef")]
+        data: Symbol,
+      },
+      Vid {
+        data: (),
+      },
+      Anonymous {
+        data: (),
+      },
+      Static {
+        data: (),
+      },
+    }
+
+    let region = value;
+    let my_region_kind: RegionKindDef = match **region {
+      ty::ReEarlyParam(ref data) if data.name != kw::Empty => {
+        RegionKindDef::Named { data: data.name }
+      }
+      ty::ReBound(_, ty::BoundRegion { kind: br, .. })
+      | ty::ReLateParam(ty::LateParamRegion {
+        bound_region: br, ..
+      })
+      | ty::RePlaceholder(ty::Placeholder {
+        bound: ty::BoundRegion { kind: br, .. },
+        ..
+      }) if let ty::BrNamed(_, name) = br
+        && br.is_named() =>
+      {
+        RegionKindDef::Named { data: name }
+      }
+      ty::ReStatic => RegionKindDef::Static { data: () },
+
+      // XXX: the catch all case is for those from above with guards, in the
+      // future if we expand the capabilities of the region printing this will
+      // need to change.
+      ty::ReVar(_) | ty::ReErased | ty::ReError(_) | _ => {
+        RegionKindDef::Anonymous { data: () }
+      }
+    };
+
+    my_region_kind.serialize(s)
   }
 }
 
-#[derive(Serialize)]
-#[serde(remote = "BoundRegion")]
-pub struct BoundRegionDef {
-  #[serde(with = "BoundVarDef")]
-  pub var: BoundVar,
-  #[serde(with = "BoundRegionKindDef")]
-  pub kind: BoundRegionKind,
-}
-
-// TODO: this is going to take much more thought.
-pub enum RegionKind__TyCtxt<'tcx> {
-  ReEarlyParam(<TyCtxt<'tcx> as Interner>::EarlyParamRegion),
-  ReBound(DebruijnIndex, <TyCtxt<'tcx> as Interner>::BoundRegion),
-  ReLateParam(<TyCtxt<'tcx> as Interner>::LateParamRegion),
-  ReStatic,
-  ReVar(<TyCtxt<'tcx> as Interner>::InferRegion),
-  RePlaceholder(<TyCtxt<'tcx> as Interner>::PlaceholderRegion),
-  ReErased,
-  ReError(<TyCtxt<'tcx> as Interner>::ErrorGuaranteed),
-}
-
-impl<'tcx> Serialize for RegionKind__TyCtxt<'tcx> {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+pub struct Slice__RegionDef;
+impl Slice__RegionDef {
+  pub fn serialize<'tcx, S>(
+    value: &[Region<'tcx>],
+    s: S,
+  ) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    // TODO: (gavinleroy)
-    "'region".serialize(s)
+    #[derive(Serialize)]
+    struct Wrapper<'a, 'tcx: 'a>(#[serde(with = "RegionDef")] &'a Region<'tcx>);
+    serialize_custom_seq! { Wrapper, s, value }
   }
 }
 
-impl<'tcx> From<&ir::RegionKind<TyCtxt<'tcx>>> for RegionKind__TyCtxt<'tcx> {
-  fn from(value: &ir::RegionKind<TyCtxt<'tcx>>) -> Self {
-    match value {
-      RegionKind::ReEarlyParam(v) => {
-        RegionKind__TyCtxt::ReEarlyParam(v.clone())
-      }
-      RegionKind::ReBound(v1, v2) => {
-        RegionKind__TyCtxt::ReBound(v1.clone(), v2.clone())
-      }
-      RegionKind::ReLateParam(v) => RegionKind__TyCtxt::ReLateParam(v.clone()),
-      RegionKind::ReStatic => RegionKind__TyCtxt::ReStatic,
-      RegionKind::ReVar(v) => RegionKind__TyCtxt::ReVar(v.clone()),
-      RegionKind::RePlaceholder(v) => {
-        RegionKind__TyCtxt::RePlaceholder(v.clone())
-      }
-      RegionKind::ReErased => RegionKind__TyCtxt::ReErased,
-      RegionKind::ReError(v) => RegionKind__TyCtxt::ReError(v.clone()),
-    }
-  }
-}
+// #[derive(Serialize)]
+// #[serde(remote = "BoundRegion")]
+// pub struct BoundRegionDef {
+//   #[serde(with = "BoundVarDef")]
+//   pub var: BoundVar,
+//   #[serde(with = "BoundRegionKindDef")]
+//   pub kind: BoundRegionKind,
+// }
 
-#[derive(Serialize)]
-#[serde(remote = "BoundVar")]
-pub struct BoundVarDef {
-  #[serde(skip)]
-  pub(crate) private: u32,
-}
+// #[derive(Serialize)]
+// #[serde(remote = "BoundVar")]
+// pub struct BoundVarDef {
+//   #[serde(skip)]
+//   pub(crate) private: u32,
+// }
 
 pub struct GenericArgDef;
 impl GenericArgDef {
@@ -772,6 +895,23 @@ impl GenericArgDef {
     S: serde::Serializer,
   {
     GenericArgKindDef::serialize(&value.unpack(), s)
+  }
+}
+
+pub struct Slice__GenericArgDef;
+impl Slice__GenericArgDef {
+  pub fn serialize<'tcx, S>(
+    value: &[GenericArg<'tcx>],
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    #[derive(Serialize)]
+    struct Wrapper<'a, 'tcx: 'a>(
+      #[serde(with = "GenericArgDef")] &'a GenericArg<'tcx>,
+    );
+    serialize_custom_seq! { Wrapper, s, value }
   }
 }
 
@@ -1283,14 +1423,6 @@ pub struct CoercePredicateDef<'tcx> {
 }
 
 #[derive(Serialize)]
-#[serde(remote = "InferConst")]
-pub enum InferConstDef {
-  Var(#[serde(with = "ConstVidDef")] ConstVid),
-  EffectVar(#[serde(with = "EffectVidDef")] EffectVid),
-  Fresh(u32),
-}
-
-#[derive(Serialize)]
 #[serde(remote = "ConstVid")]
 pub struct ConstVidDef {
   #[serde(skip)]
@@ -1331,40 +1463,27 @@ pub struct RegionVidDef {
   private: u32,
 }
 
-pub struct PlaceholderRegionDef;
-impl PlaceholderRegionDef {
-  pub fn serialize<'tcx, S>(
-    value: &Placeholder<BoundRegion>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    Placeholder__BoundRegion::from(value).serialize(s)
-  }
-}
-
-pub fn slice__val_tree<'tcx, S>(
-  value: &[ValTree<'tcx>],
-  s: S,
-) -> Result<S::Ok, S::Error>
-where
-  S: serde::Serializer,
-{
-  #[derive(Serialize)]
-  struct Wrapper<'a, 'tcx>(#[serde(with = "ValTreeDef")] &'a ValTree<'tcx>);
-  serialize_custom_seq! { Wrapper, s, value }
-}
+// pub fn slice__val_tree<'tcx, S>(
+//   value: &[ValTree<'tcx>],
+//   s: S,
+// ) -> Result<S::Ok, S::Error>
+// where
+//   S: serde::Serializer,
+// {
+//   #[derive(Serialize)]
+//   struct Wrapper<'a, 'tcx>(#[serde(with = "ValTreeDef")] &'a ValTree<'tcx>);
+//   serialize_custom_seq! { Wrapper, s, value }
+// }
 
 // FIXME:
-#[derive(Serialize)]
-#[serde(remote = "ScalarInt")]
-pub struct ScalarIntDef {
-  #[serde(skip)]
-  data: u128,
-  #[serde(skip)]
-  size: NonZeroU8,
-}
+// #[derive(Serialize)]
+// #[serde(remote = "ScalarInt")]
+// pub struct ScalarIntDef {
+//   #[serde(skip)]
+//   data: u128,
+//   #[serde(skip)]
+//   size: NonZeroU8,
+// }
 
 #[derive(Serialize)]
 #[serde(remote = "ParamConst")]
@@ -1392,9 +1511,44 @@ impl SymbolDef {
   }
 }
 
+pub struct Slice__SymbolDef;
+impl Slice__SymbolDef {
+  pub fn serialize<'tcx, S>(value: &[Symbol], s: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    #[derive(Serialize)]
+    struct Wrapper<'a>(#[serde(with = "SymbolDef")] &'a Symbol);
+    serialize_custom_seq! { Wrapper, s, value }
+  }
+}
+
 #[derive(Serialize)]
 #[serde(remote = "AliasRelationDirection")]
 pub enum AliasRelationDirectionDef {
   Equate,
   Subtype,
+}
+
+pub struct BoundVariable {
+  debruijn_idx: DebruijnIndex,
+  var: BoundVar,
+}
+
+impl BoundVariable {
+  pub fn new(d: DebruijnIndex, v: BoundVar) -> Self {
+    BoundVariable {
+      debruijn_idx: d,
+      var: v,
+    }
+  }
+}
+
+impl Serialize for BoundVariable {
+  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    todo!("see debug_bound_var in RUSTC")
+  }
 }

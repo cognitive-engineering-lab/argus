@@ -1,6 +1,6 @@
 use std::{
   borrow::Cow,
-  env,
+  env, io,
   path::PathBuf,
   process::{exit, Command},
   time::Instant,
@@ -10,14 +10,13 @@ use argus::types::{ObligationHash, ToTarget};
 use clap::{Parser, Subcommand};
 use fluid_let::fluid_set;
 use log::{debug, info};
-use rustc_errors::DiagCtxt;
+use rustc_errors::{emitter::HumanEmitter, DiagCtxt};
 use rustc_hir::BodyId;
 use rustc_interface::interface::Result as RustcResult;
 use rustc_middle::ty::TyCtxt;
 use rustc_plugin::{CrateFilter, RustcPlugin, RustcPluginArgs, Utf8Path};
 use rustc_span::{FileName, RealFileName};
 use rustc_utils::{
-  errors::silent_emitter::SilentEmitter,
   source_map::{
     filename::Filename,
     find_bodies::{find_bodies, find_enclosing_bodies},
@@ -41,7 +40,7 @@ enum ArgusCommand {
   Preload,
   RustcVersion,
   Obligations {
-    file: String,
+    file: Option<String>,
   },
   Tree {
     file: String,
@@ -80,7 +79,7 @@ where
 }
 
 struct ArgusCallbacks<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>> {
-  file: PathBuf,
+  file: Option<PathBuf>,
   analysis: Option<A>,
   compute_target: Option<F>,
   result: Vec<A::Output>,
@@ -136,15 +135,16 @@ impl RustcPlugin for ArgusPlugin {
     };
 
     let file = match &args.command {
-      Tree { file, .. } => file,
-      Obligations { file } => file,
+      Tree { file, .. } => Some(file),
+      Obligations { file } => file.as_ref(),
       _ => unreachable!(),
     };
 
-    RustcPluginArgs {
-      filter: CrateFilter::CrateContainingFile(PathBuf::from(file)),
-      args,
-    }
+    let filter = file
+      .map(|file| CrateFilter::CrateContainingFile(PathBuf::from(file)))
+      .unwrap_or(CrateFilter::OnlyWorkspace);
+
+    RustcPluginArgs { filter, args }
   }
 
   fn run(
@@ -186,7 +186,7 @@ impl RustcPlugin for ArgusPlugin {
 
         let v = run(
           argus::analysis::tree,
-          PathBuf::from(&file),
+          Some(PathBuf::from(&file)),
           compute_target,
           &compiler_args,
         );
@@ -196,7 +196,7 @@ impl RustcPlugin for ArgusPlugin {
         let nothing = || None::<(ObligationHash, CharRange)>;
         let v = run(
           argus::analysis::obligations,
-          PathBuf::from(file),
+          file.map(PathBuf::from),
           nothing,
           &compiler_args,
         );
@@ -209,7 +209,7 @@ impl RustcPlugin for ArgusPlugin {
 
 fn run<A: ArgusAnalysis, T: ToTarget>(
   analysis: A,
-  file: PathBuf,
+  file: Option<PathBuf>,
   compute_target: impl FnOnce() -> Option<T> + Send,
   args: &[String],
 ) -> ArgusResult<Vec<A::Output>> {
@@ -270,7 +270,13 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
       // Create a new emitter writer which consumes *silently* all
       // errors. There most certainly is a *better* way to do this,
       // if you, the reader, know what that is, please open an issue :)
-      sess.dcx = DiagCtxt::with_emitter(Box::new(SilentEmitter));
+      // let emitter = SilentEmitter;
+      let fallback_bundle = rustc_errors::fallback_fluent_bundle(
+        rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
+        false,
+      );
+      let emitter = HumanEmitter::new(Box::new(io::sink()), fallback_bundle);
+      sess.dcx = DiagCtxt::with_emitter(Box::new(emitter));
     }));
   }
 
@@ -285,12 +291,13 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
     queries.global_ctxt().unwrap().enter(|tcx| {
       elapsed("global_ctxt", start);
       let mut analysis = self.analysis.take().unwrap();
+      let target_file = self.file.as_ref();
 
       let mut inner = |(_, body)| {
         if let FileName::Real(RealFileName::LocalPath(p)) =
           get_file_of_body(tcx, body)
         {
-          if self.file.ends_with(&p) {
+          if target_file.map(|f| f.ends_with(&p)).unwrap_or(true) {
             match analysis.analyze(tcx, body) {
               Ok(v) => Some(v),
               Err(_) => None,

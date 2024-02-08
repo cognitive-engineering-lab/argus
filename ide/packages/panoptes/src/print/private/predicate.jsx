@@ -3,7 +3,7 @@ import React from "react";
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
 import { PrintTerm } from "./term";
-import { PrintBinder, PrintGenericArg, PrintTy } from "./ty";
+import { PrintBinder, PrintGenericArg, PrintRegion, PrintTy } from "./ty";
 
 export const PrintGoalPredicate = ({ o }) => {
   // NOTE: by default just print the predicate, not the env.

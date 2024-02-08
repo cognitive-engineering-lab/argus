@@ -26,6 +26,10 @@ use serde::Serialize;
 use term::*;
 use ty::*;
 
+#[derive(Serialize)]
+struct NoOp(#[serde(skip_serializing_if = "Option::is_none")] Option<()>);
+const NOOP: NoOp = NoOp(None);
+
 /// Entry function to serialize anything from rustc.
 pub fn serialize_to_value<'a, 'tcx: 'a, T: Serialize + 'a>(
   infcx: &InferCtxt<'tcx>,

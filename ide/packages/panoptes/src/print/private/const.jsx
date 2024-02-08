@@ -1,31 +1,58 @@
 import React from "react";
 
-export const PrintConst = ({ o }) => {
-  //   Infer(#[serde(with = "InferConstDef")] InferConst),
-  //   Bound(#[serde(skip)] DebruijnIndex, #[serde(with = "BoundConstDef")] <TyCtxt<'tcx> as Interner>::BoundConst),
-  //   Placeholder(#[serde(with = "PlaceholderConstDef")] <TyCtxt<'tcx> as Interner>::PlaceholderConst),
-  //   Unevaluated(#[serde(with = "AliasConstDef")] <TyCtxt<'tcx> as Interner>::AliasConst),
-  //   Value(#[serde(with = "ValueConstDef")] <TyCtxt<'tcx> as Interner>::ValueConst),
-  //   Error(#[serde(skip)] <TyCtxt<'tcx> as Interner>::ErrorGuaranteed),
-  //   Expr(#[serde(with = "ExprConstDef")] <TyCtxt<'tcx> as Interner>::ExprConst),
+import { PrintValuePath } from "./path";
+import { PrintExpr, PrintValueTree } from "./term";
+import { PrintBoundVariable, PrintSymbol } from "./ty";
 
-  if ("Infer" in o) {
-    throw new Error("TODO");
-  } else if ("Bound" in o) {
-    throw new Error("TODO");
-  } else if ("Placeholder" in o) {
-    throw new Error("TODO");
-  } else if ("Unevaluated" in o) {
-    throw new Error("TODO");
-  } else if ("Value" in o) {
-    throw new Error("TODO");
-  } else if ("Error" in o) {
-    return "{{error}}";
-  } else if ("Expr" in o) {
-    // FIXME: this is what rustc does, but can't we just print
-    // the full expression?
-    return "{{const expr}}";
-  } else {
-    throw new Error("Unknown const", o);
+export const PrintConst = ({ o }) => {
+  switch (o.type) {
+    case "error":
+      return "{{const error}}";
+    case "param":
+      return <PrintParamConst o={o.data} />;
+    case "infer":
+      return <PrintInferConst o={o.data} />;
+    case "bound":
+      return <PrintBoundVariable o={o.data} />;
+    case "Placeholder":
+      throw new Error("TODO");
+    case "unevaluated":
+      return <PrintUnevaluatedConst o={o.data} />;
+    case "value":
+      return <PrintValueTree o={o.data} />;
+    case "expr":
+      return <PrintExpr o={o.data} />;
+    default:
+      throw new Error("Unknown const kind", o);
+  }
+};
+
+const PrintInferConst = ({ o }) => {
+  switch (o.type) {
+    case "anon": {
+      return <span>_</span>;
+    }
+    default:
+      throw new Error("Unknown infer const kind", o);
+  }
+};
+
+const PrintParamConst = ({ o }) => {
+  return <PrintSymbol o={o.name} />;
+};
+
+const PrintUnevaluatedConst = ({ o }) => {
+  switch (o.type) {
+    case "valuePath": {
+      return <PrintValuePath o={o.data} />;
+    }
+    case "anonSnippet": {
+      return <span>{o.data}</span>;
+    }
+    case "nonLocalPath": {
+      throw new Error("todo");
+    }
+    default:
+      throw new Error("Unknown unevaluated const kind", o);
   }
 };

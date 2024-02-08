@@ -12,11 +12,7 @@ use rustc_span::{
 };
 use serde::{Serialize, Serializer};
 
-use super::{serialize_custom_seq, ty::SymbolDef};
-
-#[derive(Serialize)]
-struct NoOp(#[serde(skip_serializing_if = "Option::is_none")] Option<()>);
-const NOOP: NoOp = NoOp(None);
+use super::{serialize_custom_seq, ty::SymbolDef, NOOP};
 
 #[derive(Serialize)]
 #[serde(remote = "Ident")]

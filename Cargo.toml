@@ -1,6 +1,6 @@
 [workspace]
 members = [ "crates/*" ]
-# exclude = [ ]
+exclude = [ "crates/argus_cli/tests/workspaces" ]
 resolver = "2"
 
 [profile.dev.package.similar]
