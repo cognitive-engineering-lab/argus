@@ -189,20 +189,6 @@ impl BoundConstDef {
   }
 }
 
-// pub struct ValueConstDef;
-// impl ValueConstDef {
-//   pub fn serialize<'tcx, S>(
-//     value: &ValTree<'tcx>,
-//     s: S,
-//   ) -> Result<S::Ok, S::Error>
-//   where
-//     S: serde::Serializer,
-//   {
-//     todo!()
-//     // ValTreeDef::serialize(value, s)
-//   }
-// }
-
 pub struct ExprConstDef;
 impl ExprConstDef {
   pub fn serialize<'tcx, S>(value: &Expr<'tcx>, s: S) -> Result<S::Ok, S::Error>

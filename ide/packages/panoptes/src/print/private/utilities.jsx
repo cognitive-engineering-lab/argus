@@ -20,6 +20,10 @@ export function intersperse(arr, sep, proc = undefined) {
 // NOTE: difference between this and _.takeRightWhile is that
 // this *does* include the first element that matches the predicate.
 export function takeRightUntil(arr, pred) {
+  if (arr.length <= 1) {
+    return arr;
+  }
+
   let i = arr.length - 1;
   while (0 <= i) {
     if (pred(arr[i])) {

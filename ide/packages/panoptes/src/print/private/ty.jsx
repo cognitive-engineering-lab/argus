@@ -298,10 +298,14 @@ export const PrintAliasTyKind = ({ o }) => {
 };
 
 export const PrintAliasTy = ({ o }) => {
-  // TODO: this isn't quite accurate, the serialization code needs to get
-  // updated, see AliasTyDef::serialize for up-to-date info.
-  // The case for 'inherent projections' is missing.
-  return <PrintDefPath o={o} />;
+  switch (o.type) {
+    case "pathDef":
+      return <PrintDefPath o={o.data} />;
+    case "inherent":
+      return <PrintDefPath o={o} />;
+    default:
+      throw new Error("Unknown alias ty kind", o);
+  }
 };
 
 export const PrintOqaqueImplType = ({ o }) => {
@@ -345,20 +349,19 @@ export const PrintPlaceholderTy = ({ o }) => {
   }
 };
 
-// TODO: infer types are not yet "done"
 export const PrintInferTy = ({ o }) => {
-  if (o === "Unresolved") {
-    return "_";
-  } else {
-    throw new Error("Unknown infer ty", o);
-  }
-};
-
-export const PrintTyVar = ({ o }) => {
-  if (typeof o === "string" || o instanceof String) {
-    return o;
-  } else {
-    return <PrintTy o={o} />;
+  switch (o.type) {
+    case "intVar":
+      return "{{int}}";
+    case "floatVar":
+      return "{{float}}";
+    case "named":
+      // NOTE: we also have access to the symbol it came from o.name
+      return <PrintDefPath o={o.pathDef} />;
+    case "unresolved":
+      return "_";
+    default:
+      throw new Error("Unknown infer ty", o);
   }
 };
 

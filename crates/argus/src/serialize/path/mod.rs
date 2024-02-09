@@ -67,6 +67,25 @@ impl<'tcx> Serialize for PathDefWithArgs<'tcx> {
   }
 }
 
+pub struct AliasPath<'a, 'tcx: 'a> {
+  alias_ty: &'a ty::AliasTy<'tcx>,
+}
+
+impl<'a, 'tcx: 'a> AliasPath<'a, 'tcx> {
+  pub fn new(alias_ty: &'a ty::AliasTy<'tcx>) -> Self {
+    AliasPath { alias_ty }
+  }
+}
+
+impl<'tcx> Serialize for AliasPath<'_, 'tcx> {
+  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    PathBuilder::compile_inherent_projection(self.alias_ty, s)
+  }
+}
+
 // --------------------------------------------------------
 // Value path definitions
 
@@ -418,8 +437,8 @@ impl<'tcx> Serialize for OpaqueImplType<'tcx> {
 
 // NOTE: this is the type that the PathBuilder
 // will build and serialize.
-#[derive(Serialize)]
-struct DefinedPath {}
+// #[derive(Serialize)]
+// struct DefinedPath {}
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -528,6 +547,27 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
     };
 
     builder.print_def_path(def_id, args);
+
+    builder.serialize(s)
+  }
+
+  pub fn compile_inherent_projection(
+    alias_ty: &ty::AliasTy<'tcx>,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    let infcx = super::get_dynamic_ctx();
+    let mut builder = PathBuilder {
+      infcx,
+      empty_path: true,
+      in_value: false,
+      segments: Vec::new(),
+      _marker: std::marker::PhantomData::<S>,
+    };
+
+    builder.pretty_print_inherent_projection(alias_ty);
 
     builder.serialize(s)
   }

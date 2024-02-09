@@ -638,4 +638,20 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
       })
     })
   }
+
+  pub fn pretty_print_inherent_projection(
+    &mut self,
+    alias_ty: &ty::AliasTy<'tcx>,
+  ) {
+    let def_key = self.tcx().def_key(alias_ty.def_id);
+    self.path_generic_args(
+      |cx| {
+        cx.path_append(
+          |cx| cx.path_qualified(alias_ty.self_ty(), None),
+          &def_key.disambiguated_data,
+        )
+      },
+      &alias_ty.args[1 ..],
+    )
+  }
 }

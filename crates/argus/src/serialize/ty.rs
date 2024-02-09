@@ -588,15 +588,29 @@ pub enum AbiDef {
 pub struct ExistentialProjectionDef;
 impl ExistentialProjectionDef {
   fn serialize<'tcx, S>(
-    _value: &ExistentialProjection<'tcx>,
-    _s: S,
+    value: &ExistentialProjection<'tcx>,
+    s: S,
   ) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    todo!();
+    #[derive(Serialize)]
+    struct Wrapper<'tcx> {
+      #[serde(with = "SymbolDef")]
+      name: Symbol,
+      #[serde(with = "TermDef")]
+      term: Term<'tcx>,
+    }
+
+    // CHANGE:
     // let name = cx.tcx().associated_item(self.def_id).name;
     // p!(write("{} = ", name), print(self.term))
+    let tcx = get_dynamic_ctx().tcx;
+    Wrapper {
+      name: tcx.associated_item(value.def_id).name,
+      term: value.term,
+    }
+    .serialize(s)
   }
 }
 
@@ -632,16 +646,29 @@ impl AliasTyDef {
   where
     S: serde::Serializer,
   {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase", tag = "type")]
+    enum Wrapper<'a, 'tcx: 'a> {
+      Inherent { data: path::AliasPath<'a, 'tcx> },
+      PathDef { data: path::PathDefWithArgs<'tcx> },
+    }
+
     let cx = get_dynamic_ctx();
-    if let DefKind::Impl { of_trait: false } =
+    let here_kind = if let DefKind::Impl { of_trait: false } =
       cx.tcx.def_kind(cx.tcx.parent(value.def_id))
     {
       // CHANGE: p!(pretty_print_inherent_projection(self))
-      todo!()
+      Wrapper::Inherent {
+        data: path::AliasPath::new(value),
+      }
     } else {
       // CHANGE: p!(print_def_path(self.def_id, self.args));
-      path::PathDefWithArgs::new(value.def_id, value.args).serialize(s)
-    }
+      Wrapper::PathDef {
+        data: path::PathDefWithArgs::new(value.def_id, value.args),
+      }
+    };
+
+    here_kind.serialize(s)
   }
 }
 
@@ -757,20 +784,6 @@ pub enum UintTyDef {
 pub enum FloatTyDef {
   F32,
   F64,
-}
-
-pub struct AdtDefDef;
-impl AdtDefDef {
-  pub fn serialize<'tcx, S>(
-    _value: &AdtDef<'tcx>,
-    _s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    // TODO: gavinleroy
-    todo!("ADT def def {:?}", _value)
-  }
 }
 
 #[derive(Serialize)]
@@ -926,25 +939,58 @@ pub enum GenericArgKindDef<'tcx> {
 // TODO: gavinleroy
 pub struct InferTyDef;
 impl InferTyDef {
-  pub fn serialize<'tcx, S>(_value: &InferTy, s: S) -> Result<S::Ok, S::Error>
+  pub fn serialize<'tcx, S>(value: &InferTy, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    "Unresolved".serialize(s)
-  }
-}
+    use rustc_infer::infer::type_variable::TypeVariableOriginKind::TypeParameterDefinition;
 
-// TODO: gavinleroy
-pub struct TyVidDef;
-impl TyVidDef {
-  pub fn serialize<'a, 'tcx: 'a, S>(
-    _value: &TyVid,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    "Unresolved".serialize(s)
+    #[derive(Serialize)]
+    #[serde(
+      rename_all = "camelCase",
+      rename_all_fields = "camelCase",
+      tag = "type"
+    )]
+    enum InferKind {
+      IntVar,
+      FloatVar,
+      // TODO: We should also include source information
+      Named {
+        #[serde(with = "SymbolDef")]
+        name: Symbol,
+        path_def: path::PathDefNoArgs,
+      },
+      Unresolved,
+    }
+
+    let infcx = get_dynamic_ctx();
+    let tcx = infcx.tcx;
+
+    let ty = Ty::new_infer(tcx, *value);
+
+    let here_kind = if let Some(type_origin) = infcx.type_var_origin(ty)
+      && let TypeParameterDefinition(name, def_id) = type_origin.kind
+    {
+      InferKind::Named {
+        name,
+        path_def: path::PathDefNoArgs::new(def_id),
+      }
+    } else {
+      match value {
+        // TODO: can we do any better in these cases??
+        ty::InferTy::TyVar(_) | ty::InferTy::FreshTy(_) => {
+          InferKind::Unresolved
+        }
+        ty::InferTy::IntVar(_) | ty::InferTy::FreshIntTy(_) => {
+          InferKind::IntVar
+        }
+        ty::InferTy::FloatVar(_) | ty::InferTy::FreshFloatTy(_) => {
+          InferKind::FloatVar
+        }
+      }
+    };
+
+    here_kind.serialize(s)
   }
 }
 
@@ -1070,80 +1116,6 @@ where
     #[serde(with = "BoundVariableKindDef")] &'a BoundVariableKind,
   );
   serialize_custom_seq! { Wrapper, s, value }
-}
-
-pub struct BoundExistentialPredicatesDef;
-impl BoundExistentialPredicatesDef {
-  pub fn serialize<'tcx, S>(
-    value: &List<Binder<'tcx, ExistentialPredicate<'tcx>>>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    #[derive(Serialize)]
-    struct Wrapper<'tcx>(
-      #[serde(serialize_with = "binder__existential_predicate")]
-      Binder<'tcx, ExistentialPredicate<'tcx>>,
-    );
-    serialize_custom_seq! { Wrapper, s, value }
-  }
-}
-
-fn binder__existential_predicate<'tcx, S>(
-  value: &Binder<'tcx, ExistentialPredicate<'tcx>>,
-  s: S,
-) -> Result<S::Ok, S::Error>
-where
-  S: serde::Serializer,
-{
-  Binder__ExistentialPredicate::from(value).serialize(s)
-}
-
-#[derive(Serialize)]
-pub struct Binder__ExistentialPredicate<'tcx> {
-  #[serde(serialize_with = "vec__bound_variable_kind")]
-  pub bound_vars: Vec<BoundVariableKind>,
-  #[serde(with = "ExistentialPredicateDef")]
-  pub value: ExistentialPredicate<'tcx>,
-}
-
-impl<'tcx> From<&Binder<'tcx, ExistentialPredicate<'tcx>>>
-  for Binder__ExistentialPredicate<'tcx>
-{
-  fn from(value: &Binder<'tcx, ExistentialPredicate<'tcx>>) -> Self {
-    Binder__ExistentialPredicate {
-      bound_vars: value.bound_vars().to_vec(),
-      value: value.skip_binder().clone(),
-    }
-  }
-}
-
-#[derive(Serialize)]
-#[serde(remote = "ExistentialPredicate")]
-pub enum ExistentialPredicateDef<'tcx> {
-  Trait(#[serde(with = "ExistentialTraitRefDef")] ExistentialTraitRef<'tcx>),
-  Projection(
-    #[serde(with = "ExistentialProjectionDef")] ExistentialProjection<'tcx>,
-  ),
-  AutoTrait(#[serde(serialize_with = "path::path_def_no_args")] DefId),
-}
-
-pub struct ExistentialTraitRefDef;
-
-impl ExistentialTraitRefDef {
-  fn serialize<'tcx, S>(
-    value: &ExistentialTraitRef<'tcx>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    let infcx = get_dynamic_ctx();
-    let dummy_self = Ty::new_fresh(infcx.tcx, 0);
-    let trait_ref = value.with_self_ty(infcx.tcx, dummy_self);
-    TraitRefPrintOnlyTraitPathDefWrapper(trait_ref).serialize(s)
-  }
 }
 
 #[derive(Serialize)]
