@@ -19,8 +19,11 @@ use serde::Serialize;
 
 use crate::{
   analysis::{EvaluationResult, FulfillmentData},
-  serialize::{serialize_to_value, ty::PredicateDef},
-  types::{Obligation, ObligationNecessity},
+  serialize::{
+    serialize_to_value,
+    ty::{PredicateDef, TraitRefPrintOnlyTraitPathDefWrapper},
+  },
+  types::{ImplHeader, Obligation, ObligationNecessity},
 };
 
 pub trait CharRangeExt: Copy + Sized {
@@ -79,6 +82,8 @@ pub trait TyCtxtExt<'tcx> {
     body_id: BodyId,
     inspector: ObligationInspector<'tcx>,
   ) -> &TypeckResults;
+
+  fn get_impl_header(&self, def_id: DefId) -> Option<ImplHeader<'tcx>>;
 }
 
 pub trait TypeckResultsExt<'tcx> {
@@ -208,6 +213,58 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
     let local_def_id = self.hir().body_owner_def_id(body_id);
     // Typeck current body, accumulating inspected information in TLS.
     inspect_typeck(self, local_def_id, inspector)
+  }
+
+  fn get_impl_header(&self, def_id: DefId) -> Option<ImplHeader<'tcx>> {
+    use rustc_data_structures::fx::FxIndexSet;
+    let tcx = *self;
+    let impl_def_id = def_id;
+
+    // From [`rustc_trait_selection::traits::specialize`]
+
+    let trait_ref = tcx.impl_trait_ref(impl_def_id)?.instantiate_identity();
+    let args = ty::GenericArgs::identity_for_item(tcx, impl_def_id);
+
+    // FIXME: Currently only handles ?Sized.
+    //        Needs to support ?Move and ?DynSized when they are implemented.
+    let mut types_without_default_bounds = FxIndexSet::default();
+    let sized_trait = tcx.lang_items().sized_trait();
+
+    let arg_names = args
+      .iter()
+      .filter(|k| k.to_string() != "'_")
+      .collect::<Vec<_>>();
+
+    let name = TraitRefPrintOnlyTraitPathDefWrapper(trait_ref);
+    let self_ty = tcx.type_of(impl_def_id).instantiate_identity();
+
+    // The predicates will contain default bounds like `T: Sized`. We need to
+    // remove these bounds, and add `T: ?Sized` to any untouched type parameters.
+    let predicates = tcx.predicates_of(impl_def_id).predicates;
+    let mut pretty_predicates =
+      Vec::with_capacity(predicates.len() + types_without_default_bounds.len());
+
+    for (p, _) in predicates {
+      if let Some(poly_trait_ref) = p.as_trait_clause() {
+        if Some(poly_trait_ref.def_id()) == sized_trait {
+          types_without_default_bounds
+            .remove(&poly_trait_ref.self_ty().skip_binder());
+          continue;
+        }
+      }
+      pretty_predicates.push(p.clone());
+    }
+
+    let tys_without_default_bounds =
+      types_without_default_bounds.into_iter().collect::<Vec<_>>();
+
+    Some(ImplHeader {
+      args: arg_names,
+      name,
+      self_ty,
+      predicates: pretty_predicates,
+      tys_without_default_bounds,
+    })
   }
 }
 

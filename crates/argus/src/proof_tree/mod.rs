@@ -15,8 +15,9 @@ use serde::Serialize;
 pub use topology::*;
 use ts_rs::TS;
 
-use crate::serialize::{
-  hir::Option__ImplDef, serialize_to_value, ty::Goal__PredicateDef,
+use crate::{
+  serialize::{hir::ImplDef, serialize_to_value, ty::Goal__PredicateDef},
+  types::ImplHeader,
 };
 
 crate::define_idx! {
@@ -44,12 +45,15 @@ pub struct Goal {
 #[derive(Serialize, TS, Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Candidate {
-  Impl {
-    #[ts(type = "Impl | undefined")]
+  ImplHir {
+    #[ts(type = "Impl")]
     data: serde_json::Value,
-    fallback: String,
   },
-
+  ImplMiddle {
+    #[ts(type = "any")]
+    // Type is ImplHeader from mod `crate::types`.
+    data: serde_json::Value,
+  },
   // TODO remove variant once everything is structured
   Any {
     data: String,
@@ -92,32 +96,38 @@ impl Goal {
 }
 
 impl Candidate {
-  fn new_impl<'tcx, 'hir>(
+  fn new_impl_hir<'tcx, 'hir>(
     infcx: &InferCtxt<'tcx>,
-    impl_: Option<&'hir hir::Impl<'hir>>,
-    fallback: String,
+    impl_: &'hir hir::Impl<'hir>,
   ) -> Self {
     #[derive(Serialize)]
-    struct Wrapper<'hir>(
-      #[serde(skip_serializing_if = "Option::is_none")]
-      #[serde(with = "Option__ImplDef")]
-      Option<&'hir hir::Impl<'hir>>,
-    );
+    struct Wrapper<'hir>(#[serde(with = "ImplDef")] &'hir hir::Impl<'hir>);
 
     let impl_ = serialize_to_value(infcx, &Wrapper(impl_))
-      .expect("couldn't serialie impl");
+      .expect("couldn't serialize impl");
 
-    Self::Impl {
-      data: impl_,
-      fallback,
-    }
+    Self::ImplHir { data: impl_ }
+  }
+
+  fn new_impl_header<'tcx>(
+    infcx: &InferCtxt<'tcx>,
+    impl_: &ImplHeader<'tcx>,
+  ) -> Self {
+    let impl_ =
+      serialize_to_value(infcx, impl_).expect("couldn't serialize impl header");
+
+    Self::ImplMiddle { data: impl_ }
   }
 }
 
 impl From<&'static str> for Candidate {
   fn from(value: &'static str) -> Self {
-    Candidate::Any {
-      data: value.to_string(),
-    }
+    value.to_string().into()
+  }
+}
+
+impl From<String> for Candidate {
+  fn from(value: String) -> Self {
+    Candidate::Any { data: value }
   }
 }

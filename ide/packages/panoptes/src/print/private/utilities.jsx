@@ -1,4 +1,13 @@
 import _ from "lodash";
+import React from "react";
+
+export const Kw = ({ children }) => {
+  return <span className="kw">{children}</span>;
+};
+
+export function anyElems(...lists) {
+  return _.some(lists, l => l.length > 0);
+}
 
 export function intersperse(arr, sep, proc = undefined) {
   const doInner = proc === undefined ? (e, _i) => e : proc;

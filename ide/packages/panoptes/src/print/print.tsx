@@ -10,7 +10,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import ReactJson from "react-json-view";
 
 import "./print.css";
-import { PrintImpl as UnsafePrintImpl } from "./private/hir";
+import { PrintImpl as UnsafePrintImplHir } from "./private/hir";
 import {
   PrintDefPath as UnsafePrintDefPath,
   PrintDefPathFull as UnsafePrintDefPathFull,
@@ -19,7 +19,10 @@ import {
   PrintBinderPredicateKind,
   PrintGoalPredicate as UnsafePrintGoalPredicate,
 } from "./private/predicate";
-import { PrintTy as UnsafePrintTy } from "./private/ty";
+import {
+  PrintImplHeader as UnsafePrintImplHeader,
+  PrintTy as UnsafePrintTy,
+} from "./private/ty";
 
 // NOTE: please Please PLEASE wrap all printing components in this
 // PrintWithFallback. Pretty printing is still a fragile process and
@@ -45,7 +48,7 @@ export const PrintWithFallback = ({
     return (
       <div className="PrintError">
         <p>Whoops! Something went wrong while printing:</p>
-        <ReactJson src={object} collapsed={true} />
+        <ReactJson src={object ?? "null"} collapsed={true} />
         <pre>`{error.message}`</pre>
       </div>
     );
@@ -78,11 +81,20 @@ export const PrintObligation = ({ obligation }: { obligation: Obligation }) => {
   );
 };
 
-export const PrintImpl = ({ impl }: { impl: Impl }) => {
+export const PrintImplHir = ({ impl }: { impl: Impl }) => {
   return (
     <PrintWithFallback
       object={impl}
-      Content={() => <UnsafePrintImpl impl={impl} />}
+      Content={() => <UnsafePrintImplHir impl={impl} />}
+    />
+  );
+};
+
+export const PrintImplHeader = ({ impl }: { impl: any }) => {
+  return (
+    <PrintWithFallback
+      object={impl}
+      Content={() => <UnsafePrintImplHeader o={impl} />}
     />
   );
 };

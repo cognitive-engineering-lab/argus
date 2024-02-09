@@ -23,7 +23,10 @@ use crate::{
   serialize::{
     path::PathDefNoArgs,
     serialize_to_value,
-    ty::{SymbolDef, TyDef},
+    ty::{
+      Slice__ClauseDef, Slice__GenericArgDef, Slice__TyDef, SymbolDef,
+      TraitRefPrintOnlyTraitPathDefWrapper, TyDef,
+    },
   },
 };
 
@@ -55,7 +58,6 @@ impl ExtensionCandidates {
     infcx: &InferCtxt<'tcx>,
     traits: Vec<ty::TraitRef<'tcx>>,
   ) -> Self {
-    use crate::serialize::ty::TraitRefPrintOnlyTraitPathDefWrapper;
     let wrapped = traits
       .into_iter()
       .map(TraitRefPrintOnlyTraitPathDefWrapper)
@@ -170,7 +172,7 @@ impl ObligationsInBody {
 }
 
 #[derive(Serialize, TS, Clone, Debug)]
-#[serde(rename_all = "camelCase", tag = "type")]
+#[serde(rename_all = "camelCase")]
 pub struct Obligation {
   #[ts(type = "any")] // type: Predicate
   pub predicate: serde_json::Value,
@@ -182,6 +184,20 @@ pub struct Obligation {
   #[ts(type = "EvaluationResult")]
   pub result: intermediate::EvaluationResult,
   pub is_synthetic: bool,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ImplHeader<'tcx> {
+  #[serde(with = "Slice__GenericArgDef")]
+  pub args: Vec<ty::GenericArg<'tcx>>,
+  pub name: TraitRefPrintOnlyTraitPathDefWrapper<'tcx>,
+  #[serde(with = "TyDef")]
+  pub self_ty: Ty<'tcx>,
+  #[serde(with = "Slice__ClauseDef")]
+  pub predicates: Vec<ty::Clause<'tcx>>,
+  #[serde(with = "Slice__TyDef")]
+  pub tys_without_default_bounds: Vec<Ty<'tcx>>,
 }
 
 #[derive(Serialize, TS, Clone, Debug, PartialEq, Eq)]

@@ -3,7 +3,13 @@ import React from "react";
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
 import { PrintTerm } from "./term";
-import { PrintBinder, PrintGenericArg, PrintRegion, PrintTy } from "./ty";
+import {
+  PrintAliasTy,
+  PrintBinder,
+  PrintGenericArg,
+  PrintRegion,
+  PrintTy,
+} from "./ty";
 
 export const PrintGoalPredicate = ({ o }) => {
   // NOTE: by default just print the predicate, not the env.
@@ -69,6 +75,10 @@ export const PrintAliasRelationDirection = ({ o }) => {
   } else {
     throw new Error("Unknown alias relation direction", o);
   }
+};
+
+export const PrintClause = ({ o }) => {
+  return <PrintBinder binder={o} innerF={o => <PrintClauseKind o={o} />} />;
 };
 
 export const PrintClauseKind = ({ o }) => {

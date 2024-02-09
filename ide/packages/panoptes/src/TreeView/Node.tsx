@@ -4,18 +4,16 @@ import {
 } from "@argus/common/bindings";
 import React from "react";
 
-import { PrintGoal, PrintImpl } from "../print/print";
+import { PrintGoal, PrintImplHeader, PrintImplHir } from "../print/print";
 
 export const Candidate = ({ candidate }: { candidate: CandidateTy }) => {
   switch (candidate.type) {
     case "any":
-      return <span>{candidate.data}</span>;
-    case "impl":
-      return candidate.data === undefined ? (
-        <span>{candidate.fallback}</span>
-      ) : (
-        <PrintImpl impl={candidate.data} />
-      );
+      return candidate.data;
+    case "implHir":
+      return <PrintImplHir impl={candidate.data} />;
+    case "implMiddle":
+      return <PrintImplHeader impl={candidate.data} />;
     default:
       throw new Error(`Unexpected candidate type ${candidate}`);
   }

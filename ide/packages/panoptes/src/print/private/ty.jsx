@@ -1,8 +1,17 @@
+import _ from "lodash";
 import React from "react";
 
+import { HoverInfo } from "../../utilities/HoverInfo";
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
-import { fnInputsAndOutput, intersperse, tyIsUnit } from "./utilities";
+import { PrintClause } from "./predicate";
+import {
+  Kw,
+  anyElems,
+  fnInputsAndOutput,
+  intersperse,
+  tyIsUnit,
+} from "./utilities";
 
 export const PrintBinder = ({ binder, innerF }) => {
   return innerF(binder.value);
@@ -24,6 +33,69 @@ export const DBraced = ({ children }) => {
       {"{{"}
       {children}
       {"}}"}
+    </span>
+  );
+};
+
+export const PrintImplHeader = ({ o }) => {
+  const genArgs = _.map(o.args, (arg, i) => () => (
+    <PrintGenericArg o={arg} key={i} />
+  ));
+  const argsWAngle =
+    genArgs.length > 0 ? (
+      <Angled>
+        {intersperse(genArgs, ", ", E => (
+          <E />
+        ))}
+      </Angled>
+    ) : (
+      ""
+    );
+  const trait = <PrintDefPath o={o.name} />;
+  const selfTy = <PrintTy o={o.selfTy} />;
+  const whereClause = (
+    <PrintWhereClause
+      predicates={o.predicates}
+      tysWOBound={o.tysWithoutDefaultBounds}
+    />
+  );
+
+  return (
+    <span>
+      <Kw>impl</Kw>
+      {argsWAngle} {trait} for {selfTy}
+      {whereClause}
+    </span>
+  );
+};
+
+export const PrintWhereClause = ({ predicates, tysWOBound }) => {
+  if (!anyElems(predicates, tysWOBound)) {
+    return "";
+  }
+
+  const whereHoverContent = () => (
+    <div className="DirNode WhereConstraintArea">
+      {_.map(predicates, (pred, idx) => (
+        <div className="WhereConstraint" key={idx}>
+          <PrintClause o={pred} />
+        </div>
+      ))}
+      {_.map(tysWOBound, (ty, idx) => (
+        <div className="WhereConstraint" key={idx}>
+          <PrintTy o={ty} />: ?Sized
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <span>
+      {" "}
+      <Kw>where</Kw>{" "}
+      <HoverInfo Content={whereHoverContent}>
+        <span className="where">...</span>
+      </HoverInfo>
     </span>
   );
 };
@@ -354,8 +426,6 @@ export const PrintBoundVariable = ({ o }) => {
 };
 
 export const PrintOpaqueImplType = ({ o }) => {
-  const areElems = (...lists) => _.some(lists, l => l.length > 0);
-
   const PrintFnTrait = ({ o }) => {
     const args = _.map(o.params, (param, i) => <PrintTy o={param} key={i} />);
     const ret =
@@ -391,7 +461,7 @@ export const PrintOpaqueImplType = ({ o }) => {
     const assocArgs = _.map(o.assocArgs, (arg, i) => () => (
       <PrintAssocItem o={arg} key={i} />
     ));
-    const list = areElems(args, assocArgs) ? (
+    const list = anyElems(args, assocArgs) ? (
       <Angled>
         {intersperse(args.concat(assocArgs), ", ", E => (
           <E />
@@ -420,11 +490,11 @@ export const PrintOpaqueImplType = ({ o }) => {
   ));
   const sized = "TODO: ?Sized";
 
-  const firstSep = areElems(fnTraits) && traits.length > 0 ? " + " : "";
+  const firstSep = anyElems(fnTraits) && traits.length > 0 ? " + " : "";
   const secondSep =
-    areElems(fnTraits, traits) && lifetimes.length > 0 ? " + " : "";
+    anyElems(fnTraits, traits) && lifetimes.length > 0 ? " + " : "";
   const thirdSep =
-    areElems(fnTraits, traits, lifetimes) && sized !== "" ? " + " : "";
+    anyElems(fnTraits, traits, lifetimes) && sized !== "" ? " + " : "";
 
   return (
     <span>

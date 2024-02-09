@@ -14,7 +14,10 @@ use rustc_trait_selection::{
 };
 
 use super::*;
-use crate::{ext::InferCtxtExt, types::ObligationNecessity};
+use crate::{
+  ext::{InferCtxtExt, TyCtxtExt},
+  types::ObligationNecessity,
+};
 
 pub struct SerializedTreeVisitor {
   pub def_id: DefId,
@@ -121,33 +124,42 @@ impl Node {
   }
 
   fn from_impl(infcx: &InferCtxt, def_id: DefId) -> Candidate {
-    let impl_string = infcx
-      .tcx
-      .span_of_impl(def_id)
-      .map(|sp| {
-        infcx
-          .tcx
-          .sess
-          .source_map()
-          .span_to_snippet(sp)
-          .unwrap_or_else(|_| "{failed to find impl}".to_string())
+    let tcx = infcx.tcx;
+    // First, try to get a local Impl definition
+    // XXX: in the future we can do away with this and just use the
+    // impl ty, but I don't want to fully rely on that yet.
+    tcx
+      .hir()
+      .get_if_local(def_id)
+      .and_then(|item| match item {
+        hir::Node::Item(hir::Item {
+          kind: hir::ItemKind::Impl(impl_),
+          ..
+        }) => Some(Candidate::new_impl_hir(infcx, *impl_)),
+        _ => None,
       })
-      .unwrap_or_else(|symb| format!("foreign impl from: {}", symb.as_str()));
-
-    let impl_ =
-      infcx
-        .tcx
-        .hir()
-        .get_if_local(def_id)
-        .and_then(|item| match item {
-          hir::Node::Item(hir::Item {
-            kind: hir::ItemKind::Impl(impl_),
-            ..
-          }) => Some(*impl_),
-          _ => None,
-        });
-
-    Candidate::new_impl(infcx, impl_, impl_string)
+      // Second, try to get an impl header from the def_id ty
+      .or_else(|| {
+        tcx
+          .get_impl_header(def_id)
+          .map(|header| Candidate::new_impl_header(infcx, &header))
+      })
+      // Third, scramble to find a suitable span, or some error string.
+      .unwrap_or_else(|| {
+        tcx
+          .span_of_impl(def_id)
+          .map(|sp| {
+            tcx
+              .sess
+              .source_map()
+              .span_to_snippet(sp)
+              .unwrap_or_else(|_| "failed to find impl".to_string())
+          })
+          .unwrap_or_else(|symb| {
+            format!("foreign impl from: {}", symb.as_str())
+          })
+          .into()
+      })
   }
 
   fn from_result(result: &Result<solve::Certainty, NoSolution>) -> Self {

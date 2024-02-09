@@ -1196,6 +1196,21 @@ impl ClauseDef {
   }
 }
 
+pub struct Slice__ClauseDef;
+impl Slice__ClauseDef {
+  pub fn serialize<'tcx, S>(
+    value: &[Clause<'tcx>],
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    #[derive(Serialize)]
+    struct Wrapper<'a, 'tcx: 'a>(#[serde(with = "ClauseDef")] &'a Clause<'tcx>);
+    serialize_custom_seq! { Wrapper, s, value }
+  }
+}
+
 fn clause_kind__ty_ctxt<'tcx, S>(
   value: &ir::ClauseKind<TyCtxt<'tcx>>,
   s: S,
