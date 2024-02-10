@@ -97,10 +97,7 @@ pub enum TyKind__TyCtxt<'tcx> {
   ),
   Closure(path::PathDefWithArgs<'tcx>),
   Param(#[serde(with = "ParamTyDef")] <TyCtxt<'tcx> as Interner>::ParamTy),
-  Bound(
-    #[serde(skip)] DebruijnIndex,
-    #[serde(with = "BoundTyDef")] <TyCtxt<'tcx> as Interner>::BoundTy,
-  ),
+  Bound(BoundTyDef),
   Alias(AliasTyKindDef<'tcx>),
   Dynamic(DynamicTyKindDef<'tcx>),
   Coroutine(CoroutineTyKindDef<'tcx>),
@@ -138,9 +135,10 @@ impl<'tcx> From<&ir::TyKind<TyCtxt<'tcx>>> for TyKind__TyCtxt<'tcx> {
       }
       ir::TyKind::FnPtr(v) => TyKind__TyCtxt::FnPtr(v.clone()),
       ir::TyKind::Param(param_ty) => TyKind__TyCtxt::Param(param_ty.clone()),
-      ir::TyKind::Bound(dji, bound_ty) => {
-        TyKind__TyCtxt::Bound(*dji, bound_ty.clone())
-      }
+      ir::TyKind::Bound(dji, bound_ty) => TyKind__TyCtxt::Bound(BoundTyDef {
+        debruijn: *dji,
+        ty: *bound_ty,
+      }),
       ir::TyKind::Alias(k, aty) => TyKind__TyCtxt::Alias(AliasTyKindDef {
         kind: k.clone(),
         ty: aty.clone(),
@@ -399,7 +397,6 @@ impl<'tcx> Serialize for CoroutineTyKindDef<'tcx> {
     let witness = args.as_coroutine().witness();
     let movability = coroutine_kind.movability();
 
-    // TODO: gavinleroy
     Wrapper {
       path: path::PathDefWithArgs::new(*def_id, args),
       movability,
@@ -672,9 +669,13 @@ impl AliasTyDef {
   }
 }
 
-pub struct BoundTyDef;
-impl BoundTyDef {
-  pub fn serialize<S>(value: &ty::BoundTy, s: S) -> Result<S::Ok, S::Error>
+pub struct BoundTyDef {
+  debruijn: DebruijnIndex,
+  ty: BoundTy,
+}
+
+impl Serialize for BoundTyDef {
+  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -685,14 +686,18 @@ impl BoundTyDef {
         #[serde(with = "SymbolDef")]
         data: Symbol,
       },
+      Bound {
+        data: BoundVariable,
+      },
     }
 
-    match value.kind {
-      ty::BoundTyKind::Anon => todo!("bound variables need to be expaaanded"),
-      ty::BoundTyKind::Param(_, name) => {
-        BoundTyKind::Named { data: name }.serialize(s)
-      }
+    match self.ty.kind {
+      ty::BoundTyKind::Anon => BoundTyKind::Bound {
+        data: BoundVariable::new(self.debruijn, self.ty.var),
+      },
+      ty::BoundTyKind::Param(_, name) => BoundTyKind::Named { data: name },
     }
+    .serialize(s)
   }
 }
 

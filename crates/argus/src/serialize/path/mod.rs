@@ -435,11 +435,6 @@ impl<'tcx> Serialize for OpaqueImplType<'tcx> {
   }
 }
 
-// NOTE: this is the type that the PathBuilder
-// will build and serialize.
-// #[derive(Serialize)]
-// struct DefinedPath {}
-
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 enum PathSegment<'tcx> {

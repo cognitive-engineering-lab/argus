@@ -1,5 +1,5 @@
 use index_vec::IndexVec;
-use rustc_data_structures::fx::FxHashSet as HashSet;
+use rustc_data_structures::fx::{FxHashMap as HashMap, FxHashSet as HashSet};
 use rustc_hir::{self as hir, intravisit::Map, BodyId, HirId};
 use rustc_infer::{
   infer::{canonical::OriginalQueryValues, InferCtxt, InferOk},
@@ -151,6 +151,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           .unwrap_or_else(|_| String::from("{unknown snippet}"));
         Some((r, snip))
       }) {
+        let mut ambiguous_call = false;
         let kind = match kind {
           BinKind::Misc => Misc,
           BinKind::CallableExpr => CallableExpr,
@@ -158,10 +159,12 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           BinKind::Call => Call,
           BinKind::MethodReceiver => MethodReceiver,
           BinKind::MethodCall => {
-            let Some(hir::Node::Expr(hir::Expr {
-              kind: hir::ExprKind::MethodCall(segment, recvr, args, call_span),
-              ..
-            })) = hir.find(hir_id)
+            let Some(hir::Node::Expr(
+              call_expr @ hir::Expr {
+                kind: hir::ExprKind::MethodCall(segment, recvr, args, call_span),
+                ..
+              },
+            )) = hir.find(hir_id)
             else {
               unreachable!(
                 "Bin kind `MethodCall` for non `ExprKind::MethodCall` {:?}",
@@ -169,14 +172,17 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
               );
             };
 
-            if let Some((idx, error_recvr)) = self.relate_method_call(
-              hir_id,
-              segment,
-              recvr,
-              args,
-              *call_span,
-              &obligations,
-            ) {
+            if let Some((idx, error_recvr, error_call)) = self
+              .relate_method_call(
+                call_expr,
+                segment,
+                recvr,
+                args,
+                *call_span,
+                &obligations,
+              )
+            {
+              ambiguous_call = error_recvr || error_call;
               MethodCall {
                 data: idx,
                 error_recvr,
@@ -192,12 +198,16 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           .map(|idx| *self.obligations[idx])
           .collect::<HashSet<_>>();
 
-        self.exprs.push(Expr {
+        let expr_idx = self.exprs.push(Expr {
           range,
           snippet,
           obligations,
           kind,
         });
+
+        if ambiguous_call {
+          self.ambiguity_errors.insert(expr_idx);
+        }
       } else {
         log::error!(
           "failed to get range for HIR: {}",
@@ -209,6 +219,15 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
 
   fn relate_trait_bound(&mut self) {
     // TODO: !
+    // - take the expressions from the "reported_trait_errors" and find
+    //   all the expressions that they correspond to. we should also
+    //   maintain the order in which they are reported and use this
+    //   sorting to present errors.
+    //
+    // - we also need to search for expressions that are "ambiguous," these
+    //   don't always have associated reported errors. my current thoughts to
+    //   do this are to find obligations that are unsuccessful and have a
+    //   concrete obligations code.
   }
 
   // TODO: for the method call we need to:
@@ -216,8 +235,8 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
   // 1. build the method call table (see ambiguous / )
   fn relate_method_call<'hir>(
     &mut self,
-    // Id of the call e xpression (for debugging only)
-    _hir_id: HirId,
+    // Expr of the entire call expression
+    call_expr: &'hir hir::Expr<'hir>,
     // The method segment
     _segment: &'hir hir::PathSegment<'hir>,
     // Call receiver
@@ -228,14 +247,16 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     call_span: Span,
     // FIXME: type the `usize` here,
     obligations: &[usize],
-  ) -> Option<(MethodLookupIdx, bool)> {
-    let _hir = self.tcx.hir();
-
+  ) -> Option<(MethodLookupIdx, bool, bool)> {
     // Given that the receiver is of type error, we can tell users
     // to annotate the receiver type if they want to get "better"
     // error messages (potentially).
     let error_recvr = matches!(
       self.typeck_results.expr_ty(recvr).kind(),
+      ty::TyKind::Error(..)
+    );
+    let error_call = matches!(
+      self.typeck_results.expr_ty(call_expr).kind(),
       ty::TyKind::Error(..)
     );
 
@@ -404,6 +425,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         candidates: ExtensionCandidates::new(infcx, trait_candidates),
       }),
       error_recvr,
+      error_call,
     ))
   }
 }
