@@ -2,8 +2,10 @@
 use std::cell::RefCell;
 
 use index_vec::IndexVec;
+use rustc_data_structures::fx::FxIndexMap;
 use rustc_hir::BodyId;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
+use rustc_span::Span;
 pub use unsafe_tls::{
   store as unsafe_store_data, take as unsafe_take_data, FullObligationData,
   SynIdx, UODIdx,
@@ -12,7 +14,7 @@ pub use unsafe_tls::{
 use crate::{
   proof_tree::SerializedTree,
   serialize::{path::PathDefNoArgs, serialize_to_value},
-  types::{intermediate::Provenance, Obligation},
+  types::{intermediate::Provenance, Obligation, ObligationHash},
 };
 
 // NOTE: we use thread local storage to accumulate obligations
@@ -26,6 +28,8 @@ thread_local! {
   static OBLIGATIONS: RefCell<Vec<Provenance<Obligation>>> = Default::default();
 
   static TREE: RefCell<Option<SerializedTree>> = Default::default();
+
+  static REPORTED_ERRORS: RefCell<FxIndexMap<Span, Vec<ObligationHash>>> = Default::default();
 }
 
 // This is for complex obligations and their inference contexts.
@@ -104,6 +108,14 @@ pub fn store_obligation(obl: Provenance<Obligation>) {
 
 pub fn take_obligations() -> Vec<Provenance<Obligation>> {
   OBLIGATIONS.with(|obls| obls.take())
+}
+
+pub fn replace_reported_errors(errs: FxIndexMap<Span, Vec<ObligationHash>>) {
+  REPORTED_ERRORS.with(|rerrs| rerrs.replace(errs));
+}
+
+pub fn take_reported_errors() -> FxIndexMap<Span, Vec<ObligationHash>> {
+  REPORTED_ERRORS.with(|rerrs| rerrs.take())
 }
 
 pub fn store_tree(new_tree: SerializedTree) {

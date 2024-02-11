@@ -14,8 +14,8 @@ export const Candidate = ({ candidate }: { candidate: CandidateTy }) => {
       return <PrintImplHir impl={candidate.data} />;
     case "implMiddle":
       return <PrintImplHeader impl={candidate.data} />;
-    default:
-      throw new Error(`Unexpected candidate type ${candidate}`);
+    case "paramEnv":
+      throw new Error("paramEnv not implemented");
   }
 };
 

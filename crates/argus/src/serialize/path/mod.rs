@@ -112,7 +112,7 @@ impl<'tcx> Serialize for ValuePathWithArgs<'tcx> {
 // --------------------------------------------------------
 // Opaque impl types
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct OpaqueFnEntry<'tcx> {
   // The trait ref is already stored as a key, so just track if we have it as a real predicate
   has_fn_once: bool,
@@ -271,6 +271,8 @@ impl<'tcx> Serialize for OpaqueImplType<'tcx> {
     // Grab the "TraitA + TraitB" from `impl TraitA + TraitB`,
     // by looking up the projections associated with the def_id.
     let bounds = tcx.explicit_item_bounds(def_id);
+
+    log::debug!("Explicit item bounds {:?}", bounds);
 
     let mut traits = FxIndexMap::default();
     let mut fn_traits = FxIndexMap::default();
@@ -431,6 +433,14 @@ impl<'tcx> Serialize for OpaqueImplType<'tcx> {
 
     here_opaque_type.has_sized_bound = has_sized_bound;
     here_opaque_type.has_negative_sized_bound = has_negative_sized_bound;
+
+    if here_opaque_type.traits.is_empty()
+      && here_opaque_type.fn_traits.is_empty()
+      && here_opaque_type.lifetimes.is_empty()
+    {
+      log::error!("No bounds were added for OpaqueImplTy {bounds:?}");
+    }
+
     here_opaque_type.serialize(s)
   }
 }

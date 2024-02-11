@@ -15,7 +15,12 @@ import {
 import _ from "lodash";
 import * as vscode from "vscode";
 
-import { exprRangeDecorate, rangeHighlight } from "./decorate";
+import {
+  ambigErrorDecorate,
+  exprRangeDecorate,
+  rangeHighlight,
+  traitErrorDecorate,
+} from "./decorate";
 import { showErrorDialog } from "./errors";
 import { setup } from "./setup";
 import {
@@ -199,23 +204,46 @@ export class Ctx {
 
   // TODO: this isn't updated to the new ambiguity / error boundaries cases.
   private registerBodyInfo(editor: RustEditor, info: ObligationsInBody[]) {
-    // editor.setDecorations(
-    //   exprRangeDecorate,
-    //   _.flatMap(info, (inf, bIdx) => {
-    //     return _.map(inf.exprs, (e, eIdx) => {
-    //       return {
-    //         range: rustRangeToVscodeRange(e.range),
-    //         hoverMessage: "This expression has associated obligations!",
-    //       };
-    //     });
-    //   })
-    // );
-    // this.setTraitErrors(editor, info);
-    // this.setAmbiguityErrors(editor, info);
+    this.setTraitErrors(editor, info);
+    this.setAmbiguityErrors(editor, info);
   }
 
   // ------------------------------------
   // Diagnostic helpers
+
+  private setTraitErrors(editor: RustEditor, oib: ObligationsInBody[]) {
+    editor.setDecorations(
+      traitErrorDecorate,
+      _.flatMap(oib, (ob, bodyIdx) => {
+        return _.map(ob.traitErrors, (e, errIdx) => ({
+          range: rustRangeToVscodeRange(ob.exprs[e].range),
+          hoverMessage: this.buildOpenErrorItemCmd(
+            editor.document.fileName,
+            bodyIdx,
+            errIdx,
+            "trait"
+          ),
+        }));
+      })
+    );
+  }
+
+  private setAmbiguityErrors(editor: RustEditor, oib: ObligationsInBody[]) {
+    editor.setDecorations(
+      ambigErrorDecorate,
+      _.flatMap(oib, (ob, bodyIdx) => {
+        return _.map(ob.ambiguityErrors, (e, errIdx) => ({
+          range: rustRangeToVscodeRange(ob.exprs[e].range),
+          hoverMessage: this.buildOpenErrorItemCmd(
+            editor.document.fileName,
+            bodyIdx,
+            errIdx,
+            "ambig"
+          ),
+        }));
+      })
+    );
+  }
 
   private buildOpenErrorItemCmd(
     filename: Filename,
@@ -223,77 +251,14 @@ export class Ctx {
     erroridx: number,
     type: "trait" | "ambig"
   ): string {
-    const blingCommandUri = vscode.Uri.parse(
-      `command:argus.openError?${encodeURIComponent(
-        JSON.stringify([filename, type, bodyidx, erroridx])
-      )}`
-    );
-    return `[Debug error in window](${blingCommandUri})`;
+    // TODO: the webview needs to add a signal for opening an error expression.
+    // const blingCommandUri = vscode.Uri.parse(
+    //   `command:argus.openError?${encodeURIComponent(
+    //     JSON.stringify([filename, type, bodyidx, erroridx])
+    //   )}`
+    // );
+    return "This is an error — Argus"; // `[Debug error in window](${blingCommandUri})`;
   }
-
-  // private setTraitErrors(editor: RustEditor, oib: ObligationsInBody[]) {
-  //   const renderErrorAction = (
-  //     err: TraitError,
-  //     bIdx: number,
-  //     eIdx: number
-  //   ): vscode.MarkdownString => {
-  //     // TODO: make the hover message useful and structured.
-  //     const jumpToDebug = this.buildOpenErrorItemCmd(
-  //       editor.document.fileName,
-  //       bIdx,
-  //       eIdx,
-  //       "trait"
-  //     );
-  //     const lines: string[] = [`Trait bound not satisfied : ${jumpToDebug}`];
-  //     const result = new vscode.MarkdownString(lines.join("\n"));
-  //     result.isTrusted = true;
-  //     return result;
-  //   };
-
-  //   editor.setDecorations(
-  //     traitErrorDecorate,
-  //     _.flatMap(oib, (ob, bodyIdx) => {
-  //       return _.map(ob.traitErrors, (e, errIdx) => {
-  //         return {
-  //           range: rustRangeToVscodeRange(e.range),
-  //           hoverMessage: renderErrorAction(e, bodyIdx, errIdx),
-  //         };
-  //       });
-  //     })
-  //   );
-  // }
-
-  // private setAmbiguityErrors(editor: RustEditor, oib: ObligationsInBody[]) {
-  //   const renderErrorAction = (
-  //     err: AmbiguityError,
-  //     bIdx: number,
-  //     eIdx: number
-  //   ): vscode.MarkdownString => {
-  //     // TODO: make the hover message useful and structured.
-  //     const jumpToDebug = this.buildOpenErrorItemCmd(
-  //       editor.document.fileName,
-  //       bIdx,
-  //       eIdx,
-  //       "ambig"
-  //     );
-  //     const lines = ["This method call is ambiguous", "", jumpToDebug];
-  //     const result = new vscode.MarkdownString(lines.join("\n"));
-  //     result.isTrusted = true;
-  //     return result;
-  //   };
-
-  //   editor.setDecorations(
-  //     ambigErrorDecorate,
-  //     _.flatMap(oib, (oi, bIdx) => {
-  //       return _.map(oi.ambiguityErrors, (e, eIdx) => {
-  //         return {
-  //           range: rustRangeToVscodeRange(e.range),
-  //           hoverMessage: renderErrorAction(e, bIdx, eIdx),
-  //         };
-  //       });
-  //     })
-  //   );
-  // }
 
   async addHighlightRange(filename: Filename, range: CharRange) {
     const editor = this.findVisibleEditorByName(filename);

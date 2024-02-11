@@ -7,14 +7,9 @@ import { DirRecursive } from "./Directory";
 
 const BottomUp = () => {
   const tree = useContext(TreeContext)!;
-  const allLeaves = _.map(tree.errorLeaves, idx => tree.topology.parent[idx]!);
-  // let leaves = _.filter(allLeaves, idx => {
-  //   let ancestors = pathToRoot(tree, idx);
-  //   // Filter out leaves that are decendents of unnecessary roots
-  //   return _.some(ancestors.path, idx => tree.unnecessaryRoots.includes(idx));
-  // });
-  // TODO(gavinleroy): we need to filter nodes that are decendents of unnecessary roots.
-  const leaves = allLeaves;
+  const leaves = tree.errorLeaves;
+
+  // TODO: start from the first non-leaf goal and go up the tree.
 
   const getParent = (idx: ProofNodeIdx) => {
     let p = tree.topology.parent[idx];

@@ -47,3 +47,7 @@ export const IcoAmbiguous = () => {
 export const IcoLoop = () => {
   return <i className="codicon codicon-sync" />;
 };
+
+export const IcoNote = () => {
+  return <i className="codicon codicon-note" />;
+};

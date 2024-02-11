@@ -16,8 +16,9 @@ pub use topology::*;
 use ts_rs::TS;
 
 use crate::{
+  ext::InferCtxtExt,
   serialize::{hir::ImplDef, serialize_to_value, ty::Goal__PredicateDef},
-  types::ImplHeader,
+  types::{ImplHeader, ObligationNecessity},
 };
 
 crate::define_idx! {
@@ -39,6 +40,7 @@ pub enum Node {
 pub struct Goal {
   #[ts(type = "any")]
   goal: serde_json::Value,
+  necessity: ObligationNecessity,
 }
 
 // FIXME: this shouldn't be EQ
@@ -53,6 +55,9 @@ pub enum Candidate {
     #[ts(type = "any")]
     // Type is ImplHeader from mod `crate::types`.
     data: serde_json::Value,
+  },
+  ParamEnv {
+    idx: usize,
   },
   // TODO remove variant once everything is structured
   Any {
@@ -89,9 +94,10 @@ impl Goal {
       &'a solve::Goal<'tcx, ty::Predicate<'tcx>>,
     );
 
+    let necessity = infcx.guess_predicate_necessity(&goal.predicate);
     let goal = serialize_to_value(infcx, &Wrapper(goal))
       .expect("failed to serialize goal");
-    Self { goal }
+    Self { goal, necessity }
   }
 }
 
@@ -117,6 +123,11 @@ impl Candidate {
       serialize_to_value(infcx, impl_).expect("couldn't serialize impl header");
 
     Self::ImplMiddle { data: impl_ }
+  }
+
+  // TODO: we should pass the ParamEnv here for certainty.
+  fn new_param_env(idx: usize) -> Self {
+    Self::ParamEnv { idx }
   }
 }
 

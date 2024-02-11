@@ -98,8 +98,9 @@ pub struct Expr {
   pub range: CharRange,
   pub snippet: String,
   #[ts(type = "ObligationIdx[]")]
-  pub obligations: HashSet<ObligationIdx>,
+  pub obligations: Vec<ObligationIdx>,
   pub kind: ExprKind,
+  pub is_body: bool,
 }
 
 #[derive(Serialize, TS)]
@@ -174,8 +175,9 @@ impl ObligationsInBody {
 #[derive(Serialize, TS, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Obligation {
-  #[ts(type = "any")] // type: Predicate
-  pub predicate: serde_json::Value,
+  #[ts(type = "any")]
+  // type: PredicateObligation
+  pub obligation: serde_json::Value,
   pub hash: ObligationHash,
   pub range: CharRange,
   pub kind: ObligationKind,

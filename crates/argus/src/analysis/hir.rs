@@ -5,7 +5,7 @@ use rustc_hir::{
 use rustc_middle::ty::TyCtxt;
 use rustc_span::Span;
 
-use crate::types::intermediate::ErrorAssemblyCtx;
+use crate::{ext::TyCtxtExt, types::intermediate::ErrorAssemblyCtx};
 
 pub fn associate_obligations_nodes(ctx: &ErrorAssemblyCtx) -> Vec<Bin> {
   let mut grouped: HashMap<_, Vec<_>> = HashMap::default();
@@ -85,11 +85,7 @@ struct BinCreator<'a, 'tcx: 'a> {
 
 impl BinCreator<'_, '_> {
   fn drain_nested(&mut self, target: HirId, kind: BinKind) {
-    let hir = self.ctx.tcx.hir();
-    let is_nested = |id: HirId| {
-      target == id
-        || hir.parent_iter(id).find(|&(id, _)| id == target).is_some()
-    };
+    let is_nested = |id: HirId| self.ctx.tcx.is_parent_of(target, id);
 
     let obligations = self
       .map

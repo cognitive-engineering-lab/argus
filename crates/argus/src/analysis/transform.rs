@@ -1,5 +1,7 @@
 use index_vec::IndexVec;
-use rustc_data_structures::fx::{FxHashMap as HashMap, FxHashSet as HashSet};
+use rustc_data_structures::fx::{
+  FxHashMap as HashMap, FxHashSet as HashSet, FxIndexMap,
+};
 use rustc_hir::{self as hir, intravisit::Map, BodyId, HirId};
 use rustc_infer::{
   infer::{canonical::OriginalQueryValues, InferCtxt, InferOk},
@@ -17,7 +19,7 @@ use super::{
   EvaluationResult,
 };
 use crate::{
-  ext::{InferCtxtExt, PredicateExt},
+  ext::{EvaluationResultExt, InferCtxtExt, PredicateExt, TyCtxtExt},
   types::{intermediate::*, *},
 };
 
@@ -53,13 +55,14 @@ pub fn compute_provenance<'tcx>(
   }
 }
 
-pub fn transform<'tcx>(
+pub fn transform<'a, 'tcx: 'a>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
   typeck_results: &'tcx TypeckResults<'tcx>,
   obligations: Vec<Provenance<Obligation>>,
   obligation_data: &ObligationQueriesInBody<'tcx>,
   synthetic_data: &mut SyntheticQueriesInBody<'tcx>,
+  reported_trait_errors: &FxIndexMap<Span, Vec<ObligationHash>>,
   bins: Vec<Bin>,
 ) -> ObligationsInBody {
   let mut obligations_idx = IndexVec::<ObligationIdx, _>::default();
@@ -82,7 +85,9 @@ pub fn transform<'tcx>(
     obligations: obligations_with_idx,
     full_data: obligation_data,
     synthetic_data,
+    reported_trait_errors,
 
+    exprs_to_hir_id: Default::default(),
     ambiguity_errors: Default::default(),
     trait_errors: Default::default(),
     exprs: Default::default(),
@@ -90,6 +95,7 @@ pub fn transform<'tcx>(
   };
 
   builder.sort_bins(bins);
+  builder.relate_trait_bound();
 
   let hir = tcx.hir();
   let source_map = tcx.sess.source_map();
@@ -123,8 +129,10 @@ struct ObligationsBuilder<'a, 'tcx: 'a> {
   full_data: &'a ObligationQueriesInBody<'tcx>,
   synthetic_data: &'a mut SyntheticQueriesInBody<'tcx>,
   typeck_results: &'tcx TypeckResults<'tcx>,
+  reported_trait_errors: &'a FxIndexMap<Span, Vec<ObligationHash>>,
 
   // Structures to be filled in
+  exprs_to_hir_id: HashMap<ExprIdx, HirId>,
   ambiguity_errors: HashSet<ExprIdx>,
   trait_errors: HashSet<ExprIdx>,
   exprs: IndexVec<ExprIdx, Expr>,
@@ -144,13 +152,15 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       kind,
     } in bins
     {
-      if let Some((range, snippet)) = hir.opt_span(hir_id).and_then(|span| {
-        let r = CharRange::from_span(span, source_map).ok()?;
-        let snip = source_map
-          .span_to_snippet(span)
-          .unwrap_or_else(|_| String::from("{unknown snippet}"));
-        Some((r, snip))
-      }) {
+      let span = hir.span_with_body(hir_id);
+      if let Some((range, snippet)) =
+        CharRange::from_span(span, source_map).ok().and_then(|r| {
+          let snip = source_map
+            .span_to_snippet(span)
+            .unwrap_or_else(|_| String::from("{unknown snippet}"));
+          Some((r, snip))
+        })
+      {
         let mut ambiguous_call = false;
         let kind = match kind {
           BinKind::Misc => Misc,
@@ -188,7 +198,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
                 error_recvr,
               }
             } else {
-              Misc // FIXME: remove this after debugging!
+              Misc
             }
           }
         };
@@ -196,15 +206,17 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         let obligations = obligations
           .into_iter()
           .map(|idx| *self.obligations[idx])
-          .collect::<HashSet<_>>();
+          .collect::<Vec<_>>();
 
+        let is_body = hir_id == self.tcx.hir().body_owner(self.body_id);
         let expr_idx = self.exprs.push(Expr {
           range,
           snippet,
           obligations,
           kind,
+          is_body,
         });
-
+        self.exprs_to_hir_id.insert(expr_idx, hir_id);
         if ambiguous_call {
           self.ambiguity_errors.insert(expr_idx);
         }
@@ -217,17 +229,105 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     }
   }
 
+  // FIXME: this isn't efficient, but the number of obligations per
+  // body isn't large, so shouldnt' be an issue.
   fn relate_trait_bound(&mut self) {
-    // TODO: !
-    // - take the expressions from the "reported_trait_errors" and find
-    //   all the expressions that they correspond to. we should also
-    //   maintain the order in which they are reported and use this
-    //   sorting to present errors.
-    //
-    // - we also need to search for expressions that are "ambiguous," these
-    //   don't always have associated reported errors. my current thoughts to
-    //   do this are to find obligations that are unsuccessful and have a
-    //   concrete obligations code.
+    // 1. take the expressions from the "reported_trait_errors" and find
+    //    all the expressions that they correspond to. we should also
+    //    maintain the order in which they are reported and use this
+    //    sorting to present errors.
+    for (span, predicates) in self.reported_trait_errors.iter() {
+      let Some(this_id) =
+        hier_hir::find_most_enclosing_node(&self.tcx, self.body_id, *span)
+      else {
+        log::error!("reported error doesn't have an associated span ...");
+        continue;
+      };
+
+      let matching_expressions = self
+        .exprs_to_hir_id
+        .iter()
+        .filter(|(_, that_id)| self.tcx.is_parent_of(**that_id, this_id))
+        .collect::<Vec<_>>();
+
+      let Some((expr_id, hir_id)) =
+        matching_expressions.iter().copied().find(|(_, this_id)| {
+          matching_expressions
+            .iter()
+            .all(|(_, that_id)| self.tcx.is_parent_of(**that_id, **this_id))
+        })
+      else {
+        log::error!(
+          "failed to find most enclosing hir id for {:?}",
+          matching_expressions
+        );
+        continue;
+      };
+
+      // Mark the found Expr as containing an error.
+      self.trait_errors.insert(*expr_id);
+
+      // Sort the Expr obligations according to the reported order.
+      let expr_obligations = &mut self.exprs[*expr_id].obligations;
+      let num_errs = predicates.len();
+      expr_obligations.sort_by_key(|&obl_idx| {
+        let obl = &self.raw_obligations[obl_idx];
+        let obl_hash = obl.hash;
+        let obl_is_certain = obl.result.is_certain();
+        predicates
+          .iter()
+          .position(|&h| h == obl_hash)
+          .unwrap_or_else(|| {
+            if obl_is_certain {
+              // push successful obligations down
+              num_errs + 1
+            } else {
+              num_errs
+            }
+          })
+      })
+    }
+
+    // 2. we also need to search for expressions that are "ambiguous," these
+    //    don't always have associated reported errors. my current thoughts to
+    //    do this are to find obligations that are unsuccessful and have a
+    //    concrete obligations code.
+    let is_important_failed_query = |obl_idx: ObligationIdx| {
+      use rustc_infer::traits::ObligationCauseCode::*;
+      if let Some(prov) = self.obligations.iter().find(|p| ***p == obl_idx)
+        && let Some(uodidx) = prov.full_data
+      {
+        let full_data = self.full_data.get(uodidx);
+        !(full_data.result.is_certain()
+          || matches!(full_data.obligation.cause.code(), MiscObligation))
+      } else {
+        false
+      }
+    };
+    let lift_failed_obligations = |v: &mut Vec<ObligationIdx>| {
+      v.sort_by_key(|&idx| {
+        if self.raw_obligations[idx].result.is_certain() {
+          1
+        } else {
+          0
+        }
+      })
+    };
+    let unmarked_exprs = self
+      .exprs
+      .iter_mut_enumerated()
+      .filter(|(id, _)| !self.ambiguity_errors.contains(id));
+    for (expr_id, expr) in unmarked_exprs {
+      let contains_failed = expr
+        .obligations
+        .iter()
+        .copied()
+        .any(is_important_failed_query);
+      if contains_failed {
+        self.trait_errors.insert(expr_id);
+      }
+      lift_failed_obligations(&mut expr.obligations)
+    }
   }
 
   // TODO: for the method call we need to:

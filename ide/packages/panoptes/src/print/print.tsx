@@ -16,8 +16,8 @@ import {
   PrintDefPathFull as UnsafePrintDefPathFull,
 } from "./private/path";
 import {
-  PrintBinderPredicateKind,
   PrintGoalPredicate as UnsafePrintGoalPredicate,
+  PrintPredicateObligation as UnsafePrintPredicateObligation,
 } from "./private/predicate";
 import {
   PrintImplHeader as UnsafePrintImplHeader,
@@ -73,12 +73,10 @@ export const PrintTy = ({ ty }: { ty: any }) => {
 };
 
 export const PrintObligation = ({ obligation }: { obligation: Obligation }) => {
-  return (
-    <PrintWithFallback
-      object={obligation}
-      Content={() => <PrintBinderPredicateKind o={obligation.predicate} />}
-    />
+  const InnerContent = () => (
+    <UnsafePrintPredicateObligation o={obligation.obligation} />
   );
+  return <PrintWithFallback object={obligation} Content={InnerContent} />;
 };
 
 export const PrintImplHir = ({ impl }: { impl: Impl }) => {

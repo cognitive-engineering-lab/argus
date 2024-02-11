@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, bail, Result};
 use fluid_let::fluid_let;
+use rustc_data_structures::fx::FxIndexMap;
 use rustc_hir::BodyId;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::ty::{Predicate, TyCtxt, TypeckResults};
@@ -66,9 +67,9 @@ pub fn process_obligation<'tcx>(
   // TODO: we need to figure out when to save the full data.
   // Saving it for every obligation will consume a ton of memory
   // and make the tool relatively slow, but I don't have a tight
-  // enough metric as to when it should be ignored. NOTE: that
-  // if the full data doesn't get stored for every obligation, make
-  // sure that usages of `provenance.full_data` are guarded, as
+  // enough metric as to when it should be ignored.
+  // NOTE: that if the full data doesn't get stored for every obligation,
+  // make sure that usages of `provenance.full_data` are guarded, as
   // some currently use `.unwrap()`.
   let dataid = Some(tls::unsafe_store_data(infcx, obl, result));
 
@@ -76,6 +77,25 @@ pub fn process_obligation<'tcx>(
     transform::compute_provenance(infcx, obl, result, dataid, None);
 
   tls::store_obligation(obligation);
+
+  // Look at the `reported_trait_errors` and store an updated version.
+
+  let hashed_error_tree = infcx
+    .reported_trait_errors
+    .borrow()
+    .iter()
+    .map(|(span, predicates)| {
+      (
+        *span,
+        predicates
+          .iter()
+          .map(|p| infcx.predicate_hash(p).into())
+          .collect::<Vec<_>>(),
+      )
+    })
+    .collect::<FxIndexMap<_, _>>();
+
+  tls::replace_reported_errors(hashed_error_tree);
 }
 
 pub fn process_obligation_for_tree<'tcx>(
@@ -83,7 +103,7 @@ pub fn process_obligation_for_tree<'tcx>(
   obl: &PredicateObligation<'tcx>,
   result: EvaluationResult,
 ) {
-  let _target = OBLIGATION_TARGET.get(|target| {
+  OBLIGATION_TARGET.get(|target| {
     let target = target.unwrap();
 
     // A synthetic target requires that we do the method call queries.
@@ -123,8 +143,6 @@ pub fn build_obligations_output<'tcx>(
   Ok(build_obligations_in_body(tcx, body_id, typeck_results).1)
 }
 
-// TODO: if we are looking for the tree of a synthetic obligation
-// then we will actually need to do some computation here.
 pub fn build_tree_output<'tcx>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
@@ -188,10 +206,7 @@ pub(in crate::analysis) fn build_obligations_in_body<'tcx>(
 ) -> (FullData<'tcx>, ObligationsInBody) {
   let hir = tcx.hir();
   let source_map = tcx.sess.source_map();
-  let _name = hir.opt_name(hir.body_owner(body_id));
   let body = hir.body(body_id);
-  let _body_range = CharRange::from_span(body.value.span, source_map)
-    .expect("Couldn't get body range");
 
   let obligations = tls::take_obligations();
   let obligation_data = tls::unsafe_take_data();
@@ -206,7 +221,7 @@ pub(in crate::analysis) fn build_obligations_in_body<'tcx>(
     obligations: &obligations,
     obligation_data: &obligation_data,
   };
-
+  let reported_errors = tls::take_reported_errors();
   let bins = hir::associate_obligations_nodes(&ctx);
   let oib = transform::transform(
     tcx,
@@ -215,6 +230,7 @@ pub(in crate::analysis) fn build_obligations_in_body<'tcx>(
     obligations,
     &obligation_data,
     &mut synthetic_data,
+    &reported_errors,
     bins,
   );
 

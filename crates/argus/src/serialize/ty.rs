@@ -1,6 +1,7 @@
 use std::num::*;
 
 use rustc_hir::{self as hir, def::DefKind, def_id::DefId, Unsafety};
+use rustc_infer::traits::{ObligationCause, PredicateObligation};
 use rustc_middle::ty::{self, *};
 use rustc_span::symbol::{kw, Symbol};
 use rustc_target::spec::abi::Abi;
@@ -174,8 +175,6 @@ pub struct AliasTyKindDef<'tcx> {
   ty: AliasTy<'tcx>,
 }
 
-// TODO: this needs to go inside of the PathBuilder, alias types are
-// aliases to defined paths...
 impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
   fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
   where
@@ -186,13 +185,13 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
     // type to the frontend.
     #[derive(Serialize)]
     #[serde(tag = "type", rename_all = "camelCase")]
-    enum AliasTyKindWrapper<'tcx> {
+    enum AliasTyKindWrapper<'a, 'tcx: 'a> {
       OpaqueImplType {
         data: path::OpaqueImplType<'tcx>,
       },
       AliasTy {
         #[serde(with = "AliasTyDef")]
-        data: AliasTy<'tcx>,
+        data: &'a AliasTy<'tcx>,
       },
       DefPath {
         data: path::PathDefWithArgs<'tcx>,
@@ -200,10 +199,11 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
     }
 
     let infcx = get_dynamic_ctx();
-    match self.kind {
-      AliasKind::Projection | AliasKind::Inherent | AliasKind::Weak => {
-        let data = self.ty;
-
+    match (self.kind, self.ty) {
+      (
+        AliasKind::Projection | AliasKind::Inherent | AliasKind::Weak,
+        ref data,
+      ) => {
         if !(infcx.should_print_verbose() || with_no_queries())
           && infcx.tcx.is_impl_trait_in_trait(data.def_id)
         {
@@ -217,8 +217,7 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
           AliasTyKindWrapper::AliasTy { data }.serialize(s)
         }
       }
-      AliasKind::Opaque => {
-        let AliasTy { def_id, args, .. } = self.ty;
+      (AliasKind::Opaque, ty::AliasTy { def_id, args, .. }) => {
         // We use verbose printing in 'NO_QUERIES' mode, to
         // avoid needing to call `predicates_of`. This should
         // only affect certain debug messages (e.g. messages printed
@@ -232,8 +231,7 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
           // CHANGE: p!(write("Opaque({:?}, {})", def_id, args.print_as_list()));
           // return Ok(())
           // NOTE: I'm taking the risk of using print_def_path here
-          // as indicated by the above comment. If things break, look here
-          // first.
+          // as indicated by the above comment. If things break, look here.
           return AliasTyKindWrapper::DefPath {
             data: path::PathDefWithArgs::new(def_id, args),
           }
@@ -1001,14 +999,18 @@ impl InferTyDef {
 
 // ------------------------------------------------------------------------
 
-// #[derive(Serialize)]
-// #[serde(remote = "LateParamRegion")]
-// pub struct LateParamRegionDef {
-//   #[serde(with = "DefIdDef")]
-//   pub scope: DefId,
-//   #[serde(with = "BoundRegionKindDef")]
-//   pub bound_region: BoundRegionKind,
-// }
+#[derive(Serialize)]
+#[serde(remote = "PredicateObligation", rename_all = "camelCase")]
+pub struct PredicateObligationDef<'tcx> {
+  #[serde(skip)]
+  pub cause: ObligationCause<'tcx>,
+  #[serde(with = "ParamEnvDef")]
+  pub param_env: ParamEnv<'tcx>,
+  #[serde(with = "PredicateDef")]
+  pub predicate: Predicate<'tcx>,
+  #[serde(skip)]
+  pub recursion_depth: usize,
+}
 
 pub struct Goal__PredicateDef;
 impl Goal__PredicateDef {
@@ -1020,6 +1022,7 @@ impl Goal__PredicateDef {
     S: serde::Serializer,
   {
     #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
     pub struct Wrapper<'a, 'tcx: 'a> {
       #[serde(with = "PredicateDef")]
       pub predicate: &'a Predicate<'tcx>,
@@ -1044,9 +1047,7 @@ impl ParamEnvDef {
   where
     S: serde::Serializer,
   {
-    #[derive(Serialize)]
-    struct Wrapper<'tcx>(#[serde(with = "ClauseDef")] Clause<'tcx>);
-    serialize_custom_seq! { Wrapper, s, value.caller_bounds() }
+    Slice__ClauseDef::serialize(value.caller_bounds(), s)
   }
 }
 

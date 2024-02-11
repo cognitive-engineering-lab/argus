@@ -1,5 +1,6 @@
 import React from "react";
 
+import { IcoNote } from "../../utilities/icons";
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
 import { PrintTerm } from "./term";
@@ -11,9 +12,39 @@ import {
   PrintTy,
 } from "./ty";
 
+export const PrintPredicateObligation = ({ o }) => {
+  const hoverContent =
+    o.paramEnv.length === 0 ? (
+      ""
+    ) : (
+      <HoverInfo Content={() => <PrintParamEnv o={o.paramEnv} />}>
+        {" "}
+        <IcoNote />
+      </HoverInfo>
+    );
+
+  return (
+    <>
+      <PrintBinderPredicateKind o={o.predicate} />
+      {hoverContent}
+    </>
+  );
+};
+
 export const PrintGoalPredicate = ({ o }) => {
-  // NOTE: by default just print the predicate, not the env.
-  return <PrintBinderPredicateKind o={o.predicate} />;
+  // NOTE: goals and obligations aren't the same thing, but they
+  // currently have the same semantic structure.
+  return <PrintPredicateObligation o={o} />;
+};
+
+export const PrintParamEnv = ({ o }) => {
+  const innerContent = _.map(o, (clause, idx) => (
+    <div className="WhereConstraint" key={idx}>
+      <PrintClause o={clause} />
+    </div>
+  ));
+
+  return <div className="DirNode WhereParamArea">{innerContent}</div>;
 };
 
 export const PrintBinderPredicateKind = ({ o }) => {

@@ -21,7 +21,7 @@ use crate::{
   analysis::{EvaluationResult, FulfillmentData},
   serialize::{
     serialize_to_value,
-    ty::{PredicateDef, TraitRefPrintOnlyTraitPathDefWrapper},
+    ty::{PredicateObligationDef, TraitRefPrintOnlyTraitPathDefWrapper},
   },
   types::{ImplHeader, Obligation, ObligationNecessity},
 };
@@ -84,6 +84,9 @@ pub trait TyCtxtExt<'tcx> {
   ) -> &TypeckResults;
 
   fn get_impl_header(&self, def_id: DefId) -> Option<ImplHeader<'tcx>>;
+
+  /// Test whether `a` is a parent node of `b`.
+  fn is_parent_of(&self, a: HirId, b: HirId) -> bool;
 }
 
 pub trait TypeckResultsExt<'tcx> {
@@ -266,6 +269,10 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
       tys_without_default_bounds,
     })
   }
+
+  fn is_parent_of(&self, a: HirId, b: HirId) -> bool {
+    a == b || self.hir().parent_iter(b).find(|&(id, _)| id == a).is_some()
+  }
 }
 
 impl<'tcx> TypeckResultsExt<'tcx> for TypeckResults<'tcx> {
@@ -338,6 +345,10 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
 
     if matches!(code, SizedReturnType) && is_lhs_unit() {
       No
+    } else if matches!(code, MiscObligation) {
+      ForProfessionals
+    } else if is_lhs_unit() {
+      OnError
     } else {
       self.guess_predicate_necessity(p)
     }
@@ -404,14 +415,16 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     let necessity = self.obligation_necessity(&obl);
 
     #[derive(Serialize)]
-    struct Wrapper<'tcx>(#[serde(with = "PredicateDef")] Predicate<'tcx>);
+    #[serde(rename_all = "camelCase")]
+    struct Wrapper<'a, 'tcx: 'a>(
+      #[serde(with = "PredicateObligationDef")] &'a PredicateObligation<'tcx>,
+    );
 
-    let w = Wrapper(obl.predicate.clone());
-    let predicate =
-      serialize_to_value(self, &w).expect("could not serialize predicate");
+    let obligation = serialize_to_value(self, &Wrapper(obl))
+      .expect("could not serialize predicate");
 
     Obligation {
-      predicate,
+      obligation,
       hash: fdata.hash.into(),
       range,
       kind: fdata.kind(),

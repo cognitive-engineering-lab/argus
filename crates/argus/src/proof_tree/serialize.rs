@@ -14,10 +14,7 @@ use rustc_trait_selection::{
 };
 
 use super::*;
-use crate::{
-  ext::{InferCtxtExt, TyCtxtExt},
-  types::ObligationNecessity,
-};
+use crate::ext::TyCtxtExt;
 
 pub struct SerializedTreeVisitor {
   pub def_id: DefId,
@@ -113,7 +110,7 @@ impl Node {
         CandidateSource::BuiltinImpl(_built_impl) => "builtin".into(),
         CandidateSource::AliasBound => "alias-bound".into(),
         // The only two we really care about.
-        CandidateSource::ParamEnv(_idx) => "param-env".into(),
+        CandidateSource::ParamEnv(idx) => Candidate::new_param_env(idx),
         CandidateSource::Impl(def_id) => {
           Self::from_impl(candidate.infcx(), def_id)
         }
@@ -176,22 +173,6 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
     &mut self,
     goal: &InspectGoal<'_, 'tcx>,
   ) -> ControlFlow<Self::BreakTy> {
-    let infcx = goal.infcx();
-
-    // TODO: we don't need to actually store/mark unnecessary roots atm.
-    // The frontend doesn't use them, but eventually we will!
-    // self.unnecessary_roots.insert(n);
-
-    // Skip unnecessary predicates, but not the root goal.
-    if self.root.is_some()
-      && !matches!(
-        infcx.guess_predicate_necessity(&goal.goal().predicate),
-        ObligationNecessity::Yes
-      )
-    {
-      return ControlFlow::Continue(());
-    }
-
     let here_node = Node::from_goal(goal, self.def_id);
     let here_idx = self.nodes.push(here_node.clone());
 

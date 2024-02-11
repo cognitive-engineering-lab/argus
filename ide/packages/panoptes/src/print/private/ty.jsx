@@ -491,7 +491,13 @@ export const PrintOpaqueImplType = ({ o }) => {
   const lifetimes = _.map(o.lifetimes, (lifetime, i) => (
     <PrintRegion o={lifetime} key={i} />
   ));
-  const sized = "TODO: ?Sized";
+
+  const addSized =
+    o.hasSizedBound &&
+    (!anyElems(fnTraits, traits, lifetimes) || o.hasNegativeSizedBound);
+  const addMaybeSized = !o.hasSizedBound && !o.hasNegativeSizedBound;
+  const sized =
+    addSized || addMaybeSized ? (addMaybeSized ? "?" : "") + "Sized" : "";
 
   const firstSep = anyElems(fnTraits) && traits.length > 0 ? " + " : "";
   const secondSep =
@@ -499,15 +505,21 @@ export const PrintOpaqueImplType = ({ o }) => {
   const thirdSep =
     anyElems(fnTraits, traits, lifetimes) && sized !== "" ? " + " : "";
 
+  const start =
+    !anyElems(fnTraits, traits, lifetimes) && sized === ""
+      ? "{opaque}}"
+      : "impl ";
+
   return (
-    <span>
-      impl {fnTraits}
+    <>
+      {start}
+      {fnTraits}
       {firstSep}
       {traits}
       {secondSep}
       {lifetimes}
       {thirdSep}
       {sized}
-    </span>
+    </>
   );
 };
