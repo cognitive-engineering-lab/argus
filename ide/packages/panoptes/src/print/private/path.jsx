@@ -1,9 +1,10 @@
 import _ from "lodash";
 import React from "react";
 
-import { HoverInfo } from "../../utilities/HoverInfo";
+import { HoverInfo } from "../../HoverInfo";
+import { takeRightUntil } from "../../utilities/func";
+import { Angled, CommaSeparated } from "./syntax";
 import { PrintGenericArg, PrintTy } from "./ty";
-import { intersperse, takeRightUntil } from "./utilities";
 
 export const PrintValuePath = ({ o }) => {
   return <PrintDefPath o={o} />;
@@ -114,25 +115,23 @@ export const PrintPathSegment = ({ o }) => {
       if (o.inner.length === 0) {
         return "";
       }
-      let [lt, gt] = ["<", ">"];
       return (
-        <span>
-          {lt}
+        <Angled>
           <PrintDefPathFull o={o.inner} />
-          {gt}
-        </span>
+        </Angled>
       );
     }
     case "commaSeparated": {
-      const doInner =
+      const Mapper =
         o.kind.type === "genericArg"
-          ? (e, i) => {
-              return <PrintGenericArg o={e} key={i} />;
-            }
-          : (_e, _i) => {
+          ? PrintGenericArg
+          : ({ o }) => {
               throw new Error("Unknown comma separated kind", o);
             };
-      return <>{intersperse(o.entries, ", ", doInner)}</>;
+
+      const components = _.map(o.entries, entry => () => <Mapper o={entry} />);
+
+      return <CommaSeparated components={components} />;
     }
     default: {
       throw new Error("Unknown path segment type", o);

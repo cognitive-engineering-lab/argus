@@ -1,6 +1,8 @@
+import _ from "lodash";
 import React from "react";
 
-import { IcoNote } from "../../utilities/icons";
+import { HoverInfo } from "../../HoverInfo";
+import { IcoNote } from "../../Icons";
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
 import { PrintTerm } from "./term";

@@ -4,10 +4,10 @@ import {
   ObligationOutput,
 } from "@argus/common/lib";
 import _ from "lodash";
-import React, { RefObject, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
-import { errorCardId, obligationCardId } from "./File";
 import Workspace from "./Workspace";
+import { errorCardId, obligationCardId } from "./utilities/func";
 
 // FIXME: this is wrong, expanding the nodes with JS doesn't cause
 // a re-render in React. Better to have a signal that collapsible

@@ -21,4 +21,7 @@ where
   T: 'static,
   S: Clone + Send + Sync + 'static,
 {
+  use axum::{routing::get, Router};
+  let app = Router::new().route("/", get(handler));
+  unreachable!()
 }

@@ -64,6 +64,11 @@ pub fn process_obligation<'tcx>(
 
   log::debug!("Processing obligation {obl:?}");
 
+  // Use this to get rid of any resolved inference variables,
+  // these could have been resolved while trying to solve the obligation
+  // and we want to present it as such to the user.
+  let obl = &infcx.resolve_vars_if_possible(obl.clone());
+
   // TODO: we need to figure out when to save the full data.
   // Saving it for every obligation will consume a ton of memory
   // and make the tool relatively slow, but I don't have a tight

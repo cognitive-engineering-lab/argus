@@ -1,21 +1,5 @@
-import { SerializedTree } from "@argus/common/bindings";
-import { makeAutoObservable } from "mobx";
 import { createContext } from "react";
 
-export class ActiveState {
-  currentNode: number | null = null;
-  constructor() {
-    makeAutoObservable(this);
-  }
+import TreeInfo from "./TreeInfo";
 
-  setActiveNode(node: number) {
-    this.currentNode = node;
-  }
-
-  getActiveNode() {
-    return this.currentNode;
-  }
-}
-
-export const ActiveContext = createContext<ActiveState | null>(null);
-export const TreeContext = createContext<SerializedTree | null>(null);
+export const TreeContext = createContext<TreeInfo | null>(null);

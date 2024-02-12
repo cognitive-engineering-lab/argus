@@ -292,46 +292,49 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     //    don't always have associated reported errors. my current thoughts to
     //    do this are to find obligations that are unsuccessful and have a
     //    concrete obligations code.
-    let is_important_failed_query = |obl_idx: ObligationIdx| {
-      use rustc_infer::traits::ObligationCauseCode::*;
-      if let Some(prov) = self.obligations.iter().find(|p| ***p == obl_idx)
-        && let Some(uodidx) = prov.full_data
-      {
-        let full_data = self.full_data.get(uodidx);
-        !(full_data.result.is_certain()
-          || matches!(full_data.obligation.cause.code(), MiscObligation))
-      } else {
-        false
-      }
-    };
-    let lift_failed_obligations = |v: &mut Vec<ObligationIdx>| {
-      v.sort_by_key(|&idx| {
-        if self.raw_obligations[idx].result.is_certain() {
-          1
-        } else {
-          0
-        }
-      })
-    };
-    let unmarked_exprs = self
-      .exprs
-      .iter_mut_enumerated()
-      .filter(|(id, _)| !self.ambiguity_errors.contains(id));
-    for (expr_id, expr) in unmarked_exprs {
-      let contains_failed = expr
-        .obligations
-        .iter()
-        .copied()
-        .any(is_important_failed_query);
-      if contains_failed {
-        self.trait_errors.insert(expr_id);
-      }
-      lift_failed_obligations(&mut expr.obligations)
-    }
+    //
+    // TODO: this isn't quite doing what I want. We need a way to figure
+    // out which obligations are "reruns" of a previous goal, and
+    // then remove the prior 'ambiguous' answer from the list.
+    //
+    // let is_important_failed_query = |obl_idx: ObligationIdx| {
+    //   use rustc_infer::traits::ObligationCauseCode::*;
+    //   if let Some(prov) = self.obligations.iter().find(|p| ***p == obl_idx)
+    //     && let Some(uodidx) = prov.full_data
+    //   {
+    //     let full_data = self.full_data.get(uodidx);
+    //     !(full_data.result.is_certain()
+    //       || matches!(full_data.obligation.cause.code(), MiscObligation))
+    //   } else {
+    //     false
+    //   }
+    // };
+    // let lift_failed_obligations = |v: &mut Vec<ObligationIdx>| {
+    //   v.sort_by_key(|&idx| {
+    //     if self.raw_obligations[idx].result.is_certain() {
+    //       1
+    //     } else {
+    //       0
+    //     }
+    //   })
+    // };
+    // let unmarked_exprs = self
+    //   .exprs
+    //   .iter_mut_enumerated()
+    //   .filter(|(id, _)| !self.ambiguity_errors.contains(id));
+    // for (expr_id, expr) in unmarked_exprs {
+    //   let contains_failed = expr
+    //     .obligations
+    //     .iter()
+    //     .copied()
+    //     .any(is_important_failed_query);
+    //   if contains_failed {
+    //     self.trait_errors.insert(expr_id);
+    //   }
+    //   lift_failed_obligations(&mut expr.obligations)
+    // }
   }
 
-  // TODO: for the method call we need to:
-  //
   // 1. build the method call table (see ambiguous / )
   fn relate_method_call<'hir>(
     &mut self,

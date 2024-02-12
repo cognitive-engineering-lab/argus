@@ -7,23 +7,31 @@ import { DirRecursive } from "./Directory";
 
 const BottomUp = () => {
   const tree = useContext(TreeContext)!;
-  const leaves = tree.errorLeaves;
-
-  // TODO: start from the first non-leaf goal and go up the tree.
+  const leaves = _.map(tree.errorNodes(), leaf => {
+    let curr: ProofNodeIdx | undefined = leaf;
+    while (curr !== undefined && tree.node(curr).type !== "goal") {
+      curr = tree.parent(curr);
+    }
+    return curr;
+  });
 
   const getParent = (idx: ProofNodeIdx) => {
-    let p = tree.topology.parent[idx];
-    return p != undefined ? [p] : [];
+    let p = tree.parent(idx);
+    return p !== undefined ? [p] : [];
   };
 
-  return _.map(leaves, (leaf, i) => (
-    <DirRecursive
-      key={i}
-      level={[leaf]}
-      getNext={getParent}
-      styleEdges={false}
-    />
-  ));
+  return _.map(leaves, (leaf, i) =>
+    leaf === undefined ? (
+      ""
+    ) : (
+      <DirRecursive
+        key={i}
+        level={[leaf]}
+        getNext={getParent}
+        styleEdges={false}
+      />
+    )
+  );
 };
 
 export default BottomUp;

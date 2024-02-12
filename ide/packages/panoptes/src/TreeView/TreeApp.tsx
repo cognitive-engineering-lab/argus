@@ -9,10 +9,11 @@ import React from "react";
 import ReactJson from "react-json-view";
 
 import BottomUp from "./BottomUp";
-import { ActiveContext, ActiveState, TreeContext } from "./Context";
+import { TreeContext } from "./Context";
 import TopDown from "./TopDown";
 import "./TreeApp.css";
 import TreeCycle from "./TreeCycle";
+import TreeInfo from "./TreeInfo";
 
 const TreeApp = ({ tree }: { tree: SerializedTree | undefined }) => {
   // FIXME: this shouldn't ever happen, if a properly hashed
@@ -27,35 +28,35 @@ const TreeApp = ({ tree }: { tree: SerializedTree | undefined }) => {
     );
   }
 
+  const treeInfo = new TreeInfo(tree);
+
   let tabs: [string, React.FC][] = [
     ["Bottom Up", BottomUp],
     ["Top Down", TopDown],
     ["JSON", () => <ReactJson src={tree} />],
   ];
 
-  // FIXME: why do I need the '!' here? - - - - - - ---------  VVVVVVVV
   if (tree.cycle !== undefined) {
+    // FIXME: why do I need the '!' here? - - - - - --------  VVVVVVVV
     tabs.unshift(["Cycle Detected", () => <TreeCycle path={tree.cycle!} />]);
   }
 
   return (
-    <TreeContext.Provider value={tree}>
-      <ActiveContext.Provider value={new ActiveState()}>
-        <div className="App">
-          <VSCodePanels>
-            {_.map(tabs, ([name, _], idx) => (
-              <VSCodePanelTab key={idx} id={`tab-${idx}`}>
-                {name}
-              </VSCodePanelTab>
-            ))}
-            {_.map(tabs, ([_, Component], idx) => (
-              <VSCodePanelView key={idx} id={`tab-${idx}`}>
-                <Component />
-              </VSCodePanelView>
-            ))}
-          </VSCodePanels>
-        </div>
-      </ActiveContext.Provider>
+    <TreeContext.Provider value={treeInfo}>
+      <div className="App">
+        <VSCodePanels>
+          {_.map(tabs, ([name, _], idx) => (
+            <VSCodePanelTab key={idx} id={`tab-${idx}`}>
+              {name}
+            </VSCodePanelTab>
+          ))}
+          {_.map(tabs, ([_, Component], idx) => (
+            <VSCodePanelView key={idx} id={`tab-${idx}`}>
+              <Component />
+            </VSCodePanelView>
+          ))}
+        </VSCodePanels>
+      </div>
     </TreeContext.Provider>
   );
 };

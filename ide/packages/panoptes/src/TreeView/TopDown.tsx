@@ -7,11 +7,7 @@ import { DirRecursive } from "./Directory";
 
 const TopDown = () => {
   const tree = useContext(TreeContext)!;
-  const getChildren = (idx: ProofNodeIdx) => {
-    return _.reject(tree.topology.children[idx] || [], idx =>
-      tree.unnecessaryRoots.includes(idx)
-    );
-  };
+  const getChildren = (idx: ProofNodeIdx) => tree.children(idx);
   return (
     <DirRecursive level={[tree.root]} getNext={getChildren} styleEdges={true} />
   );

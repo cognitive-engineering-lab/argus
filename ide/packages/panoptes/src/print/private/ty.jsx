@@ -1,55 +1,27 @@
 import _ from "lodash";
 import React from "react";
 
-import { HoverInfo } from "../../utilities/HoverInfo";
+import { HoverInfo } from "../../HoverInfo";
+import { IcoMegaphone } from "../../Icons";
+import { anyElems, fnInputsAndOutput, tyIsUnit } from "../../utilities/func";
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
 import { PrintClause } from "./predicate";
-import {
-  Kw,
-  anyElems,
-  fnInputsAndOutput,
-  intersperse,
-  tyIsUnit,
-} from "./utilities";
+import { Angled, CommaSeparated, DBraced, Kw, PlusSeparated } from "./syntax";
 
 export const PrintBinder = ({ binder, innerF }) => {
   return innerF(binder.value);
 };
 
-export const Angled = ({ children }) => {
-  return (
-    <span>
-      {"<"}
-      {children}
-      {">"}
-    </span>
-  );
-};
-
-export const DBraced = ({ children }) => {
-  return (
-    <span>
-      {"{{"}
-      {children}
-      {"}}"}
-    </span>
-  );
-};
-
 export const PrintImplHeader = ({ o }) => {
-  const genArgs = _.map(o.args, (arg, i) => () => (
-    <PrintGenericArg o={arg} key={i} />
-  ));
+  const genArgs = _.map(o.args, arg => () => <PrintGenericArg o={arg} />);
   const argsWAngle =
-    genArgs.length > 0 ? (
-      <Angled>
-        {intersperse(genArgs, ", ", E => (
-          <E />
-        ))}
-      </Angled>
-    ) : (
+    genArgs.length === 0 ? (
       ""
+    ) : (
+      <Angled>
+        <CommaSeparated components={genArgs} />
+      </Angled>
     );
   const trait = <PrintDefPath o={o.name} />;
   const selfTy = <PrintTy o={o.selfTy} />;
@@ -61,11 +33,11 @@ export const PrintImplHeader = ({ o }) => {
   );
 
   return (
-    <span>
+    <>
       <Kw>impl</Kw>
       {argsWAngle} {trait} for {selfTy}
       {whereClause}
-    </span>
+    </>
   );
 };
 
@@ -90,40 +62,19 @@ export const PrintWhereClause = ({ predicates, tysWOBound }) => {
   );
 
   return (
-    <span>
+    <>
       {" "}
       <Kw>where</Kw>{" "}
       <HoverInfo Content={whereHoverContent}>
         <span className="where">...</span>
       </HoverInfo>
-    </span>
+    </>
   );
 };
 
 export const PrintTy = ({ o }) => {
   console.debug("Printing Ty", o);
   return <PrintTyKind o={o} />;
-};
-
-export const PrintFnSig = ({ inputs, output, cVariadic }) => {
-  const doTy = (ty, i) => {
-    return <PrintTy o={ty} key={i} />;
-  };
-  const variadic = !cVariadic ? "" : args.length === 0 ? "..." : ", ...";
-  const ret = tyIsUnit(output) ? (
-    ""
-  ) : (
-    <span>
-      {" "}
-      {"->"} <PrintTy o={output} />
-    </span>
-  );
-  return (
-    <span>
-      ({intersperse(inputs, ", ", doTy)}
-      {variadic}){ret}
-    </span>
-  );
 };
 
 // TODO: enums that don't have an inner object need to use a
@@ -168,7 +119,6 @@ export const PrintTyKind = ({ o }) => {
       </span>
     );
   } else if ("Ref" in o) {
-    // TODO: when to print regions?
     const [r, ty, mtbl] = o.Ref;
     const tyAndMut = {
       ty: ty,
@@ -176,40 +126,18 @@ export const PrintTyKind = ({ o }) => {
     };
     return (
       <span>
-        &<PrintTypeAndMut o={tyAndMut} />
+        &<PrintRegion o={r} /> <PrintTypeAndMut o={tyAndMut} />
       </span>
     );
   } else if ("FnDef" in o) {
     return <PrintFnDef o={o.FnDef} />;
   } else if ("FnPtr" in o) {
-    const binderFnSig = o.FnPtr;
-
-    const inner = o => {
-      const unsafetyStr = o.unsafety === "Unsafe" ? "unsafe " : "";
-      // TODO: we could write the ABI here, or expose it at least.
-      const abi = o.abi === "Rust" ? "" : "extern ";
-      const [inputs, output] = fnInputsAndOutput(o.inputs_and_output);
-      return (
-        <span>
-          fn{" "}
-          <PrintFnSig
-            inputs={inputs}
-            output={output}
-            cVariadic={o.c_variadic}
-          />
-        </span>
-      );
-    };
-
-    return <PrintBinder binder={binderFnSig} innerF={inner} />;
+    return <PrintPolyFnSig o={o.FnPtr} />;
   } else if ("Tuple" in o) {
+    const components = _.map(o.Tuple, t => () => <PrintTy o={t} />);
     return (
       <span>
-        (
-        {intersperse(o.Tuple, ", ", (e, i) => {
-          return <PrintTy o={e} key={i} />;
-        })}
-        )
+        (<CommaSeparated components={components} />)
       </span>
     );
   } else if ("Placeholder" in o) {
@@ -264,19 +192,12 @@ export const PrintCoroutineWitnessTy = ({ o }) => {
 export const PrintDynamicTy = ({ o }) => {
   const hasHead = o.data !== undefined;
   const head = hasHead ? <PrintDefPath o={o.data} /> : "";
-  const autoTraits = _.map(o.autoTraits, (trait, i) => () => (
-    <PrintDefPath o={trait} key={i} />
-  ));
+  const components = _.map(o.autoTraits, t => () => <PrintDefPath o={t} />);
   return (
-    <span>
+    <>
       {head}
-      {_.map(autoTraits, (Trait, i) => (
-        <span key={i}>
-          {hasHead || i > 0 ? " + " : ""}
-          <Trait />
-        </span>
-      ))}
-    </span>
+      <CommaSeparated components={components} />
+    </>
   );
 };
 
@@ -308,14 +229,53 @@ export const PrintAliasTy = ({ o }) => {
   }
 };
 
-export const PrintOqaqueImplType = ({ o }) => {
-  throw new Error("NYI");
+export const PrintPolyFnSig = ({ o }) => {
+  const InnerSig = ({ inputs, output, cVariadic }) => {
+    const inputComponents = _.map(inputs, ty => () => <PrintTy o={ty} />);
+    const variadic = !cVariadic ? "" : args.length === 0 ? "..." : ", ...";
+    const ret = tyIsUnit(output) ? (
+      ""
+    ) : (
+      <>
+        {" "}
+        {"->"} <PrintTy o={output} />
+      </>
+    );
+    return (
+      <>
+        (<CommaSeparated components={inputComponents} />
+        {variadic}){ret}
+      </>
+    );
+  };
+
+  const inner = o => {
+    const unsafetyStr = o.unsafety === "Unsafe" ? "unsafe " : "";
+    // TODO: we could write the ABI here, or expose it at least.
+    const abi = o.abi === "Rust" ? "" : "extern ";
+    const [inputs, output] = fnInputsAndOutput(o.inputs_and_output);
+    return (
+      <>
+        fn <InnerSig inputs={inputs} output={output} cVariadic={o.c_variadic} />
+      </>
+    );
+  };
+
+  return <PrintBinder binder={o} innerF={inner} />;
 };
 
 export const PrintFnDef = ({ o }) => {
   // NOTE: `FnDef`s have both a path and a signature.
   // We should show both (somehow), not sure what's the best way to present it.
-  return <PrintDefPath o={o.path} />;
+  return (
+    <>
+      <PrintDefPath o={o.path} />
+      <HoverInfo Content={() => <PrintPolyFnSig o={o.sig} />}>
+        {" "}
+        <IcoMegaphone />
+      </HoverInfo>
+    </>
+  );
 };
 
 export const PrintParamTy = ({ o }) => {
@@ -329,7 +289,7 @@ export const PrintSymbol = ({ o }) => {
 export const PrintBoundTy = ({ o }) => {
   switch (o.type) {
     case "named": {
-      return <span>{o.data}</span>;
+      return <PrintSymbol o={o.data} />;
     }
     default: {
       throw new Error("Unknown bound ty kind", o);
@@ -344,7 +304,7 @@ export const PrintPlaceholderTy = ({ o }) => {
       return "{anon}";
     }
     case "named": {
-      return <span>{o.data}</span>;
+      return <PrintSymbol o={o.data} />;
     }
   }
 };
@@ -367,16 +327,14 @@ export const PrintInferTy = ({ o }) => {
 
 export const PrintTypeAndMut = ({ o }) => {
   return (
-    <span>
+    <>
       {o.mutbl === "Mut" ? "mut " : ""}
       <PrintTy o={o.ty} />
-    </span>
+    </>
   );
 };
 
 export const PrintGenericArg = ({ o }) => {
-  console.debug("GenericArg", o);
-
   if ("Type" in o) {
     return <PrintTy o={o.Type} />;
   } else if ("Lifetime" in o) {
@@ -430,19 +388,19 @@ export const PrintBoundVariable = ({ o }) => {
 
 export const PrintOpaqueImplType = ({ o }) => {
   const PrintFnTrait = ({ o }) => {
-    const args = _.map(o.params, (param, i) => <PrintTy o={param} key={i} />);
+    const args = _.map(o.params, param => () => <PrintTy o={param} key={i} />);
     const ret =
       o.retTy !== undefined ? (
-        <span>
+        <>
           {" -> "}
           <PrintTy o={o.retTy} />
-        </span>
+        </>
       ) : (
         ""
       );
     return (
       <span>
-        ({o.kind}({args}){ret})
+        ({o.kind}(<CommaSeparated components={args} />){ret})
       </span>
     );
   };
@@ -450,7 +408,7 @@ export const PrintOpaqueImplType = ({ o }) => {
   const PrintAssocItem = ({ o }) => {
     return (
       <span>
-        o.name = <PrintTerm o={o.term} />
+        {o.name} = <PrintTerm o={o.term} />
       </span>
     );
   };
@@ -458,27 +416,25 @@ export const PrintOpaqueImplType = ({ o }) => {
   const PrintTrait = ({ o }) => {
     const prefix = o.polarity === "Negative" ? "!" : "";
     const name = <PrintDefPath o={o.traitName} />;
-    const args = _.map(o.ownArgs, (arg, i) => () => (
-      <PrintGenericArg o={arg} key={i} />
+    const ownArgs = _.map(o.ownArgs, arg => () => <PrintGenericArg o={arg} />);
+    const assocArgs = _.map(o.assocArgs, arg => () => (
+      <PrintAssocItem o={arg} />
     ));
-    const assocArgs = _.map(o.assocArgs, (arg, i) => () => (
-      <PrintAssocItem o={arg} key={i} />
-    ));
-    const list = anyElems(args, assocArgs) ? (
-      <Angled>
-        {intersperse(args.concat(assocArgs), ", ", E => (
-          <E />
-        ))}
-      </Angled>
-    ) : (
-      ""
-    );
+    const argComponents = [...ownArgs, ...assocArgs];
+    const list =
+      argComponents.length === 0 ? (
+        ""
+      ) : (
+        <Angled>
+          <CommaSeparated components={argComponents} />
+        </Angled>
+      );
     return (
-      <span>
+      <>
         {prefix}
         {name}
         {list}
-      </span>
+      </>
     );
   };
 
@@ -492,6 +448,8 @@ export const PrintOpaqueImplType = ({ o }) => {
     <PrintRegion o={lifetime} key={i} />
   ));
 
+  const implComponents = [...fnTraits, ...traits, ...lifetimes];
+
   const addSized =
     o.hasSizedBound &&
     (!anyElems(fnTraits, traits, lifetimes) || o.hasNegativeSizedBound);
@@ -499,26 +457,17 @@ export const PrintOpaqueImplType = ({ o }) => {
   const sized =
     addSized || addMaybeSized ? (addMaybeSized ? "?" : "") + "Sized" : "";
 
-  const firstSep = anyElems(fnTraits) && traits.length > 0 ? " + " : "";
-  const secondSep =
-    anyElems(fnTraits, traits) && lifetimes.length > 0 ? " + " : "";
-  const thirdSep =
+  const lastSep =
     anyElems(fnTraits, traits, lifetimes) && sized !== "" ? " + " : "";
 
   const start =
-    !anyElems(fnTraits, traits, lifetimes) && sized === ""
-      ? "{opaque}}"
-      : "impl ";
+    implComponents.length === 0 && sized === "" ? "{opaque}}" : "impl ";
 
   return (
     <>
       {start}
-      {fnTraits}
-      {firstSep}
-      {traits}
-      {secondSep}
-      {lifetimes}
-      {thirdSep}
+      <PlusSeparated components={implComponents} />
+      {lastSep}
       {sized}
     </>
   );

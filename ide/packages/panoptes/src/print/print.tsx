@@ -98,12 +98,13 @@ export const PrintImplHeader = ({ impl }: { impl: any }) => {
 };
 
 export const PrintGoal = ({ o }: { o: Goal }) => {
-  return (
-    <PrintWithFallback
-      object={o}
-      Content={() => <UnsafePrintGoalPredicate o={o.goal} />}
-    />
+  const Content = () => (
+    <>
+      <UnsafePrintGoalPredicate o={o.goal} />
+      <div style={{ opacity: 0.5 }}>RustcPretty: {o.debugComparison}</div>
+    </>
   );
+  return <PrintWithFallback object={o} Content={Content} />;
 };
 
 // The individual components aren't typed, so we'll require passing the entire array for now.

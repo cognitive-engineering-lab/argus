@@ -1,6 +1,6 @@
 use std::{collections::HashSet, ops::ControlFlow};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use ext::*;
 use index_vec::IndexVec;
 use rustc_hir::{self as hir, def_id::DefId};
@@ -10,11 +10,11 @@ use rustc_trait_selection::{
   solve::inspect::{
     InspectCandidate, InspectGoal, ProofTreeInferCtxtExt, ProofTreeVisitor,
   },
-  traits::{query::NoSolution, solve},
+  traits::solve,
 };
 
 use super::*;
-use crate::ext::TyCtxtExt;
+use crate::{ext::TyCtxtExt, types::intermediate::EvaluationResult};
 
 pub struct SerializedTreeVisitor {
   pub def_id: DefId,
@@ -159,9 +159,9 @@ impl Node {
       })
   }
 
-  fn from_result(result: &Result<solve::Certainty, NoSolution>) -> Self {
+  fn from_result(result: &EvaluationResult) -> Self {
     Node::Result {
-      data: result.pretty(),
+      data: result.clone(),
     }
   }
 }
@@ -233,4 +233,49 @@ pub fn serialize_proof_tree<'tcx>(
     infcx.visit_proof_tree(goal, &mut visitor);
     visitor.into_tree()
   })
+}
+
+pub(super) mod var_counter {
+  use rustc_middle::ty::{TyCtxt, TypeFoldable, TypeSuperFoldable};
+  use rustc_type_ir::fold::TypeFolder;
+
+  use super::*;
+
+  pub fn count_vars<'tcx, T>(tcx: TyCtxt<'tcx>, t: T) -> usize
+  where
+    T: TypeFoldable<TyCtxt<'tcx>>,
+  {
+    let mut folder = TyVarCounterVisitor { tcx, count: 0 };
+    t.fold_with(&mut folder);
+    folder.count
+  }
+
+  pub(super) struct TyVarCounterVisitor<'tcx> {
+    pub tcx: TyCtxt<'tcx>,
+    pub count: usize,
+  }
+
+  impl<'tcx> TypeFolder<TyCtxt<'tcx>> for TyVarCounterVisitor<'tcx> {
+    fn interner(&self) -> TyCtxt<'tcx> {
+      self.tcx
+    }
+
+    fn fold_ty(&mut self, ty: ty::Ty<'tcx>) -> ty::Ty<'tcx> {
+      match ty.kind() {
+        ty::Infer(ty::TyVar(_))
+        | ty::Infer(ty::IntVar(_))
+        | ty::Infer(ty::FloatVar(_)) => self.count += 1,
+        _ => {}
+      };
+      ty.super_fold_with(self)
+    }
+
+    fn fold_const(&mut self, c: ty::Const<'tcx>) -> ty::Const<'tcx> {
+      match c.kind() {
+        ty::ConstKind::Infer(_) => self.count += 1,
+        _ => {}
+      };
+      c.super_fold_with(self)
+    }
+  }
 }

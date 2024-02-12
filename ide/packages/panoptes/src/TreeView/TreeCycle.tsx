@@ -1,4 +1,4 @@
-import { ProofCycle, ProofNodeIdx } from "@argus/common/bindings";
+import { ProofCycle } from "@argus/common/bindings";
 import _ from "lodash";
 import React, { useContext } from "react";
 

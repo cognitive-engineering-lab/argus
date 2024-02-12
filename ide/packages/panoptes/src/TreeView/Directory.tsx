@@ -1,4 +1,4 @@
-import { ProofNodeIdx, SerializedTree } from "@argus/common/bindings";
+import { ProofNodeIdx } from "@argus/common/bindings";
 import classNames from "classnames";
 import _ from "lodash";
 import React, { PropsWithChildren, useContext, useState } from "react";
@@ -9,7 +9,7 @@ import {
   IcoDot,
   IcoTriangleDown,
   IcoTriangleRight,
-} from "../utilities/icons";
+} from "../Icons";
 import { TreeContext } from "./Context";
 import "./Directory.css";
 import { Node } from "./Node";
@@ -65,7 +65,7 @@ export const DirNode = ({
   children,
 }: PropsWithChildren<{ idx: number; styleEdge: boolean }>) => {
   const tree = useContext(TreeContext)!;
-  const node = tree.nodes[idx];
+  const node = tree.node(idx);
 
   const arrows: ElementPair = [<IcoTriangleDown />, <IcoTriangleRight />];
   const dots: ElementPair = [<IcoDot />, <IcoDot />];
@@ -89,7 +89,7 @@ export const DirRecursive = ({
   styleEdges: boolean;
 }) => {
   const tree = useContext(TreeContext)!;
-  const node = tree.nodes[level[0]];
+  const node = tree.node(level[0]);
   const className = classNames("DirRecursive", {
     "is-candidate": styleEdges && node?.type === "candidate",
     "is-subgoal": styleEdges && node?.type === "goal",

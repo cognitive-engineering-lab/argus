@@ -24,9 +24,9 @@ import {
 import _ from "lodash";
 import React from "react";
 
-import { HoverInfo } from "../../utilities/HoverInfo";
+import { HoverInfo } from "../../HoverInfo";
 import "./hir.css";
-import * as kw from "./kw";
+import * as kw from "./syntax";
 
 function isObject(x: any): x is object {
   return typeof x === "object" && x !== null;

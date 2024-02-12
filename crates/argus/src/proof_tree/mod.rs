@@ -18,7 +18,10 @@ use ts_rs::TS;
 use crate::{
   ext::InferCtxtExt,
   serialize::{hir::ImplDef, serialize_to_value, ty::Goal__PredicateDef},
-  types::{ImplHeader, ObligationNecessity},
+  types::{
+    intermediate::{EvaluationResult, EvaluationResultDef},
+    ImplHeader, ObligationNecessity,
+  },
 };
 
 crate::define_idx! {
@@ -26,24 +29,38 @@ crate::define_idx! {
   ProofNodeIdx
 }
 
+// FIXME: Nodes shouldn't be PartialEq, or Eq. They are currently
+// so we can "detect cycles" by doing a raw comparison of the nodes.
+// Of course, this isn't robust and should be removed ASAP.
+//
+// Same goes for Candidates and Goals.
 #[derive(Serialize, TS, Debug, Clone, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Node {
-  Result { data: String },
-  Candidate { data: Candidate },
-  Goal { data: Goal },
+  Result {
+    #[serde(with = "EvaluationResultDef")]
+    #[ts(type = "EvaluationResult")]
+    data: EvaluationResult,
+  },
+  Candidate {
+    data: Candidate,
+  },
+  Goal {
+    data: Goal,
+  },
 }
 
-// FIXME: this shouldn't be EQ
 #[derive(Serialize, TS, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Goal {
   #[ts(type = "any")]
   goal: serde_json::Value,
+  // TODO: remove this is only for debugging
+  debug_comparison: String,
   necessity: ObligationNecessity,
+  num_vars: usize,
 }
 
-// FIXME: this shouldn't be EQ
 #[derive(Serialize, TS, Clone, Debug, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Candidate {
@@ -93,11 +110,18 @@ impl Goal {
       #[serde(with = "Goal__PredicateDef")]
       &'a solve::Goal<'tcx, ty::Predicate<'tcx>>,
     );
-
+    let debug_comparison = format!("{:?}", goal.predicate.kind().skip_binder());
     let necessity = infcx.guess_predicate_necessity(&goal.predicate);
+    let num_vars =
+      serialize::var_counter::count_vars(infcx.tcx, goal.predicate);
     let goal = serialize_to_value(infcx, &Wrapper(goal))
       .expect("failed to serialize goal");
-    Self { goal, necessity }
+    Self {
+      goal,
+      debug_comparison,
+      necessity,
+      num_vars,
+    }
   }
 }
 

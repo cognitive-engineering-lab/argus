@@ -2,6 +2,7 @@ import React from "react";
 
 import { PrintConst } from "./const";
 import { PrintValuePath } from "./path";
+import { Angled, CommaSeparated, DBraced } from "./syntax";
 import { PrintTy } from "./ty";
 
 export const PrintTerm = ({ o }) => {
@@ -35,30 +36,21 @@ export const PrintExpr = ({ o }) => {
   } else if ("FunctionCall" in o) {
     const [callable, args] = o.FunctionCall;
     return (
-      <>
+      <span>
         <PrintConst o={callable} />(
-        {_.map(args, (arg, i) =>
-          i > 0 ? (
-            <span key={i}>
-              , <PrintConst o={arg} />
-            </span>
-          ) : (
-            <span key={idx}>
-              <PrintConst o={arg} />
-            </span>
-          )
-        )}
+        {intersperse(args, ", ", (arg, i) => (
+          <PrintConst o={arg} key={i} />
+        ))}
         )
-      </>
+      </span>
     );
   } else if ("Cast" in o) {
+    // TODO: handle cast kinds
     const [castKind, expr, ty] = o.Cast;
     return (
-      <span>
-        {"<"}
+      <Angled>
         <PrintConst o={expr} /> as <PrintTy o={ty} />
-        {">"}
-      </span>
+      </Angled>
     );
   }
 };
@@ -129,18 +121,18 @@ export const PrintValueTree = ({ o }) => {
       // TODO: do we need to escape something here?
       const prefix = o.isDeref ? "*" : "";
       return (
-        <span>
+        <>
           {prefix}
           {o.data}
-        </span>
+        </>
       );
     }
     case "ref": {
       return (
-        <span>
+        <>
           {"&"}
           <PrintValueTree o={o.inner} />
-        </span>
+        </>
       );
     }
     case "aggregate": {
@@ -170,26 +162,20 @@ export const PrintValueTree = ({ o }) => {
 };
 
 const PrintAggregateArray = ({ o }) => {
-  const innerFields = _.map(o.fields, (field, i) => (
-    <span key={i}>
-      {i > 0 ? ", " : ""}
-      <PrintConst o={field} />
+  const components = _.map(o.fields, field => () => <PrintConst o={field} />);
+  return (
+    <span>
+      [<CommaSeparated components={components} />]
     </span>
-  ));
-  return <span>[{innerFields}]</span>;
+  );
 };
 
 const PrintAggregateTuple = ({ o }) => {
-  const innerFields = _.map(o.fields, (field, i) => (
-    <span key={i}>
-      {i > 0 ? ", " : ""}
-      <PrintConst o={field} />
-    </span>
-  ));
+  const components = _.map(o.fields, field => () => <PrintConst o={field} />);
   const trailingComma = o.fields.length === 1 ? "," : "";
   return (
     <span>
-      ({innerFields}
+      (<CommaSeparated components={components} />
       {trailingComma})
     </span>
   );
@@ -204,15 +190,12 @@ const PrintAggregateAdt = ({ o, valuePath, kind }) => {
   switch (kind.type) {
     case "fn": {
       const head = <PrintValuePath o={valuePath} />;
-      const innerFields = _.map(o.fields, (field, i) => (
-        <span key={i}>
-          {i > 0 ? ", " : ""}
-          <PrintConst o={field} />
-        </span>
+      const components = _.map(o.fields, field => () => (
+        <PrintConst o={field} />
       ));
       return (
         <span>
-          {head}({innerFields})
+          {head}(<CommaSeparated components={components} />)
         </span>
       );
     }
@@ -221,22 +204,21 @@ const PrintAggregateAdt = ({ o, valuePath, kind }) => {
       return "";
     }
     case "misc": {
-      const innerFields = _.map(
+      const components = _.map(
         _.zip(kind.names, o.fields),
-        ([name, field], i) => (
-          <span className="CtorField" key={i}>
-            {i > 0 ? ", " : ""}
-            <PrintSymbol o={name} />: <PrintConst o={field} />
-          </span>
-        )
+        ([name, field]) =>
+          () =>
+            (
+              <span>
+                <PrintSymbol o={name} />: <PrintConst o={field} />
+              </span>
+            )
       );
 
       return (
-        <span>
-          {"{"}
-          {innerFields}
-          {"}"}
-        </span>
+        <DBraced>
+          <CommaSeparated components={components} />
+        </DBraced>
       );
     }
   }
@@ -245,10 +227,10 @@ const PrintAggregateAdt = ({ o, valuePath, kind }) => {
 const PrintTreeLeaf = ({ o }) => {
   const prefix = o.kind.type === "ref" ? "&" : "";
   return (
-    <span>
+    <>
       {prefix}
       <PrintConstScalarInt o={o.data} />
-    </span>
+    </>
   );
 };
 
@@ -260,10 +242,10 @@ export const PrintConstScalarInt = ({ o }) => {
       return "true";
     case "float": {
       return (
-        <span>
+        <>
           {o.data}
           {o.isFinite ? "" : "_"}
-        </span>
+        </>
       );
     }
 
@@ -271,7 +253,7 @@ export const PrintConstScalarInt = ({ o }) => {
     case "int":
     case "char":
     case "misc": {
-      return <span>{o.data}</span>;
+      return o.data;
     }
     default:
       throw new Error("Unknown scalar int kind", o);

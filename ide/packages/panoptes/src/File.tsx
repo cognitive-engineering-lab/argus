@@ -1,12 +1,9 @@
 import {
   CharRange,
   EvaluationResult,
-  Expr,
   ExprIdx,
-  MethodLookup,
   MethodLookupIdx,
   Obligation,
-  ObligationHash,
   ObligationIdx,
   ObligationsInBody,
   SerializedTree,
@@ -23,16 +20,8 @@ import React, {
   useState,
 } from "react";
 
+import BodyInfo from "./BodyInfo";
 import "./File.css";
-import { CollapsibleElement } from "./TreeView/Directory";
-import TreeApp from "./TreeView/TreeApp";
-import {
-  PrintBodyName,
-  PrintExtensionCandidate,
-  PrintObligation,
-  PrintTy,
-} from "./print/print";
-import { WaitingOn } from "./utilities/WaitingOn";
 import {
   IcoAmbiguous,
   IcoCheck,
@@ -40,116 +29,31 @@ import {
   IcoChevronUp,
   IcoError,
   IcoLoop,
-} from "./utilities/icons";
-import { postToExtension, requestFromExtension } from "./utilities/vscode";
+} from "./Icons";
+import { CollapsibleElement } from "./TreeView/Directory";
+import TreeApp from "./TreeView/TreeApp";
+import { WaitingOn } from "./WaitingOn";
+import {
+  PrintBodyName,
+  PrintExtensionCandidate,
+  PrintObligation,
+  PrintTy,
+} from "./print/print";
+import {
+  isObject,
+  makeHighlightPosters,
+  obligationCardId,
+} from "./utilities/func";
+import { requestFromExtension } from "./utilities/vscode";
 
 const FileContext = createContext<Filename | undefined>(undefined);
 const BodyInfoContext = createContext<BodyInfo | undefined>(undefined);
-
-class BodyInfo {
-  constructor(
-    readonly oib: ObligationsInBody,
-    readonly idx: number,
-    readonly viewHiddenObligations: boolean = false
-  ) {}
-  get showHidden(): boolean {
-    return this.viewHiddenObligations;
-  }
-  get numErrors(): number {
-    return this.oib.ambiguityErrors.length + this.oib.traitErrors.length;
-  }
-  get exprs(): ExprIdx[] {
-    return _.map(this.oib.exprs, (_, idx) => idx);
-  }
-  hasVisibleExprs() {
-    return _.some(this.exprs, idx => this.exprObligations(idx).length > 0);
-  }
-  byHash(hash: ObligationHash): Obligation | undefined {
-    return this.oib.obligations.find(o => o.hash === hash);
-  }
-  getObligation(idx: ObligationIdx): Obligation {
-    return this.oib.obligations[idx];
-  }
-  getExpr(idx: ExprIdx): Expr {
-    return this.oib.exprs[idx];
-  }
-  exprObligations(idx: ExprIdx): ObligationIdx[] {
-    return _.filter(this.oib.exprs[idx].obligations, i => this.notHidden(i));
-  }
-  getMethodLookup(idx: MethodLookupIdx): MethodLookup {
-    console.debug(
-      "Method lookups: ",
-      this.oib.methodLookups.length,
-      idx,
-      this.oib.methodLookups
-    );
-    return this.oib.methodLookups[idx];
-  }
-  notHidden(hash: ObligationIdx): boolean {
-    const o = this.getObligation(hash);
-    if (o === undefined) {
-      return false;
-    }
-    return o.necessity === "Yes" || this.showHidden;
-  }
-}
-
-function isObject(x: any): x is object {
-  return typeof x === "object" && x !== null;
-}
-
-export function obligationCardId(file: Filename, hash: ObligationHash) {
-  const name = file.split(/[\\/]/).pop();
-  return `obl--${name}-${hash}`;
-}
-
-export function errorCardId(
-  file: Filename,
-  bodyIdx: number,
-  errIdx: number,
-  errType: "trait" | "ambig"
-) {
-  const name = file.split(/[\\/]/).pop();
-  return `err--${name}-${bodyIdx}-${errType}-${errIdx}`;
-}
-
-function makeHighlightPosters(range: CharRange, file: Filename) {
-  const addHighlight = () => {
-    postToExtension({
-      type: "FROM_WEBVIEW",
-      file,
-      command: "add-highlight",
-      range,
-    });
-  };
-
-  const removeHighlight = () => {
-    postToExtension({
-      type: "FROM_WEBVIEW",
-      file,
-      command: "remove-highlight",
-      range,
-    });
-  };
-
-  return [addHighlight, removeHighlight];
-}
 
 const NoTreeFound = ({ obligation }: { obligation: Obligation }) => {
   return (
     <div>
       <h3>Couldn't find a proof tree for this obligation</h3>
       <PrintObligation obligation={obligation} />
-
-      <p>This is a bug, please report it!</p>
-    </div>
-  );
-};
-
-const NoObligationFound = ({ hash }: { hash: ObligationHash }) => {
-  return (
-    <div className="NoInfoError">
-      <h3>No obligation found for internal hash {hash}</h3>
 
       <p>This is a bug, please report it!</p>
     </div>
@@ -353,13 +257,12 @@ const InExpr = ({ idx }: { idx: ExprIdx }) => {
 };
 
 const ObligationBody = ({ bodyInfo }: { bodyInfo: BodyInfo }) => {
-  const osib = bodyInfo.oib;
   const errCount = bodyInfo.numErrors;
   const bodyName =
-    osib.name === undefined ? (
+    bodyInfo.name === undefined ? (
       "{anon body}"
     ) : (
-      <PrintBodyName defPath={osib.name} />
+      <PrintBodyName defPath={bodyInfo.name} />
     );
   const header = (
     <span>
