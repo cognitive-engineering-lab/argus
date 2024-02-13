@@ -428,18 +428,18 @@ impl<'tcx> Serialize for OpaqueImplType<'tcx> {
           let name = tcx.associated_item(assoc_item_def_id).name;
           assoc_args.push(AssocItemDef { name, term });
         }
+
+        here_opaque_type.traits.push(Trait {
+          polarity,
+          trait_name,
+          own_args,
+          assoc_args,
+        });
       });
     }
 
     here_opaque_type.has_sized_bound = has_sized_bound;
     here_opaque_type.has_negative_sized_bound = has_negative_sized_bound;
-
-    if here_opaque_type.traits.is_empty()
-      && here_opaque_type.fn_traits.is_empty()
-      && here_opaque_type.lifetimes.is_empty()
-    {
-      log::error!("No bounds were added for OpaqueImplTy {bounds:?}");
-    }
 
     here_opaque_type.serialize(s)
   }

@@ -196,6 +196,8 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
       },
     }
 
+    log::debug!("Serializing AliasTy {:?} {:?}", self.kind, self.ty);
+
     let infcx = get_dynamic_ctx();
     match (self.kind, self.ty) {
       (

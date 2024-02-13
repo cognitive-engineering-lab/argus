@@ -8,6 +8,7 @@ import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
 import { PrintClause } from "./predicate";
 import { Angled, CommaSeparated, DBraced, Kw, PlusSeparated } from "./syntax";
+import { PrintTerm } from "./term";
 
 export const PrintBinder = ({ binder, innerF }) => {
   return innerF(binder.value);
@@ -352,7 +353,7 @@ export const PrintRegion = ({ o }) => {
       return "'static";
     }
     case "named": {
-      return o.data;
+      return <PrintSymbol o={o.data} />;
     }
     case "anonymous": {
       // TODO: maybe we don't want to print anonymous lifetimes?
@@ -387,7 +388,10 @@ export const PrintBoundVariable = ({ o }) => {
 };
 
 export const PrintOpaqueImplType = ({ o }) => {
+  console.debug("Printing OpaqueImplType", o);
+
   const PrintFnTrait = ({ o }) => {
+    console.debug("Printing FnTrait", o);
     const args = _.map(o.params, param => () => <PrintTy o={param} key={i} />);
     const ret =
       o.retTy !== undefined ? (
@@ -406,6 +410,7 @@ export const PrintOpaqueImplType = ({ o }) => {
   };
 
   const PrintAssocItem = ({ o }) => {
+    console.debug("Printing AssocItem", o);
     return (
       <span>
         {o.name} = <PrintTerm o={o.term} />
@@ -414,6 +419,7 @@ export const PrintOpaqueImplType = ({ o }) => {
   };
 
   const PrintTrait = ({ o }) => {
+    console.debug("Printing Trait", o);
     const prefix = o.polarity === "Negative" ? "!" : "";
     const name = <PrintDefPath o={o.traitName} />;
     const ownArgs = _.map(o.ownArgs, arg => () => <PrintGenericArg o={arg} />);
@@ -438,14 +444,10 @@ export const PrintOpaqueImplType = ({ o }) => {
     );
   };
 
-  const fnTraits = _.map(o.fnTraits, (trait, i) => (
-    <PrintFnTrait o={trait} key={i} />
-  ));
-  const traits = _.map(o.traits, (trait, i) => (
-    <PrintTrait o={trait} key={i} />
-  ));
-  const lifetimes = _.map(o.lifetimes, (lifetime, i) => (
-    <PrintRegion o={lifetime} key={i} />
+  const fnTraits = _.map(o.fnTraits, trait => () => <PrintFnTrait o={trait} />);
+  const traits = _.map(o.traits, trait => () => <PrintTrait o={trait} />);
+  const lifetimes = _.map(o.lifetimes, lifetime => () => (
+    <PrintRegion o={lifetime} />
   ));
 
   const implComponents = [...fnTraits, ...traits, ...lifetimes];

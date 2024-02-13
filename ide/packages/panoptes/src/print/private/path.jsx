@@ -49,7 +49,6 @@ export const PrintDefPathShort = ({ o }) => {
       segment.type === "implAs"
     );
   });
-  console.debug("Prefix", prefix);
 
   return (
     <span>
@@ -72,7 +71,6 @@ export const PrintDefPathFull = ({ o }) => {
 };
 
 export const PrintPathSegment = ({ o }) => {
-  console.debug("Printing path segment", o);
   switch (o.type) {
     case "colons": {
       return "::";
