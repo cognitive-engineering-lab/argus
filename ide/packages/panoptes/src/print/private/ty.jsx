@@ -352,7 +352,7 @@ export const PrintRegion = ({ o }) => {
       return "'static";
     }
     case "named": {
-      return `'${o.data}`;
+      return o.data;
     }
     case "anonymous": {
       // TODO: maybe we don't want to print anonymous lifetimes?

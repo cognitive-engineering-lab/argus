@@ -8,16 +8,22 @@ use std::{
 };
 
 use serde::Serialize;
+#[cfg(feature = "testing")]
 use ts_rs::TS;
 
 use super::ProofNodeIdx;
 
+#[cfg(feature = "testing")]
 pub trait Idx = Copy + PartialEq + Eq + Hash + Debug + Serialize + TS;
+
+#[cfg(not(feature = "testing"))]
+pub trait Idx = Copy + PartialEq + Eq + Hash + Debug + Serialize;
 
 /// Parent child relationships between structures.
 // NOTE: instead of using a generic parameter `I: Idx` it's
 // more convenient to use `ProofNodeIdx` for ts-rs.
-#[derive(TS, Serialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "testing", derive(TS))]
 pub struct TreeTopology {
   pub children: HashMap<ProofNodeIdx, HashSet<ProofNodeIdx>>,
   pub parent: HashMap<ProofNodeIdx, ProofNodeIdx>,

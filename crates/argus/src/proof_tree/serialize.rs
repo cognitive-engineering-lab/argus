@@ -3,7 +3,7 @@ use std::{collections::HashSet, ops::ControlFlow};
 use anyhow::{bail, Result};
 use ext::*;
 use index_vec::IndexVec;
-use rustc_hir::{self as hir, def_id::DefId};
+use rustc_hir::def_id::DefId;
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::ty::Predicate;
 use rustc_trait_selection::{
@@ -66,6 +66,8 @@ impl SerializedTreeVisitor {
   }
 
   fn check_for_cycle_from(&mut self, from: ProofNodeIdx) {
+    return;
+
     if self.cycle.is_some() {
       return;
     }
@@ -85,9 +87,10 @@ impl SerializedTreeVisitor {
 impl Node {
   fn from_goal<'tcx>(goal: &InspectGoal<'_, 'tcx>, _def_id: DefId) -> Self {
     let infcx = goal.infcx();
+    let result = goal.result();
     let goal = goal.goal();
     Node::Goal {
-      data: Goal::new(infcx, &goal),
+      data: Goal::new(infcx, &goal, result),
     }
   }
 
@@ -125,22 +128,22 @@ impl Node {
     // First, try to get a local Impl definition
     // XXX: in the future we can do away with this and just use the
     // impl ty, but I don't want to fully rely on that yet.
+    // tcx
+    //   .hir()
+    //   .get_if_local(def_id)
+    //   .and_then(|item| match item {
+    //     hir::Node::Item(hir::Item {
+    //       kind: hir::ItemKind::Impl(impl_),
+    //       ..
+    //     }) => Some(Candidate::new_impl_hir(infcx, *impl_)),
+    //     _ => None,
+    //   })
+    //   .or_else(|| {
+    //   })
+    // Second, try to get an impl header from the def_id ty
     tcx
-      .hir()
-      .get_if_local(def_id)
-      .and_then(|item| match item {
-        hir::Node::Item(hir::Item {
-          kind: hir::ItemKind::Impl(impl_),
-          ..
-        }) => Some(Candidate::new_impl_hir(infcx, *impl_)),
-        _ => None,
-      })
-      // Second, try to get an impl header from the def_id ty
-      .or_else(|| {
-        tcx
-          .get_impl_header(def_id)
-          .map(|header| Candidate::new_impl_header(infcx, &header))
-      })
+      .get_impl_header(def_id)
+      .map(|header| Candidate::new_impl_header(infcx, &header))
       // Third, scramble to find a suitable span, or some error string.
       .unwrap_or_else(|| {
         tcx

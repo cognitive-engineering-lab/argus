@@ -8,10 +8,6 @@ import vscode from "vscode";
 import { Ctx } from "./ctx";
 import { log } from "./logging";
 
-// TODO: before release
-// [ ] make argus_cli a published crate.
-// [ ] make argus binaries available for download.
-
 declare const VERSION: string;
 declare const TOOLCHAIN: {
   channel: string;
@@ -57,7 +53,7 @@ export const getArgusOpts = async (cwd: string) => {
       [libraryPath]: targetLibdir,
       LD_LIBRARY_PATH: targetLibdir,
       SYSROOT: sysroot,
-      RUST_LOG: "debug", // TODO: remove this, turn this into a debugging option
+      RUST_LOG: "info",
       RUST_BACKTRACE: "1",
       PATH,
       ...process.env,
@@ -69,7 +65,7 @@ export const getArgusOpts = async (cwd: string) => {
   return opts;
 };
 
-let execNotifyBinary = async (
+const execNotifyBinary = async (
   cmd: string,
   args: string[],
   _title: string,
@@ -77,21 +73,19 @@ let execNotifyBinary = async (
 ): Promise<Buffer> => {
   log("Running command: ", cmd, args, opts);
 
-  let proc = cp.spawn(cmd, args, opts);
+  const proc = cp.spawn(cmd, args, opts);
 
-  let stdoutChunks: Buffer[] = [];
+  const stdoutChunks: Buffer[] = [];
   proc.stdout.on("data", data => {
     stdoutChunks.push(data);
   });
 
-  let stderrChunks: string[] = [];
+  const stderrChunks: string[] = [];
   proc.stderr.setEncoding("utf8");
   proc.stderr.on("data", data => {
     log(data);
     stderrChunks.push(data);
   });
-
-  // globals.status_bar.set_state("loading", title);
 
   return new Promise<Buffer>((resolve, reject) => {
     proc.addListener("close", _ => {
@@ -107,38 +101,39 @@ let execNotifyBinary = async (
   });
 };
 
-export let execNotify = async (
+export const execNotify = async (
   cmd: string,
   args: string[],
   title: string,
   opts?: any
 ): Promise<string> => {
-  let buffer = await execNotifyBinary(cmd, args, title, opts);
-  let text = buffer.toString("utf8");
+  const buffer = await execNotifyBinary(cmd, args, title, opts);
+  const text = buffer.toString("utf8");
   return text.trimEnd();
 };
 
-export let cargoBin = () => {
-  let cargo_home = process.env.CARGO_HOME || path.join(os.homedir(), ".cargo");
+export const cargoBin = () => {
+  const cargo_home =
+    process.env.CARGO_HOME || path.join(os.homedir(), ".cargo");
   return path.join(cargo_home, "bin");
 };
 
-export let cargoCommand = (): [string, string[]] => {
-  let cargo = "cargo";
-  let toolchain = `+${TOOLCHAIN.channel}`;
+export const cargoCommand = (): [string, string[]] => {
+  const cargo = "cargo";
+  const toolchain = `+${TOOLCHAIN.channel}`;
   return [cargo, [toolchain]];
 };
 
-let findWorkspaceRoot = async (): Promise<string | null> => {
-  let folders = vscode.workspace.workspaceFolders;
+const findWorkspaceRoot = async (): Promise<string | null> => {
+  const folders = vscode.workspace.workspaceFolders;
   if (!folders || folders.length === 0) {
     log("No folders exist");
     return null;
   }
 
-  let hasCargoToml = async (dir: string) => {
-    let manifestPath = path.join(dir, "Cargo.toml");
-    let manifestUri = vscode.Uri.file(manifestPath);
+  const hasCargoToml = async (dir: string) => {
+    const manifestPath = path.join(dir, "Cargo.toml");
+    const manifestUri = vscode.Uri.file(manifestPath);
     try {
       await vscode.workspace.fs.stat(manifestUri);
       return true;
@@ -147,28 +142,28 @@ let findWorkspaceRoot = async (): Promise<string | null> => {
     }
   };
 
-  let folderPath = folders[0].uri.fsPath;
+  const folderPath = folders[0].uri.fsPath;
   if (await hasCargoToml(folderPath)) return folderPath;
 
-  let activeEditor = vscode.window.activeTextEditor;
+  const activeEditor = vscode.window.activeTextEditor;
   if (!activeEditor) {
     log("No active editor exists");
     return null;
   }
 
-  let activeFilePath = activeEditor.document.fileName;
+  const activeFilePath = activeEditor.document.fileName;
   log(`Looking for workspace root between ${folderPath} and ${activeFilePath}`);
 
-  let components = path.relative(folderPath, activeFilePath).split(path.sep);
-  let folderSubdirTil = (idx: number) =>
+  const components = path.relative(folderPath, activeFilePath).split(path.sep);
+  const folderSubdirTil = (idx: number) =>
     path.join(folderPath, ...components.slice(0, idx));
-  let prefixHasToml = await Promise.all(
+  const prefixHasToml = await Promise.all(
     _.range(components.length).map(idx => ({
       idx,
       has: hasCargoToml(folderSubdirTil(idx)),
     }))
   );
-  let entry = prefixHasToml.find(({ has }) => has);
+  const entry = prefixHasToml.find(({ has }) => has);
   if (entry === undefined) return null;
 
   return folderSubdirTil(entry.idx);
@@ -192,65 +187,49 @@ const checkVersionAndInstall = async (
   }
 
   if (version !== VERSION) {
-    throw new Error(`TODO: INSTALL SCRIPTS AND STUFF {version} {VERSION}`);
-    // log(
-    //   `Argus binary version ${version} does not match expected IDE version ${VERSION}`
-    // );
-    // let components = TOOLCHAIN.components.map((c) => ["-c", c]).flat();
-    // try {
-    //   await exec_notify(
-    //     "rustup",
-    //     [
-    //       "toolchain",
-    //       "install",
-    //       TOOLCHAIN.channel,
-    //       "--profile",
-    //       "minimal",
-    //       ...components,
-    //     ],
-    //     "Installing nightly Rust..."
-    //   );
-    // } catch (e: any) {
-    //   let choice = await vscode.window.showErrorMessage(
-    //     'Argus failed to install because rustup failed. Click "Show fix" to resolve, or click "Dismiss to attempt installation later.',
-    //     "Show fix",
-    //     "Dismiss"
-    //   );
+    log(
+      `Argus binary version ${version} does not match expected IDE version ${VERSION}`
+    );
+    const components = TOOLCHAIN.components.map(c => ["-c", c]).flat();
+    try {
+      await execNotify(
+        "rustup",
+        [
+          "toolchain",
+          "install",
+          TOOLCHAIN.channel,
+          "--profile",
+          "minimal",
+          ...components,
+        ],
+        "Installing nightly Rust..."
+      );
+    } catch (e: any) {
+      const choice = await vscode.window.showErrorMessage(
+        'Argus failed to install because rustup failed. Click "Show fix" to resolve, or click "Dismiss" to attempt installation later.',
+        "Show fix",
+        "Dismiss"
+      );
 
-    //   if (choice === "Show fix") {
-    //     await vscode.window.showInformationMessage(
-    //       'Click "Continue" once you have completed the fix.',
-    //       "Continue"
-    //     );
-    //   } else {
-    //     return null;
-    //   }
-    // }
+      if (choice === "Show fix") {
+        await vscode.window.showInformationMessage(
+          'Click "Continue" once you have completed the fix.',
+          "Continue"
+        );
+      } else {
+        return false;
+      }
+    }
 
-    // try {
-    //   await download();
-    // } catch (e: any) {
-    //   log("Install script failed with error:", e.toString());
+    await execNotify(
+      cargo,
+      [...cargoArgs, "install", "argus_cli", "--version", VERSION, "--force"],
+      "Installing Argus from source... (this may take a minute)"
+    );
 
-    //   await exec_notify(
-    //     cargo,
-    //     [
-    //       ...cargo_args,
-    //       "install",
-    //       "argus_cli",
-    //       "--version",
-    //       VERSION,
-    //       "--force",
-    //     ],
-    //     "Argus binaries not available, instead installing the Argus crate from source... (this may take a minute)"
-    //   );
-    // }
-
-    // if (version === "") {
-    //   vscode.window.showInformationMessage(
-    //     "Argus has successfully installed!"
-    //   );
-    // }
+    if (version === "") {
+      vscode.window.showInformationMessage("Argus has successfully installed!");
+    }
   }
 
   return true;
@@ -276,7 +255,8 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
   );
 
   if (!isArgusInstalled) {
-    throw new Error("TODO: SETUP FAILED");
+    log("Argus failed to install");
+    return null;
   }
 
   const argusOpts = await getArgusOpts(workspaceRoot);
@@ -285,7 +265,7 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
 
     let output;
     try {
-      let editor = vscode.window.activeTextEditor;
+      const editor = vscode.window.activeTextEditor;
 
       if (editor) {
         await editor.document.save();
@@ -314,9 +294,7 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
     let outputTyped: Result<T>;
     try {
       log("output", output);
-
-      let outputStr = output;
-      outputTyped = JSON.parse(outputStr);
+      outputTyped = JSON.parse(output);
     } catch (e: any) {
       return {
         type: "analysis-error",

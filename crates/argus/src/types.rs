@@ -2,8 +2,8 @@ use std::{ops::Deref, str::FromStr};
 
 use anyhow::Result;
 use index_vec::IndexVec;
-use rustc_data_structures::{fx::FxHashSet as HashSet, stable_hasher::Hash64};
-use rustc_hir::{BodyId, HirId};
+use indexmap::IndexSet;
+use rustc_data_structures::stable_hasher::Hash64;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::{
   traits::{
@@ -12,9 +12,10 @@ use rustc_middle::{
   },
   ty::{self, Ty, TyCtxt, TypeckResults},
 };
-use rustc_span::{def_id::DefId, symbol::Symbol, Span};
+use rustc_span::{def_id::DefId, Span};
 use rustc_utils::source_map::range::{CharRange, ToSpan};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "testing")]
 use ts_rs::TS;
 
 use self::intermediate::EvaluationResult;
@@ -38,17 +39,19 @@ crate::define_idx! { usize,
   ObligationIdx
 }
 
-#[derive(Serialize, TS)]
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct MethodLookup {
   pub candidates: ExtensionCandidates,
   pub table: Vec<MethodStep>,
 }
 
-#[derive(Serialize, TS)]
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ExtensionCandidates {
-  #[ts(type = "any")]
+  #[cfg_attr(feature = "testing", ts(type = "any"))]
   // Type: Vec<TraitRefPrintOnlyTraitPath>
   data: serde_json::Value,
 }
@@ -68,17 +71,20 @@ impl ExtensionCandidates {
   }
 }
 
-#[derive(Serialize, TS)]
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct MethodStep {
   pub recvr_ty: ReceiverAdjStep,
   pub trait_predicates: Vec<ObligationIdx>,
 }
 
-#[derive(Serialize, TS)]
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ReceiverAdjStep {
-  #[ts(type = "any")] // type Ty
+  #[cfg_attr(feature = "testing", ts(type = "any"))]
+  // type Ty
   ty: serde_json::Value,
 }
 
@@ -92,36 +98,40 @@ impl ReceiverAdjStep {
   }
 }
 
-#[derive(Serialize, TS)]
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Expr {
   pub range: CharRange,
   pub snippet: String,
-  #[ts(type = "ObligationIdx[]")]
+  #[cfg_attr(feature = "testing", ts(type = "ObligationIdx[]"))]
   pub obligations: Vec<ObligationIdx>,
   pub kind: ExprKind,
   pub is_body: bool,
 }
 
-#[derive(Serialize, TS)]
-#[serde(rename_all = "camelCase", tag = "type")]
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum ExprKind {
   Misc,
   CallableExpr,
   MethodReceiver,
   Call,
   CallArg,
+  #[serde(rename_all = "camelCase")]
   MethodCall {
     data: MethodLookupIdx,
     error_recvr: bool,
   },
 }
 
-#[derive(Serialize, TS)]
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ObligationsInBody {
   #[serde(skip_serializing_if = "Option::is_none")]
-  #[ts(type = "any | undefined")]
+  #[cfg_attr(feature = "testing", ts(type = "any | undefined"))]
   // type: DefPath
   name: Option<serde_json::Value>,
 
@@ -131,19 +141,20 @@ pub struct ObligationsInBody {
   /// All ambiguous expression in the body. These *could* involve
   /// trait errors, so it's important that we can map the specific
   /// obligations to these locations. (That is, if they occur.)
-  #[ts(type = "ExprIdx[]")]
-  pub ambiguity_errors: HashSet<ExprIdx>,
+  pub ambiguity_errors: IndexSet<ExprIdx>,
 
   /// Concrete trait errors, this would be when the compiler
   /// can say for certainty that a specific trait bound was required
   /// but not satisfied.
-  #[ts(type = "ExprIdx[]")]
-  pub trait_errors: HashSet<ExprIdx>,
+  pub trait_errors: IndexSet<ExprIdx>,
 
+  #[cfg_attr(feature = "testing", ts(type = "Obligation[]"))]
   pub obligations: IndexVec<ObligationIdx, Obligation>,
 
+  #[cfg_attr(feature = "testing", ts(type = "Expr[]"))]
   pub exprs: IndexVec<ExprIdx, Expr>,
 
+  #[cfg_attr(feature = "testing", ts(type = "MethodLookup[]"))]
   pub method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,
 }
 
@@ -151,8 +162,8 @@ impl ObligationsInBody {
   pub fn new(
     id: Option<(&InferCtxt, DefId)>,
     range: CharRange,
-    ambiguity_errors: HashSet<ExprIdx>,
-    trait_errors: HashSet<ExprIdx>,
+    ambiguity_errors: IndexSet<ExprIdx>,
+    trait_errors: IndexSet<ExprIdx>,
     obligations: IndexVec<ObligationIdx, Obligation>,
     exprs: IndexVec<ExprIdx, Expr>,
     method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,
@@ -172,10 +183,11 @@ impl ObligationsInBody {
   }
 }
 
-#[derive(Serialize, TS, Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
+#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Obligation {
-  #[ts(type = "any")]
+  #[cfg_attr(feature = "testing", ts(type = "any"))]
   // type: PredicateObligation
   pub obligation: serde_json::Value,
   pub hash: ObligationHash,
@@ -183,7 +195,7 @@ pub struct Obligation {
   pub kind: ObligationKind,
   pub necessity: ObligationNecessity,
   #[serde(with = "intermediate::EvaluationResultDef")]
-  #[ts(type = "EvaluationResult")]
+  #[cfg_attr(feature = "testing", ts(type = "EvaluationResult"))]
   pub result: intermediate::EvaluationResult,
   pub is_synthetic: bool,
 }
@@ -202,7 +214,9 @@ pub struct ImplHeader<'tcx> {
   pub tys_without_default_bounds: Vec<Ty<'tcx>>,
 }
 
-#[derive(Serialize, TS, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum ObligationNecessity {
   No,
   ForProfessionals,
@@ -220,7 +234,8 @@ impl ObligationNecessity {
   }
 }
 
-#[derive(Serialize, TS, Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
+#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ObligationKind {
   Success,
@@ -228,24 +243,11 @@ pub enum ObligationKind {
   Failure,
 }
 
-// Serialize an Option<Symbol> using SymbolDef but the value must be a Some(..)
-fn serialize_option<S: serde::Serializer>(
-  value: &Option<Symbol>,
-  s: S,
-) -> Result<S::Ok, S::Error> {
-  let Some(symb) = value else {
-    unreachable!();
-  };
-
-  SymbolDef::serialize(symb, s)
-}
-
-#[derive(
-  Deserialize, TS, Serialize, Copy, Clone, Debug, Hash, PartialEq, Eq,
-)]
+#[derive(Deserialize, Serialize, Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "testing", derive(TS))]
 pub struct ObligationHash(
   #[serde(with = "string")]
-  #[ts(type = "string")]
+  #[cfg_attr(feature = "testing", ts(type = "string"))]
   u64,
 );
 

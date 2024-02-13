@@ -10,9 +10,7 @@
   dead_code
 )]
 
-pub mod compound;
 pub mod r#const;
-pub mod hir;
 pub mod path;
 pub mod term;
 pub mod ty;
@@ -26,10 +24,6 @@ use rustc_trait_selection::traits::solve::Goal;
 use serde::Serialize;
 use term::*;
 use ty::*;
-
-#[derive(Serialize)]
-struct NoOp(#[serde(skip_serializing_if = "Option::is_none")] Option<()>);
-const NOOP: NoOp = NoOp(None);
 
 /// Entry function to serialize anything from rustc.
 pub fn serialize_to_value<'a, 'tcx: 'a, T: Serialize + 'a>(

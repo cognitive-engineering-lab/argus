@@ -1,12 +1,10 @@
-use std::num::*;
-
 use rustc_hir::{self as hir, def::DefKind, def_id::DefId, Unsafety};
 use rustc_infer::traits::{ObligationCause, PredicateObligation};
 use rustc_middle::ty::{self, *};
 use rustc_span::symbol::{kw, Symbol};
 use rustc_target::spec::abi::Abi;
 use rustc_type_ir as ir;
-use serde::{ser::SerializeSeq, Serialize};
+use serde::Serialize;
 
 use super::*;
 
@@ -43,7 +41,7 @@ impl Option__TyDef {
     S: serde::Serializer,
   {
     match value {
-      None => NOOP.serialize(s),
+      None => s.serialize_none(),
       Some(ty) => TyDef::serialize(ty, s),
     }
   }
@@ -305,6 +303,7 @@ impl<'tcx> Serialize for DynamicTyKindDef<'tcx> {
     #[serde(rename_all = "camelCase")]
     struct Wrapper<'tcx> {
       #[serde(with = "Slice__Binder__ExistentialPredicateDef")]
+      // #[serde(skip_serializing_if = "List::is_empty")]
       data: &'tcx List<Binder<'tcx, ExistentialPredicate<'tcx>>>,
       #[serde(with = "RegionDef")]
       region: Region<'tcx>,
@@ -1047,7 +1046,12 @@ impl ParamEnvDef {
   where
     S: serde::Serializer,
   {
-    Slice__ClauseDef::serialize(value.caller_bounds(), s)
+    #[derive(Serialize)]
+    struct Wrapper<'a, 'tcx: 'a>(
+      #[serde(with = "Slice__ClauseDef")] &'a List<Clause<'tcx>>,
+    );
+
+    Wrapper(value.caller_bounds()).serialize(s)
   }
 }
 
@@ -1415,80 +1419,18 @@ pub struct CoercePredicateDef<'tcx> {
   pub b: Ty<'tcx>,
 }
 
-#[derive(Serialize)]
-#[serde(remote = "ConstVid")]
-pub struct ConstVidDef {
-  #[serde(skip)]
-  private: u32,
-}
-
-#[derive(Serialize)]
-#[serde(remote = "EffectVid")]
-pub struct EffectVidDef {
-  #[serde(skip)]
-  private: u32,
-}
-
 // #[derive(Serialize)]
-// #[serde(remote = "EarlyParamRegion")]
-// pub struct EarlyParamRegionDef {
-//   #[serde(with = "DefIdDef")]
-//   pub def_id: DefId,
+// #[serde(remote = "ParamConst")]
+// pub struct ParamConstDef {
 //   pub index: u32,
 //   #[serde(with = "SymbolDef")]
 //   pub name: Symbol,
 // }
 
-pub struct InferRegionDef;
-impl InferRegionDef {
-  pub fn serialize<'tcx, S>(value: &RegionVid, s: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    RegionVidDef::serialize(value, s)
-  }
-}
-
-#[derive(Serialize)]
-#[serde(remote = "RegionVid")]
-pub struct RegionVidDef {
-  #[serde(skip)]
-  private: u32,
-}
-
-// pub fn slice__val_tree<'tcx, S>(
-//   value: &[ValTree<'tcx>],
-//   s: S,
-// ) -> Result<S::Ok, S::Error>
-// where
-//   S: serde::Serializer,
-// {
-//   #[derive(Serialize)]
-//   struct Wrapper<'a, 'tcx>(#[serde(with = "ValTreeDef")] &'a ValTree<'tcx>);
-//   serialize_custom_seq! { Wrapper, s, value }
-// }
-
-// FIXME:
-// #[derive(Serialize)]
-// #[serde(remote = "ScalarInt")]
-// pub struct ScalarIntDef {
-//   #[serde(skip)]
-//   data: u128,
-//   #[serde(skip)]
-//   size: NonZeroU8,
-// }
-
-#[derive(Serialize)]
-#[serde(remote = "ParamConst")]
-pub struct ParamConstDef {
-  pub index: u32,
-  #[serde(with = "SymbolDef")]
-  pub name: Symbol,
-}
-
 #[derive(Serialize)]
 #[serde(remote = "ParamTy")]
 pub struct ParamTyDef {
+  #[serde(skip)]
   pub index: u32,
   #[serde(with = "SymbolDef")]
   pub name: Symbol,
@@ -1513,6 +1455,22 @@ impl Slice__SymbolDef {
     #[derive(Serialize)]
     struct Wrapper<'a>(#[serde(with = "SymbolDef")] &'a Symbol);
     serialize_custom_seq! { Wrapper, s, value }
+  }
+}
+
+pub struct Option__SymbolDef;
+impl Option__SymbolDef {
+  pub fn serialize<'tcx, S>(
+    value: &Option<Symbol>,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    match value {
+      None => s.serialize_none(),
+      Some(sym) => SymbolDef::serialize(sym, s),
+    }
   }
 }
 

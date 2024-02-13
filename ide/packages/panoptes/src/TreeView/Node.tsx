@@ -10,11 +10,9 @@ export const Candidate = ({ candidate }: { candidate: CandidateTy }) => {
   switch (candidate.type) {
     case "any":
       return candidate.data;
-    case "implHir":
-      return <PrintImplHir impl={candidate.data} />;
-    case "implMiddle":
+    case "impl":
       return <PrintImplHeader impl={candidate.data} />;
-    case "paramEnv":
+    case "paramenv":
       throw new Error("paramEnv not implemented");
   }
 };

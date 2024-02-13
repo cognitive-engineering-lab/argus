@@ -43,7 +43,7 @@ mod rustc;
 mod serialize;
 #[cfg(feature = "testing")]
 pub mod test_utils;
-#[cfg(test)]
+#[cfg(feature = "testing")]
 mod ts;
 pub mod types;
 
@@ -62,6 +62,7 @@ macro_rules! define_idx {
 #[macro_export]
 macro_rules! define_tsrs_alias {
     ($($($ty:ty,)* => $l:ident),*) => {$($(
+        #[cfg(feature = "testing")]
         impl ts_rs::TS for $ty {
             const EXPORT_TO: Option<&'static str> =
               Some(concat!("bindings/", stringify!($ty), ".ts"));

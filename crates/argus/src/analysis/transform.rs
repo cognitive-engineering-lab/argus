@@ -1,7 +1,6 @@
 use index_vec::IndexVec;
-use rustc_data_structures::fx::{
-  FxHashMap as HashMap, FxHashSet as HashSet, FxIndexMap,
-};
+use indexmap::IndexSet;
+use rustc_data_structures::fx::{FxHashMap as HashMap, FxIndexMap};
 use rustc_hir::{self as hir, intravisit::Map, BodyId, HirId};
 use rustc_infer::{
   infer::{canonical::OriginalQueryValues, InferCtxt, InferOk},
@@ -133,8 +132,8 @@ struct ObligationsBuilder<'a, 'tcx: 'a> {
 
   // Structures to be filled in
   exprs_to_hir_id: HashMap<ExprIdx, HirId>,
-  ambiguity_errors: HashSet<ExprIdx>,
-  trait_errors: HashSet<ExprIdx>,
+  ambiguity_errors: IndexSet<ExprIdx>,
+  trait_errors: IndexSet<ExprIdx>,
   exprs: IndexVec<ExprIdx, Expr>,
   method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,
 }

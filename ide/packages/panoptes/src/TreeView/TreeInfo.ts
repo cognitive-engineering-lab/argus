@@ -34,7 +34,7 @@ export class TreeInfo {
       const node = tree.nodes[n];
       switch (node.type) {
         case "goal": {
-          if (node.data.necessity === "Yes") {
+          if (node.data.necessity.type === "yes") {
             return "keep";
           } else {
             return "remove-tree";

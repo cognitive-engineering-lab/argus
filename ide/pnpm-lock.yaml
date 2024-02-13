@@ -87,6 +87,9 @@ importers:
       lodash:
         specifier: ^4.17.21
         version: 4.17.21
+      new-github-issue-url:
+        specifier: ^1.0.0
+        version: 1.0.0
       react:
         specifier: ^18.0.0
         version: 18.0.0
@@ -2469,6 +2472,11 @@ packages:
 
   /natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
+    dev: true
+
+  /new-github-issue-url@1.0.0:
+    resolution: {integrity: sha512-wa9jlUFg3v6S3ddijQiB18SY4u9eJYcUe5sHa+6SB8m1UUbtX+H/bBglxOLnhhF1zIHuhWXnKBAa8kBeKRIozQ==}
+    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
     dev: true
 
   /node-fetch@2.7.0:

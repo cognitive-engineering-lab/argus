@@ -17,7 +17,6 @@ import * as vscode from "vscode";
 
 import {
   ambigErrorDecorate,
-  exprRangeDecorate,
   rangeHighlight,
   traitErrorDecorate,
 } from "./decorate";
@@ -74,7 +73,7 @@ export type CtxInit = Ctx;
 
 type CallBackend = <T>(
   _args: ArgusArgs,
-  _no_output?: boolean
+  _noOutput?: boolean
 ) => Promise<ArgusResult<T>>;
 
 export class Ctx {
@@ -96,12 +95,14 @@ export class Ctx {
     this.commandFactories = commandFactories;
     this.workspace = workspace;
     this.errorCollection = vscode.languages.createDiagnosticCollection("argus");
-    this.cache = new BackendCache(() => {
-      throw new Error(`
-        Argus backend was not initialized.
-
-        This is a bug, please report it!
+    this.cache = new BackendCache(async () => {
+      showErrorDialog(`
+        Argus backend left uninitialized.
       `);
+      return {
+        type: "analysis-error",
+        error: "Argus uninitialized.",
+      };
     });
   }
 
@@ -137,12 +138,10 @@ export class Ctx {
     // TODO: add some sort of "status loading" indicator.
     // Compile the workspace with the Argus version of rustc.
     await b(["preload"], true);
-    // this.backend = b;
-
     this.cache = new BackendCache(b);
 
     // Register the commands with VSCode after the backend is setup.
-    this._updateCommands();
+    this.updateCommands();
 
     vscode.window.onDidChangeActiveTextEditor(async editor => {
       if (
@@ -247,14 +246,14 @@ export class Ctx {
 
   private buildOpenErrorItemCmd(
     filename: Filename,
-    bodyidx: number,
-    erroridx: number,
+    bodyIdx: number,
+    errorIdx: number,
     type: "trait" | "ambig"
   ): string {
     // TODO: the webview needs to add a signal for opening an error expression.
     // const blingCommandUri = vscode.Uri.parse(
     //   `command:argus.openError?${encodeURIComponent(
-    //     JSON.stringify([filename, type, bodyidx, erroridx])
+    //     JSON.stringify([filename, type, bodyIdx, errorIdx])
     //   )}`
     // );
     return "This is an error — Argus"; // `[Debug error in window](${blingCommandUri})`;
@@ -299,7 +298,7 @@ export class Ctx {
     return _.filter(initialData, ([_, obl]) => obl !== undefined) as any;
   }
 
-  private _updateCommands() {
+  private updateCommands() {
     this.commandDisposables.forEach(disposable => disposable.dispose());
     this.commandDisposables = [];
     for (const [name, factory] of Object.entries(this.commandFactories)) {
@@ -339,7 +338,7 @@ class BackendCache {
     ]);
 
     if (res.type !== "output") {
-      vscode.window.showErrorMessage(res.error);
+      showErrorDialog(res.error);
       return;
     }
 
@@ -372,7 +371,7 @@ class BackendCache {
     ]);
 
     if (res.type !== "output") {
-      vscode.window.showErrorMessage(res.error);
+      showErrorDialog(res.error);
       return;
     }
 

@@ -1,11 +1,47 @@
+import cp from "child_process";
+import newGithubIssueUrl from "new-github-issue-url";
+import os from "os";
 import vscode from "vscode";
 
-// TODO: lots more to do here.
+import { log, logs } from "./logging";
 
-export let showErrorDialog = async (err: string) => {
-  let outcome = await vscode.window.showErrorMessage(
+export const showErrorDialog = async (err: string) => {
+  const outcome = await vscode.window.showErrorMessage(
     `Argus error: ${err}`,
-    // 'Report bug',
+    "Report bug",
     "Dismiss"
   );
+
+  if (outcome === "Report bug") {
+    let logUrl = null;
+    try {
+      logUrl = cp.execSync("curl --data-binary @- https://paste.rs/", {
+        input: logs.join("\n"),
+      });
+    } catch (e: any) {
+      log("Failed to call to paste.rs: ", e.toString());
+    }
+
+    const bts = "```";
+    const logText = logUrl !== null ? `\n**Full log:** ${logUrl}` : ``;
+    const url = newGithubIssueUrl({
+      user: "gavinleroy",
+      repo: "argus",
+      body: `# Problem
+<!-- Please describe the problem and how you encountered it. -->
+
+# Logs
+<!-- You don't need to add or change anything below this point. -->
+
+**OS:** ${os.platform()} (${os.release()})
+**VSCode:** ${vscode.version}
+**Error message**
+${bts}
+${err}
+${bts}
+${logText}`,
+    });
+
+    open(url);
+  }
 };

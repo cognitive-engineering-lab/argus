@@ -2,4 +2,4 @@
 import type { Candidate } from "./Candidate";
 import type { Goal } from "./Goal";
 
-export type Node = { type: "result", data: EvaluationResult, } | { type: "candidate", data: Candidate, } | { type: "goal", data: Goal, };
+export type Node = { "type": "result", data: EvaluationResult, } | { "type": "candidate", data: Candidate, } | { "type": "goal", data: Goal, };

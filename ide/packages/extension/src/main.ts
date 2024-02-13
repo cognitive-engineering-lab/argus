@@ -1,8 +1,8 @@
-import { ArgusArgs, ArgusResult, Filename } from "@argus/common/lib";
 import vscode from "vscode";
 
 import * as commands from "./commands";
 import { CommandFactory, Ctx, fetchWorkspace } from "./ctx";
+import { showErrorDialog } from "./errors";
 import { log } from "./logging";
 
 export let globals: {
@@ -14,9 +14,7 @@ export async function activate(context: vscode.ExtensionContext) {
   log("Activating Argus ...");
   const ctx = new Ctx(context, createCommands(), fetchWorkspace());
   const api = await activateBackend(ctx).catch(err => {
-    void vscode.window.showErrorMessage(
-      `Cannot activate Argus extension: ${err.message}`
-    );
+    showErrorDialog(`Cannot activate Argus extension: ${err.message}`);
     throw err;
   });
 

@@ -256,8 +256,7 @@ pub fn run_with_callbacks(
 }
 
 fn postprocess<T: Serialize>(result: T) -> RustcResult<()> {
-  let s = serde_json::to_string(&result).unwrap();
-  println!("{}", s);
+  serde_json::to_writer(io::stdout(), &result).unwrap();
   Ok(())
 }
 
