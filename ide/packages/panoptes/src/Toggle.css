@@ -1,0 +1,14 @@
+.toggle-box {
+  display: inline;  
+  border: 1px solid var(--vscode-textCodeBlock-background);
+  border-radius: 4px;
+}
+
+.toggle-box.expanded {
+  display: inline-block;
+}
+
+.toggle-box .summary {
+  color: var(--vscode-input-placeholderForeground);
+  font-size: 80%;
+}

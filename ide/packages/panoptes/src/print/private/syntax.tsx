@@ -10,11 +10,11 @@ export const UnderscoreLifetime: Ident = { name: "'_" };
 
 export const PathRoot: Ident = { name: "{{root}}" };
 
-export const Kw = ({ children }: React.PropsWithChildren<{}>) => {
+export const Kw = ({ children }: React.PropsWithChildren) => {
   return <span className="kw">{children}</span>;
 };
 
-export const Angled = ({ children }: React.PropsWithChildren<{}>) => {
+export const Angled = ({ children }: React.PropsWithChildren) => {
   return (
     <span>
       {"<"}
@@ -24,7 +24,7 @@ export const Angled = ({ children }: React.PropsWithChildren<{}>) => {
   );
 };
 
-export const DBraced = ({ children }: React.PropsWithChildren<{}>) => {
+export const DBraced = ({ children }: React.PropsWithChildren) => {
   return (
     <span>
       {"{{"}

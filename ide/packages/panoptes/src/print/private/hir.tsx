@@ -25,8 +25,10 @@ import _ from "lodash";
 import React from "react";
 
 import { HoverInfo } from "../../HoverInfo";
+import { Toggle } from "../../Toggle";
 import "./hir.css";
 import * as kw from "./syntax";
+import { Kw } from "./syntax";
 
 function isObject(x: any): x is object {
   return typeof x === "object" && x !== null;
@@ -38,10 +40,10 @@ const genericArgsNone: GenericArgs = {
   parenthesized: "No",
 };
 
-const CommaSeparated = ({ children }: { children: React.ReactNode[] }) => {
+const CommaSeparated = ({ children }: React.PropsWithChildren) => {
   return (
     <span>
-      {_.map(children, (child, i) => (
+      {React.Children.map(children, (child, i) => (
         <span key={i}>
           {i > 0 ? ", " : ""}
           {child}
@@ -51,12 +53,12 @@ const CommaSeparated = ({ children }: { children: React.ReactNode[] }) => {
   );
 };
 
-const Angled = ({ child }: { child: React.ReactNode }) => {
+const Angled = ({ children }: React.PropsWithChildren) => {
   const [lt, gt] = ["<", ">"];
   return (
     <span>
       {lt}
-      {child}
+      {children}
       {gt}
     </span>
   );
@@ -72,38 +74,29 @@ export const PrintImpl = ({ impl }: { impl: Impl }) => {
   console.debug("Printing Impl", impl);
 
   const generics =
-    impl.generics.params.length === 0 ? (
-      ""
-    ) : (
+    impl.generics.params.length === 0 ? null : (
       <span>
         <PrintGenericsParams generics={impl.generics} />{" "}
       </span>
     );
 
-  const polarity = impl.polarity === "Positive" ? "" : "!";
+  const polarity = impl.polarity === "Positive" ? null : "!";
 
   const ofTrait =
     impl.of_trait !== undefined ? (
       <span>
-        <PrintTraitRef traitRef={impl.of_trait} />{" "}
-        <span className="kw">for</span>{" "}
+        <PrintTraitRef traitRef={impl.of_trait} /> <Kw>for</Kw>{" "}
       </span>
-    ) : (
-      ""
-    );
+    ) : null;
 
-  const ty = <PrintTy ty={impl.self_ty} />;
-  const whereClause = <PrintWhereClause generics={impl.generics} />;
-
-  // TODO: the where clauses need to go in a tooltip
   return (
     <span>
-      <span className="kw">impl</span>
+      <Kw>impl</Kw>
       {generics}
       {polarity}
       {ofTrait}
-      {ty}
-      {whereClause}
+      <PrintTy ty={impl.self_ty} />
+      <PrintWhereClause generics={impl.generics} />
     </span>
   );
 };
@@ -157,7 +150,7 @@ const PrintWhereClause = ({ generics }: { generics: Generics }) => {
   return (
     <span>
       {" "}
-      <span className="kw">where</span>{" "}
+      <Kw>where</Kw>{" "}
       <HoverInfo Content={whereHoverContent}>
         <span className="where">...</span>
       </HoverInfo>
@@ -175,7 +168,14 @@ const PrintGenericsParams = ({ generics }: { generics: Generics }) => {
     <PrintGenericParam param={param} key={idx} />
   ));
 
-  return <Angled child={<CommaSeparated children={innerElems} />} />;
+  return (
+    <Angled>
+      <Toggle
+        summary={"..."}
+        Children={() => <CommaSeparated>{innerElems}</CommaSeparated>}
+      />
+    </Angled>
+  );
 };
 
 const PrintGenericParam = ({ param }: { param: GenericParam }) => {
@@ -453,7 +453,7 @@ const PrintGenericParams = ({ params }: { params: GenericParam[] }) => {
       ))}
     />
   );
-  return <Angled child={inner} />;
+  return <Angled>{inner}</Angled>;
 };
 
 const PrintTypeBinding = ({ binding }: { binding: TypeBinding }) => {
@@ -602,14 +602,12 @@ const PrintQPath = ({
       );
     });
     const angles = (
-      <Angled
-        child={
-          <span>
-            {inner}
-            {listed}
-          </span>
-        }
-      />
+      <Angled>
+        <span>
+          {inner}
+          {listed}
+        </span>
+      </Angled>
     );
     const lastSegment = (
       <PrintPathSegment segment={path.segments[path.segments.length - 1]} />
@@ -630,7 +628,9 @@ const PrintQPath = ({
       ty.kind.Path.Resolved[0] === undefined ? (
         <PrintTy ty={ty} />
       ) : (
-        <Angled child={<PrintTy ty={ty} />} />
+        <Angled>
+          <PrintTy ty={ty} />
+        </Angled>
       );
     return (
       <span>

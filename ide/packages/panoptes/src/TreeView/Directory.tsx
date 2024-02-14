@@ -25,12 +25,13 @@ export const CollapsibleElement = ({
   info,
   icos = defaultCollapseArrows,
   indentChildren = false,
-  children,
-}: PropsWithChildren<{
+  Children,
+}: {
   info: React.ReactElement;
   icos?: ElementPair;
   indentChildren?: boolean;
-}>) => {
+  Children: React.FC | null;
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [openIco, closedIco] = icos;
 
@@ -44,17 +45,17 @@ export const CollapsibleElement = ({
     collapsed: !isOpen,
   });
 
-  let numChildren = React.Children.count(children);
-
   return (
     <>
       <div className="DirNode" onClick={toggleCollapse}>
         <span className="toggle">
-          {numChildren > 0 ? (isOpen ? openIco : closedIco) : null}
+          {Children !== null ? (isOpen ? openIco : closedIco) : null}
         </span>
         <span className="information">{info}</span>
       </div>
-      <div className={collapseCN}>{children}</div>
+      <div className={collapseCN}>
+        {isOpen && Children !== null ? <Children /> : null}
+      </div>
     </>
   );
 };
@@ -62,8 +63,12 @@ export const CollapsibleElement = ({
 export const DirNode = ({
   idx,
   styleEdge,
-  children,
-}: PropsWithChildren<{ idx: number; styleEdge: boolean }>) => {
+  Children,
+}: {
+  idx: number;
+  styleEdge: boolean;
+  Children: React.FC | null;
+}) => {
   const tree = useContext(TreeContext)!;
   const node = tree.node(idx);
 
@@ -73,9 +78,12 @@ export const DirNode = ({
   const info = <Node node={node} />;
 
   return (
-    <CollapsibleElement info={info} icos={icos} indentChildren={true}>
-      {children}
-    </CollapsibleElement>
+    <CollapsibleElement
+      info={info}
+      icos={icos}
+      indentChildren={true}
+      Children={Children}
+    />
   );
 };
 
@@ -93,6 +101,7 @@ export const DirRecursive = ({
   const className = classNames("DirRecursive", {
     "is-candidate": styleEdges && node?.type === "candidate",
     "is-subgoal": styleEdges && node?.type === "goal",
+    "generic-edge": !styleEdges,
   });
 
   return (
@@ -100,15 +109,22 @@ export const DirRecursive = ({
       {_.map(level, (current, i) => {
         const next = getNext(current);
         return (
-          <DirNode key={i} idx={current} styleEdge={styleEdges}>
-            {next.length > 0 ? (
-              <DirRecursive
-                level={next}
-                getNext={getNext}
-                styleEdges={styleEdges}
-              />
-            ) : null}
-          </DirNode>
+          <DirNode
+            key={i}
+            idx={current}
+            styleEdge={styleEdges}
+            Children={
+              next.length > 0
+                ? () => (
+                    <DirRecursive
+                      level={next}
+                      getNext={getNext}
+                      styleEdges={styleEdges}
+                    />
+                  )
+                : null
+            }
+          />
         );
       })}
     </div>

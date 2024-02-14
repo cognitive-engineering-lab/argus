@@ -19,21 +19,19 @@ function basename(path: string) {
   return path.split("/").reverse()[0];
 }
 
-const FatalErrorPanel = ({ error, resetErrorBoundary }: any) => {
-  return (
-    <div>
-      <p>
-        Whoops! This is not a drill, a fatal error occurred. Please{" "}
-        <a href="https://github.com/gavinleroy/argus/issues/new">
-          report this error
-        </a>{" "}
-        to the Argus team, and include the following information:
-      </p>
-      <pre>{error.message}</pre>
-      <button onClick={resetErrorBoundary}>Reset Argus</button>
-    </div>
-  );
-};
+const FatalErrorPanel = ({ error, resetErrorBoundary }: any) => (
+  <div>
+    <p>
+      Whoops! This is not a drill, a fatal error occurred. Please{" "}
+      <a href="https://github.com/gavinleroy/argus/issues/new">
+        report this error
+      </a>{" "}
+      to the Argus team, and include the following information:
+    </p>
+    <pre>{error.message}</pre>
+    <button onClick={resetErrorBoundary}>Reset Argus</button>
+  </div>
+);
 
 const Workspace = ({
   files,
@@ -41,31 +39,29 @@ const Workspace = ({
 }: {
   files: [Filename, ObligationsInBody[]][];
   reset: () => void;
-}) => {
-  return (
-    <VSCodePanels>
-      {_.map(files, ([filename, _], idx) => {
-        return (
-          <VSCodePanelTab key={idx} id={`tab-${idx}`}>
-            {basename(filename)}
-          </VSCodePanelTab>
-        );
-      })}
-      {_.map(files, ([filename, content], idx) => {
-        return (
-          <ErrorBoundary
-            key={idx}
-            FallbackComponent={FatalErrorPanel}
-            onReset={reset}
-          >
-            <VSCodePanelView key={idx} id={`view-${idx}`}>
-              <File file={filename} osibs={content} />
-            </VSCodePanelView>
-          </ErrorBoundary>
-        );
-      })}
-    </VSCodePanels>
-  );
-};
+}) => (
+  <VSCodePanels>
+    {_.map(files, ([filename, _], idx) => (
+      <VSCodePanelTab key={idx} id={`tab-${idx}`}>
+        {basename(filename)}
+      </VSCodePanelTab>
+    ))}
+    {_.map(files, ([filename, content], idx) => (
+      <ErrorBoundary
+        key={idx}
+        FallbackComponent={FatalErrorPanel}
+        onReset={reset}
+      >
+        <VSCodePanelView
+          key={idx}
+          id={`view-${idx}`}
+          style={{ paddingLeft: 0, paddingRight: 0 }}
+        >
+          <File file={filename} osibs={content} />
+        </VSCodePanelView>
+      </ErrorBoundary>
+    ))}
+  </VSCodePanels>
+);
 
 export default Workspace;

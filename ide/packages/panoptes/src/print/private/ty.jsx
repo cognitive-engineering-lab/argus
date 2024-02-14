@@ -3,6 +3,7 @@ import React from "react";
 
 import { HoverInfo } from "../../HoverInfo";
 import { IcoMegaphone } from "../../Icons";
+import { Toggle } from "../../Toggle";
 import { anyElems, fnInputsAndOutput, tyIsUnit } from "../../utilities/func";
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
@@ -17,11 +18,12 @@ export const PrintBinder = ({ binder, innerF }) => {
 export const PrintImplHeader = ({ o }) => {
   const genArgs = _.map(o.args, arg => () => <PrintGenericArg o={arg} />);
   const argsWAngle =
-    genArgs.length === 0 ? (
-      ""
-    ) : (
+    genArgs.length === 0 ? null : (
       <Angled>
-        <CommaSeparated components={genArgs} />
+        <Toggle
+          summary={".."}
+          Children={() => <CommaSeparated components={genArgs} />}
+        />
       </Angled>
     );
   const trait = <PrintDefPath o={o.name} />;
@@ -36,7 +38,7 @@ export const PrintImplHeader = ({ o }) => {
   return (
     <>
       <Kw>impl</Kw>
-      {argsWAngle} {trait} for {selfTy}
+      {argsWAngle} {trait} <Kw>for</Kw> {selfTy}
       {whereClause}
     </>
   );
@@ -44,7 +46,7 @@ export const PrintImplHeader = ({ o }) => {
 
 export const PrintWhereClause = ({ predicates, tysWOBound }) => {
   if (!anyElems(predicates, tysWOBound)) {
-    return "";
+    return null;
   }
 
   const whereHoverContent = () => (
@@ -65,10 +67,7 @@ export const PrintWhereClause = ({ predicates, tysWOBound }) => {
   return (
     <>
       {" "}
-      <Kw>where</Kw>{" "}
-      <HoverInfo Content={whereHoverContent}>
-        <span className="where">...</span>
-      </HoverInfo>
+      <Kw>where</Kw> <Toggle summary={".."} Children={whereHoverContent} />
     </>
   );
 };
@@ -168,7 +167,7 @@ export const PrintTyKind = ({ o }) => {
 
 export const PrintCoroutineTy = ({ o }) => {
   const movability =
-    o.shouldPrintMovability && o.movability === "Static" ? "static " : "";
+    o.shouldPrintMovability && o.movability === "Static" ? "static " : null;
   const pathDef = <PrintDefPath o={o.path} />;
   // NOTE: the upvars are tupled together into a single type.
   const upvars = <PrintTy o={o.upvarTys} />;
@@ -192,7 +191,7 @@ export const PrintCoroutineWitnessTy = ({ o }) => {
 
 export const PrintDynamicTy = ({ o }) => {
   const hasHead = o.data !== undefined;
-  const head = hasHead ? <PrintDefPath o={o.data} /> : "";
+  const head = hasHead ? <PrintDefPath o={o.data} /> : null;
   const components = _.map(o.autoTraits, t => () => <PrintDefPath o={t} />);
   return (
     <>
@@ -233,10 +232,8 @@ export const PrintAliasTy = ({ o }) => {
 export const PrintPolyFnSig = ({ o }) => {
   const InnerSig = ({ inputs, output, cVariadic }) => {
     const inputComponents = _.map(inputs, ty => () => <PrintTy o={ty} />);
-    const variadic = !cVariadic ? "" : args.length === 0 ? "..." : ", ...";
-    const ret = tyIsUnit(output) ? (
-      ""
-    ) : (
+    const variadic = !cVariadic ? null : args.length === 0 ? "..." : ", ...";
+    const ret = tyIsUnit(output) ? null : (
       <>
         {" "}
         {"->"} <PrintTy o={output} />
@@ -251,9 +248,9 @@ export const PrintPolyFnSig = ({ o }) => {
   };
 
   const inner = o => {
-    const unsafetyStr = o.unsafety === "Unsafe" ? "unsafe " : "";
+    const unsafetyStr = o.unsafety === "Unsafe" ? "unsafe " : null;
     // TODO: we could write the ABI here, or expose it at least.
-    const abi = o.abi === "Rust" ? "" : "extern ";
+    const abi = o.abi === "Rust" ? null : "extern ";
     const [inputs, output] = fnInputsAndOutput(o.inputs_and_output);
     return (
       <>
@@ -270,11 +267,8 @@ export const PrintFnDef = ({ o }) => {
   // We should show both (somehow), not sure what's the best way to present it.
   return (
     <>
-      <PrintDefPath o={o.path} />
-      <HoverInfo Content={() => <PrintPolyFnSig o={o.sig} />}>
-        {" "}
-        <IcoMegaphone />
-      </HoverInfo>
+      <Toggle summary=".." Children={() => <PrintPolyFnSig o={o.sig} />} />{" "}
+      {"{"}<PrintDefPath o={o.path} />{"}"}
     </>
   );
 };
@@ -329,7 +323,7 @@ export const PrintInferTy = ({ o }) => {
 export const PrintTypeAndMut = ({ o }) => {
   return (
     <>
-      {o.mutbl === "Mut" ? "mut " : ""}
+      {o.mutbl === "Mut" ? "mut " : null}
       <PrintTy o={o.ty} />
     </>
   );
@@ -360,7 +354,7 @@ export const PrintRegion = ({ o }) => {
       return "'_";
     }
     case "vid": {
-      return "";
+      return null;
     }
     default: {
       throw new Error("Unknown region type", o);
@@ -399,9 +393,7 @@ export const PrintOpaqueImplType = ({ o }) => {
           {" -> "}
           <PrintTy o={o.retTy} />
         </>
-      ) : (
-        ""
-      );
+      ) : null;
     return (
       <span>
         ({o.kind}(<CommaSeparated components={args} />){ret})
@@ -420,7 +412,7 @@ export const PrintOpaqueImplType = ({ o }) => {
 
   const PrintTrait = ({ o }) => {
     console.debug("Printing Trait", o);
-    const prefix = o.polarity === "Negative" ? "!" : "";
+    const prefix = o.polarity === "Negative" ? "!" : null;
     const name = <PrintDefPath o={o.traitName} />;
     const ownArgs = _.map(o.ownArgs, arg => () => <PrintGenericArg o={arg} />);
     const assocArgs = _.map(o.assocArgs, arg => () => (
@@ -428,9 +420,7 @@ export const PrintOpaqueImplType = ({ o }) => {
     ));
     const argComponents = [...ownArgs, ...assocArgs];
     const list =
-      argComponents.length === 0 ? (
-        ""
-      ) : (
+      argComponents.length === 0 ? null : (
         <Angled>
           <CommaSeparated components={argComponents} />
         </Angled>
@@ -457,10 +447,10 @@ export const PrintOpaqueImplType = ({ o }) => {
     (!anyElems(fnTraits, traits, lifetimes) || o.hasNegativeSizedBound);
   const addMaybeSized = !o.hasSizedBound && !o.hasNegativeSizedBound;
   const sized =
-    addSized || addMaybeSized ? (addMaybeSized ? "?" : "") + "Sized" : "";
+    addSized || addMaybeSized ? (addMaybeSized ? "?" : "") + "Sized" : null;
 
   const lastSep =
-    anyElems(fnTraits, traits, lifetimes) && sized !== "" ? " + " : "";
+    anyElems(fnTraits, traits, lifetimes) && sized !== "" ? " + " : null;
 
   const start =
     implComponents.length === 0 && sized === "" ? "{opaque}}" : "impl ";

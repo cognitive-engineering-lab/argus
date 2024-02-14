@@ -1,7 +1,7 @@
 import { ObligationOutput } from "@argus/common/lib";
 import { Filename } from "@argus/common/lib";
 import * as React from "react";
-import * as ReactDOM from "react-dom";
+import * as ReactDOM from "react-dom/client";
 
 import App from "./App";
 
@@ -13,10 +13,6 @@ declare global {
 
 window.addEventListener("load", () => {
   console.log("Loading initialData", window.initialData);
-  ReactDOM.render(
-    <React.StrictMode>
-      <App initialData={window.initialData} />
-    </React.StrictMode>,
-    document.getElementById("root") as HTMLElement
-  );
+  let root = ReactDOM.createRoot(document.getElementById("root")!);
+  root.render(<App initialData={window.initialData} />);
 });
