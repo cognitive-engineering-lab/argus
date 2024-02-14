@@ -117,7 +117,6 @@ const ObligationCard = ({
   range: CharRange;
   obligation: Obligation;
 }) => {
-  const [isInfoVisible, setIsInfoVisible] = useState(false);
   const file = useContext(FileContext)!;
   const id = obligationCardId(file, obligation.hash);
 
@@ -126,36 +125,22 @@ const ObligationCard = ({
     file
   );
 
-  const handleClick = () => {
-    setIsInfoVisible(!isInfoVisible);
-  };
-
-  const cname = classNames("ObligationCard", obligation.result);
+  const header = (
+    <span id={id} onMouseEnter={addHighlight} onMouseLeave={removeHighlight}>
+      <span className={classNames("result", obligation.result)}>
+        <ObligationResult result={obligation.result} />
+      </span>{" "}
+      <PrintObligation obligation={obligation} />
+    </span>
+  );
 
   return (
-    <div
-      id={id}
-      className={cname}
-      onMouseEnter={addHighlight}
-      onMouseLeave={removeHighlight}
-    >
-      <div className="PrettyObligationArea">
-        <span className={classNames("result", obligation.result)}>
-          <ObligationResult result={obligation.result} />
-        </span>{" "}
-        <PrintObligation obligation={obligation} />
-      </div>
-      <VSCodeButton
-        className="ObligationButton"
-        appearance="secondary"
-        onClick={handleClick}
-      >
-        {isInfoVisible ? <IcoChevronUp /> : <IcoChevronDown />}
-      </VSCodeButton>
-      {isInfoVisible && (
+    <CollapsibleElement
+      info={header}
+      Children={() => (
         <ObligationTreeWrapper range={range} obligation={obligation} />
       )}
-    </div>
+    />
   );
 };
 
@@ -244,14 +229,10 @@ const InExpr = ({ idx }: { idx: ExprIdx }) => {
     );
 
   // TODO: we should limit the length of the expression snippet.
-  const header = (
-    <span>
-      Expression <code>{expr.snippet}</code>
-    </span>
-  );
+  const header = <code>{expr.snippet}</code>;
   return (
     <div onMouseEnter={addHighlight} onMouseLeave={removeHighlight}>
-      <CollapsibleElement info={header}>{content}</CollapsibleElement>
+      <CollapsibleElement info={header} Children={() => content} />
     </div>
   );
 };
@@ -277,11 +258,12 @@ const ObligationBody = ({ bodyInfo }: { bodyInfo: BodyInfo }) => {
 
   return (
     <BodyInfoContext.Provider value={bodyInfo}>
-      <CollapsibleElement info={header}>
-        {_.map(bodyInfo.exprs, (i, idx) => (
-          <InExpr idx={i} key={idx} />
-        ))}
-      </CollapsibleElement>
+      <CollapsibleElement
+        info={header}
+        Children={() =>
+          _.map(bodyInfo.exprs, (i, idx) => <InExpr idx={i} key={idx} />)
+        }
+      />
     </BodyInfoContext.Provider>
   );
 };

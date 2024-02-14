@@ -3,11 +3,15 @@
 }
 
 .DirRecursive.is-candidate {
-    border-left: 1px dotted #ccc;
+    border-left: 1px dotted var(--vscode-dropdown-border);
 }
 
 .DirRecursive.is-subgoal {
-    border-left: 1.5px solid #aaa;
+    border-left: 1.5px solid var(--vscode-descriptionForeground);
+}
+
+.DirRecursive.generic-edge {
+    border-left: 1px solid var(--vscode-widget-border);
 }
 
 .Collapsible {
@@ -15,7 +19,7 @@
 }
 
 .Collapsible.indent {
-    padding-left: 1em;
+    padding-left: 0.5em;
 }
 
 .Collapsible.collapsed {
@@ -29,11 +33,11 @@
 
 .DirNode > .toggle {
     display: inline-block;
-    width: 12px;
+    width: 10px;
 }
 
 .DirNode > .toggle > .codicon {
-    font-size: 12px;
+    font-size: 10px;
 }
 
 .information::before {

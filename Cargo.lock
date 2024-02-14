@@ -61,15 +61,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "argus_macro"
-version = "0.0.1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"

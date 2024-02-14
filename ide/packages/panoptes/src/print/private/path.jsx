@@ -3,7 +3,7 @@ import React from "react";
 
 import { HoverInfo } from "../../HoverInfo";
 import { takeRightUntil } from "../../utilities/func";
-import { Angled, CommaSeparated } from "./syntax";
+import { Angled, CommaSeparated, Kw } from "./syntax";
 import { PrintGenericArg, PrintTy } from "./ty";
 
 export const PrintValuePath = ({ o }) => {
@@ -145,12 +145,12 @@ export const PrintImplFor = ({ o }) => {
     ) : (
       <span>
         <PrintDefPathFull o={o.path} />
-        for
+        <Kw>for</Kw>
       </span>
     );
   return (
     <span>
-      impl {path} <PrintTy o={o.ty} />
+      <Kw>impl</Kw> {path} <PrintTy o={o.ty} />
     </span>
   );
 };
@@ -158,14 +158,12 @@ export const PrintImplFor = ({ o }) => {
 // <TY as PATH>
 export const PrintImplAs = ({ o }) => {
   const path =
-    o.path === undefined ? (
-      ""
-    ) : (
+    o.path !== undefined ? (
       <span>
-        {" as "}
-        <PrintDefPathFull o={o.path} />
+        {" "}
+        <Kw>as</Kw> <PrintDefPathFull o={o.path} />
       </span>
-    );
+    ) : null;
   return (
     <span>
       <PrintTy o={o.ty} />

@@ -1,4 +1,5 @@
 import {
+  FloatingDelayGroup,
   FloatingPortal,
   offset,
   useFloating,
@@ -20,7 +21,11 @@ export const HoverInfo = ({
     onOpenChange: setIsOpen,
     middleware: [offset(() => 5)],
   });
-  const hover = useHover(context);
+  const hover = useHover(context, {
+    delay: {
+      open: 500,
+    },
+  });
   const { getReferenceProps, getFloatingProps } = useInteractions([hover]);
 
   return (

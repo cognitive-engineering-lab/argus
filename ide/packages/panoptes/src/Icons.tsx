@@ -1,5 +1,7 @@
 import React from "react";
 
+import "./Icons.css";
+
 export const IcoPlus = () => <i className="codicon codicon-plus" />;
 
 export const IcoDot = () => (
