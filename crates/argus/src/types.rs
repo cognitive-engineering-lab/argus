@@ -135,6 +135,8 @@ pub struct ObligationsInBody {
   // type: DefPath
   name: Option<serde_json::Value>,
 
+  hash: BodyHash,
+
   /// Range of the represented body.
   pub range: CharRange,
 
@@ -173,6 +175,7 @@ impl ObligationsInBody {
     });
     ObligationsInBody {
       name: json_name,
+      hash: BodyHash::new(),
       range,
       ambiguity_errors,
       trait_errors,
@@ -180,6 +183,18 @@ impl ObligationsInBody {
       exprs,
       method_lookups,
     }
+  }
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+pub struct BodyHash(
+  #[cfg_attr(feature = "testing", ts(type = "string"))] uuid::Uuid,
+);
+
+impl BodyHash {
+  fn new() -> Self {
+    Self(uuid::Uuid::new_v4())
   }
 }
 

@@ -5,6 +5,8 @@ use rustc_span::symbol::{kw, Symbol};
 use rustc_target::spec::abi::Abi;
 use rustc_type_ir as ir;
 use serde::Serialize;
+#[cfg(feature = "testing")]
+use ts_rs::TS;
 
 use super::*;
 
@@ -1438,13 +1440,23 @@ pub struct ParamTyDef {
   pub name: Symbol,
 }
 
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS), ts(export, rename = "Symbol"))]
+pub struct SymbolDefDef<'a>(&'a str);
+
+impl<'a> From<&'a Symbol> for SymbolDefDef<'a> {
+  fn from(value: &'a Symbol) -> Self {
+    SymbolDefDef(value.as_str())
+  }
+}
+
 pub struct SymbolDef;
 impl SymbolDef {
   pub fn serialize<'tcx, S>(value: &Symbol, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    value.as_str().serialize(s)
+    SymbolDefDef::from(value).serialize(s)
   }
 }
 

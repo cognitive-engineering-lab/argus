@@ -1,5 +1,7 @@
 import {
+  BodyHash,
   CharRange,
+  ExprIdx,
   Obligation,
   ObligationHash,
   ObligationsInBody,
@@ -34,17 +36,26 @@ export type ExtensionReturn<T extends ExtensionToWebViewMsg["command"]> =
     ? { obligations: ObligationOutput[] }
     : {};
 
+interface HighlightPayload {
+  command: "highlight";
+  bodyIdx: BodyHash;
+  exprIdx: ExprIdx;
+  hash: ObligationHash;
+}
+
+interface OpenErrorPayload {
+  command: "open-error";
+  errType: "ambig" | "trait";
+  bodyIdx: number;
+  errIdx: number;
+}
+
 export type ExtensionToWebViewMsg = { type: FROM_EXT } & (
   | { command: "reset"; data: [Filename, ObligationsInBody[]][] }
   | (CommonData &
       (
-        | { command: "bling"; oblHash: ObligationHash }
-        | {
-            command: "open-error";
-            errType: "ambig" | "trait";
-            bodyIdx: number;
-            errIdx: number;
-          }
+        | HighlightPayload
+        | OpenErrorPayload
         | { command: "open-file"; data: ObligationOutput[] }
         | { command: "obligations"; obligations: ObligationOutput[] }
         | { command: "tree"; tree: TreeOutput }

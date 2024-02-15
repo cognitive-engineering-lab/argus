@@ -5,6 +5,7 @@ import { PrintExpr, PrintValueTree } from "./term";
 import { PrintBoundVariable, PrintSymbol } from "./ty";
 
 export const PrintConst = ({ o }) => {
+  console.debug("Printing const", o);
   switch (o.type) {
     case "error":
       return "{{const error}}";
@@ -47,12 +48,38 @@ const PrintUnevaluatedConst = ({ o }) => {
       return <PrintValuePath o={o.data} />;
     }
     case "anonSnippet": {
-      return <span>{o.data}</span>;
+      return o.data;
     }
     case "nonLocalPath": {
       throw new Error("todo");
     }
     default:
       throw new Error("Unknown unevaluated const kind", o);
+  }
+};
+
+export const PrintConstScalarInt = ({ o }) => {
+  switch (o.type) {
+    case "false":
+      return "false";
+    case "true":
+      return "true";
+    case "float": {
+      return (
+        <>
+          {o.data}
+          {o.isFinite ? "" : "_"}
+        </>
+      );
+    }
+
+    // NOTE: fallthrough is intentional
+    case "int":
+    case "char":
+    case "misc": {
+      return o.data;
+    }
+    default:
+      throw new Error("Unknown scalar int kind", o);
   }
 };

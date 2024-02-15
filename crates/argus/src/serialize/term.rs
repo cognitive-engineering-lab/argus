@@ -5,6 +5,8 @@ use rustc_middle::{
 };
 use rustc_span::Symbol;
 use serde::Serialize;
+#[cfg(feature = "testing")]
+use ts_rs::TS;
 
 use super::*;
 
@@ -19,93 +21,126 @@ impl TermDef {
 }
 
 #[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "Term"))]
 #[serde(remote = "TermKind")]
 pub enum TermKindDef<'tcx> {
-  Ty(#[serde(with = "TyDef")] Ty<'tcx>),
-  Const(#[serde(with = "ConstDef")] Const<'tcx>),
+  Ty(
+    #[serde(with = "TyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    Ty<'tcx>,
+  ),
+  Const(
+    #[serde(with = "ConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    Const<'tcx>,
+  ),
 }
 
-pub struct ValTreeDef<'a, 'tcx: 'a> {
-  tree: &'a ValTree<'tcx>,
-  ty: &'a Ty<'tcx>,
+pub struct ValTreeDef<'tcx> {
+  tree: ValTree<'tcx>,
+  ty: Ty<'tcx>,
 }
 
-impl<'a, 'tcx: 'a> ValTreeDef<'a, 'tcx> {
-  pub fn new(tree: &'a ValTree<'tcx>, ty: &'a Ty<'tcx>) -> Self {
+impl<'tcx> ValTreeDef<'tcx> {
+  pub fn new(tree: ValTree<'tcx>, ty: Ty<'tcx>) -> Self {
     Self { tree, ty }
   }
 }
 
-// See rustc_middle::ty::print::pretty::pretty_print_const_valtree
-impl<'a, 'tcx: 'a> Serialize for ValTreeDef<'a, 'tcx> {
+impl<'tcx> Serialize for ValTreeDef<'tcx> {
   fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
+    ValTreeKind::from(self).serialize(s)
+  }
+}
+
+// NOTE: inner types for a ValTreeDef
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "ValTree"))]
+#[serde(rename_all = "camelCase", tag = "type")]
+enum ValTreeKind<'tcx> {
+  #[serde(rename_all = "camelCase")]
+  Ref {
+    #[cfg_attr(feature = "testing", ts(type = "ValTreeKind"))]
+    inner: ValTreeDef<'tcx>,
+  },
+
+  #[serde(rename_all = "camelCase")]
+  String { data: String, is_deref: bool },
+
+  #[serde(rename_all = "camelCase")]
+  Aggregate {
+    #[serde(with = "Slice__ConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    fields: &'tcx [Const<'tcx>],
+    kind: ValTreeAggregateKind<'tcx>,
+  },
+
+  #[serde(rename_all = "camelCase")]
+  Leaf {
+    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    data: ConstScalarIntDef<'tcx>,
+    kind: LeafKind,
+  },
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+#[serde(rename_all = "camelCase", tag = "type")]
+enum ValTreeAggregateKind<'tcx> {
+  Array,
+  Tuple,
+  AdtNoVariants,
+  Adt {
+    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    data: path::ValuePathWithArgs<'tcx>,
+    kind: AdtAggregateKind,
+  },
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+#[serde(rename_all = "camelCase", tag = "type")]
+enum AdtAggregateKind {
+  Fn,
+  Const,
+  Misc {
+    #[serde(with = "Slice__SymbolDef")]
+    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    names: Vec<Symbol>,
+  },
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+#[serde(rename_all = "camelCase", tag = "type")]
+enum LeafKind {
+  Ref,
+  Scalar,
+}
+
+impl<'tcx> From<&ValTreeDef<'tcx>> for ValTreeKind<'tcx> {
+  fn from(value: &ValTreeDef<'tcx>) -> Self {
     let infcx = get_dynamic_ctx();
     let tcx = &infcx.tcx;
-
-    #[derive(Serialize)]
-    enum ValTreeKind<'a, 'tcx: 'a> {
-      Ref {
-        inner: ValTreeDef<'a, 'tcx>,
-      },
-
-      String {
-        data: String,
-        is_deref: bool,
-      },
-
-      Aggregate {
-        #[serde(with = "Slice__ConstDef")]
-        fields: &'tcx [Const<'tcx>],
-        kind: ValTreeAggregateKind<'tcx>,
-      },
-
-      Leaf {
-        data: ConstScalarIntDef<'tcx>,
-        kind: LeafKind,
-      },
-    }
-
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase", tag = "type")]
-    enum ValTreeAggregateKind<'tcx> {
-      Array,
-      Tuple,
-      AdtNoVariants,
-      Adt {
-        data: path::ValuePathWithArgs<'tcx>,
-        kind: AdtAggregateKind,
-      },
-    }
-
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase", tag = "type")]
-    enum AdtAggregateKind {
-      Fn,
-      Const,
-      Misc {
-        #[serde(with = "Slice__SymbolDef")]
-        names: Vec<Symbol>,
-      },
-    }
-
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase", tag = "type")]
-    enum LeafKind {
-      Ref,
-      Scalar,
-    }
+    let this = value;
 
     let u8_type = tcx.types.u8;
-    let here_kind = match (self.tree, self.ty.kind()) {
+    match (this.tree, this.ty.kind()) {
       (ty::ValTree::Branch(_), ty::Ref(_, inner_ty, _)) => {
         match inner_ty.kind() {
           ty::Slice(t) if *t == u8_type => {
-            let bytes = self
+            let bytes = this
               .tree
-              .try_to_raw_bytes(*tcx, *self.ty)
+              .try_to_raw_bytes(*tcx, this.ty)
               .unwrap_or_else(|| {
                 panic!("expected bytes from slice valtree");
               });
@@ -115,9 +150,9 @@ impl<'a, 'tcx: 'a> Serialize for ValTreeDef<'a, 'tcx> {
             }
           }
           ty::Str => {
-            let bytes = self
+            let bytes = this
               .tree
-              .try_to_raw_bytes(*tcx, *self.ty)
+              .try_to_raw_bytes(*tcx, this.ty)
               .unwrap_or_else(|| {
                 panic!("expected bytes from slice valtree");
               });
@@ -127,15 +162,15 @@ impl<'a, 'tcx: 'a> Serialize for ValTreeDef<'a, 'tcx> {
             }
           }
           _ => ValTreeKind::Ref {
-            inner: ValTreeDef::new(self.tree, inner_ty),
+            inner: ValTreeDef::new(this.tree, *inner_ty),
           },
         }
       }
       (ty::ValTree::Branch(_), ty::Array(t, _)) if *t == u8_type => {
         let bytes =
-          self
+          this
             .tree
-            .try_to_raw_bytes(*tcx, *self.ty)
+            .try_to_raw_bytes(*tcx, this.ty)
             .unwrap_or_else(|| {
               panic!("expected bytes from slice valtree");
             });
@@ -147,10 +182,10 @@ impl<'a, 'tcx: 'a> Serialize for ValTreeDef<'a, 'tcx> {
       }
 
       (ty::ValTree::Branch(_), ty::Array(..) | ty::Tuple(..) | ty::Adt(..)) => {
-        let contents = tcx
-          .destructure_const(ty::Const::new_value(*tcx, *self.tree, *self.ty));
+        let contents =
+          tcx.destructure_const(ty::Const::new_value(*tcx, this.tree, this.ty));
         let fields = contents.fields;
-        let kind = match self.ty.kind() {
+        let kind = match this.ty.kind() {
           ty::Array(..) => ValTreeAggregateKind::Array,
           ty::Tuple(..) => ValTreeAggregateKind::Tuple,
           ty::Adt(def, _) if def.variants().is_empty() => {
@@ -187,11 +222,11 @@ impl<'a, 'tcx: 'a> Serialize for ValTreeDef<'a, 'tcx> {
       }
 
       (ty::ValTree::Leaf(leaf), ty::Ref(_, inner_ty, _)) => ValTreeKind::Leaf {
-        data: ConstScalarIntDef::new(*leaf, *inner_ty),
+        data: ConstScalarIntDef::new(leaf, *inner_ty),
         kind: LeafKind::Ref,
       },
       (ty::ValTree::Leaf(leaf), _) => ValTreeKind::Leaf {
-        data: ConstScalarIntDef::new(*leaf, *self.ty),
+        data: ConstScalarIntDef::new(leaf, this.ty),
         kind: LeafKind::Scalar,
       },
       _ => ValTreeKind::String {
@@ -199,36 +234,58 @@ impl<'a, 'tcx: 'a> Serialize for ValTreeDef<'a, 'tcx> {
         data: "VALTREE".to_string(),
         is_deref: false,
       },
-    };
-
-    here_kind.serialize(s)
+    }
   }
 }
 
 #[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 #[serde(remote = "Expr")]
 pub enum ExprDef<'tcx> {
   Binop(
-    #[serde(with = "BinOpDef")] BinOp,
-    #[serde(with = "ConstDef")] Const<'tcx>,
-    #[serde(with = "ConstDef")] Const<'tcx>,
+    #[serde(with = "BinOpDef")]
+    #[cfg_attr(feature = "testing", ts(type = "BinOp"))]
+    BinOp,
+    #[serde(with = "ConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Const"))]
+    Const<'tcx>,
+    #[serde(with = "ConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Const"))]
+    Const<'tcx>,
   ),
   UnOp(
-    #[serde(with = "UnOpDef")] UnOp,
-    #[serde(with = "ConstDef")] Const<'tcx>,
+    #[serde(with = "UnOpDef")]
+    #[cfg_attr(feature = "testing", ts(type = "UnOp"))]
+    UnOp,
+    #[serde(with = "ConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Const"))]
+    Const<'tcx>,
   ),
   FunctionCall(
-    #[serde(with = "ConstDef")] Const<'tcx>,
-    #[serde(serialize_with = "list__const")] &'tcx List<Const<'tcx>>,
+    #[serde(with = "ConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Const"))]
+    Const<'tcx>,
+    #[serde(with = "Slice__ConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Const[]"))]
+    &'tcx List<Const<'tcx>>,
   ),
   Cast(
-    #[serde(with = "CastKindDef")] CastKind,
-    #[serde(with = "ConstDef")] Const<'tcx>,
-    #[serde(with = "TyDef")] Ty<'tcx>,
+    #[serde(with = "CastKindDef")]
+    #[cfg_attr(feature = "testing", ts(type = "CastKind"))]
+    CastKind,
+    #[serde(with = "ConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Const"))]
+    Const<'tcx>,
+    #[serde(with = "TyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    Ty<'tcx>,
   ),
 }
 
 #[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "BinOp"))]
 #[serde(remote = "BinOp")]
 pub enum BinOpDef {
   Add,
@@ -256,6 +313,8 @@ pub enum BinOpDef {
 }
 
 #[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "UnOp"))]
 #[serde(remote = "UnOp")]
 pub enum UnOpDef {
   Not,
@@ -263,6 +322,8 @@ pub enum UnOpDef {
 }
 
 #[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "CastKind"))]
 #[serde(remote = "CastKind")]
 pub enum CastKindDef {
   As,

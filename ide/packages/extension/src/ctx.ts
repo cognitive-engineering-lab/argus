@@ -1,5 +1,7 @@
 import {
+  BodyHash,
   CharRange,
+  ExprIdx,
   Obligation,
   ObligationHash,
   ObligationsInBody,
@@ -113,7 +115,7 @@ export class Ctx {
 
   async createOrShowView() {
     if (this.view) {
-      this.view.panel.reveal();
+      this.view.getPanel().reveal();
     } else {
       const initialData = await this.getFreshWebViewData();
       this.view = new View(this.extCtx.extensionUri, initialData);
@@ -213,13 +215,14 @@ export class Ctx {
   private setTraitErrors(editor: RustEditor, oib: ObligationsInBody[]) {
     editor.setDecorations(
       traitErrorDecorate,
-      _.flatMap(oib, (ob, bodyIdx) => {
-        return _.map(ob.traitErrors, (e, errIdx) => ({
+      _.flatMap(oib, ob => {
+        return _.map(ob.traitErrors, e => ({
           range: rustRangeToVscodeRange(ob.exprs[e].range),
           hoverMessage: this.buildOpenErrorItemCmd(
             editor.document.fileName,
-            bodyIdx,
-            errIdx,
+            ob.hash,
+            e,
+            ob.obligations[ob.exprs[e].obligations[0]].hash,
             "trait"
           ),
         }));
@@ -230,13 +233,14 @@ export class Ctx {
   private setAmbiguityErrors(editor: RustEditor, oib: ObligationsInBody[]) {
     editor.setDecorations(
       ambigErrorDecorate,
-      _.flatMap(oib, (ob, bodyIdx) => {
-        return _.map(ob.ambiguityErrors, (e, errIdx) => ({
+      _.flatMap(oib, ob => {
+        return _.map(ob.ambiguityErrors, e => ({
           range: rustRangeToVscodeRange(ob.exprs[e].range),
           hoverMessage: this.buildOpenErrorItemCmd(
             editor.document.fileName,
-            bodyIdx,
-            errIdx,
+            ob.hash,
+            e,
+            ob.obligations[ob.exprs[e].obligations[0]].hash,
             "ambig"
           ),
         }));
@@ -246,17 +250,28 @@ export class Ctx {
 
   private buildOpenErrorItemCmd(
     filename: Filename,
-    bodyIdx: number,
-    errorIdx: number,
+    bodyIdx: BodyHash,
+    exprIdx: ExprIdx,
+    oblHash: ObligationHash,
     type: "trait" | "ambig"
-  ): string {
-    // TODO: the webview needs to add a signal for opening an error expression.
-    // const blingCommandUri = vscode.Uri.parse(
-    //   `command:argus.openError?${encodeURIComponent(
-    //     JSON.stringify([filename, type, bodyIdx, errorIdx])
-    //   )}`
-    // );
-    return "This is an error — Argus"; // `[Debug error in window](${blingCommandUri})`;
+  ): vscode.MarkdownString {
+    const highlightCommandUri = vscode.Uri.parse(
+      `command:argus.openError?${encodeURIComponent(
+        JSON.stringify([filename, bodyIdx, exprIdx, oblHash])
+      )}`
+    );
+
+    const msg =
+      type === "trait"
+        ? "Expression contains unsatisfied trait bounds"
+        : "This expression is ambiguous";
+
+    const mdStr = new vscode.MarkdownString();
+    mdStr.isTrusted = true;
+    mdStr.appendMarkdown("# Argus\n");
+    mdStr.appendText(msg + "\n\n");
+    mdStr.appendMarkdown(`[Debug error in window](${highlightCommandUri})`);
+    return mdStr;
   }
 
   async addHighlightRange(filename: Filename, range: CharRange) {

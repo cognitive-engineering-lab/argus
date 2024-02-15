@@ -1,11 +1,23 @@
+import {
+  AdtAggregateKind,
+  BinOp,
+  Const,
+  ExprDef,
+  LeafKind,
+  Term,
+  UnOp,
+  ValTree,
+} from "@argus/common/bindings";
+import _ from "lodash";
 import React from "react";
 
 import { PrintConst } from "./const";
+import { PrintConstScalarInt } from "./const";
 import { PrintValuePath } from "./path";
 import { Angled, CommaSeparated, DBraced } from "./syntax";
-import { PrintTy } from "./ty";
+import { PrintSymbol, PrintTy } from "./ty";
 
-export const PrintTerm = ({ o }) => {
+export const PrintTerm = ({ o }: { o: Term }) => {
   if ("Ty" in o) {
     return <PrintTy o={o.Ty} />;
   } else if ("Const" in o) {
@@ -15,9 +27,9 @@ export const PrintTerm = ({ o }) => {
   }
 };
 
-export const PrintExpr = ({ o }) => {
-  if ("BinOp" in o) {
-    const [op, lhs, rhs] = o.BinOp;
+export const PrintExpr = ({ o }: { o: ExprDef }) => {
+  if ("Binop" in o) {
+    const [op, lhs, rhs] = o.Binop;
     return (
       <>
         <PrintConst o={lhs} />
@@ -35,17 +47,15 @@ export const PrintExpr = ({ o }) => {
     );
   } else if ("FunctionCall" in o) {
     const [callable, args] = o.FunctionCall;
+    const argEs = _.map(args, arg => () => <PrintConst o={arg} />);
     return (
       <span>
         <PrintConst o={callable} />(
-        {intersperse(args, ", ", (arg, i) => (
-          <PrintConst o={arg} key={i} />
-        ))}
-        )
+        <CommaSeparated components={argEs} />)
       </span>
     );
   } else if ("Cast" in o) {
-    // TODO: handle cast kinds
+    // TODO: handle cast kind "use"
     const [castKind, expr, ty] = o.Cast;
     return (
       <Angled>
@@ -55,7 +65,7 @@ export const PrintExpr = ({ o }) => {
   }
 };
 
-const PrintBinOp = ({ o }) => {
+const PrintBinOp = ({ o }: { o: BinOp }) => {
   if (o === "Add") {
     return "+";
   } else if (o === "AddUnchecked") {
@@ -105,7 +115,7 @@ const PrintBinOp = ({ o }) => {
   }
 };
 
-const PrintUnOp = ({ o }) => {
+const PrintUnOp = ({ o }: { o: UnOp }) => {
   if (o === "Not") {
     return "!";
   } else if (o === "Neg") {
@@ -115,7 +125,7 @@ const PrintUnOp = ({ o }) => {
   }
 };
 
-export const PrintValueTree = ({ o }) => {
+export const PrintValueTree = ({ o }: { o: ValTree }) => {
   switch (o.type) {
     case "string": {
       // TODO: do we need to escape something here?
@@ -138,15 +148,15 @@ export const PrintValueTree = ({ o }) => {
     case "aggregate": {
       switch (o.kind.type) {
         case "array":
-          return <PrintAggregateArray o={o} />;
+          return <PrintAggregateArray fields={o.fields} />;
         case "tuple":
-          return <PrintAggregateTuple o={o} />;
-        case "adtNoVariants":
+          return <PrintAggregateTuple fields={o.fields} />;
+        case "adtnovariants":
           return <PrintAggregateAdtNoVariants o={o} />;
         case "adt":
           return (
             <PrintAggregateAdt
-              o={o}
+              fields={o.fields}
               valuePath={o.kind.data}
               kind={o.kind.kind}
             />
@@ -156,13 +166,13 @@ export const PrintValueTree = ({ o }) => {
       }
     }
     case "leaf": {
-      return <PrintTreeLeaf o={o} />;
+      return <PrintTreeLeaf data={o.data} kind={o.kind} />;
     }
   }
 };
 
-const PrintAggregateArray = ({ o }) => {
-  const components = _.map(o.fields, field => () => <PrintConst o={field} />);
+const PrintAggregateArray = ({ fields }: { fields: Const[] }) => {
+  const components = _.map(fields, field => () => <PrintConst o={field} />);
   return (
     <span>
       [<CommaSeparated components={components} />]
@@ -170,33 +180,39 @@ const PrintAggregateArray = ({ o }) => {
   );
 };
 
-const PrintAggregateTuple = ({ o }) => {
-  const components = _.map(o.fields, field => () => <PrintConst o={field} />);
-  const trailingComma = o.fields.length === 1 ? "," : "";
+const PrintAggregateTuple = ({ fields }: { fields: Const[] }) => {
+  const components = _.map(fields, field => () => <PrintConst o={field} />);
+  const trailingComma = fields.length === 1 ? "," : null;
   return (
-    <span>
+    <>
       (<CommaSeparated components={components} />
       {trailingComma})
-    </span>
+    </>
   );
 };
 
-const PrintAggregateAdtNoVariants = ({ o }) => {
+const PrintAggregateAdtNoVariants = ({ o: _ }: { o: unknown }) => {
   // TODO: is this right??? We'll want to put the trailing type here
   return "unreachable()";
 };
 
-const PrintAggregateAdt = ({ o, valuePath, kind }) => {
+const PrintAggregateAdt = ({
+  fields,
+  valuePath,
+  kind,
+}: {
+  fields: Const[];
+  valuePath: any;
+  kind: AdtAggregateKind;
+}) => {
   switch (kind.type) {
     case "fn": {
       const head = <PrintValuePath o={valuePath} />;
-      const components = _.map(o.fields, field => () => (
-        <PrintConst o={field} />
-      ));
+      const components = _.map(fields, field => () => <PrintConst o={field} />);
       return (
-        <span>
+        <>
           {head}(<CommaSeparated components={components} />)
-        </span>
+        </>
       );
     }
     case "const": {
@@ -205,7 +221,7 @@ const PrintAggregateAdt = ({ o, valuePath, kind }) => {
     }
     case "misc": {
       const components = _.map(
-        _.zip(kind.names, o.fields),
+        _.zip(kind.names, fields),
         ([name, field]) =>
           () =>
             (
@@ -224,38 +240,12 @@ const PrintAggregateAdt = ({ o, valuePath, kind }) => {
   }
 };
 
-const PrintTreeLeaf = ({ o }) => {
-  const prefix = o.kind.type === "ref" ? "&" : "";
+const PrintTreeLeaf = ({ data, kind }: { data: any; kind: LeafKind }) => {
+  const prefix = kind.type === "ref" ? "&" : "";
   return (
     <>
       {prefix}
-      <PrintConstScalarInt o={o.data} />
+      <PrintConstScalarInt o={data} />
     </>
   );
-};
-
-export const PrintConstScalarInt = ({ o }) => {
-  switch (o.type) {
-    case "false":
-      return "false";
-    case "true":
-      return "true";
-    case "float": {
-      return (
-        <>
-          {o.data}
-          {o.isFinite ? "" : "_"}
-        </>
-      );
-    }
-
-    // NOTE: fallthrough is intentional
-    case "int":
-    case "char":
-    case "misc": {
-      return o.data;
-    }
-    default:
-      throw new Error("Unknown scalar int kind", o);
-  }
 };

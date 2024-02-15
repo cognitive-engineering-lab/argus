@@ -1,4 +1,5 @@
 import {
+  BodyHash,
   Expr,
   ExprIdx,
   MethodLookup,
@@ -16,6 +17,10 @@ class BodyInfo {
     readonly idx: number,
     readonly viewHiddenObligations: boolean = false
   ) {}
+
+  get hash(): BodyHash {
+    return this.oib.hash;
+  }
 
   get showHidden(): boolean {
     return this.viewHiddenObligations;

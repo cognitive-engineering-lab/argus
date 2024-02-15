@@ -1,10 +1,24 @@
 import {
   Candidate as CandidateTy,
+  EvaluationResult,
   Node as NodeTy,
 } from "@argus/common/bindings";
 import React from "react";
 
-import { PrintGoal, PrintImplHeader, PrintImplHir } from "../print/print";
+import { IcoAmbiguous, IcoCheck, IcoError, IcoLoop } from "../Icons";
+import { PrintGoal, PrintImplHeader } from "../print/print";
+
+export const Result = ({ result }: { result: EvaluationResult }) => {
+  return result === "yes" ? (
+    <IcoCheck />
+  ) : result === "no" ? (
+    <IcoError />
+  ) : result === "maybe-overflow" ? (
+    <IcoLoop />
+  ) : (
+    <IcoAmbiguous />
+  );
+};
 
 export const Candidate = ({ candidate }: { candidate: CandidateTy }) => {
   switch (candidate.type) {
@@ -22,7 +36,12 @@ export const Node = ({ node }: { node: NodeTy }) => {
     case "result":
       return node.data;
     case "goal":
-      return <PrintGoal o={node.data} />;
+      return (
+        <>
+          <Result result={node.data.result} />
+          <PrintGoal o={node.data} />
+        </>
+      );
     case "candidate":
       return <Candidate candidate={node.data} />;
   }

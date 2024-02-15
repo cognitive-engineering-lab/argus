@@ -1,7 +1,7 @@
 import { ProofNodeIdx } from "@argus/common/bindings";
 import classNames from "classnames";
 import _ from "lodash";
-import React, { PropsWithChildren, useContext, useState } from "react";
+import React, { useContext, useState } from "react";
 
 import {
   IcoChevronDown,
@@ -23,17 +23,19 @@ const defaultCollapseArrows: ElementPair = [
 
 export const CollapsibleElement = ({
   info,
-  icos = defaultCollapseArrows,
+  icons = defaultCollapseArrows,
   indentChildren = false,
+  startOpen = false,
   Children,
 }: {
   info: React.ReactElement;
-  icos?: ElementPair;
+  icons?: ElementPair;
   indentChildren?: boolean;
+  startOpen?: boolean;
   Children: React.FC | null;
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [openIco, closedIco] = icos;
+  const [isOpen, setIsOpen] = useState(startOpen);
+  const [openIco, closedIco] = icons;
 
   const toggleCollapse = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
@@ -74,13 +76,13 @@ export const DirNode = ({
 
   const arrows: ElementPair = [<IcoTriangleDown />, <IcoTriangleRight />];
   const dots: ElementPair = [<IcoDot />, <IcoDot />];
-  const icos = node.type === "result" ? dots : arrows;
+  const icons = node.type === "result" ? dots : arrows;
   const info = <Node node={node} />;
 
   return (
     <CollapsibleElement
       info={info}
-      icos={icos}
+      icons={icons}
       indentChildren={true}
       Children={Children}
     />

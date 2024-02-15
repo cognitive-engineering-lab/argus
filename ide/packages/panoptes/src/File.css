@@ -9,32 +9,19 @@ div {
     margin-bottom: 1em;
 }
 
-.ObligationCard.yes > .result.yes {
-    color: green;
-}
-
-.ObligationCard.yes > .result.no {
-    color: #FF6961;
-}
-
-.ObligationCard.yes > .result.maybe-overflow {
-    color: yellow;
-}
-
-.ObligationCard.yes > .result.maybe-ambiguous {
-    color: yellow;
+span.ErrorCount {
+    color: var(--vscode-editorError-foreground);
 }
 
 .NoInfoError {
-    background: #FF6961;
-    color: white;
+    color: var(--vscode-errorForeground);
     font-weight: bold;
     overflow-y: scroll;
     padding: 1em;
 }
 
 div.bling {
-    background-color: olive;
+    background-color: var(--vscode-selection-background);
     transition: background-color 0s;
 }
 
@@ -46,11 +33,6 @@ div.bling {
 .ObligationButton {
     display: block;
     cursor: pointer;
-}
-
-/* yeah...this still doesn't work */
-:host([readonly]) .control {
-    cursor: default;
 }
 
 .PrettyObligationArea {

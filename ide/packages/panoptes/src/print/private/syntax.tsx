@@ -1,4 +1,3 @@
-import { Ident } from "@argus/common/bindings";
 import _ from "lodash";
 import React from "react";
 
@@ -6,9 +5,9 @@ import "./syntax.css";
 
 // See https://doc.rust-lang.org/stable/nightly-rustc/rustc_span/symbol/kw/index.html
 
-export const UnderscoreLifetime: Ident = { name: "'_" };
+// export const UnderscoreLifetime: Ident = { name: "'_" };
 
-export const PathRoot: Ident = { name: "{{root}}" };
+// export const PathRoot: Ident = { name: "{{root}}" };
 
 export const Kw = ({ children }: React.PropsWithChildren) => {
   return <span className="kw">{children}</span>;

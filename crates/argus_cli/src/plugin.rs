@@ -301,7 +301,7 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
               Err(_) => None,
             }
           } else {
-            info!("Skipping file {:?} due to target {:?}", p, self.file);
+            debug!("Skipping file {:?} due to target {:?}", p, self.file);
             None
           }
         } else {

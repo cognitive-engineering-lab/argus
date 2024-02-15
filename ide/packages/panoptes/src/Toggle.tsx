@@ -3,14 +3,14 @@ import React, { useState } from "react";
 
 import "./Toggle.css";
 
-export let Toggle = ({
+export const Toggle = ({
   Children,
   summary,
 }: {
   summary: React.ReactNode;
   Children: React.FC;
 }) => {
-  let [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   return (
     <div
       className={classNames("toggle-box", { expanded })}

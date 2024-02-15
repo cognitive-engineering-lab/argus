@@ -1,16 +1,10 @@
-import {
-  ExtensionCandidates,
-  Goal,
-  Impl,
-  Obligation,
-} from "@argus/common/bindings";
+import { ExtensionCandidates, Goal, Obligation } from "@argus/common/bindings";
 import _ from "lodash";
 import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import ReactJson from "react-json-view";
 
 import "./print.css";
-import { PrintImpl as UnsafePrintImplHir } from "./private/hir";
 import {
   PrintDefPath as UnsafePrintDefPath,
   PrintDefPathFull as UnsafePrintDefPathFull,
@@ -79,15 +73,6 @@ export const PrintObligation = ({ obligation }: { obligation: Obligation }) => {
   return <PrintWithFallback object={obligation} Content={InnerContent} />;
 };
 
-export const PrintImplHir = ({ impl }: { impl: Impl }) => {
-  return (
-    <PrintWithFallback
-      object={impl}
-      Content={() => <UnsafePrintImplHir impl={impl} />}
-    />
-  );
-};
-
 export const PrintImplHeader = ({ impl }: { impl: any }) => {
   return (
     <PrintWithFallback
@@ -101,7 +86,7 @@ export const PrintGoal = ({ o }: { o: Goal }) => {
   const Content = () => (
     <>
       <UnsafePrintGoalPredicate o={o.goal} />
-      {/*<div style={{ opacity: 0.5 }}>RustcPretty: {o.debugComparison}</div>*/}
+      <div style={{ opacity: 0.5 }}>{o.debugComparison}</div>
     </>
   );
   return <PrintWithFallback object={o} Content={Content} />;

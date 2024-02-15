@@ -1,6 +1,5 @@
 import {
   CharRange,
-  EvaluationResult,
   ExprIdx,
   MethodLookupIdx,
   Obligation,
@@ -9,7 +8,7 @@ import {
   SerializedTree,
 } from "@argus/common/bindings";
 import { Filename } from "@argus/common/lib";
-import { VSCodeButton, VSCodeDivider } from "@vscode/webview-ui-toolkit/react";
+import { VSCodeDivider } from "@vscode/webview-ui-toolkit/react";
 import classNames from "classnames";
 import _ from "lodash";
 import React, {
@@ -17,20 +16,14 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
 import BodyInfo from "./BodyInfo";
 import "./File.css";
-import {
-  IcoAmbiguous,
-  IcoCheck,
-  IcoChevronDown,
-  IcoChevronUp,
-  IcoError,
-  IcoLoop,
-} from "./Icons";
 import { CollapsibleElement } from "./TreeView/Directory";
+import { Result } from "./TreeView/Node";
 import TreeApp from "./TreeView/TreeApp";
 import { WaitingOn } from "./WaitingOn";
 import {
@@ -39,6 +32,7 @@ import {
   PrintObligation,
   PrintTy,
 } from "./print/print";
+import { highlightedObligation } from "./signals";
 import {
   isObject,
   makeHighlightPosters,
@@ -98,18 +92,6 @@ const ObligationTreeWrapper = ({
   return content;
 };
 
-const ObligationResult = ({ result }: { result: EvaluationResult }) => {
-  return result === "yes" ? (
-    <IcoCheck />
-  ) : result === "no" ? (
-    <IcoError />
-  ) : result === "maybe-overflow" ? (
-    <IcoLoop />
-  ) : (
-    <IcoAmbiguous />
-  );
-};
-
 const ObligationCard = ({
   range,
   obligation,
@@ -119,16 +101,32 @@ const ObligationCard = ({
 }) => {
   const file = useContext(FileContext)!;
   const id = obligationCardId(file, obligation.hash);
+  const ref = useRef<HTMLSpanElement>(null);
 
   const [addHighlight, removeHighlight] = makeHighlightPosters(
     obligation.range,
     file
   );
 
+  useEffect(() => {
+    if (highlightedObligation.value?.hash === obligation.hash) {
+      ref.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, []);
+
+  const className = classNames("result", {
+    bling: highlightedObligation.value?.hash === obligation.hash,
+  });
+
   const header = (
-    <span id={id} onMouseEnter={addHighlight} onMouseLeave={removeHighlight}>
-      <span className={classNames("result", obligation.result)}>
-        <ObligationResult result={obligation.result} />
+    <span
+      id={id}
+      ref={ref}
+      onMouseEnter={addHighlight}
+      onMouseLeave={removeHighlight}
+    >
+      <span className={className}>
+        <Result result={obligation.result} />
       </span>{" "}
       <PrintObligation obligation={obligation} />
     </span>
@@ -154,7 +152,7 @@ const ObligationFromIdx = ({ idx }: { idx: ObligationIdx }) => {
 const ObligationResultFromIdx = ({ idx }: { idx: ObligationIdx }) => {
   const bodyInfo = useContext(BodyInfoContext)!;
   const o = bodyInfo.getObligation(idx);
-  return <ObligationResult result={o.result} />;
+  return <Result result={o.result} />;
 };
 
 const MethodLookupTable = ({ lookup }: { lookup: MethodLookupIdx }) => {
@@ -228,11 +226,17 @@ const InExpr = ({ idx }: { idx: ExprIdx }) => {
       ))
     );
 
+  const openChildren = idx === highlightedObligation.value?.exprIdx;
+
   // TODO: we should limit the length of the expression snippet.
   const header = <code>{expr.snippet}</code>;
   return (
     <div onMouseEnter={addHighlight} onMouseLeave={removeHighlight}>
-      <CollapsibleElement info={header} Children={() => content} />
+      <CollapsibleElement
+        info={header}
+        startOpen={openChildren}
+        Children={() => content}
+      />
     </div>
   );
 };
@@ -248,7 +252,7 @@ const ObligationBody = ({ bodyInfo }: { bodyInfo: BodyInfo }) => {
   const header = (
     <span>
       {bodyName}
-      {errCount > 0 ? <span style={{ color: "red" }}>({errCount})</span> : ""}
+      {errCount > 0 ? <span className="ErrorCount">({errCount})</span> : null}
     </span>
   );
 
@@ -256,10 +260,13 @@ const ObligationBody = ({ bodyInfo }: { bodyInfo: BodyInfo }) => {
     return null;
   }
 
+  const openChildren = bodyInfo.hash === highlightedObligation.value?.bodyIdx;
+
   return (
     <BodyInfoContext.Provider value={bodyInfo}>
       <CollapsibleElement
         info={header}
+        startOpen={openChildren}
         Children={() =>
           _.map(bodyInfo.exprs, (i, idx) => <InExpr idx={i} key={idx} />)
         }

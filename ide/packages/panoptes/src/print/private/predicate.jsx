@@ -16,9 +16,7 @@ import {
 
 export const PrintPredicateObligation = ({ o }) => {
   const hoverContent =
-    o.paramEnv.length === 0 ? (
-      ""
-    ) : (
+    o.paramEnv.length === 0 ? null : (
       <HoverInfo Content={() => <PrintParamEnv o={o.paramEnv} />}>
         {" "}
         <IcoNote />

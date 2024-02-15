@@ -1,14 +1,27 @@
-//! Remote serde::Serialize derives for Rustc types
+//! Remote `serde::Serialize` derives for Rustc types
 //!
 //! WARNING, these definitions were done hastily, and definitely
 //! need a little "fixing up." It will be done at some point.
 //! In the meantime, consume at your own risk.
-#![allow(
-  non_camel_case_types,
-  non_snake_case,
-  suspicious_double_ref_op,
-  dead_code
-)]
+//!
+//! Here is a quick guide to naming conventions used in this module. To
+//! Serialize types we try to rely on serde::remote when possible.
+//! These remote types by convention append a "Def" suffic to the type.
+//!
+//! For example, `rustc_middle::ty::Ty` is serialized as `TyDef`.
+//!
+//! Serializing rich source information is *hard*, and requires a step
+//! of expansion and processing before all information is had. If you don't
+//! believe this claim, take a peek at `rustc_middle::ty::print::pretty` and
+//! come back when you're convinced. Processing a type into its expanded form
+//! involves another type definition. The convention is to again, append a "Def".
+//!
+//! For example, the TS generated type for `rustc_middle::ty::Ty` is defined
+//! on `TyDefDef`. Note, that these should be renamed to `Ty` for the TS binding type.
+//!
+//! If you need to serialize an optional type then prefix it with `Option__`, and
+//! lists of elements are serialized with a prefixed `Slice__`.
+#![allow(non_camel_case_types, non_snake_case)]
 
 pub mod r#const;
 pub mod path;

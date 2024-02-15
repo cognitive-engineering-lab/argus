@@ -117,6 +117,9 @@ importers:
       '@floating-ui/react':
         specifier: ^0.26.8
         version: 0.26.8(react-dom@18.0.0)(react@18.0.0)
+      '@preact/signals-react':
+        specifier: ^2.0.0
+        version: 2.0.0(react@18.0.0)
       '@types/classnames':
         specifier: ^2.3.1
         version: 2.3.1
@@ -688,6 +691,20 @@ packages:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.15.0
+    dev: true
+
+  /@preact/signals-core@1.5.1:
+    resolution: {integrity: sha512-dE6f+WCX5ZUDwXzUIWNMhhglmuLpqJhuy3X3xHrhZYI0Hm2LyQwOu0l9mdPiWrVNsE+Q7txOnJPgtIqHCYoBVA==}
+    dev: true
+
+  /@preact/signals-react@2.0.0(react@18.0.0):
+    resolution: {integrity: sha512-tMVi2SXFXlojaiPNWa8dlYaidR/XvEgMSp+iymKJgMssBM/QVtUQrodKZek1BJju+dkVHiyeuQHmkuLOI9oyNw==}
+    peerDependencies:
+      react: ^16.14.0 || 17.x || 18.x
+    dependencies:
+      '@preact/signals-core': 1.5.1
+      react: 18.0.0
+      use-sync-external-store: 1.2.0(react@18.0.0)
     dev: true
 
   /@sinclair/typebox@0.27.8:

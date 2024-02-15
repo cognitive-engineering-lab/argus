@@ -41,6 +41,7 @@ fn export_bindings_all_tys() {
     ty::Obligation,
     ty::ObligationHash,
 
+    ty::BodyHash,
     ty::ObligationKind,
     ty::ObligationNecessity,
     ty::ObligationsInBody,

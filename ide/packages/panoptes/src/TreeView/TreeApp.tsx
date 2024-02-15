@@ -30,11 +30,11 @@ const TreeApp = ({ tree }: { tree: SerializedTree | undefined }) => {
 
   const treeInfo = new TreeInfo(tree);
 
-  let tabs: [string, React.FC][] = [
-    ["Bottom Up", BottomUp],
-    ["Top Down", TopDown],
-    ["JSON", () => <ReactJson src={tree} />],
-  ];
+  const tabs: [string, React.FC][] = [["Top Down", TopDown]];
+
+  if (treeInfo.errorNodes().length > 0) {
+    tabs.unshift(["Bottom Up", BottomUp]);
+  }
 
   if (tree.cycle !== undefined) {
     // FIXME: why do I need the '!' here? - - - - - --------  VVVVVVVV

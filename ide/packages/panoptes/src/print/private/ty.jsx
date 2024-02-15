@@ -1,8 +1,6 @@
 import _ from "lodash";
 import React from "react";
 
-import { HoverInfo } from "../../HoverInfo";
-import { IcoMegaphone } from "../../Icons";
 import { Toggle } from "../../Toggle";
 import { anyElems, fnInputsAndOutput, tyIsUnit } from "../../utilities/func";
 import { PrintConst } from "./const";
@@ -99,6 +97,7 @@ export const PrintTyKind = ({ o }) => {
   } else if ("Adt" in o) {
     return <PrintDefPath o={o.Adt} />;
   } else if ("Array" in o) {
+    console.debug("Printing Array", o);
     const [ty, sz] = o.Array;
     return (
       <span>
@@ -268,7 +267,9 @@ export const PrintFnDef = ({ o }) => {
   return (
     <>
       <Toggle summary=".." Children={() => <PrintPolyFnSig o={o.sig} />} />{" "}
-      {"{"}<PrintDefPath o={o.path} />{"}"}
+      {"{"}
+      <PrintDefPath o={o.path} />
+      {"}"}
     </>
   );
 };
@@ -436,30 +437,30 @@ export const PrintOpaqueImplType = ({ o }) => {
 
   const fnTraits = _.map(o.fnTraits, trait => () => <PrintFnTrait o={trait} />);
   const traits = _.map(o.traits, trait => () => <PrintTrait o={trait} />);
-  const lifetimes = _.map(o.lifetimes, lifetime => () => (
-    <PrintRegion o={lifetime} />
-  ));
+  const lifetimes = _.map(
+    // XXX: terrible HACK, because PrintRegion can return null but we print
+    // the elements in a '+' concatenated list.
+    _.filter(o.lifetimes, lifetime => <PrintRegion o={lifetime} />),
+    lifetime => () => lifetime
+  );
 
   const implComponents = [...fnTraits, ...traits, ...lifetimes];
 
-  const addSized =
-    o.hasSizedBound &&
-    (!anyElems(fnTraits, traits, lifetimes) || o.hasNegativeSizedBound);
+  const pe = anyElems(implComponents);
+  const addSized = o.hasSizedBound && (!pe || o.hasNegativeSizedBound);
   const addMaybeSized = !o.hasSizedBound && !o.hasNegativeSizedBound;
   const sized =
-    addSized || addMaybeSized ? (addMaybeSized ? "?" : "") + "Sized" : null;
-
-  const lastSep =
-    anyElems(fnTraits, traits, lifetimes) && sized !== "" ? " + " : null;
+    addSized || addMaybeSized
+      ? `${pe ? " + " : ""}${addMaybeSized ? "?" : ""}Sized`
+      : null;
 
   const start =
-    implComponents.length === 0 && sized === "" ? "{opaque}}" : "impl ";
+    implComponents.length === 0 && sized === "" ? "{opaque}" : "impl ";
 
   return (
     <>
       {start}
       <PlusSeparated components={implComponents} />
-      {lastSep}
       {sized}
     </>
   );

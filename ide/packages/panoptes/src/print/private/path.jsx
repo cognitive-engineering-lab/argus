@@ -15,7 +15,7 @@ export const PrintValuePath = ({ o }) => {
 // qualified path. (At least that's the current idea.)
 export const PrintDefPath = ({ o }) => {
   if (o.length === 0) {
-    return "";
+    return null;
   }
 
   return (
@@ -91,7 +91,7 @@ export const PrintPathSegment = ({ o }) => {
       const suffix =
         o.disambiguator !== undefined && o.disambiguator != 0
           ? `#${o.disambiguator}`
-          : "";
+          : null;
       return (
         <span>
           {o.name}
@@ -111,7 +111,7 @@ export const PrintPathSegment = ({ o }) => {
     case "genericDelimiters": {
       // We don't want empty <> on the end of types
       if (o.inner.length === 0) {
-        return "";
+        return null;
       }
       return (
         <Angled>
@@ -140,9 +140,7 @@ export const PrintPathSegment = ({ o }) => {
 // <impl PATH for TY>
 export const PrintImplFor = ({ o }) => {
   const path =
-    o.path === undefined ? (
-      ""
-    ) : (
+    o.path === undefined ? null : (
       <span>
         <PrintDefPathFull o={o.path} />
         <Kw>for</Kw>

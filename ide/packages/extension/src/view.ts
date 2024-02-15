@@ -1,5 +1,7 @@
 import {
+  BodyHash,
   CharRange,
+  ExprIdx,
   Obligation,
   ObligationHash,
   ObligationsInBody,
@@ -31,7 +33,8 @@ type BlessedMessage = {
 // routed through the Ctx and we don't have to play the static
 // shenanigans.
 export class View {
-  public readonly panel: vscode.WebviewPanel;
+  private panel: vscode.WebviewPanel;
+  private isPanelDisposed: boolean;
   private readonly extensionUri: vscode.Uri;
   private disposables: vscode.Disposable[] = [];
 
@@ -40,12 +43,25 @@ export class View {
     initialData: [Filename, ObligationsInBody[]][],
     column: vscode.ViewColumn = vscode.ViewColumn.Beside
   ) {
-    console.log(`Creating view in ${extensionUri}`);
     this.extensionUri = extensionUri;
+    this.isPanelDisposed = true;
+    // getPanel creates a new panel if it doesn't exist.
+    this.panel = this.getPanel(initialData, column);
+  }
+
+  public getPanel(
+    initialData: [Filename, ObligationsInBody[]][] = [],
+    column: vscode.ViewColumn = vscode.ViewColumn.Beside
+  ): vscode.WebviewPanel {
+    if (!this.isPanelDisposed) {
+      return this.panel;
+    }
+
     this.panel = vscode.window.createWebviewPanel("argus", "Argus", column, {
       enableScripts: true,
-      localResourceRoots: [extensionUri],
+      localResourceRoots: [this.extensionUri],
     });
+    this.isPanelDisposed = false;
 
     // Set the webview's initial html content
     this.panel.webview.html = this.getHtmlForWebview(initialData);
@@ -60,10 +76,13 @@ export class View {
       null,
       this.disposables
     );
+
+    return this.panel;
   }
 
   public dispose() {
     // Clean up our resources
+    this.isPanelDisposed = true;
     this.panel.dispose();
     while (this.disposables.length) {
       const x = this.disposables.pop();
@@ -83,12 +102,19 @@ export class View {
     });
   }
 
-  public async blingObligation(file: Filename, obligation: ObligationHash) {
-    this.messageWebview<ObligationHash>("bling", {
+  public async blingObligation(
+    file: Filename,
+    bodyIdx: BodyHash,
+    exprIdx: ExprIdx,
+    obligation: ObligationHash
+  ) {
+    this.messageWebview<ObligationHash>("highlight", {
       type: "FROM_EXTENSION",
-      command: "bling",
+      command: "highlight",
       file,
-      oblHash: obligation,
+      bodyIdx,
+      exprIdx,
+      hash: obligation,
     });
   }
 

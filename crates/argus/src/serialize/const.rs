@@ -4,9 +4,11 @@ use rustc_apfloat::{
 };
 use rustc_hir::def::DefKind;
 use rustc_middle::ty::*;
+use rustc_span::Symbol;
 use rustc_target::abi::Size;
-use rustc_type_ir as ir;
-use serde::{ser::SerializeSeq, Serialize};
+use serde::Serialize;
+#[cfg(feature = "testing")]
+use ts_rs::TS;
 
 use super::*;
 
@@ -21,59 +23,7 @@ impl ConstDef {
   where
     S: serde::Serializer,
   {
-    #[derive(Serialize)]
-    #[serde(tag = "type", rename_all = "camelCase")]
-    enum ConstKindDef<'a, 'tcx: 'a> {
-      Unevaluated {
-        #[serde(with = "UnevaluatedConstDef")]
-        data: &'a UnevaluatedConst<'tcx>,
-      },
-      Param {
-        #[serde(with = "ParamConstDef")]
-        data: &'a ParamConst,
-      },
-      Infer {
-        #[serde(with = "InferConstDef")]
-        data: &'a InferConst,
-      },
-      Bound {
-        data: BoundVariable,
-      },
-      // TODO:
-      // Placeholder {
-      //   #[serde(skip)] // TODO:
-      //   data: &'a Placeholder<BoundVar>,
-      // },
-      Value {
-        data: ValTreeDef<'a, 'tcx>,
-      },
-      Error,
-      Expr {
-        #[serde(with = "ExprDef")]
-        data: &'a Expr<'tcx>,
-      },
-    }
-
-    let self_ty = &value.ty();
-    let kind = &value.kind();
-
-    let const_kind = match kind {
-      ConstKind::Unevaluated(uc) => ConstKindDef::Unevaluated { data: uc },
-      ConstKind::Param(v) => ConstKindDef::Param { data: v },
-      ConstKind::Value(v) => ConstKindDef::Value {
-        data: ValTreeDef::new(v, self_ty),
-      },
-      ConstKind::Expr(e) => ConstKindDef::Expr { data: e },
-      ConstKind::Error(..) => ConstKindDef::Error,
-
-      ConstKind::Bound(didx, bv) => ConstKindDef::Bound {
-        data: BoundVariable::new(*didx, *bv),
-      },
-      ConstKind::Infer(ic) => ConstKindDef::Infer { data: ic },
-      ConstKind::Placeholder(..) => todo!(),
-    };
-
-    const_kind.serialize(s)
+    ConstKindDef::from(value).serialize(s)
   }
 }
 
@@ -92,29 +42,115 @@ impl Slice__ConstDef {
   }
 }
 
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "Const"))]
+#[serde(tag = "type", rename_all = "camelCase")]
+enum ConstKindDef<'tcx> {
+  Unevaluated {
+    #[serde(with = "UnevaluatedConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "UnevaluatedConst"))]
+    data: UnevaluatedConst<'tcx>,
+  },
+  Param {
+    #[serde(with = "ParamConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "ParamConst"))]
+    data: ParamConst,
+  },
+  Infer {
+    #[serde(with = "InferConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "InferConst"))]
+    data: InferConst,
+  },
+  Bound {
+    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    data: BoundVariable,
+  },
+  // TODO:
+  // Placeholder {
+  //   #[serde(skip)] // TODO:
+  //   data: &'a Placeholder<BoundVar>,
+  // },
+  Value {
+    #[cfg_attr(feature = "testing", ts(type = "ValTree"))]
+    data: ValTreeDef<'tcx>,
+  },
+  Error,
+  Expr {
+    #[serde(with = "ExprDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Expr"))]
+    data: Expr<'tcx>,
+  },
+}
+
+impl<'a, 'tcx: 'a> From<&Const<'tcx>> for ConstKindDef<'tcx> {
+  fn from(value: &Const<'tcx>) -> Self {
+    let self_ty = value.ty();
+    let kind = value.kind();
+
+    match kind {
+      ConstKind::Unevaluated(uc) => ConstKindDef::Unevaluated { data: uc },
+      ConstKind::Param(v) => ConstKindDef::Param { data: v },
+      ConstKind::Value(v) => ConstKindDef::Value {
+        data: ValTreeDef::new(v, self_ty),
+      },
+      ConstKind::Expr(e) => ConstKindDef::Expr { data: e },
+      ConstKind::Error(..) => ConstKindDef::Error,
+
+      ConstKind::Bound(didx, bv) => ConstKindDef::Bound {
+        data: BoundVariable::new(didx, bv),
+      },
+      ConstKind::Infer(ic) => ConstKindDef::Infer { data: ic },
+      ConstKind::Placeholder(..) => todo!(),
+    }
+  }
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "InferConst"))]
+#[serde(rename_all = "camelCase", tag = "type")]
+enum InferConstKindDef {
+  // TODO: the `ConstVariableOrigin` doesn't seem to be publicly exposed.
+  // If it were, we could probe the InferCtxt for the origin of an unresolved
+  // infer var, potentially resulting in a named constant. But that isn't possible
+  // yet. (At least it doesn't seem to be.)
+  // Named {
+  //   #[serde(with = "SymbolDef")]
+  //   data: Symbol,
+  // },
+  Anon,
+}
+
 pub struct InferConstDef;
 impl InferConstDef {
   pub fn serialize<'tcx, S>(value: &InferConst, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase", tag = "type")]
-    enum InferConstKind {
-      // TODO: the `ConstVariableOrigin` doesn't seem to be publicly exposed.
-      // If it were, we could probe the InferCtxt for the origin of an unresolved
-      // infer var, potentially resulting in a named constant. But that isn't possible
-      // yet. (At least it doesn't seem to be.)
-      // Named {
-      //   #[serde(with = "SymbolDef")]
-      //   data: Symbol,
-      // },
-      Anon,
-    }
-
-    InferConstKind::Anon.serialize(s)
+    InferConstKindDef::from(value).serialize(s)
   }
 }
+
+impl From<&InferConst> for InferConstKindDef {
+  fn from(value: &InferConst) -> Self {
+    // TODO: can we get the name of an inference variable?
+    match value {
+      InferConst::Fresh(_) | InferConst::EffectVar(_) | InferConst::Var(_) => {
+        InferConstKindDef::Anon
+      }
+    }
+  }
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "ParamConst"))]
+pub struct ParamConstDefDef(
+  #[serde(with = "SymbolDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
+  Symbol,
+);
 
 pub struct ParamConstDef;
 impl ParamConstDef {
@@ -122,29 +158,29 @@ impl ParamConstDef {
   where
     S: serde::Serializer,
   {
-    SymbolDef::serialize(&value.name, s)
+    ParamConstDefDef(value.name).serialize(s)
   }
 }
 
-pub struct UnevaluatedConstDef;
-impl UnevaluatedConstDef {
-  pub fn serialize<'tcx, S>(
-    value: &UnevaluatedConst<'tcx>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase", tag = "type")]
-    enum UnevaluatedConstKind<'tcx> {
-      ValuePath { data: path::ValuePathWithArgs<'tcx> },
-      AnonSnippet { data: String },
-    }
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "UnevaluatedConst"))]
+#[serde(rename_all = "camelCase", tag = "type")]
+enum UnevaluatedConstKind<'tcx> {
+  ValuePath {
+    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    data: path::ValuePathWithArgs<'tcx>,
+  },
+  AnonSnippet {
+    data: String,
+  },
+}
 
+impl<'tcx> From<&UnevaluatedConst<'tcx>> for UnevaluatedConstKind<'tcx> {
+  fn from(value: &UnevaluatedConst<'tcx>) -> Self {
     let infcx = get_dynamic_ctx();
     let UnevaluatedConst { def, args } = value;
-    let here_kind = match infcx.tcx.def_kind(def) {
+    match infcx.tcx.def_kind(def) {
       DefKind::Const | DefKind::AssocConst => UnevaluatedConstKind::ValuePath {
         data: path::ValuePathWithArgs::new(*def, args),
       },
@@ -159,9 +195,20 @@ impl UnevaluatedConstDef {
         }
       }
       defkind => panic!("unexpected defkind {:?} {:?}", defkind, value),
-    };
+    }
+  }
+}
 
-    here_kind.serialize(s)
+pub struct UnevaluatedConstDef;
+impl UnevaluatedConstDef {
+  pub fn serialize<'tcx, S>(
+    value: &UnevaluatedConst<'tcx>,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    UnevaluatedConstKind::from(value).serialize(s)
   }
 }
 
@@ -197,22 +244,6 @@ impl ExprConstDef {
   {
     ExprDef::serialize(value, s)
   }
-}
-
-pub fn list__const<'tcx, S>(
-  value: &List<Const<'tcx>>,
-  s: S,
-) -> Result<S::Ok, S::Error>
-where
-  S: serde::Serializer,
-{
-  #[derive(Serialize)]
-  struct Wrapper<'tcx>(#[serde(with = "ConstDef")] Const<'tcx>);
-  let mut seq = s.serialize_seq(Some(value.len()))?;
-  for e in value {
-    seq.serialize_element(&Wrapper(e))?;
-  }
-  seq.end()
 }
 
 pub struct ConstScalarIntDef<'tcx> {
