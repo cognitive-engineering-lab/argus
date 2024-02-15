@@ -86,7 +86,7 @@ export const PrintGoal = ({ o }: { o: Goal }) => {
   const Content = () => (
     <>
       <UnsafePrintGoalPredicate o={o.goal} />
-      <div style={{ opacity: 0.5 }}>{o.debugComparison}</div>
+      {/* <div style={{ opacity: 0.5 }}>{o.debugComparison}</div> */}
     </>
   );
   return <PrintWithFallback object={o} Content={Content} />;

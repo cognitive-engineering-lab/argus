@@ -9,7 +9,7 @@ export function launchArgus(ctx: Ctx): Cmd {
   };
 }
 
-export function blingObligation(ctx: Ctx): Cmd {
+export function openError(ctx: Ctx): Cmd {
   return async (
     file: Filename,
     bh: BodyHash,
@@ -17,16 +17,5 @@ export function blingObligation(ctx: Ctx): Cmd {
     oblHash: ObligationHash
   ) => {
     ctx.view!.blingObligation(file, bh, ei, oblHash);
-  };
-}
-
-export function openError(ctx: Ctx): Cmd {
-  return async (
-    file: Filename,
-    type: "ambig" | "trait",
-    bodyIdx: number,
-    errIdx: number
-  ) => {
-    ctx.view!.openError(file, type, bodyIdx, errIdx);
   };
 }

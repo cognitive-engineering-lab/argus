@@ -36,25 +36,24 @@ export type ExtensionReturn<T extends ExtensionToWebViewMsg["command"]> =
     ? { obligations: ObligationOutput[] }
     : {};
 
-interface HighlightPayload {
-  command: "highlight";
+export interface OpenErrorPayload {
+  command: "open-error";
   bodyIdx: BodyHash;
   exprIdx: ExprIdx;
   hash: ObligationHash;
 }
 
-interface OpenErrorPayload {
-  command: "open-error";
-  errType: "ambig" | "trait";
-  bodyIdx: number;
-  errIdx: number;
-}
+export type PayloadTypes = {
+  "open-error": Omit<OpenErrorPayload, "command">;
+  "open-file": { data: ObligationOutput[] };
+  obligations: { obligations: ObligationOutput[] };
+  tree: { tree: TreeOutput };
+};
 
 export type ExtensionToWebViewMsg = { type: FROM_EXT } & (
   | { command: "reset"; data: [Filename, ObligationsInBody[]][] }
   | (CommonData &
       (
-        | HighlightPayload
         | OpenErrorPayload
         | { command: "open-file"; data: ObligationOutput[] }
         | { command: "obligations"; obligations: ObligationOutput[] }

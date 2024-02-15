@@ -10,7 +10,8 @@
 
 
 (define gen-dir "crates/argus/bindings")
-(define ext-dirs '("crates/argus/src/serialize/hir"))
+;; Include files here if hand-written TS bindings are required.
+(define ext-dirs '())
 
 (define dest-dir "ide/packages/common/src")
 

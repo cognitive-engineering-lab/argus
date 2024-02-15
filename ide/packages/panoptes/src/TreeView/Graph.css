@@ -1,0 +1,19 @@
+.TreeArea {
+    width: 100%;
+    height: 100vh;
+    grid-area: tree-interact;
+    border-right: solid 1px #ccc;
+}
+
+span.foreign-wrapper {
+    width: fit-content;
+    min-width: 50px;
+}
+
+rect {
+    fill: var(--vscode-input-background);
+}
+
+.edge__goal-to-candidate {
+    stroke-dasharray: 20,10,5,5,5,10;
+}

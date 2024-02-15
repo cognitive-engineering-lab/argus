@@ -33,21 +33,24 @@ const App = ({
   // NOTE: this listener should only listen for posted messages, not
   // for things that could be an expected response from a webview request.
   const listener = (e: MessageEvent) => {
-    console.log("Received message from extension", e.data);
     const {
       command,
       payload,
     }: { command: string; payload: ExtensionToWebViewMsg } = e.data;
 
+    console.debug("Received message from extension", command, payload);
+
     if (command != payload.command) {
-      console.log("Received message with mismatched commands", e.data);
+      console.error("Received message with mismatched commands", e.data);
       return;
     }
 
     switch (payload.command) {
-      case "highlight": {
+      case "open-error": {
+        console.debug("Current highlighted obligation", highlightedObligation);
         highlightedObligation.value = payload;
-        return setTimeout(() => (highlightedObligation.value = null), 1000);
+        return;
+        // return setTimeout(() => (highlightedObligation.value = null), 1000);
       }
 
       case "open-file": {

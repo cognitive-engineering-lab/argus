@@ -11,6 +11,7 @@ import {
   ExtensionToWebViewMsg,
   Filename,
   ObligationOutput,
+  OpenErrorPayload,
   WebViewToExtensionMsg,
 } from "@argus/common/lib";
 import { MessageHandlerData } from "@estruyf/vscode";
@@ -108,33 +109,13 @@ export class View {
     exprIdx: ExprIdx,
     obligation: ObligationHash
   ) {
-    this.messageWebview<ObligationHash>("highlight", {
+    this.messageWebview<Omit<OpenErrorPayload, "command">>("open-error", {
       type: "FROM_EXTENSION",
-      command: "highlight",
+      command: "open-error",
       file,
       bodyIdx,
       exprIdx,
       hash: obligation,
-    });
-  }
-
-  public async openError(
-    file: Filename,
-    type: "ambig" | "trait",
-    bodyIdx: number,
-    errIdx: number
-  ) {
-    this.messageWebview<{
-      errType: "ambig" | "trait";
-      bodyIdx: number;
-      errIdx: number;
-    }>("open-error", {
-      type: "FROM_EXTENSION",
-      command: "open-error",
-      file,
-      errType: type,
-      bodyIdx,
-      errIdx,
     });
   }
 

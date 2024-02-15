@@ -10,6 +10,7 @@ import ReactJson from "react-json-view";
 
 import BottomUp from "./BottomUp";
 import { TreeContext } from "./Context";
+import Graph from "./Graph";
 import TopDown from "./TopDown";
 import "./TreeApp.css";
 import TreeCycle from "./TreeCycle";
@@ -30,7 +31,10 @@ const TreeApp = ({ tree }: { tree: SerializedTree | undefined }) => {
 
   const treeInfo = new TreeInfo(tree);
 
-  const tabs: [string, React.FC][] = [["Top Down", TopDown]];
+  const tabs: [string, React.FC][] = [
+    ["Top Down", TopDown],
+    ["Graph", Graph],
+  ];
 
   if (treeInfo.errorNodes().length > 0) {
     tabs.unshift(["Bottom Up", BottomUp]);

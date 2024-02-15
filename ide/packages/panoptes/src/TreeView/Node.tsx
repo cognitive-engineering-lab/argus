@@ -34,7 +34,7 @@ export const Candidate = ({ candidate }: { candidate: CandidateTy }) => {
 export const Node = ({ node }: { node: NodeTy }) => {
   switch (node.type) {
     case "result":
-      return node.data;
+      return <Result result={node.data} />;
     case "goal":
       return (
         <>

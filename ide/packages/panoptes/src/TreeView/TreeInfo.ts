@@ -55,6 +55,10 @@ export class TreeInfo {
     console.debug("Tree abstracted view", this.view);
   }
 
+  get topology(): TreeTopology {
+    return this.view.topology;
+  }
+
   get root(): ProofNodeIdx {
     return this.tree.root;
   }

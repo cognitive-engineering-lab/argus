@@ -39,11 +39,10 @@ async function activateBackend(ctx: Ctx): Promise<Ctx> {
 
 function createCommands(): Record<string, CommandFactory> {
   return {
-    // Public commands taht appear in the command palette and thus need to be listed in package.json.
+    // Public commands that appear in the command palette and thus need to be listed in package.json.
     inspectWorkspace: { enabled: commands.launchArgus },
 
     // Private commands used internally, these should not appear in the command palette.
-    blingObligation: { enabled: commands.blingObligation },
     openError: { enabled: commands.openError },
   };
 }
