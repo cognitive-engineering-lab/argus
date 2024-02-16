@@ -45,7 +45,7 @@ impl Slice__ConstDef {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "Const"))]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type")]
 enum ConstKindDef<'tcx> {
   Unevaluated {
     #[serde(with = "UnevaluatedConstDef")]
@@ -78,7 +78,7 @@ enum ConstKindDef<'tcx> {
   Error,
   Expr {
     #[serde(with = "ExprDef")]
-    #[cfg_attr(feature = "testing", ts(type = "Expr"))]
+    #[cfg_attr(feature = "testing", ts(type = "ExprDef"))]
     data: Expr<'tcx>,
   },
 }
@@ -109,7 +109,7 @@ impl<'a, 'tcx: 'a> From<&Const<'tcx>> for ConstKindDef<'tcx> {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "InferConst"))]
-#[serde(rename_all = "camelCase", tag = "type")]
+#[serde(tag = "type")]
 enum InferConstKindDef {
   // TODO: the `ConstVariableOrigin` doesn't seem to be publicly exposed.
   // If it were, we could probe the InferCtxt for the origin of an unresolved
@@ -165,7 +165,7 @@ impl ParamConstDef {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "UnevaluatedConst"))]
-#[serde(rename_all = "camelCase", tag = "type")]
+#[serde(tag = "type")]
 enum UnevaluatedConstKind<'tcx> {
   ValuePath {
     #[cfg_attr(feature = "testing", ts(type = "any"))]
@@ -257,74 +257,91 @@ impl<'tcx> ConstScalarIntDef<'tcx> {
   }
 }
 
-impl<'tcx> Serialize for ConstScalarIntDef<'tcx> {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase", tag = "type")]
-    enum ConstScalarIntKind {
-      False,
-      True,
-      Float { data: String, is_finite: bool },
-      Int { data: String },
-      Char { data: String },
-      Misc { data: String },
-    }
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "ConstScalarInt"))]
+#[serde(tag = "type")]
+enum ConstScalarIntDefDef {
+  False,
+  True,
+  #[serde(rename_all = "camelCase")]
+  Float {
+    data: String,
+    is_finite: bool,
+  },
+  Int {
+    data: String,
+  },
+  Char {
+    data: String,
+  },
+  Misc {
+    data: String,
+  },
+}
 
+impl<'tcx> From<&ConstScalarIntDef<'tcx>> for ConstScalarIntDefDef {
+  fn from(value: &ConstScalarIntDef<'tcx>) -> Self {
     let infcx = get_dynamic_ctx();
     let tcx = infcx.tcx;
+    let this = value;
 
-    let here_kind = match self.ty.kind() {
-      Bool if self.int == ScalarInt::FALSE => ConstScalarIntKind::False,
-      Bool if self.int == ScalarInt::TRUE => ConstScalarIntKind::True,
+    match this.ty.kind() {
+      Bool if this.int == ScalarInt::FALSE => ConstScalarIntDefDef::False,
+      Bool if this.int == ScalarInt::TRUE => ConstScalarIntDefDef::True,
       Float(FloatTy::F32) => {
-        let val = Single::try_from(self.int).unwrap();
-        ConstScalarIntKind::Float {
+        let val = Single::try_from(this.int).unwrap();
+        ConstScalarIntDefDef::Float {
           data: format!("{val}"),
           is_finite: val.is_finite(),
         }
       }
       Float(FloatTy::F64) => {
-        let val = Double::try_from(self.int).unwrap();
-        ConstScalarIntKind::Float {
+        let val = Double::try_from(this.int).unwrap();
+        ConstScalarIntDefDef::Float {
           data: format!("{val}"),
           is_finite: val.is_finite(),
         }
       }
       Uint(_) | Int(_) => {
-        let int = ConstInt::new(
-          self.int,
-          matches!(self.ty.kind(), Int(_)),
-          self.ty.is_ptr_sized_integral(),
-        );
-        ConstScalarIntKind::Int {
-          data: format!("{}", self.int),
+        // let int = ConstInt::new(
+        //   this.int,
+        //   matches!(this.ty.kind(), Int(_)),
+        //   this.ty.is_ptr_sized_integral(),
+        // );
+        ConstScalarIntDefDef::Int {
+          data: format!("{}", this.int),
         }
       }
-      Char if char::try_from(self.int).is_ok() => ConstScalarIntKind::Char {
-        data: format!("{}", char::try_from(self.int).is_ok()),
+      Char if char::try_from(this.int).is_ok() => ConstScalarIntDefDef::Char {
+        data: format!("{}", char::try_from(this.int).is_ok()),
       },
       Ref(..) | RawPtr(..) | FnPtr(_) => {
-        let data = self.int.assert_bits(tcx.data_layout.pointer_size);
-        ConstScalarIntKind::Misc {
+        let data = this.int.assert_bits(tcx.data_layout.pointer_size);
+        ConstScalarIntDefDef::Misc {
           data: format!("0x{data:x}"),
         }
       }
       _ => {
-        if self.int.size() == Size::ZERO {
-          ConstScalarIntKind::Misc {
+        if this.int.size() == Size::ZERO {
+          ConstScalarIntDefDef::Misc {
             data: "transmute(())".to_string(),
           }
         } else {
-          ConstScalarIntKind::Misc {
-            data: format!("transmute(0x{:x})", self.int),
+          ConstScalarIntDefDef::Misc {
+            data: format!("transmute(0x{:x})", this.int),
           }
         }
       }
-    };
+    }
+  }
+}
 
-    here_kind.serialize(s)
+impl<'tcx> Serialize for ConstScalarIntDef<'tcx> {
+  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    ConstScalarIntDefDef::from(self).serialize(s)
   }
 }

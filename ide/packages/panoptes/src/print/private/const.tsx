@@ -1,70 +1,77 @@
+import {
+  Const,
+  ConstScalarInt,
+  InferConst,
+  ParamConst,
+  UnevaluatedConst,
+} from "@argus/common/bindings";
 import React from "react";
 
 import { PrintValuePath } from "./path";
 import { PrintExpr, PrintValueTree } from "./term";
 import { PrintBoundVariable, PrintSymbol } from "./ty";
 
-export const PrintConst = ({ o }) => {
+export const PrintConst = ({ o }: { o: Const }) => {
   console.debug("Printing const", o);
   switch (o.type) {
-    case "error":
+    case "Error":
       return "{{const error}}";
-    case "param":
+    case "Param":
       return <PrintParamConst o={o.data} />;
-    case "infer":
+    case "Infer":
       return <PrintInferConst o={o.data} />;
-    case "bound":
+    case "Bound":
       return <PrintBoundVariable o={o.data} />;
-    case "Placeholder":
-      throw new Error("TODO");
-    case "unevaluated":
+    // case "placeholder":
+    //   throw new Error("TODO");
+    case "Unevaluated":
       return <PrintUnevaluatedConst o={o.data} />;
-    case "value":
+    case "Value":
       return <PrintValueTree o={o.data} />;
-    case "expr":
+    case "Expr":
       return <PrintExpr o={o.data} />;
     default:
       throw new Error("Unknown const kind", o);
   }
 };
 
-const PrintInferConst = ({ o }) => {
+const PrintInferConst = ({ o }: { o: InferConst }) => {
   switch (o.type) {
-    case "anon": {
+    case "Anon": {
       return <span>_</span>;
     }
     default:
-      throw new Error("Unknown infer const kind", o);
+      throw new Error("Unknown infer const kind", o as any);
   }
 };
 
-const PrintParamConst = ({ o }) => {
-  return <PrintSymbol o={o.name} />;
+const PrintParamConst = ({ o }: { o: ParamConst }) => {
+  return <PrintSymbol o={o} />;
 };
 
-const PrintUnevaluatedConst = ({ o }) => {
+const PrintUnevaluatedConst = ({ o }: { o: UnevaluatedConst }) => {
   switch (o.type) {
-    case "valuePath": {
+    case "ValuePath": {
       return <PrintValuePath o={o.data} />;
     }
-    case "anonSnippet": {
+    case "AnonSnippet": {
       return o.data;
     }
-    case "nonLocalPath": {
-      throw new Error("todo");
-    }
+    // case "nonlocalpath": {
+    //   throw new Error("todo");
+    // }
     default:
       throw new Error("Unknown unevaluated const kind", o);
   }
 };
 
-export const PrintConstScalarInt = ({ o }) => {
+export const PrintConstScalarInt = ({ o }: { o: ConstScalarInt }) => {
   switch (o.type) {
-    case "false":
+    case "False":
       return "false";
-    case "true":
+    case "True":
       return "true";
-    case "float": {
+    case "Float": {
       return (
         <>
           {o.data}
@@ -74,9 +81,9 @@ export const PrintConstScalarInt = ({ o }) => {
     }
 
     // NOTE: fallthrough is intentional
-    case "int":
-    case "char":
-    case "misc": {
+    case "Int":
+    case "Char":
+    case "Misc": {
       return o.data;
     }
     default:

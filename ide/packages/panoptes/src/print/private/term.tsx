@@ -127,8 +127,7 @@ const PrintUnOp = ({ o }: { o: UnOp }) => {
 
 export const PrintValueTree = ({ o }: { o: ValTree }) => {
   switch (o.type) {
-    case "string": {
-      // TODO: do we need to escape something here?
+    case "String": {
       const prefix = o.isDeref ? "*" : "";
       return (
         <>
@@ -137,7 +136,7 @@ export const PrintValueTree = ({ o }: { o: ValTree }) => {
         </>
       );
     }
-    case "ref": {
+    case "Ref": {
       return (
         <>
           {"&"}
@@ -145,15 +144,15 @@ export const PrintValueTree = ({ o }: { o: ValTree }) => {
         </>
       );
     }
-    case "aggregate": {
+    case "Aggregate": {
       switch (o.kind.type) {
-        case "array":
+        case "Array":
           return <PrintAggregateArray fields={o.fields} />;
-        case "tuple":
+        case "Tuple":
           return <PrintAggregateTuple fields={o.fields} />;
-        case "adtnovariants":
+        case "AdtNoVariants":
           return <PrintAggregateAdtNoVariants o={o} />;
-        case "adt":
+        case "Adt":
           return (
             <PrintAggregateAdt
               fields={o.fields}
@@ -165,9 +164,11 @@ export const PrintValueTree = ({ o }: { o: ValTree }) => {
           throw new Error("Unknown aggregate kind", o.kind);
       }
     }
-    case "leaf": {
+    case "Leaf": {
       return <PrintTreeLeaf data={o.data} kind={o.kind} />;
     }
+    default:
+      throw new Error("Unknown value tree", o);
   }
 };
 
@@ -206,7 +207,7 @@ const PrintAggregateAdt = ({
   kind: AdtAggregateKind;
 }) => {
   switch (kind.type) {
-    case "fn": {
+    case "Fn": {
       const head = <PrintValuePath o={valuePath} />;
       const components = _.map(fields, field => () => <PrintConst o={field} />);
       return (
@@ -215,19 +216,19 @@ const PrintAggregateAdt = ({
         </>
       );
     }
-    case "const": {
-      // TODO: is this right???
-      return "";
+    case "Const": {
+      // FIXME: seems weird that rustc doesn't print anything here.
+      return null;
     }
-    case "misc": {
+    case "Misc": {
       const components = _.map(
         _.zip(kind.names, fields),
         ([name, field]) =>
           () =>
             (
-              <span>
-                <PrintSymbol o={name} />: <PrintConst o={field} />
-              </span>
+              <>
+                <PrintSymbol o={name} />: <PrintConst o={field!} />
+              </>
             )
       );
 
@@ -241,7 +242,7 @@ const PrintAggregateAdt = ({
 };
 
 const PrintTreeLeaf = ({ data, kind }: { data: any; kind: LeafKind }) => {
-  const prefix = kind.type === "ref" ? "&" : "";
+  const prefix = kind.type === "Ref" ? "&" : "";
   return (
     <>
       {prefix}

@@ -12,6 +12,8 @@ use rustc_span::symbol::Symbol;
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 use smallvec::SmallVec;
+#[cfg(feature = "testing")]
+use ts_rs::TS;
 
 use super::{ty as serial_ty, *};
 
@@ -445,23 +447,28 @@ impl<'tcx> Serialize for OpaqueImplType<'tcx> {
   }
 }
 
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+struct DefinedPath<'tcx>(Vec<PathSegment<'tcx>>);
+
 #[derive(Debug, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+#[serde(tag = "type")]
 enum PathSegment<'tcx> {
   Colons,     // ::
   LocalCrate, // crate
   RawGuess,   // r#
   DefPathDataName {
+    #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
     #[serde(with = "serial_ty::SymbolDef")]
     name: Symbol,
     #[serde(skip_serializing_if = "Option::is_none")]
     disambiguator: Option<u32>,
   },
-  Crate {
-    #[serde(with = "serial_ty::SymbolDef")]
-    name: Symbol,
-  },
   Ty {
+    #[cfg_attr(feature = "testing", ts(type = "any"))]
     #[serde(with = "serial_ty::TyDef")]
     ty: Ty<'tcx>,
   },
@@ -469,12 +476,15 @@ enum PathSegment<'tcx> {
     inner: Vec<PathSegment<'tcx>>,
   }, // < ... >
   CommaSeparated {
+    #[cfg_attr(feature = "testing", ts(type = "any[]"))]
     entries: Vec<serde_json::Value>,
     kind: CommaSeparatedKind,
   }, // ..., ..., ...
   Impl {
+    #[cfg_attr(feature = "testing", ts(type = "DefinedPath"))]
     #[serde(skip_serializing_if = "Option::is_none")]
     path: Option<TraitRefPrintOnlyTraitPathDefWrapper<'tcx>>,
+    #[cfg_attr(feature = "testing", ts(type = "any"))]
     #[serde(with = "TyDef")]
     ty: Ty<'tcx>,
     kind: ImplKind,
@@ -485,7 +495,9 @@ enum PathSegment<'tcx> {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+#[serde(tag = "type")]
 pub enum ImplKind {
   As,
   For,
@@ -516,7 +528,9 @@ struct PathBuilder<'a, 'tcx: 'a, S: serde::Serializer> {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+#[serde(tag = "type")]
 pub enum CommaSeparatedKind {
   GenericArg,
 }
@@ -582,7 +596,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
   }
 
   fn serialize(self, s: S) -> Result<S::Ok, S::Error> {
-    self.segments.serialize(s)
+    DefinedPath(self.segments).serialize(s)
   }
 
   fn should_print_verbose(&self) -> bool {

@@ -62,18 +62,16 @@ impl<'tcx> Serialize for ValTreeDef<'tcx> {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "ValTree"))]
-#[serde(rename_all = "camelCase", tag = "type")]
+#[serde(tag = "type")]
 enum ValTreeKind<'tcx> {
-  #[serde(rename_all = "camelCase")]
   Ref {
-    #[cfg_attr(feature = "testing", ts(type = "ValTreeKind"))]
+    #[cfg_attr(feature = "testing", ts(type = "ValTree"))]
     inner: ValTreeDef<'tcx>,
   },
 
   #[serde(rename_all = "camelCase")]
   String { data: String, is_deref: bool },
 
-  #[serde(rename_all = "camelCase")]
   Aggregate {
     #[serde(with = "Slice__ConstDef")]
     #[cfg_attr(feature = "testing", ts(type = "any"))]
@@ -81,9 +79,8 @@ enum ValTreeKind<'tcx> {
     kind: ValTreeAggregateKind<'tcx>,
   },
 
-  #[serde(rename_all = "camelCase")]
   Leaf {
-    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    #[cfg_attr(feature = "testing", ts(type = "ConstScalarInt"))]
     data: ConstScalarIntDef<'tcx>,
     kind: LeafKind,
   },
@@ -92,7 +89,7 @@ enum ValTreeKind<'tcx> {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-#[serde(rename_all = "camelCase", tag = "type")]
+#[serde(tag = "type")]
 enum ValTreeAggregateKind<'tcx> {
   Array,
   Tuple,
@@ -107,7 +104,7 @@ enum ValTreeAggregateKind<'tcx> {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-#[serde(rename_all = "camelCase", tag = "type")]
+#[serde(tag = "type")]
 enum AdtAggregateKind {
   Fn,
   Const,
@@ -121,7 +118,7 @@ enum AdtAggregateKind {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-#[serde(rename_all = "camelCase", tag = "type")]
+#[serde(tag = "type")]
 enum LeafKind {
   Ref,
   Scalar,

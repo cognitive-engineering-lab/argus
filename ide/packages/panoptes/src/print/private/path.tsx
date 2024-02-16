@@ -1,3 +1,4 @@
+import { DefinedPath, PathSegment } from "@argus/common/bindings";
 import _ from "lodash";
 import React from "react";
 
@@ -6,14 +7,14 @@ import { takeRightUntil } from "../../utilities/func";
 import { Angled, CommaSeparated, Kw } from "./syntax";
 import { PrintGenericArg, PrintTy } from "./ty";
 
-export const PrintValuePath = ({ o }) => {
+export const PrintValuePath = ({ o }: { o: DefinedPath }) => {
   return <PrintDefPath o={o} />;
 };
 
 // NOTE: when we aren't hovering over the path, we just
 // want to show the last segment. On hover, it should be the fully
 // qualified path. (At least that's the current idea.)
-export const PrintDefPath = ({ o }) => {
+export const PrintDefPath = ({ o }: { o: DefinedPath }) => {
   if (o.length === 0) {
     return null;
   }
@@ -38,15 +39,13 @@ export const PrintDefPath = ({ o }) => {
 };
 
 // PathSegment[]
-export const PrintDefPathShort = ({ o }) => {
+export const PrintDefPathShort = ({ o }: { o: DefinedPath }) => {
   console.debug("Printing def path short: ", o);
   const prefix = takeRightUntil(o, segment => {
     return (
-      segment.type === "crate" ||
-      segment.type === "ty" ||
-      segment.type === "defPathDataName" ||
-      segment.type === "implFor" ||
-      segment.type === "implAs"
+      segment.type === "Ty" ||
+      segment.type === "DefPathDataName" ||
+      segment.type === "Impl"
     );
   });
 
@@ -60,34 +59,31 @@ export const PrintDefPathShort = ({ o }) => {
 };
 
 // PathSegment[]
-export const PrintDefPathFull = ({ o }) => {
+export const PrintDefPathFull = ({ o }: { o: DefinedPath }) => {
   return (
-    <span>
+    <>
       {_.map(o, (segment, i) => {
         return <PrintPathSegment o={segment} key={i} />;
       })}
-    </span>
+    </>
   );
 };
 
-export const PrintPathSegment = ({ o }) => {
+export const PrintPathSegment = ({ o }: { o: PathSegment }) => {
   switch (o.type) {
-    case "colons": {
+    case "Colons": {
       return "::";
     }
-    case "localCrate": {
+    case "LocalCrate": {
       return "crate";
     }
-    case "rawGuess": {
+    case "RawGuess": {
       return "r#";
     }
-    case "crate": {
-      return o.name;
-    }
-    case "ty": {
+    case "Ty": {
       return <PrintTy o={o.ty} />;
     }
-    case "defPathDataName": {
+    case "DefPathDataName": {
       const suffix =
         o.disambiguator !== undefined && o.disambiguator != 0
           ? `#${o.disambiguator}`
@@ -99,16 +95,15 @@ export const PrintPathSegment = ({ o }) => {
         </span>
       );
     }
-    case "impl": {
-      if (o.kind === "for") {
-        return <PrintImplFor o={o} />;
-      } else if (o.kind === "as") {
-        return <PrintImplAs o={o} />;
-      } else {
-        throw new Error("Unknown impl kind", o);
+    case "Impl": {
+      switch (o.kind.type) {
+        case "For":
+          return <PrintImplFor path={o.path} ty={o.ty} />;
+        case "As":
+          return <PrintImplAs path={o.path} ty={o.ty} />;
       }
     }
-    case "genericDelimiters": {
+    case "GenericDelimiters": {
       // We don't want empty <> on the end of types
       if (o.inner.length === 0) {
         return null;
@@ -119,11 +114,11 @@ export const PrintPathSegment = ({ o }) => {
         </Angled>
       );
     }
-    case "commaSeparated": {
+    case "CommaSeparated": {
       const Mapper =
-        o.kind.type === "genericArg"
+        o.kind.type === "GenericArg"
           ? PrintGenericArg
-          : ({ o }) => {
+          : ({ o }: { o: any }) => {
               throw new Error("Unknown comma separated kind", o);
             };
 
@@ -131,73 +126,42 @@ export const PrintPathSegment = ({ o }) => {
 
       return <CommaSeparated components={components} />;
     }
-    default: {
-      throw new Error("Unknown path segment type", o);
-    }
+    default:
+      throw new Error("Unknown path segment", o as any);
   }
 };
 
 // <impl PATH for TY>
-export const PrintImplFor = ({ o }) => {
-  const path =
-    o.path === undefined ? null : (
-      <span>
-        <PrintDefPathFull o={o.path} />
-        <Kw>for</Kw>
-      </span>
+export const PrintImplFor = ({ path, ty }: { path?: DefinedPath; ty: any }) => {
+  const p =
+    path === undefined ? null : (
+      <>
+        <PrintDefPathFull o={path} />
+        <Kw>for</Kw>{" "}
+      </>
     );
+
   return (
-    <span>
-      <Kw>impl</Kw> {path} <PrintTy o={o.ty} />
-    </span>
+    <>
+      <Kw>impl</Kw> {p}
+      <PrintTy o={ty} />
+    </>
   );
 };
 
 // <TY as PATH>
-export const PrintImplAs = ({ o }) => {
-  const path =
-    o.path !== undefined ? (
-      <span>
+export const PrintImplAs = ({ path, ty }: { path?: DefinedPath; ty: any }) => {
+  const p =
+    path === undefined ? null : (
+      <>
         {" "}
-        <Kw>as</Kw> <PrintDefPathFull o={o.path} />
-      </span>
-    ) : null;
-  return (
-    <span>
-      <PrintTy o={o.ty} />
-      {path}
-    </span>
-  );
-};
+        <Kw>as</Kw> <PrintDefPathFull o={path} />
+      </>
+    );
 
-export const PrintDefPathData = ({ o }) => {
-  if ("CrateRoot" in o) {
-    return "crate";
-  } else if ("Impl" in o) {
-    return "impl";
-  } else if ("ForeignMod" in o) {
-    return "foreign mod";
-  } else if ("Use" in o) {
-    return "use";
-  } else if ("GlobalAsm" in o) {
-    return "asm";
-  } else if ("TypeNs" in o) {
-    return o.TypeNs;
-  } else if ("ValueNs" in o) {
-    return o.TypeNs;
-  } else if ("MacroNs" in o) {
-    return o.MacroNs;
-  } else if ("LifetimeNs" in o) {
-    return o.LifetimeNs;
-  } else if ("Ctor" in o) {
-    return "{{constructor}}";
-  } else if ("AnonConst" in o) {
-    return "{{anon_constructor}}";
-  } else if ("ImplTrait" in o) {
-    return "impl-trait";
-  } else if ("ImplTraitAssocTy" in o) {
-    return "impl-trait-assoc-ty";
-  } else {
-    throw new Error("Unknown def path data", o);
-  }
+  return (
+    <>
+      <PrintTy o={ty} /> {p}
+    </>
+  );
 };
