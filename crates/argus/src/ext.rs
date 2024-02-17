@@ -1,4 +1,7 @@
-use rustc_data_structures::stable_hasher::{Hash64, HashStable, StableHasher};
+use rustc_data_structures::{
+  fx::FxIndexMap,
+  stable_hasher::{Hash64, HashStable, StableHasher},
+};
 use rustc_hir::{
   def_id::{DefId, LocalDefId},
   BodyId, HirId,
@@ -258,6 +261,41 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
       pretty_predicates.push(p.clone());
     }
 
+    // ARGUS: ADDITION: group predicates together based on `self_ty`.
+    let mut grouped: FxIndexMap<_, Vec<_>> = FxIndexMap::default();
+    let mut other = vec![];
+    for p in pretty_predicates {
+      // TODO: all this binder skipping is a HACK.
+      if let Some(poly_trait_ref) = p.as_trait_clause() {
+        let ty = poly_trait_ref.self_ty().skip_binder();
+        grouped.entry(ty).or_default().push(poly_trait_ref);
+      } else {
+        other.push(p);
+      }
+    }
+
+    use crate::types::{ClauseBound, ClauseWithBounds, GroupedClauses};
+
+    let grouped = grouped
+      .into_iter()
+      .map(|(ty, trait_refs)| ClauseWithBounds {
+        ty,
+        bounds: trait_refs
+          .into_iter()
+          .map(|poly_trait_ref| {
+            let trait_ref =
+              poly_trait_ref.map_bound(|tr| tr.trait_ref).skip_binder();
+            ClauseBound {
+              path: TraitRefPrintOnlyTraitPathDefWrapper(trait_ref),
+              polarity: poly_trait_ref.polarity(),
+            }
+          })
+          .collect::<Vec<_>>(),
+      })
+      .collect::<Vec<_>>();
+
+    let grouped_clauses = GroupedClauses { grouped, other };
+
     let tys_without_default_bounds =
       types_without_default_bounds.into_iter().collect::<Vec<_>>();
 
@@ -265,7 +303,8 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
       args: arg_names,
       name,
       self_ty,
-      predicates: pretty_predicates,
+      predicates: grouped_clauses,
+      // predicates: pretty_predicates,
       tys_without_default_bounds,
     })
   }

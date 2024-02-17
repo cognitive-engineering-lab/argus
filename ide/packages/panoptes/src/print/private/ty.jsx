@@ -14,6 +14,7 @@ export const PrintBinder = ({ binder, innerF }) => {
 };
 
 export const PrintImplHeader = ({ o }) => {
+  console.debug("Printing ImplHeader", o);
   const genArgs = _.map(o.args, arg => () => <PrintGenericArg o={arg} />);
   const argsWAngle =
     genArgs.length === 0 ? null : (
@@ -43,17 +44,25 @@ export const PrintImplHeader = ({ o }) => {
 };
 
 export const PrintWhereClause = ({ predicates, tysWOBound }) => {
-  if (!anyElems(predicates, tysWOBound)) {
+  if (!anyElems(predicates.grouped, predicates.other, tysWOBound)) {
     return null;
   }
 
+  const groupedClauses = _.map(predicates.grouped, (group, idx) => (
+    <div className="WhereConstraint" key={idx}>
+      <PrintClauseWithBounds o={group} />
+    </div>
+  ));
+  const noGroupedClauses = _.map(predicates.other, (clause, idx) => (
+    <div className="WhereConstraint" key={idx}>
+      <PrintClause o={clause} />
+    </div>
+  ));
+
   const whereHoverContent = () => (
     <div className="DirNode WhereConstraintArea">
-      {_.map(predicates, (pred, idx) => (
-        <div className="WhereConstraint" key={idx}>
-          <PrintClause o={pred} />
-        </div>
-      ))}
+      {groupedClauses}
+      {noGroupedClauses}
       {_.map(tysWOBound, (ty, idx) => (
         <div className="WhereConstraint" key={idx}>
           <PrintTy o={ty} />: ?Sized
@@ -70,8 +79,21 @@ export const PrintWhereClause = ({ predicates, tysWOBound }) => {
   );
 };
 
+const PrintClauseWithBounds = ({ o }) => {
+  const boundComponents = _.map(o.bounds, bound => () => (
+    <>
+      <PrintImplPolarity o={bound.polarity} />
+      <PrintDefPath o={bound.path} />
+    </>
+  ));
+  return (
+    <>
+      <PrintTy o={o.ty} />: <PlusSeparated components={boundComponents} />
+    </>
+  );
+};
+
 export const PrintTy = ({ o }) => {
-  console.debug("Printing Ty", o);
   return <PrintTyKind o={o} />;
 };
 
@@ -382,6 +404,10 @@ export const PrintBoundVariable = ({ o }) => {
   throw new Error("TODO");
 };
 
+const PrintImplPolarity = ({ o }) => {
+  return o === "Negative" ? "!" : null;
+};
+
 export const PrintOpaqueImplType = ({ o }) => {
   console.debug("Printing OpaqueImplType", o);
 
@@ -413,7 +439,7 @@ export const PrintOpaqueImplType = ({ o }) => {
 
   const PrintTrait = ({ o }) => {
     console.debug("Printing Trait", o);
-    const prefix = o.polarity === "Negative" ? "!" : null;
+    const prefix = <PrintImplPolarity o={o.polarity} />;
     const name = <PrintDefPath o={o.traitName} />;
     const ownArgs = _.map(o.ownArgs, arg => () => <PrintGenericArg o={arg} />);
     const assocArgs = _.map(o.assocArgs, arg => () => (

@@ -25,7 +25,7 @@ use crate::{
     path::PathDefNoArgs,
     serialize_to_value,
     ty::{
-      Slice__ClauseDef, Slice__GenericArgDef, Slice__TyDef, SymbolDef,
+      ImplPolarityDef, Slice__ClauseDef, Slice__GenericArgDef, Slice__TyDef,
       TraitRefPrintOnlyTraitPathDefWrapper, TyDef,
     },
   },
@@ -215,18 +215,38 @@ pub struct Obligation {
   pub is_synthetic: bool,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImplHeader<'tcx> {
   #[serde(with = "Slice__GenericArgDef")]
   pub args: Vec<ty::GenericArg<'tcx>>,
   pub name: TraitRefPrintOnlyTraitPathDefWrapper<'tcx>,
   #[serde(with = "TyDef")]
-  pub self_ty: Ty<'tcx>,
-  #[serde(with = "Slice__ClauseDef")]
-  pub predicates: Vec<ty::Clause<'tcx>>,
+  pub self_ty: ty::Ty<'tcx>,
+  pub predicates: GroupedClauses<'tcx>,
   #[serde(with = "Slice__TyDef")]
   pub tys_without_default_bounds: Vec<Ty<'tcx>>,
+}
+
+#[derive(Serialize)]
+pub struct GroupedClauses<'tcx> {
+  pub grouped: Vec<ClauseWithBounds<'tcx>>,
+  #[serde(with = "Slice__ClauseDef")]
+  pub other: Vec<ty::Clause<'tcx>>,
+}
+
+#[derive(Serialize)]
+pub struct ClauseWithBounds<'tcx> {
+  #[serde(with = "TyDef")]
+  pub ty: ty::Ty<'tcx>,
+  pub bounds: Vec<ClauseBound<'tcx>>,
+}
+
+#[derive(Serialize)]
+pub struct ClauseBound<'tcx> {
+  pub path: TraitRefPrintOnlyTraitPathDefWrapper<'tcx>,
+  #[serde(with = "ImplPolarityDef")]
+  pub polarity: ty::ImplPolarity,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
