@@ -1,0 +1,25 @@
+name: setup
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v3
+
+    - uses: davidB/rust-cargo-make@v1
+      with:
+        version: '0.36.4'
+
+    - name: Gen bindings
+      run: cargo make init-bindings
+      shell: bash
+
+    - name: Install Depot
+      run: curl https://raw.githubusercontent.com/cognitive-engineering-lab/depot/main/scripts/install.sh | sh
+      shell: bash
+
+    - name: Prepare frontend
+      run: cd ide && depot build
+      shell: bash
+
+    - name: Install argus
+      run: cargo install --path crates/argus_cli --debug --locked
+      shell: bash

@@ -1,0 +1,25 @@
+name: argus
+
+on:
+  push:
+    branches:
+      - "**"
+    tags-ignore:
+      - "v*"
+  pull_request:
+    branches:
+      - "**"
+
+jobs:
+  test:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup
+        uses: ./.github/workflows/setup
+
+      - name: Argus tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
