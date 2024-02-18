@@ -66,7 +66,11 @@ export function takeRightUntil<T>(arr: T[], pred: (t: T) => boolean) {
   return arr.slice(i, arr.length);
 }
 
-export function fnInputsAndOutput<T>(args: [T, ...T[]]): [T[], T] {
+export function fnInputsAndOutput<T>(args: T[]): [T[], T] {
+  if (args.length === 0) {
+    throw new Error("fnInputsAndOutput: no arguments provided.");
+  }
+
   // Get all elements from 0 to args.length - 1
   let inputs = _.slice(args, 0, args.length - 1);
   let output = _.last(args)!;

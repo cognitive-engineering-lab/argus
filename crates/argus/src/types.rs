@@ -22,11 +22,11 @@ use self::intermediate::EvaluationResult;
 use crate::{
   analysis::{FullObligationData, SynIdx, UODIdx},
   serialize::{
-    path::PathDefNoArgs,
+    safe::{PathDefNoArgs, TraitRefPrintOnlyTraitPathDef},
     serialize_to_value,
     ty::{
       ImplPolarityDef, Slice__ClauseDef, Slice__GenericArgDef, Slice__TyDef,
-      TraitRefPrintOnlyTraitPathDefWrapper, TyDef,
+      TyDef,
     },
   },
 };
@@ -51,8 +51,7 @@ pub struct MethodLookup {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ExtensionCandidates {
-  #[cfg_attr(feature = "testing", ts(type = "any"))]
-  // Type: Vec<TraitRefPrintOnlyTraitPath>
+  #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath[]"))]
   data: serde_json::Value,
 }
 
@@ -63,7 +62,7 @@ impl ExtensionCandidates {
   ) -> Self {
     let wrapped = traits
       .into_iter()
-      .map(TraitRefPrintOnlyTraitPathDefWrapper)
+      .map(TraitRefPrintOnlyTraitPathDef)
       .collect::<Vec<_>>();
     let json = serialize_to_value(infcx, &wrapped)
       .expect("failed to serialied trait refs for method lookup");
@@ -83,8 +82,7 @@ pub struct MethodStep {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct ReceiverAdjStep {
-  #[cfg_attr(feature = "testing", ts(type = "any"))]
-  // type Ty
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
   ty: serde_json::Value,
 }
 
@@ -131,8 +129,7 @@ pub enum ExprKind {
 #[serde(rename_all = "camelCase")]
 pub struct ObligationsInBody {
   #[serde(skip_serializing_if = "Option::is_none")]
-  #[cfg_attr(feature = "testing", ts(type = "any | undefined"))]
-  // type: DefPath
+  #[cfg_attr(feature = "testing", ts(type = "PathDefNoArgs | undefined"))]
   name: Option<serde_json::Value>,
 
   hash: BodyHash,
@@ -171,7 +168,7 @@ impl ObligationsInBody {
     method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,
   ) -> Self {
     let json_name = id.and_then(|(infcx, id)| {
-      serialize_to_value(infcx, &PathDefNoArgs::new(id)).ok()
+      serialize_to_value(infcx, &PathDefNoArgs(id)).ok()
     });
     ObligationsInBody {
       name: json_name,
@@ -202,8 +199,7 @@ impl BodyHash {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
 pub struct Obligation {
-  #[cfg_attr(feature = "testing", ts(type = "any"))]
-  // type: PredicateObligation
+  #[cfg_attr(feature = "testing", ts(type = "PredicateObligation"))]
   pub obligation: serde_json::Value,
   pub hash: ObligationHash,
   pub range: CharRange,
@@ -217,41 +213,62 @@ pub struct Obligation {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct ImplHeader<'tcx> {
   #[serde(with = "Slice__GenericArgDef")]
+  #[cfg_attr(feature = "testing", ts(type = "GenericArg[]"))]
   pub args: Vec<ty::GenericArg<'tcx>>,
-  pub name: TraitRefPrintOnlyTraitPathDefWrapper<'tcx>,
+
+  #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
+  pub name: TraitRefPrintOnlyTraitPathDef<'tcx>,
+
   #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
   pub self_ty: ty::Ty<'tcx>,
+
   pub predicates: GroupedClauses<'tcx>,
+
   #[serde(with = "Slice__TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty[]"))]
   pub tys_without_default_bounds: Vec<Ty<'tcx>>,
 }
 
 #[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct GroupedClauses<'tcx> {
   pub grouped: Vec<ClauseWithBounds<'tcx>>,
   #[serde(with = "Slice__ClauseDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Clause[]"))]
   pub other: Vec<ty::Clause<'tcx>>,
 }
 
 #[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct ClauseWithBounds<'tcx> {
   #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
   pub ty: ty::Ty<'tcx>,
   pub bounds: Vec<ClauseBound<'tcx>>,
 }
 
 #[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct ClauseBound<'tcx> {
-  pub path: TraitRefPrintOnlyTraitPathDefWrapper<'tcx>,
+  #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
+  pub path: TraitRefPrintOnlyTraitPathDef<'tcx>,
+
   #[serde(with = "ImplPolarityDef")]
+  #[cfg_attr(feature = "testing", ts(type = "ImplPolarity"))]
   pub polarity: ty::ImplPolarity,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "testing", derive(TS))]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type")]
 pub enum ObligationNecessity {
   No,
   ForProfessionals,

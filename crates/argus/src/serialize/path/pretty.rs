@@ -23,9 +23,12 @@ use rustc_span::symbol::{kw, Ident};
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 
-use super::*;
+use super::{
+  super::ty::{GenericArgDef, TraitRefPrintOnlyTraitPathDef},
+  *,
+};
 
-impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
+impl<'a, 'tcx: 'a> PathBuilder<'a, 'tcx> {
   pub fn print_def_path(
     &mut self,
     def_id: DefId,
@@ -545,7 +548,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
       //     p!(" as ", print(trait_ref.print_only_trait_path()));
       // }
       cx.segments.push(PathSegment::Impl {
-        path: trait_ref.map(|t| TraitRefPrintOnlyTraitPathDefWrapper(t)),
+        path: trait_ref.map(|t| TraitRefPrintOnlyTraitPathDef::new(&t)),
         ty: self_ty,
         kind: ImplKind::As,
       })
@@ -633,7 +636,7 @@ impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilder<'a, 'tcx, S> {
       // p!(print(self_ty));
       cx.segments.push(PathSegment::Impl {
         ty: self_ty,
-        path: trait_ref.map(|t| TraitRefPrintOnlyTraitPathDefWrapper(t)),
+        path: trait_ref.map(|t| TraitRefPrintOnlyTraitPathDef::new(&t)),
         kind: ImplKind::For,
       })
     })

@@ -4,4 +4,4 @@ import type { ObligationHash } from "./ObligationHash";
 import type { ObligationKind } from "./ObligationKind";
 import type { ObligationNecessity } from "./ObligationNecessity";
 
-export interface Obligation { obligation: any, hash: ObligationHash, range: CharRange, kind: ObligationKind, necessity: ObligationNecessity, result: EvaluationResult, isSynthetic: boolean, }
+export interface Obligation { obligation: PredicateObligation, hash: ObligationHash, range: CharRange, kind: ObligationKind, necessity: ObligationNecessity, result: EvaluationResult, isSynthetic: boolean, }

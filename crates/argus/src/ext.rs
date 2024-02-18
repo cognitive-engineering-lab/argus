@@ -23,8 +23,8 @@ use serde::Serialize;
 use crate::{
   analysis::{EvaluationResult, FulfillmentData},
   serialize::{
-    serialize_to_value,
-    ty::{PredicateObligationDef, TraitRefPrintOnlyTraitPathDefWrapper},
+    safe::TraitRefPrintOnlyTraitPathDef, serialize_to_value,
+    ty::PredicateObligationDef,
   },
   types::{ImplHeader, Obligation, ObligationNecessity},
 };
@@ -241,7 +241,7 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
       .filter(|k| k.to_string() != "'_")
       .collect::<Vec<_>>();
 
-    let name = TraitRefPrintOnlyTraitPathDefWrapper(trait_ref);
+    let name = TraitRefPrintOnlyTraitPathDef(trait_ref);
     let self_ty = tcx.type_of(impl_def_id).instantiate_identity();
 
     // The predicates will contain default bounds like `T: Sized`. We need to
@@ -286,7 +286,7 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
             let trait_ref =
               poly_trait_ref.map_bound(|tr| tr.trait_ref).skip_binder();
             ClauseBound {
-              path: TraitRefPrintOnlyTraitPathDefWrapper(trait_ref),
+              path: TraitRefPrintOnlyTraitPathDef(trait_ref),
               polarity: poly_trait_ref.polarity(),
             }
           })

@@ -1,3 +1,35 @@
+import {
+  AliasTy,
+  AliasTyKind,
+  AssocItem,
+  BoundTy,
+  BoundVariable,
+  Clause,
+  CoroutineTyKind,
+  CoroutineWitnessTyKind,
+  DynamicTyKind,
+  FloatTy,
+  FnDef,
+  FnSig,
+  FnTrait,
+  GenericArg,
+  ImplHeader,
+  ImplPolarity,
+  InferTy,
+  IntTy,
+  OpaqueImpl,
+  ParamTy,
+  PlaceholderBoundTy,
+  PolyExistentialPredicates,
+  PolyFnSig,
+  Region,
+  Symbol,
+  Trait,
+  Ty,
+  TyKind,
+  TypeAndMut,
+  UintTy,
+} from "@argus/common/bindings";
 import _ from "lodash";
 import React from "react";
 
@@ -9,11 +41,17 @@ import { PrintClause } from "./predicate";
 import { Angled, CommaSeparated, DBraced, Kw, PlusSeparated } from "./syntax";
 import { PrintTerm } from "./term";
 
-export const PrintBinder = ({ binder, innerF }) => {
+export const PrintBinder = ({
+  binder,
+  innerF,
+}: {
+  binder: any;
+  innerF: any;
+}) => {
   return innerF(binder.value);
 };
 
-export const PrintImplHeader = ({ o }) => {
+export const PrintImplHeader = ({ o }: { o: ImplHeader }) => {
   console.debug("Printing ImplHeader", o);
   const genArgs = _.map(o.args, arg => () => <PrintGenericArg o={arg} />);
   const argsWAngle =
@@ -43,7 +81,13 @@ export const PrintImplHeader = ({ o }) => {
   );
 };
 
-export const PrintWhereClause = ({ predicates, tysWOBound }) => {
+export const PrintWhereClause = ({
+  predicates,
+  tysWOBound,
+}: {
+  predicates: any;
+  tysWOBound: Ty[];
+}) => {
   if (!anyElems(predicates.grouped, predicates.other, tysWOBound)) {
     return null;
   }
@@ -79,7 +123,7 @@ export const PrintWhereClause = ({ predicates, tysWOBound }) => {
   );
 };
 
-const PrintClauseWithBounds = ({ o }) => {
+const PrintClauseWithBounds = ({ o }: { o: Clause }) => {
   const boundComponents = _.map(o.bounds, bound => () => (
     <>
       <PrintImplPolarity o={bound.polarity} />
@@ -93,13 +137,13 @@ const PrintClauseWithBounds = ({ o }) => {
   );
 };
 
-export const PrintTy = ({ o }) => {
+export const PrintTy = ({ o }: { o: Ty }) => {
   return <PrintTyKind o={o} />;
 };
 
 // TODO: enums that don't have an inner object need to use a
 // comparison, instead of the `in` operator.
-export const PrintTyKind = ({ o }) => {
+export const PrintTyKind = ({ o }: { o: TyKind }) => {
   if ("Bool" === o) {
     return "bool";
   } else if ("Char" === o) {
@@ -186,7 +230,7 @@ export const PrintTyKind = ({ o }) => {
   }
 };
 
-export const PrintCoroutineTy = ({ o }) => {
+export const PrintCoroutineTy = ({ o }: { o: CoroutineTyKind }) => {
   const movability =
     o.shouldPrintMovability && o.movability === "Static" ? "static " : null;
   const pathDef = <PrintDefPath o={o.path} />;
@@ -202,7 +246,11 @@ export const PrintCoroutineTy = ({ o }) => {
   );
 };
 
-export const PrintCoroutineWitnessTy = ({ o }) => {
+export const PrintCoroutineWitnessTy = ({
+  o,
+}: {
+  o: CoroutineWitnessTyKind;
+}) => {
   return (
     <DBraced>
       <PrintDefPath o={o} />
@@ -210,9 +258,12 @@ export const PrintCoroutineWitnessTy = ({ o }) => {
   );
 };
 
-export const PrintDynamicTy = ({ o }) => {
-  const hasHead = o.data !== undefined;
-  const head = hasHead ? <PrintDefPath o={o.data} /> : null;
+export const PrintPolyExistentialPredicates = ({
+  o,
+}: {
+  o: PolyExistentialPredicates;
+}) => {
+  const head = o.data === undefined ? null : <PrintDefPath o={o.data} />;
   const components = _.map(o.autoTraits, t => () => <PrintDefPath o={t} />);
   return (
     <>
@@ -222,15 +273,26 @@ export const PrintDynamicTy = ({ o }) => {
   );
 };
 
-export const PrintAliasTyKind = ({ o }) => {
+export const PrintDynamicTy = ({ o }: { o: DynamicTyKind }) => {
+  const head = <PrintPolyExistentialPredicates o={o.predicates} />;
+  const region = <PrintRegion o={o.region} />;
+  const dynKind = o.kind === "Dyn" ? "dyn" : "dyn*";
+  return (
+    <>
+      ({dynKind} {head} + {region})
+    </>
+  );
+};
+
+export const PrintAliasTyKind = ({ o }: { o: AliasTyKind }) => {
   switch (o.type) {
-    case "opaqueImplType": {
+    case "OpaqueImpl": {
       return <PrintOpaqueImplType o={o.data} />;
     }
-    case "aliasTy": {
+    case "AliasTy": {
       return <PrintAliasTy o={o.data} />;
     }
-    case "defPath": {
+    case "DefPath": {
       return <PrintDefPath o={o.data} />;
     }
     default: {
@@ -239,21 +301,29 @@ export const PrintAliasTyKind = ({ o }) => {
   }
 };
 
-export const PrintAliasTy = ({ o }) => {
+export const PrintAliasTy = ({ o }: { o: AliasTy }) => {
   switch (o.type) {
-    case "pathDef":
+    case "PathDef":
       return <PrintDefPath o={o.data} />;
-    case "inherent":
-      return <PrintDefPath o={o} />;
+    case "Inherent":
+      return <PrintDefPath o={o.data} />;
     default:
       throw new Error("Unknown alias ty kind", o);
   }
 };
 
-export const PrintPolyFnSig = ({ o }) => {
-  const InnerSig = ({ inputs, output, cVariadic }) => {
+export const PrintPolyFnSig = ({ o }: { o: PolyFnSig }) => {
+  const InnerSig = ({
+    inputs,
+    output,
+    cVariadic,
+  }: {
+    inputs: Ty[];
+    output: Ty;
+    cVariadic: boolean;
+  }) => {
     const inputComponents = _.map(inputs, ty => () => <PrintTy o={ty} />);
-    const variadic = !cVariadic ? null : args.length === 0 ? "..." : ", ...";
+    const variadic = !cVariadic ? null : inputs.length === 0 ? "..." : ", ...";
     const ret = tyIsUnit(output) ? null : (
       <>
         {" "}
@@ -268,7 +338,7 @@ export const PrintPolyFnSig = ({ o }) => {
     );
   };
 
-  const inner = o => {
+  const inner = (o: FnSig) => {
     const unsafetyStr = o.unsafety === "Unsafe" ? "unsafe " : null;
     // TODO: we could write the ABI here, or expose it at least.
     const abi = o.abi === "Rust" ? null : "extern ";
@@ -283,7 +353,7 @@ export const PrintPolyFnSig = ({ o }) => {
   return <PrintBinder binder={o} innerF={inner} />;
 };
 
-export const PrintFnDef = ({ o }) => {
+export const PrintFnDef = ({ o }: { o: FnDef }) => {
   // NOTE: `FnDef`s have both a path and a signature.
   // We should show both (somehow), not sure what's the best way to present it.
   return (
@@ -296,18 +366,21 @@ export const PrintFnDef = ({ o }) => {
   );
 };
 
-export const PrintParamTy = ({ o }) => {
+export const PrintParamTy = ({ o }: { o: ParamTy }) => {
   return <PrintSymbol o={o.name} />;
 };
 
-export const PrintSymbol = ({ o }) => {
+export const PrintSymbol = ({ o }: { o: Symbol }) => {
   return o;
 };
 
-export const PrintBoundTy = ({ o }) => {
+export const PrintBoundTy = ({ o }: { o: BoundTy }) => {
   switch (o.type) {
-    case "named": {
+    case "Named": {
       return <PrintSymbol o={o.data} />;
+    }
+    case "Bound": {
+      return <PrintBoundVariable o={o.data} />;
     }
     default: {
       throw new Error("Unknown bound ty kind", o);
@@ -315,35 +388,35 @@ export const PrintBoundTy = ({ o }) => {
   }
 };
 
-export const PrintPlaceholderTy = ({ o }) => {
+export const PrintPlaceholderTy = ({ o }: { o: PlaceholderBoundTy }) => {
   switch (o.type) {
-    case "anon": {
+    case "Anon": {
       // TODO: what do we really want to anon placeholders?
       return "{anon}";
     }
-    case "named": {
+    case "Named": {
       return <PrintSymbol o={o.data} />;
     }
   }
 };
 
-export const PrintInferTy = ({ o }) => {
+export const PrintInferTy = ({ o }: { o: InferTy }) => {
   switch (o.type) {
-    case "intVar":
+    case "IntVar":
       return "{{int}}";
-    case "floatVar":
+    case "FloatVar":
       return "{{float}}";
-    case "named":
+    case "Named":
       // NOTE: we also have access to the symbol it came from o.name
       return <PrintDefPath o={o.pathDef} />;
-    case "unresolved":
+    case "Unresolved":
       return "_";
     default:
       throw new Error("Unknown infer ty", o);
   }
 };
 
-export const PrintTypeAndMut = ({ o }) => {
+export const PrintTypeAndMut = ({ o }: { o: TypeAndMut }) => {
   return (
     <>
       {o.mutbl === "Mut" ? "mut " : null}
@@ -352,7 +425,7 @@ export const PrintTypeAndMut = ({ o }) => {
   );
 };
 
-export const PrintGenericArg = ({ o }) => {
+export const PrintGenericArg = ({ o }: { o: GenericArg }) => {
   if ("Type" in o) {
     return <PrintTy o={o.Type} />;
   } else if ("Lifetime" in o) {
@@ -364,20 +437,17 @@ export const PrintGenericArg = ({ o }) => {
   }
 };
 
-export const PrintRegion = ({ o }) => {
+export const PrintRegion = ({ o }: { o: Region }) => {
   switch (o.type) {
-    case "static": {
+    case "Static": {
       return "'static";
     }
-    case "named": {
+    case "Named": {
       return <PrintSymbol o={o.data} />;
     }
-    case "anonymous": {
+    case "Anonymous": {
       // TODO: maybe we don't want to print anonymous lifetimes?
       return "'_";
-    }
-    case "vid": {
-      return null;
     }
     default: {
       throw new Error("Unknown region type", o);
@@ -388,32 +458,31 @@ export const PrintRegion = ({ o }) => {
 // --------------------------
 // Numeric types
 
-export const PrintFloatTy = ({ o }) => {
+export const PrintFloatTy = ({ o }: { o: FloatTy }) => {
   return o.toLowerCase();
 };
 
-export const PrintUintTy = ({ o }) => {
+export const PrintUintTy = ({ o }: { o: UintTy }) => {
   return o.toLowerCase();
 };
 
-export const PrintIntTy = ({ o }) => {
+export const PrintIntTy = ({ o }: { o: IntTy }) => {
   return o.toLowerCase();
 };
 
-export const PrintBoundVariable = ({ o }) => {
+export const PrintBoundVariable = ({ o }: { o: BoundVariable }) => {
   throw new Error("TODO");
 };
 
-const PrintImplPolarity = ({ o }) => {
+const PrintImplPolarity = ({ o }: { o: ImplPolarity }) => {
   return o === "Negative" ? "!" : null;
 };
 
-export const PrintOpaqueImplType = ({ o }) => {
+export const PrintOpaqueImplType = ({ o }: { o: OpaqueImpl }) => {
   console.debug("Printing OpaqueImplType", o);
 
-  const PrintFnTrait = ({ o }) => {
-    console.debug("Printing FnTrait", o);
-    const args = _.map(o.params, param => () => <PrintTy o={param} key={i} />);
+  const PrintFnTrait = ({ o }: { o: FnTrait }) => {
+    const args = _.map(o.params, param => () => <PrintTy o={param} />);
     const ret =
       o.retTy !== undefined ? (
         <>
@@ -428,7 +497,7 @@ export const PrintOpaqueImplType = ({ o }) => {
     );
   };
 
-  const PrintAssocItem = ({ o }) => {
+  const PrintAssocItem = ({ o }: { o: AssocItem }) => {
     console.debug("Printing AssocItem", o);
     return (
       <span>
@@ -437,7 +506,7 @@ export const PrintOpaqueImplType = ({ o }) => {
     );
   };
 
-  const PrintTrait = ({ o }) => {
+  const PrintTrait = ({ o }: { o: Trait }) => {
     console.debug("Printing Trait", o);
     const prefix = <PrintImplPolarity o={o.polarity} />;
     const name = <PrintDefPath o={o.traitName} />;
@@ -463,14 +532,10 @@ export const PrintOpaqueImplType = ({ o }) => {
 
   const fnTraits = _.map(o.fnTraits, trait => () => <PrintFnTrait o={trait} />);
   const traits = _.map(o.traits, trait => () => <PrintTrait o={trait} />);
-  const lifetimes = _.map(
-    // XXX: terrible HACK, because PrintRegion can return null but we print
-    // the elements in a '+' concatenated list.
-    _.filter(o.lifetimes, lifetime => <PrintRegion o={lifetime} />),
-    lifetime => () => lifetime
-  );
-
-  const implComponents = [...fnTraits, ...traits, ...lifetimes];
+  const lifetimes = _.map(o.lifetimes, lifetime => () => (
+    <PrintRegion o={lifetime} />
+  ));
+  const implComponents = _.concat(fnTraits, traits, lifetimes);
 
   const pe = anyElems(implComponents);
   const addSized = o.hasSizedBound && (!pe || o.hasNegativeSizedBound);

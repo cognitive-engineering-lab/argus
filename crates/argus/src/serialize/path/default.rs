@@ -31,9 +31,7 @@ pub trait PathBuilderDefault<'tcx> {
   );
 }
 
-impl<'a, 'tcx: 'a, S: serde::Serializer> PathBuilderDefault<'tcx>
-  for PathBuilder<'a, 'tcx, S>
-{
+impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
   fn default_print_def_path(
     &mut self,
     def_id: DefId,

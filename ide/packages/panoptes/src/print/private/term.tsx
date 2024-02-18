@@ -227,7 +227,7 @@ const PrintAggregateAdt = ({
           () =>
             (
               <>
-                <PrintSymbol o={name} />: <PrintConst o={field!} />
+                <PrintSymbol o={name!} />: <PrintConst o={field!} />
               </>
             )
       );

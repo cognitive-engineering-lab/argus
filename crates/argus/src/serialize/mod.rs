@@ -6,37 +6,36 @@
 //!
 //! Here is a quick guide to naming conventions used in this module. To
 //! Serialize types we try to rely on serde::remote when possible.
-//! These remote types by convention append a "Def" suffic to the type.
+//! These remote types by convention append a "Def" suffix to the type.
 //!
 //! For example, `rustc_middle::ty::Ty` is serialized as `TyDef`.
 //!
 //! Serializing rich source information is *hard*, and requires a step
 //! of expansion and processing before all information is had. If you don't
 //! believe this claim, take a peek at `rustc_middle::ty::print::pretty` and
-//! come back when you're convinced. Processing a type into its expanded form
-//! involves another type definition. The convention is to again, append a "Def".
+//! come back when you're convinced.
 //!
-//! For example, the TS generated type for `rustc_middle::ty::Ty` is defined
-//! on `TyDefDef`. Note, that these should be renamed to `Ty` for the TS binding type.
+//! If a type requires expansion into a richer form, this is done inside the `new` function.
+//!
+//! If a type needs to be used within a serde `with` attribute, then an associated function
+//! `serialize` is defined, and actual serialization will be deffered to the `serialize`
+//! extension method.
 //!
 //! If you need to serialize an optional type then prefix it with `Option__`, and
 //! lists of elements are serialized with a prefixed `Slice__`.
 #![allow(non_camel_case_types, non_snake_case)]
 
 pub mod r#const;
-pub mod path;
+pub(self) mod path;
 pub mod term;
 pub mod ty;
 
 use std::cell::Cell;
 
-use r#const::*;
 use rustc_infer::infer::InferCtxt;
-use rustc_middle::ty::print as pretty_ty;
+use rustc_middle::ty::{self as rustc_ty, print as pretty_ty};
 use rustc_trait_selection::traits::solve::Goal;
 use serde::Serialize;
-use term::*;
-use ty::*;
 
 /// Entry function to serialize anything from rustc.
 pub fn serialize_to_value<'a, 'tcx: 'a, T: Serialize + 'a>(
@@ -65,7 +64,9 @@ fn in_dynamic_ctx<'tcx, T>(
 }
 
 fn get_dynamic_ctx<'a, 'tcx: 'a>() -> &'a InferCtxt<'tcx> {
-  let infcx: &'static InferCtxt<'static> = INFCX.copied().unwrap();
+  let infcx: &'static InferCtxt<'static> = INFCX
+    .copied()
+    .unwrap_or_else(|| unreachable!("no dynamic context set"));
   unsafe {
     std::mem::transmute::<&'static InferCtxt<'static>, &'a InferCtxt<'tcx>>(
       infcx,
@@ -166,3 +167,18 @@ define_helper!(
     /// visible (public) reexports of types as paths.
     fn with_no_visible_paths(NoVisibleGuard, NO_VISIBLE_PATH);
 );
+
+pub(crate) mod safe {
+  use rustc_hir::def_id::DefId;
+
+  use super::*;
+
+  #[derive(Serialize)]
+  pub struct PathDefNoArgs(#[serde(with = "path::PathDefNoArgs")] pub DefId);
+
+  #[derive(Serialize)]
+  pub struct TraitRefPrintOnlyTraitPathDef<'tcx>(
+    #[serde(with = "ty::TraitRefPrintOnlyTraitPathDef")]
+    pub  rustc_ty::TraitRef<'tcx>,
+  );
+}

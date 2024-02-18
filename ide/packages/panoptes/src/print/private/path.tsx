@@ -103,6 +103,10 @@ export const PrintPathSegment = ({ o }: { o: PathSegment }) => {
           return <PrintImplAs path={o.path} ty={o.ty} />;
       }
     }
+    case "AnonImpl": {
+      // TODO: we should actually print something here (or send the file snippet).
+      return <span>impl@{o.range.toString()}</span>;
+    }
     case "GenericDelimiters": {
       // We don't want empty <> on the end of types
       if (o.inner.length === 0) {
@@ -127,7 +131,7 @@ export const PrintPathSegment = ({ o }: { o: PathSegment }) => {
       return <CommaSeparated components={components} />;
     }
     default:
-      throw new Error("Unknown path segment", o as any);
+      throw new Error("Unknown path segment", o);
   }
 };
 

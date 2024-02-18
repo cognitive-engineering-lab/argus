@@ -10,7 +10,11 @@ use serde::Serialize;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
-use super::*;
+use super::{
+  term::*,
+  ty::{BoundVariable, SymbolDef},
+  *,
+};
 
 // TODO: one thing missing is being able to print
 // the `Ty` after the constant syntactic definition.
@@ -63,7 +67,7 @@ enum ConstKindDef<'tcx> {
     data: InferConst,
   },
   Bound {
-    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    #[cfg_attr(feature = "testing", ts(type = "BoundVariable"))]
     data: BoundVariable,
   },
   // TODO:
@@ -167,13 +171,8 @@ impl ParamConstDef {
 #[cfg_attr(feature = "testing", ts(export, rename = "UnevaluatedConst"))]
 #[serde(tag = "type")]
 enum UnevaluatedConstKind<'tcx> {
-  ValuePath {
-    #[cfg_attr(feature = "testing", ts(type = "any"))]
-    data: path::ValuePathWithArgs<'tcx>,
-  },
-  AnonSnippet {
-    data: String,
-  },
+  ValuePath { data: path::ValuePathWithArgs<'tcx> },
+  AnonSnippet { data: String },
 }
 
 impl<'tcx> From<&UnevaluatedConst<'tcx>> for UnevaluatedConstKind<'tcx> {

@@ -125,26 +125,11 @@ impl Node {
 
   fn from_impl(infcx: &InferCtxt, def_id: DefId) -> Candidate {
     let tcx = infcx.tcx;
-    // First, try to get a local Impl definition
-    // XXX: in the future we can do away with this and just use the
-    // impl ty, but I don't want to fully rely on that yet.
-    // tcx
-    //   .hir()
-    //   .get_if_local(def_id)
-    //   .and_then(|item| match item {
-    //     hir::Node::Item(hir::Item {
-    //       kind: hir::ItemKind::Impl(impl_),
-    //       ..
-    //     }) => Some(Candidate::new_impl_hir(infcx, *impl_)),
-    //     _ => None,
-    //   })
-    //   .or_else(|| {
-    //   })
-    // Second, try to get an impl header from the def_id ty
+    // First, try to get an impl header from the def_id ty
     tcx
       .get_impl_header(def_id)
       .map(|header| Candidate::new_impl_header(infcx, &header))
-      // Third, scramble to find a suitable span, or some error string.
+      // Second, scramble to find a suitable span, or some error string.
       .unwrap_or_else(|| {
         tcx
           .span_of_impl(def_id)

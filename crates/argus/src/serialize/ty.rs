@@ -4,30 +4,34 @@ use rustc_infer::traits::{ObligationCause, PredicateObligation};
 use rustc_middle::{traits::util::supertraits_for_pretty_printing, ty};
 use rustc_span::symbol::{kw, Symbol};
 use rustc_target::spec::abi::Abi;
-use rustc_type_ir as ir;
 use serde::Serialize;
 use smallvec::SmallVec;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
-use super::*;
+use super::{r#const::*, term::*, *};
 
-pub struct TyDef;
-impl TyDef {
-  pub fn serialize<'tcx, S>(
-    value: &ty::Ty<'tcx>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "Ty"))]
+pub struct TyDef<'tcx>(
+  #[serde(with = "TyKindDef")]
+  #[cfg_attr(feature = "testing", ts(type = "TyKind"))]
+  &'tcx ty::TyKind<'tcx>,
+);
+
+impl<'tcx> TyDef<'tcx> {
+  pub fn serialize<S>(value: &ty::Ty<'tcx>, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    TyKindDef::serialize(value.kind(), s)
+    Self(value.kind()).serialize(s)
   }
 }
 
-pub type Slice__TyDef = TysDef;
-pub struct TysDef;
-impl TysDef {
+pub type TysDef = Slice__TyDef;
+pub struct Slice__TyDef;
+impl Slice__TyDef {
   pub fn serialize<'tcx, S>(
     value: &[ty::Ty<'tcx>],
     s: S,
@@ -57,49 +61,88 @@ impl Option__TyDef {
   }
 }
 
-pub struct TyKindDef;
-impl TyKindDef {
-  pub fn serialize<'tcx, S>(
-    value: &ty::TyKind<'tcx>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    TyKind__TyCtxt::from(value).serialize(s)
-  }
-}
-
 #[derive(Serialize)]
-pub enum TyKind__TyCtxt<'tcx> {
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "TyKind"))]
+pub enum TyKindDef<'tcx> {
   Bool,
   Char,
-  Int(#[serde(with = "IntTyDef")] ty::IntTy),
-  Uint(#[serde(with = "UintTyDef")] ty::UintTy),
-  Float(#[serde(with = "FloatTyDef")] ty::FloatTy),
+  Int(
+    #[serde(with = "IntTyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "IntTy"))]
+    ty::IntTy,
+  ),
+  Uint(
+    #[serde(with = "UintTyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "UintTy"))]
+    ty::UintTy,
+  ),
+  Float(
+    #[serde(with = "FloatTyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "FloatTy"))]
+    ty::FloatTy,
+  ),
   Adt(path::PathDefWithArgs<'tcx>),
   Str,
   Array(
-    #[serde(with = "TyDef")] ty::Ty<'tcx>,
-    #[serde(with = "ConstDef")] ty::Const<'tcx>,
+    #[serde(with = "TyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+    ty::Ty<'tcx>,
+    #[serde(with = "ConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Const"))]
+    ty::Const<'tcx>,
   ),
-  Slice(#[serde(with = "TyDef")] ty::Ty<'tcx>),
-  RawPtr(#[serde(with = "TypeAndMutDef")] ty::TypeAndMut<'tcx>),
+  Slice(
+    #[serde(with = "TyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+    ty::Ty<'tcx>,
+  ),
+  RawPtr(
+    #[serde(with = "TypeAndMutDef")]
+    #[cfg_attr(feature = "testing", ts(type = "TypeAndMut"))]
+    ty::TypeAndMut<'tcx>,
+  ),
   Ref(
-    #[serde(with = "RegionDef")] ty::Region<'tcx>,
-    #[serde(with = "TyDef")] ty::Ty<'tcx>,
-    #[serde(with = "MutabilityDef")] ty::Mutability,
+    #[serde(with = "RegionDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Region"))]
+    ty::Region<'tcx>,
+    #[serde(with = "TyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+    ty::Ty<'tcx>,
+    #[serde(with = "MutabilityDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Mutability"))]
+    ty::Mutability,
   ),
-  FnDef(FnDefDef<'tcx>),
-  FnPtr(#[serde(with = "PolyFnSigDef")] ty::PolyFnSig<'tcx>),
+  FnDef(FnDef<'tcx>),
+  FnPtr(
+    #[serde(with = "PolyFnSigDef")]
+    #[cfg_attr(feature = "testing", ts(type = "PolyFnSig"))]
+    ty::PolyFnSig<'tcx>,
+  ),
   Never,
-  Tuple(#[serde(with = "Slice__TyDef")] &'tcx ty::List<ty::Ty<'tcx>>),
-  Placeholder(#[serde(with = "PlaceholderTyDef")] ty::Placeholder<ty::BoundTy>),
-  Infer(#[serde(with = "InferTyDef")] ty::InferTy),
+  Tuple(
+    #[serde(with = "Slice__TyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Ty[]"))]
+    &'tcx ty::List<ty::Ty<'tcx>>,
+  ),
+  Placeholder(
+    #[serde(with = "PlaceholderTyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "PlaceholderBoundTy"))]
+    ty::Placeholder<ty::BoundTy>,
+  ),
+  Infer(
+    #[serde(with = "InferTyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "InferTy"))]
+    ty::InferTy,
+  ),
   Error,
-  Foreign(#[serde(serialize_with = "path::path_def_no_args")] DefId),
+  Foreign(path::PathDefNoArgs<'tcx>),
   Closure(path::PathDefWithArgs<'tcx>),
-  Param(#[serde(with = "ParamTyDef")] ty::ParamTy),
+  Param(
+    #[serde(with = "ParamTyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "ParamTy"))]
+    ty::ParamTy,
+  ),
   Bound(BoundTyDef),
   Alias(AliasTyKindDef<'tcx>),
   Dynamic(DynamicTyKindDef<'tcx>),
@@ -107,103 +150,85 @@ pub enum TyKind__TyCtxt<'tcx> {
   CoroutineWitness(CoroutineWitnessTyKindDef<'tcx>),
 }
 
-impl<'tcx> From<&ir::TyKind<ty::TyCtxt<'tcx>>> for TyKind__TyCtxt<'tcx> {
-  fn from(value: &ir::TyKind<ty::TyCtxt<'tcx>>) -> Self {
+impl<'tcx> From<&ty::TyKind<'tcx>> for TyKindDef<'tcx> {
+  fn from(value: &ty::TyKind<'tcx>) -> Self {
     match value {
-      ir::TyKind::Bool => TyKind__TyCtxt::Bool,
-      ir::TyKind::Char => TyKind__TyCtxt::Char,
-      ir::TyKind::Int(v) => TyKind__TyCtxt::Int(*v),
-      ir::TyKind::Uint(v) => TyKind__TyCtxt::Uint(*v),
-      ir::TyKind::Float(v) => TyKind__TyCtxt::Float(*v),
-      ir::TyKind::Str => TyKind__TyCtxt::Str,
-      ir::TyKind::Adt(def, args) => {
-        TyKind__TyCtxt::Adt(path::PathDefWithArgs::new(def.did(), args))
+      ty::TyKind::Bool => Self::Bool,
+      ty::TyKind::Char => Self::Char,
+      ty::TyKind::Int(v) => Self::Int(*v),
+      ty::TyKind::Uint(v) => Self::Uint(*v),
+      ty::TyKind::Float(v) => Self::Float(*v),
+      ty::TyKind::Str => Self::Str,
+      ty::TyKind::Adt(def, args) => {
+        Self::Adt(path::PathDefWithArgs::new(def.did(), args))
       }
-      ir::TyKind::Array(ty, sz) => TyKind__TyCtxt::Array(*ty, *sz),
-      ir::TyKind::Slice(ty) => TyKind__TyCtxt::Slice(*ty),
-      ir::TyKind::Ref(r, ty, mutbl) => TyKind__TyCtxt::Ref(*r, *ty, *mutbl),
-      ir::TyKind::FnDef(def_id, args) => TyKind__TyCtxt::FnDef(FnDefDef {
-        def_id: *def_id,
-        args,
-      }),
-      ir::TyKind::Never => TyKind__TyCtxt::Never,
-      ir::TyKind::Tuple(tys) => TyKind__TyCtxt::Tuple(tys),
-      ir::TyKind::Placeholder(v) => TyKind__TyCtxt::Placeholder(*v),
-      ir::TyKind::Error(_) => TyKind__TyCtxt::Error,
-      ir::TyKind::Infer(v) => TyKind__TyCtxt::Infer(*v),
-      ir::TyKind::RawPtr(tam) => TyKind__TyCtxt::RawPtr(*tam),
-      ir::TyKind::Foreign(d) => TyKind__TyCtxt::Foreign(*d),
-      ir::TyKind::Closure(def_id, args) => {
-        TyKind__TyCtxt::Closure(path::PathDefWithArgs::new(*def_id, args))
+      ty::TyKind::Array(ty, sz) => Self::Array(*ty, *sz),
+      ty::TyKind::Slice(ty) => Self::Slice(*ty),
+      ty::TyKind::Ref(r, ty, mutbl) => Self::Ref(*r, *ty, *mutbl),
+      ty::TyKind::FnDef(def_id, args) => Self::FnDef(FnDef::new(*def_id, args)),
+      ty::TyKind::Never => Self::Never,
+      ty::TyKind::Tuple(tys) => Self::Tuple(tys),
+      ty::TyKind::Placeholder(v) => Self::Placeholder(*v),
+      ty::TyKind::Error(_) => Self::Error,
+      ty::TyKind::Infer(v) => Self::Infer(*v),
+      ty::TyKind::RawPtr(tam) => Self::RawPtr(*tam),
+      ty::TyKind::Foreign(d) => Self::Foreign(path::PathDefNoArgs::new(*d)),
+      ty::TyKind::Closure(def_id, args) => {
+        Self::Closure(path::PathDefWithArgs::new(*def_id, args))
       }
-      ir::TyKind::FnPtr(v) => TyKind__TyCtxt::FnPtr(v.clone()),
-      ir::TyKind::Param(param_ty) => TyKind__TyCtxt::Param(param_ty.clone()),
-      ir::TyKind::Bound(dji, bound_ty) => TyKind__TyCtxt::Bound(BoundTyDef {
-        debruijn: *dji,
-        ty: *bound_ty,
-      }),
-      ir::TyKind::Alias(k, aty) => TyKind__TyCtxt::Alias(AliasTyKindDef {
-        kind: k.clone(),
-        ty: aty.clone(),
-      }),
-      ir::TyKind::Dynamic(bep, r, dy_kind) => {
-        TyKind__TyCtxt::Dynamic(DynamicTyKindDef {
-          predicates: bep,
-          region: r.clone(),
-          kind: dy_kind.clone(),
-        })
+      ty::TyKind::FnPtr(v) => Self::FnPtr(v.clone()),
+      ty::TyKind::Param(param_ty) => Self::Param(param_ty.clone()),
+      ty::TyKind::Bound(dji, bound_ty) => {
+        Self::Bound(BoundTyDef::new(*dji, *bound_ty))
       }
-      ir::TyKind::Coroutine(def_id, args) => {
-        TyKind__TyCtxt::Coroutine(CoroutineTyKindDef {
-          def_id: *def_id,
-          args,
-        })
+      ty::TyKind::Alias(k, aty) => Self::Alias(AliasTyKindDef::new(*k, *aty)),
+      ty::TyKind::Dynamic(bep, r, dy_kind) => {
+        Self::Dynamic(DynamicTyKindDef::new(bep, r, *dy_kind))
       }
-      ir::TyKind::CoroutineWitness(def_id, args) => {
-        TyKind__TyCtxt::CoroutineWitness(CoroutineWitnessTyKindDef {
-          def_id: *def_id,
-          args,
-        })
+      ty::TyKind::Coroutine(def_id, args) => {
+        Self::Coroutine(CoroutineTyKindDef::new(*def_id, args))
+      }
+      ty::TyKind::CoroutineWitness(def_id, args) => {
+        Self::CoroutineWitness(CoroutineWitnessTyKindDef::new(*def_id, args))
       }
     }
+  }
+}
+
+impl<'tcx> TyKindDef<'tcx> {
+  pub fn serialize<S>(value: &ty::TyKind<'tcx>, s: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    TyKindDef::from(value).serialize(s)
   }
 }
 
 // -----------------------------------
 // Alias types
 
-pub struct AliasTyKindDef<'tcx> {
-  kind: ty::AliasKind,
-  ty: ty::AliasTy<'tcx>,
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "AliasTyKind"))]
+#[serde(tag = "type")]
+pub enum AliasTyKindDef<'tcx> {
+  OpaqueImpl {
+    data: OpaqueImpl<'tcx>,
+  },
+  AliasTy {
+    #[serde(with = "AliasTyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "AliasTy"))]
+    data: ty::AliasTy<'tcx>,
+  },
+  DefPath {
+    data: path::PathDefWithArgs<'tcx>,
+  },
 }
 
-impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    // NOTE: this wrapper should be used to serialize anything within this
-    // method. Alias types are complicated, and we need to tag the serialized
-    // type to the frontend.
-    #[derive(Serialize)]
-    #[serde(tag = "type", rename_all = "camelCase")]
-    enum AliasTyKindWrapper<'a, 'tcx: 'a> {
-      OpaqueImplType {
-        data: OpaqueImplType<'tcx>,
-      },
-      AliasTy {
-        #[serde(with = "AliasTyDef")]
-        data: &'a ty::AliasTy<'tcx>,
-      },
-      DefPath {
-        data: path::PathDefWithArgs<'tcx>,
-      },
-    }
-
-    log::debug!("Serializing AliasTy {:?} {:?}", self.kind, self.ty);
-
+impl<'tcx> AliasTyKindDef<'tcx> {
+  pub fn new(kind: ty::AliasKind, ty: ty::AliasTy<'tcx>) -> Self {
     let infcx = get_dynamic_ctx();
-    match (self.kind, self.ty) {
+    match (kind, ty) {
       (
         ty::AliasKind::Projection
         | ty::AliasKind::Inherent
@@ -213,14 +238,13 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
         if !(infcx.should_print_verbose() || with_no_queries())
           && infcx.tcx.is_impl_trait_in_trait(data.def_id)
         {
-          // CHANGE: return self.pretty_print_opaque_impl_type(data.def_id, data.args);
-          AliasTyKindWrapper::OpaqueImplType {
-            data: OpaqueImplType::new(data.def_id, data.args),
+          // CHANGE: return this.pretty_print_opaque_impl_type(data.def_id, data.args);
+          Self::OpaqueImpl {
+            data: OpaqueImpl::new(data.def_id, data.args),
           }
-          .serialize(s)
         } else {
           // CHANGE: p!(print(data))
-          AliasTyKindWrapper::AliasTy { data }.serialize(s)
+          Self::AliasTy { data: *data }
         }
       }
       (ty::AliasKind::Opaque, ty::AliasTy { def_id, args, .. }) => {
@@ -238,10 +262,9 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
           // return Ok(())
           // NOTE: I'm taking the risk of using print_def_path here
           // as indicated by the above comment. If things break, look here.
-          return AliasTyKindWrapper::DefPath {
+          return Self::DefPath {
             data: path::PathDefWithArgs::new(def_id, args),
-          }
-          .serialize(s);
+          };
         }
 
         let parent = infcx.tcx.parent(def_id);
@@ -257,34 +280,30 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
                 // opaque type we're printing, then skip the `::{opaque#1}`.
                 // CHANGE: p!(print_def_path(parent, args));
                 // return Ok(())
-                return AliasTyKindWrapper::DefPath {
+                return Self::DefPath {
                   data: path::PathDefWithArgs::new(parent, args),
-                }
-                .serialize(s);
+                };
               }
             }
             // Complex opaque type, e.g. `type Foo = (i32, impl Debug);`
             // CHANGE: p!(print_def_path(def_id, args));
             // return Ok(())
-            return AliasTyKindWrapper::DefPath {
+            return Self::DefPath {
               data: path::PathDefWithArgs::new(def_id, args),
-            }
-            .serialize(s);
+            };
           }
           _ => {
             if with_no_queries() {
               // CHANGE: p!(print_def_path(def_id, &[]));
               // return Ok(())
-              AliasTyKindWrapper::DefPath {
+              Self::DefPath {
                 data: path::PathDefWithArgs::new(def_id, &[]),
               }
-              .serialize(s)
             } else {
-              // CHANGE: return self.pretty_print_opaque_impl_type(def_id, args);
-              AliasTyKindWrapper::OpaqueImplType {
-                data: OpaqueImplType::new(def_id, args),
+              // CHANGE: return this.pretty_print_opaque_impl_type(def_id, args);
+              Self::OpaqueImpl {
+                data: OpaqueImpl::new(def_id, args),
               }
-              .serialize(s)
             }
           }
         }
@@ -296,64 +315,58 @@ impl<'tcx> Serialize for AliasTyKindDef<'tcx> {
 // -----------------------------------
 // Dynamic types
 
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "DynamicTyKind"))]
 pub struct DynamicTyKindDef<'tcx> {
-  predicates: &'tcx ty::List<ty::Binder<'tcx, ty::ExistentialPredicate<'tcx>>>,
+  predicates: PolyExistentialPredicatesDef<'tcx>,
+
+  #[serde(with = "RegionDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Region"))]
   region: ty::Region<'tcx>,
+
+  #[serde(with = "DynKindDef")]
+  #[cfg_attr(feature = "testing", ts(type = "DynKind"))]
   kind: ty::DynKind,
 }
 
-impl<'tcx> Serialize for DynamicTyKindDef<'tcx> {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase")]
-    struct Wrapper<'tcx> {
-      #[serde(with = "Slice__Binder__ExistentialPredicateDef")]
-      data: &'tcx ty::List<ty::Binder<'tcx, ty::ExistentialPredicate<'tcx>>>,
-      #[serde(with = "RegionDef")]
-      region: ty::Region<'tcx>,
-      #[serde(with = "DynKindDef")]
-      kind: ty::DynKind,
+impl<'tcx> DynamicTyKindDef<'tcx> {
+  pub fn new(
+    predicates: &ty::List<ty::PolyExistentialPredicate<'tcx>>,
+    region: &ty::Region<'tcx>,
+    kind: ty::DynKind,
+  ) -> Self {
+    Self {
+      predicates: PolyExistentialPredicatesDef::new(predicates),
+      region: *region,
+      kind,
     }
-
-    Wrapper {
-      data: self.predicates,
-      region: self.region,
-      kind: self.kind,
-    }
-    .serialize(s)
   }
 }
 
-pub type Slice__PolyExistentialPredicateDef =
-  Slice__Binder__ExistentialPredicateDef;
-pub struct Slice__Binder__ExistentialPredicateDef;
-impl Slice__Binder__ExistentialPredicateDef {
-  pub fn serialize<'tcx, S>(
-    value: &ty::List<ty::PolyExistentialPredicate<'tcx>>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase")]
-    struct Wrapper {
-      #[serde(skip_serializing_if = "Option::is_none")]
-      data: Option<path::PathDefNoArgs>,
-      auto_traits: Vec<path::PathDefNoArgs>,
-    }
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(
+  feature = "testing",
+  ts(export, rename = "PolyExistentialPredicates")
+)]
+#[serde(rename_all = "camelCase")]
+pub struct PolyExistentialPredicatesDef<'tcx> {
+  #[serde(skip_serializing_if = "Option::is_none")]
+  data: Option<path::PathDefNoArgs<'tcx>>,
+  auto_traits: Vec<path::PathDefNoArgs<'tcx>>,
+}
 
-    let predicates = value;
-
+impl<'tcx> PolyExistentialPredicatesDef<'tcx> {
+  pub fn new(
+    predicates: &ty::List<ty::PolyExistentialPredicate<'tcx>>,
+  ) -> Self {
     let data = predicates.principal().map(|principal| {
       // TODO: how to deal with binders
       let principal = principal.skip_binder();
 
       // TODO: see pretty_print_dyn_existential where
-      // they do some wonky special casing and re-sugaring...
+      // they do some wonky special casing and "re-sugaring"...
 
       path::PathDefNoArgs::new(principal.def_id)
     });
@@ -362,47 +375,58 @@ impl Slice__Binder__ExistentialPredicateDef {
       .map(|def_id| path::PathDefNoArgs::new(def_id))
       .collect::<Vec<_>>();
 
-    Wrapper { data, auto_traits }.serialize(s)
+    Self { data, auto_traits }
+  }
+
+  pub fn serialize<S>(
+    value: &ty::List<ty::PolyExistentialPredicate<'tcx>>,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    Self::new(value).serialize(s)
   }
 }
 
 // -----------------------------------
 // Coroutine definitions
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "CoroutineTyKind"))]
 pub struct CoroutineTyKindDef<'tcx> {
-  def_id: DefId,
-  args: &'tcx ty::List<ty::GenericArg<'tcx>>,
+  path: path::PathDefWithArgs<'tcx>,
+  #[serde(with = "MovabilityDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Movability"))]
+  movability: ty::Movability,
+
+  #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+  upvar_tys: ty::Ty<'tcx>,
+
+  #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+  witness: ty::Ty<'tcx>,
+  should_print_movability: bool,
 }
 
-impl<'tcx> Serialize for CoroutineTyKindDef<'tcx> {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase")]
-    struct Wrapper<'tcx> {
-      path: path::PathDefWithArgs<'tcx>,
-      #[serde(with = "MovabilityDef")]
-      movability: ty::Movability,
-      #[serde(with = "TyDef")]
-      upvar_tys: ty::Ty<'tcx>,
-      #[serde(with = "TyDef")]
-      witness: ty::Ty<'tcx>,
-      should_print_movability: bool,
-    }
-
+impl<'tcx> CoroutineTyKindDef<'tcx> {
+  pub fn new(
+    def_id: DefId,
+    args: &'tcx ty::List<ty::GenericArg<'tcx>>,
+  ) -> Self {
     let infcx = get_dynamic_ctx();
     let tcx = infcx.tcx;
-    let CoroutineTyKindDef { def_id, args } = self;
 
     let coroutine_kind = tcx.coroutine_kind(def_id).unwrap();
     let upvar_tys = args.as_coroutine().tupled_upvars_ty();
     let witness = args.as_coroutine().witness();
     let movability = coroutine_kind.movability();
 
-    Wrapper {
-      path: path::PathDefWithArgs::new(*def_id, &**args),
+    Self {
+      path: path::PathDefWithArgs::new(def_id, &*args),
       movability,
       upvar_tys,
       witness,
@@ -411,63 +435,65 @@ impl<'tcx> Serialize for CoroutineTyKindDef<'tcx> {
         hir::CoroutineKind::Coroutine(_)
       ),
     }
-    .serialize(s)
   }
 }
 
 // -----------------------------------
 // Coroutine witness definitions
 
-pub struct CoroutineWitnessTyKindDef<'tcx> {
-  def_id: DefId,
-  args: &'tcx ty::List<ty::GenericArg<'tcx>>,
-}
-
-impl<'tcx> Serialize for CoroutineWitnessTyKindDef<'tcx> {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    path::PathDefWithArgs::new(self.def_id, self.args).serialize(s)
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "CoroutineWitnessTyKind"))]
+pub struct CoroutineWitnessTyKindDef<'tcx>(path::PathDefWithArgs<'tcx>);
+impl<'tcx> CoroutineWitnessTyKindDef<'tcx> {
+  pub fn new(
+    def_id: DefId,
+    args: &'tcx ty::List<ty::GenericArg<'tcx>>,
+  ) -> Self {
+    Self(path::PathDefWithArgs::new(def_id, args))
   }
 }
 
 // -----------------------------------
 // Function definitions
 
-pub struct FnDefDef<'tcx> {
-  def_id: DefId,
-  args: &'tcx [ty::GenericArg<'tcx>],
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "FnDef"))]
+pub struct FnDef<'tcx> {
+  #[serde(with = "PolyFnSigDef")]
+  #[cfg_attr(feature = "testing", ts(type = "PolyFnSig"))]
+  sig: ty::PolyFnSig<'tcx>,
+  path: path::ValuePathWithArgs<'tcx>,
 }
 
-impl<'tcx> Serialize for FnDefDef<'tcx> {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    #[derive(Serialize)]
-    struct Wrapper<'tcx> {
-      #[serde(with = "PolyFnSigDef")]
-      sig: ty::PolyFnSig<'tcx>,
-      path: path::ValuePathWithArgs<'tcx>,
-    }
+impl<'tcx> FnDef<'tcx> {
+  pub fn new(def_id: DefId, args: &'tcx [ty::GenericArg<'tcx>]) -> Self {
     let infcx = get_dynamic_ctx();
-    let sig = infcx
-      .tcx
-      .fn_sig(self.def_id)
-      .instantiate(infcx.tcx, self.args);
-    Wrapper {
+    let sig = infcx.tcx.fn_sig(def_id).instantiate(infcx.tcx, args);
+    Self {
       sig,
-      path: path::ValuePathWithArgs::new(self.def_id, self.args),
+      path: path::ValuePathWithArgs::new(def_id, args),
     }
-    .serialize(s)
   }
 }
 
 // -----------------------------------
 // Placeholder definitions
 
-pub struct PlaceholderTyDef;
+#[derive(Serialize)]
+#[serde(tag = "type")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "PlaceholderBoundTy"))]
+pub enum PlaceholderTyDef {
+  Named {
+    #[serde(with = "SymbolDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
+    data: Symbol,
+  },
+  Anon,
+}
+
 impl PlaceholderTyDef {
   pub fn serialize<'tcx, S>(
     value: &ty::Placeholder<ty::BoundTy>,
@@ -476,21 +502,9 @@ impl PlaceholderTyDef {
   where
     S: serde::Serializer,
   {
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase", tag = "type")]
-    enum PlaceholderTyBoundKind {
-      Named {
-        #[serde(with = "SymbolDef")]
-        data: Symbol,
-      },
-      Anon,
-    }
-
     let serialize_kind = match value.bound.kind {
-      ty::BoundTyKind::Anon => PlaceholderTyBoundKind::Anon,
-      ty::BoundTyKind::Param(_, name) => {
-        PlaceholderTyBoundKind::Named { data: name }
-      }
+      ty::BoundTyKind::Anon => Self::Anon,
+      ty::BoundTyKind::Param(_, name) => Self::Named { data: name },
     };
 
     serialize_kind.serialize(s)
@@ -500,53 +514,63 @@ impl PlaceholderTyDef {
 // -----------------------------------
 // Function signature definitions
 
-pub struct PolyFnSigDef;
-impl PolyFnSigDef {
-  pub fn serialize<'tcx, S>(
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "PolyFnSig"))]
+pub struct Binder__FnSigDef<'tcx> {
+  #[serde(with = "FnSigDef")]
+  #[cfg_attr(feature = "testing", ts(type = "FnSig"))]
+  value: ty::FnSig<'tcx>,
+
+  #[serde(with = "Slice__BoundVariableKindDef")]
+  #[cfg_attr(feature = "testing", ts(type = "BoundVariableKind[]"))]
+  bound_vars: &'tcx ty::List<ty::BoundVariableKind>,
+}
+
+type PolyFnSigDef<'tcx> = Binder__FnSigDef<'tcx>;
+
+impl<'tcx> Binder__FnSigDef<'tcx> {
+  pub fn new(value: &ty::Binder<'tcx, ty::FnSig<'tcx>>) -> Self {
+    Self {
+      bound_vars: value.bound_vars(),
+      value: value.skip_binder(),
+    }
+  }
+
+  pub fn serialize<S>(
     value: &ty::Binder<'tcx, ty::FnSig<'tcx>>,
     s: S,
   ) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    Binder__FnSig::from(value).serialize(s)
-  }
-}
-
-#[derive(Serialize)]
-pub struct Binder__FnSig<'tcx> {
-  #[serde(serialize_with = "vec__bound_variable_kind")]
-  pub bound_vars: Vec<ty::BoundVariableKind>,
-  #[serde(with = "FnSigDef")]
-  pub value: ty::FnSig<'tcx>,
-}
-
-impl<'tcx> From<&ty::Binder<'tcx, ty::FnSig<'tcx>>> for Binder__FnSig<'tcx> {
-  fn from(value: &ty::Binder<'tcx, ty::FnSig<'tcx>>) -> Self {
-    Binder__FnSig {
-      bound_vars: value.bound_vars().to_vec().clone(),
-      value: value.skip_binder().clone(),
-    }
+    Self::new(value).serialize(s)
   }
 }
 
 #[derive(Serialize)]
 #[serde(remote = "ty::FnSig")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "FnSig"))]
 pub struct FnSigDef<'tcx> {
-  #[serde(with = "TysDef")]
+  #[serde(with = "Slice__TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty[]"))]
   pub inputs_and_output: &'tcx ty::List<ty::Ty<'tcx>>,
   pub c_variadic: bool,
+
   #[serde(with = "UnsafetyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Unsafety"))]
   pub unsafety: Unsafety,
+
   #[serde(with = "AbiDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Abi"))]
   pub abi: Abi,
 }
 
-// -----------------------------------
-// Miscelaney
-
 #[derive(Serialize)]
 #[serde(remote = "Unsafety")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "Unsafety"))]
 pub enum UnsafetyDef {
   Unsafe,
   Normal,
@@ -554,6 +578,8 @@ pub enum UnsafetyDef {
 
 #[derive(Serialize)]
 #[serde(remote = "Abi")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "Abi"))]
 pub enum AbiDef {
   Rust,
   C { unwind: bool },
@@ -584,36 +610,9 @@ pub enum AbiDef {
   RiscvInterruptS,
 }
 
-pub struct ExistentialProjectionDef;
-impl ExistentialProjectionDef {
-  fn serialize<'tcx, S>(
-    value: &ty::ExistentialProjection<'tcx>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    #[derive(Serialize)]
-    struct Wrapper<'tcx> {
-      #[serde(with = "SymbolDef")]
-      name: Symbol,
-      #[serde(with = "TermDef")]
-      term: ty::Term<'tcx>,
-    }
-
-    // CHANGE:
-    // let name = cx.tcx().associated_item(self.def_id).name;
-    // p!(write("{} = ", name), print(self.term))
-    let tcx = get_dynamic_ctx().tcx;
-    Wrapper {
-      name: tcx.associated_item(value.def_id).name,
-      term: value.term,
-    }
-    .serialize(s)
-  }
-}
-
 #[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "DynKind"))]
 #[serde(remote = "ty::DynKind")]
 pub enum DynKindDef {
   Dyn,
@@ -621,6 +620,8 @@ pub enum DynKindDef {
 }
 
 #[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "Movability"))]
 #[serde(remote = "ty::Movability")]
 pub enum MovabilityDef {
   Static,
@@ -628,78 +629,66 @@ pub enum MovabilityDef {
 }
 
 #[derive(Serialize)]
-#[serde(remote = "ty::AliasKind")]
-pub enum AliasKindDef {
-  Projection,
-  Inherent,
-  Opaque,
-  Weak,
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "AliasTy"))]
+#[serde(tag = "type")]
+pub enum AliasTyDef<'tcx> {
+  Inherent { data: path::AliasPath<'tcx> },
+  PathDef { data: path::PathDefWithArgs<'tcx> },
 }
 
-pub struct AliasTyDef;
-impl AliasTyDef {
-  pub fn serialize<'tcx, S>(
+impl<'tcx> AliasTyDef<'tcx> {
+  pub fn new(value: &ty::AliasTy<'tcx>) -> Self {
+    let cx = get_dynamic_ctx();
+    if let DefKind::Impl { of_trait: false } =
+      cx.tcx.def_kind(cx.tcx.parent(value.def_id))
+    {
+      // CHANGE: p!(pretty_print_inherent_projection(self))
+      Self::Inherent {
+        data: path::AliasPath::new(*value),
+      }
+    } else {
+      // CHANGE: p!(print_def_path(self.def_id, self.args));
+      Self::PathDef {
+        data: path::PathDefWithArgs::new(value.def_id, value.args),
+      }
+    }
+  }
+
+  pub fn serialize<S>(
     value: &ty::AliasTy<'tcx>,
     s: S,
   ) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase", tag = "type")]
-    enum Wrapper<'a, 'tcx: 'a> {
-      Inherent { data: path::AliasPath<'a, 'tcx> },
-      PathDef { data: path::PathDefWithArgs<'tcx> },
-    }
-
-    let cx = get_dynamic_ctx();
-    let here_kind = if let DefKind::Impl { of_trait: false } =
-      cx.tcx.def_kind(cx.tcx.parent(value.def_id))
-    {
-      // CHANGE: p!(pretty_print_inherent_projection(self))
-      Wrapper::Inherent {
-        data: path::AliasPath::new(value),
-      }
-    } else {
-      // CHANGE: p!(print_def_path(self.def_id, self.args));
-      Wrapper::PathDef {
-        data: path::PathDefWithArgs::new(value.def_id, value.args),
-      }
-    };
-
-    here_kind.serialize(s)
+    Self::new(value).serialize(s)
   }
 }
 
-pub struct BoundTyDef {
-  debruijn: ty::DebruijnIndex,
-  ty: ty::BoundTy,
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "BoundTy"))]
+#[serde(tag = "type")]
+pub enum BoundTyDef {
+  Named {
+    #[serde(with = "SymbolDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
+    data: Symbol,
+  },
+  Bound {
+    data: BoundVariable,
+  },
 }
 
-impl Serialize for BoundTyDef {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase", tag = "type")]
-    enum BoundTyKind {
-      Named {
-        #[serde(with = "SymbolDef")]
-        data: Symbol,
+impl BoundTyDef {
+  pub fn new(debruijn: ty::DebruijnIndex, ty: ty::BoundTy) -> Self {
+    match ty.kind {
+      ty::BoundTyKind::Anon => Self::Bound {
+        data: BoundVariable::new(debruijn, ty.var),
       },
-      Bound {
-        data: BoundVariable,
-      },
+      ty::BoundTyKind::Param(_, name) => Self::Named { data: name },
     }
-
-    match self.ty.kind {
-      ty::BoundTyKind::Anon => BoundTyKind::Bound {
-        data: BoundVariable::new(self.debruijn, self.ty.var),
-      },
-      ty::BoundTyKind::Param(_, name) => BoundTyKind::Named { data: name },
-    }
-    .serialize(s)
   }
 }
 
@@ -709,22 +698,58 @@ impl Serialize for BoundTyDef {
 
 #[derive(Serialize)]
 #[serde(remote = "ty::BoundVariableKind")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "BoundVariableKind"))]
 pub enum BoundVariableKindDef {
-  Ty(#[serde(with = "BoundTyKindDef")] ty::BoundTyKind),
-  Region(#[serde(with = "BoundRegionKindDef")] ty::BoundRegionKind),
+  Ty(
+    #[serde(with = "BoundTyKindDef")]
+    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    ty::BoundTyKind,
+  ),
+  Region(
+    #[serde(with = "BoundRegionKindDef")]
+    #[cfg_attr(feature = "testing", ts(type = "BoundRegionKind"))]
+    ty::BoundRegionKind,
+  ),
   Const,
+}
+
+pub struct Slice__BoundVariableKindDef;
+impl Slice__BoundVariableKindDef {
+  fn serialize<S>(
+    value: &[ty::BoundVariableKind],
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    #[derive(Serialize)]
+    struct Wrapper<'a>(
+      #[serde(with = "BoundVariableKindDef")] &'a ty::BoundVariableKind,
+    );
+    serialize_custom_seq! { Wrapper, s, value }
+  }
 }
 
 #[derive(Serialize)]
 #[serde(remote = "ty::BoundRegionKind")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "BoundRegionKind"))]
 pub enum BoundRegionKindDef {
   BrAnon,
-  BrNamed(#[serde(skip)] DefId, #[serde(with = "SymbolDef")] Symbol),
+  BrNamed(
+    #[serde(skip)] DefId,
+    #[serde(with = "SymbolDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
+    Symbol,
+  ),
   BrEnv,
 }
 
 #[derive(Serialize)]
 #[serde(remote = "ty::BoundTyKind")]
+// #[cfg_attr(feature = "testing", derive(TS))]
+// #[cfg_attr(feature = "testing", ts(export, rename = "BoundTyKind"))]
 pub enum BoundTyKindDef {
   Anon,
   Param(#[serde(skip)] DefId, #[serde(skip)] Symbol),
@@ -734,35 +759,10 @@ pub enum BoundTyKindDef {
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-pub struct GenericArgsDef;
-impl GenericArgsDef {
-  pub fn serialize<'tcx, S>(
-    value: &ty::GenericArgs<'tcx>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    vec__generic_arg(&value.to_vec(), s)
-  }
-}
-
-fn vec__generic_arg<'tcx, S>(
-  value: &Vec<ty::GenericArg<'tcx>>,
-  s: S,
-) -> Result<S::Ok, S::Error>
-where
-  S: serde::Serializer,
-{
-  #[derive(Serialize)]
-  struct Wrapper<'a, 'tcx>(
-    #[serde(with = "GenericArgDef")] &'a ty::GenericArg<'tcx>,
-  );
-  serialize_custom_seq! { Wrapper, s, value }
-}
-
 #[derive(Serialize)]
 #[serde(remote = "ty::IntTy")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "IntTy"))]
 pub enum IntTyDef {
   Isize,
   I8,
@@ -774,6 +774,8 @@ pub enum IntTyDef {
 
 #[derive(Serialize)]
 #[serde(remote = "ty::UintTy")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "UintTy"))]
 pub enum UintTyDef {
   Usize,
   U8,
@@ -785,6 +787,8 @@ pub enum UintTyDef {
 
 #[derive(Serialize)]
 #[serde(remote = "ty::FloatTy")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "FloatTy"))]
 pub enum FloatTyDef {
   F32,
   F64,
@@ -792,15 +796,22 @@ pub enum FloatTyDef {
 
 #[derive(Serialize)]
 #[serde(remote = "ty::TypeAndMut")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "TypeAndMut"))]
 pub struct TypeAndMutDef<'tcx> {
   #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
   pub ty: ty::Ty<'tcx>,
+
   #[serde(with = "MutabilityDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Mutability"))]
   pub mutbl: ty::Mutability,
 }
 
 #[derive(Serialize)]
 #[serde(remote = "ty::Mutability")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "Mutability"))]
 pub enum MutabilityDef {
   Not,
   Mut,
@@ -813,31 +824,26 @@ pub enum MutabilityDef {
 // TODO: we should use some sort of "region highlight mode"
 // see: <https://doc.rust-lang.org/stable/nightly-rustc/rustc_middle/ty/print/pretty/struct.RegionHighlightMode.html>
 // to differentiate regions in the types, I guess not necessary now.
-pub struct RegionDef;
-impl RegionDef {
-  pub fn serialize<'tcx, S>(
-    value: &ty::Region<'tcx>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase", tag = "type")]
-    enum RegionKindDef {
-      Named {
-        #[serde(with = "SymbolDef")]
-        data: Symbol,
-      },
-      Vid,
-      Anonymous,
-      Static,
-    }
+#[derive(Serialize)]
+#[serde(tag = "type")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "Region"))]
+pub enum RegionDef {
+  Named {
+    #[serde(with = "SymbolDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
+    data: Symbol,
+  },
+  Anonymous,
+  Static,
+}
 
+impl<'tcx> RegionDef {
+  pub fn new(value: &ty::Region<'tcx>) -> Self {
     let region = value;
-    let my_region_kind: RegionKindDef = match **region {
+    match **region {
       ty::ReEarlyParam(ref data) if data.name != kw::Empty => {
-        RegionKindDef::Named { data: data.name }
+        Self::Named { data: data.name }
       }
       ty::ReBound(_, ty::BoundRegion { kind: br, .. })
       | ty::ReLateParam(ty::LateParamRegion {
@@ -849,19 +855,27 @@ impl RegionDef {
       }) if let ty::BrNamed(_, name) = br
         && br.is_named() =>
       {
-        RegionKindDef::Named { data: name }
+        Self::Named { data: name }
       }
-      ty::ReStatic => RegionKindDef::Static,
+      ty::ReStatic => Self::Static,
 
       // XXX: the catch all case is for those from above with guards, in the
       // future if we expand the capabilities of the region printing this will
       // need to change.
-      ty::ReVar(_) | ty::ReErased | ty::ReError(_) | _ => {
-        RegionKindDef::Anonymous
-      }
-    };
+      ty::ReVar(_) | ty::ReErased | ty::ReError(_) | _ => Self::Anonymous,
+    }
+  }
+}
 
-    my_region_kind.serialize(s)
+impl RegionDef {
+  pub fn serialize<'tcx, S>(
+    value: &ty::Region<'tcx>,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    Self::new(value).serialize(s)
   }
 }
 
@@ -882,16 +896,24 @@ impl Slice__RegionDef {
   }
 }
 
-pub struct GenericArgDef;
-impl GenericArgDef {
-  pub fn serialize<'tcx, S>(
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "GenericArg"))]
+pub struct GenericArgDef<'tcx>(
+  #[serde(with = "GenericArgKindDef")]
+  #[cfg_attr(feature = "testing", ts(type = "GenericArgKind"))]
+  ty::GenericArgKind<'tcx>,
+);
+
+impl<'tcx> GenericArgDef<'tcx> {
+  pub fn serialize<S>(
     value: &ty::GenericArg<'tcx>,
     s: S,
   ) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    GenericArgKindDef::serialize(&value.unpack(), s)
+    Self(value.unpack()).serialize(s)
   }
 }
 
@@ -914,165 +936,227 @@ impl Slice__GenericArgDef {
 
 #[derive(Serialize)]
 #[serde(remote = "ty::GenericArgKind")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "GenericArgKind"))]
 pub enum GenericArgKindDef<'tcx> {
-  Lifetime(#[serde(with = "RegionDef")] ty::Region<'tcx>),
-  Type(#[serde(with = "TyDef")] ty::Ty<'tcx>),
-  Const(#[serde(with = "ConstDef")] ty::Const<'tcx>),
+  Lifetime(
+    #[serde(with = "RegionDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Region"))]
+    ty::Region<'tcx>,
+  ),
+  Type(
+    #[serde(with = "TyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+    ty::Ty<'tcx>,
+  ),
+  Const(
+    #[serde(with = "ConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Const"))]
+    ty::Const<'tcx>,
+  ),
 }
 
 // TODO: gavinleroy
-pub struct InferTyDef;
-impl InferTyDef {
-  pub fn serialize<'tcx, S>(
-    value: &ty::InferTy,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    use rustc_infer::infer::type_variable::TypeVariableOriginKind::TypeParameterDefinition;
+#[derive(Serialize)]
+#[serde(tag = "type")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "InferTy"))]
+pub enum InferTyDef<'tcx> {
+  IntVar,
+  FloatVar,
+  // TODO: We should also include source information
+  #[serde(rename_all = "camelCase")]
+  Named {
+    #[serde(with = "SymbolDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
+    name: Symbol,
+    path_def: path::PathDefNoArgs<'tcx>,
+  },
+  Unresolved,
+}
 
-    #[derive(Serialize)]
-    #[serde(
-      rename_all = "camelCase",
-      rename_all_fields = "camelCase",
-      tag = "type"
-    )]
-    enum InferKind {
-      IntVar,
-      FloatVar,
-      // TODO: We should also include source information
-      Named {
-        #[serde(with = "SymbolDef")]
-        name: Symbol,
-        path_def: path::PathDefNoArgs,
-      },
-      Unresolved,
-    }
+impl<'tcx> InferTyDef<'tcx> {
+  pub fn new(value: &ty::InferTy) -> Self {
+    use rustc_infer::infer::type_variable::TypeVariableOriginKind::TypeParameterDefinition;
 
     let infcx = get_dynamic_ctx();
     let tcx = infcx.tcx;
 
     let ty = ty::Ty::new_infer(tcx, *value);
 
-    let here_kind = if let Some(type_origin) = infcx.type_var_origin(ty)
+    if let Some(type_origin) = infcx.type_var_origin(ty)
       && let TypeParameterDefinition(name, def_id) = type_origin.kind
     {
-      InferKind::Named {
+      Self::Named {
         name,
         path_def: path::PathDefNoArgs::new(def_id),
       }
     } else {
       match value {
         // TODO: can we do any better in these cases??
-        ty::InferTy::TyVar(_) | ty::InferTy::FreshTy(_) => {
-          InferKind::Unresolved
-        }
-        ty::InferTy::IntVar(_) | ty::InferTy::FreshIntTy(_) => {
-          InferKind::IntVar
-        }
+        ty::InferTy::TyVar(_) | ty::InferTy::FreshTy(_) => Self::Unresolved,
+        ty::InferTy::IntVar(_) | ty::InferTy::FreshIntTy(_) => Self::IntVar,
         ty::InferTy::FloatVar(_) | ty::InferTy::FreshFloatTy(_) => {
-          InferKind::FloatVar
+          Self::FloatVar
         }
       }
-    };
+    }
+  }
 
-    here_kind.serialize(s)
+  pub fn serialize<S>(value: &ty::InferTy, s: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    Self::new(value).serialize(s)
   }
 }
 
 // ------------------------------------------------------------------------
 
 #[derive(Serialize)]
-#[serde(remote = "PredicateObligation", rename_all = "camelCase")]
+#[serde(remote = "PredicateObligation")]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "PredicateObligation"))]
 pub struct PredicateObligationDef<'tcx> {
   #[serde(skip)]
   pub cause: ObligationCause<'tcx>,
+
   #[serde(with = "ParamEnvDef")]
+  #[cfg_attr(feature = "testing", ts(type = "ParamEnv"))]
   pub param_env: ty::ParamEnv<'tcx>,
+
   #[serde(with = "PredicateDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Predicate"))]
   pub predicate: ty::Predicate<'tcx>,
+
   #[serde(skip)]
   pub recursion_depth: usize,
 }
 
-pub struct Goal__PredicateDef;
-impl Goal__PredicateDef {
-  pub fn serialize<'tcx, S>(
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "GoalPredicate"))]
+pub struct Goal__PredicateDef<'tcx> {
+  #[serde(with = "PredicateDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Predicate"))]
+  pub predicate: ty::Predicate<'tcx>,
+
+  #[serde(with = "ParamEnvDef")]
+  #[cfg_attr(feature = "testing", ts(type = "ParamEnv"))]
+  pub param_env: ty::ParamEnv<'tcx>,
+}
+
+impl<'tcx> Goal__PredicateDef<'tcx> {
+  pub fn serialize<S>(
     value: &Goal<'tcx, ty::Predicate<'tcx>>,
     s: S,
   ) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase")]
-    pub struct Wrapper<'a, 'tcx: 'a> {
-      #[serde(with = "PredicateDef")]
-      pub predicate: &'a ty::Predicate<'tcx>,
-      #[serde(with = "ParamEnvDef")]
-      pub param_env: &'a ty::ParamEnv<'tcx>,
-    }
-
-    Wrapper {
-      predicate: &value.predicate,
-      param_env: &value.param_env,
+    Self {
+      predicate: value.predicate,
+      param_env: value.param_env,
     }
     .serialize(s)
   }
 }
 
-pub struct ParamEnvDef;
-impl ParamEnvDef {
-  pub fn serialize<'tcx, S>(
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "ParamEnv"))]
+pub struct ParamEnvDef<'a, 'tcx: 'a>(
+  #[serde(with = "Slice__ClauseDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Clause[]"))]
+  &'a ty::List<ty::Clause<'tcx>>,
+);
+
+impl<'tcx> ParamEnvDef<'_, 'tcx> {
+  pub fn serialize<S>(
     value: &ty::ParamEnv<'tcx>,
     s: S,
   ) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    #[derive(Serialize)]
-    struct Wrapper<'a, 'tcx: 'a>(
-      #[serde(with = "Slice__ClauseDef")] &'a ty::List<ty::Clause<'tcx>>,
-    );
-
-    Wrapper(value.caller_bounds()).serialize(s)
+    Self(value.caller_bounds()).serialize(s)
   }
 }
 
-pub struct PredicateDef;
-impl PredicateDef {
-  pub fn serialize<'tcx, S>(
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "Predicate"))]
+pub struct PredicateDef<'tcx>(
+  #[serde(with = "Binder__PredicateKind")]
+  #[cfg_attr(feature = "testing", ts(type = "PolyPredicateKind"))]
+  ty::Binder<'tcx, ty::PredicateKind<'tcx>>,
+);
+
+impl<'tcx> PredicateDef<'tcx> {
+  pub fn serialize<S>(
     value: &ty::Predicate<'tcx>,
     s: S,
   ) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    log::debug!("Serializing predicate {:#?}", value);
-    Binder__PredicateKind::from(&value.kind()).serialize(s)
+    Self(value.kind()).serialize(s)
   }
 }
 
 #[derive(Serialize)]
-pub struct Binder__ClauseKindDef;
-impl Binder__ClauseKindDef {
-  pub fn serialize<'tcx, S>(
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "PolyPredicateKind"))]
+pub struct Binder__PredicateKind<'tcx> {
+  #[serde(with = "Slice__BoundVariableKindDef")]
+  #[cfg_attr(feature = "testing", ts(type = "BoundVariableKind[]"))]
+  pub bound_vars: Vec<ty::BoundVariableKind>,
+
+  #[serde(with = "PredicateKindDef")]
+  #[cfg_attr(feature = "testing", ts(type = "PredicateKind"))]
+  pub value: ty::PredicateKind<'tcx>,
+}
+
+impl<'tcx> Binder__PredicateKind<'tcx> {
+  pub fn serialize<S>(
+    value: &ty::Binder<'tcx, ty::PredicateKind<'tcx>>,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    Binder__PredicateKind {
+      bound_vars: value.bound_vars().to_vec(),
+      value: value.skip_binder().clone(),
+    }
+    .serialize(s)
+  }
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "PolyClauseKind"))]
+pub struct Binder__ClauseKindDef<'tcx> {
+  #[serde(with = "Slice__BoundVariableKindDef")]
+  #[cfg_attr(feature = "testing", ts(type = "BoundVariableKind[]"))]
+  pub bound_vars: Vec<ty::BoundVariableKind>,
+
+  #[serde(with = "ClauseKindDef")]
+  #[cfg_attr(feature = "testing", ts(type = "ClauseKind"))]
+  pub value: ty::ClauseKind<'tcx>,
+}
+
+impl<'tcx> Binder__ClauseKindDef<'tcx> {
+  pub fn serialize<S>(
     value: &ty::Binder<'tcx, ty::ClauseKind<'tcx>>,
     s: S,
   ) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    #[derive(Serialize)]
-    struct Wrapper<'tcx> {
-      #[serde(serialize_with = "vec__bound_variable_kind")]
-      pub bound_vars: Vec<ty::BoundVariableKind>,
-      #[serde(serialize_with = "clause_kind__ty_ctxt")]
-      pub value: ir::ClauseKind<ty::TyCtxt<'tcx>>,
-    }
-
-    Wrapper {
+    Self {
       bound_vars: value.bound_vars().to_vec(),
       value: value.skip_binder(),
     }
@@ -1081,87 +1165,96 @@ impl Binder__ClauseKindDef {
 }
 
 #[derive(Serialize)]
-pub struct Binder__PredicateKind<'tcx> {
-  #[serde(serialize_with = "vec__bound_variable_kind")]
-  pub bound_vars: Vec<ty::BoundVariableKind>,
-  #[serde(with = "PredicateKindDef")]
-  pub value: ir::PredicateKind<ty::TyCtxt<'tcx>>,
-}
-
-impl<'tcx> From<&ty::Binder<'tcx, ir::PredicateKind<ty::TyCtxt<'tcx>>>>
-  for Binder__PredicateKind<'tcx>
-{
-  fn from(
-    value: &ty::Binder<'tcx, ir::PredicateKind<ty::TyCtxt<'tcx>>>,
-  ) -> Self {
-    Binder__PredicateKind {
-      bound_vars: value.bound_vars().to_vec(),
-      value: value.skip_binder().clone(),
-    }
-  }
-}
-
-fn vec__bound_variable_kind<S>(
-  value: &Vec<ty::BoundVariableKind>,
-  s: S,
-) -> Result<S::Ok, S::Error>
-where
-  S: serde::Serializer,
-{
-  #[derive(Serialize)]
-  struct Wrapper<'a>(
-    #[serde(with = "BoundVariableKindDef")] &'a ty::BoundVariableKind,
-  );
-  serialize_custom_seq! { Wrapper, s, value }
-}
-
-#[derive(Serialize)]
 #[serde(remote = "ty::PredicateKind")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "PredicateKind"))]
 pub enum PredicateKindDef<'tcx> {
   Clause(
-    #[serde(serialize_with = "clause_kind__ty_ctxt")]
-    ir::ClauseKind<ty::TyCtxt<'tcx>>,
+    #[serde(with = "ClauseKindDef")]
+    #[cfg_attr(feature = "testing", ts(type = "ClauseKind"))]
+    ty::ClauseKind<'tcx>,
   ),
-  ObjectSafe(#[serde(serialize_with = "path::path_def_no_args")] DefId),
-  Subtype(#[serde(with = "SubtypePredicateDef")] ty::SubtypePredicate<'tcx>),
-  Coerce(#[serde(with = "CoercePredicateDef")] ty::CoercePredicate<'tcx>),
+  ObjectSafe(
+    #[serde(with = "path::PathDefNoArgs")]
+    #[cfg_attr(feature = "testing", ts(type = "PathDefNoArgs"))]
+    DefId,
+  ),
+  Subtype(
+    #[serde(with = "SubtypePredicateDef")]
+    #[cfg_attr(feature = "testing", ts(type = "SubtypePredicate"))]
+    ty::SubtypePredicate<'tcx>,
+  ),
+  Coerce(
+    #[serde(with = "CoercePredicateDef")]
+    #[cfg_attr(feature = "testing", ts(type = "CoercePredicate"))]
+    ty::CoercePredicate<'tcx>,
+  ),
   ConstEquate(
-    #[serde(with = "ConstDef")] ty::Const<'tcx>,
-    #[serde(with = "ConstDef")] ty::Const<'tcx>,
+    #[serde(with = "ConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Const"))]
+    ty::Const<'tcx>,
+    #[serde(with = "ConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Const"))]
+    ty::Const<'tcx>,
   ),
   Ambiguous,
-  NormalizesTo(#[serde(with = "NormalizesToDef")] ty::NormalizesTo<'tcx>),
+  NormalizesTo(
+    #[serde(with = "NormalizesToDef")]
+    #[cfg_attr(feature = "testing", ts(type = "NormalizesTo"))]
+    ty::NormalizesTo<'tcx>,
+  ),
   AliasRelate(
-    #[serde(with = "TermDef")] ty::Term<'tcx>,
-    #[serde(with = "TermDef")] ty::Term<'tcx>,
-    #[serde(with = "AliasRelationDirectionDef")] ty::AliasRelationDirection,
+    #[serde(with = "TermDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Term"))]
+    ty::Term<'tcx>,
+    #[serde(with = "TermDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Term"))]
+    ty::Term<'tcx>,
+    #[serde(with = "AliasRelationDirectionDef")]
+    #[cfg_attr(feature = "testing", ts(type = "AliasRelationDirection"))]
+    ty::AliasRelationDirection,
   ),
 }
 
 #[derive(Serialize)]
 #[serde(remote = "ty::NormalizesTo")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "NormalizesTo"))]
 pub struct NormalizesToDef<'tcx> {
   #[serde(with = "AliasTyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "AliasTy"))]
   pub alias: ty::AliasTy<'tcx>,
+
   #[serde(with = "TermDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Term"))]
   pub term: ty::Term<'tcx>,
 }
 
 #[derive(Serialize)]
 #[serde(remote = "ty::ClosureKind")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "ClosureKind"))]
 pub enum ClosureKindDef {
   Fn,
   FnMut,
   FnOnce,
 }
 
-pub struct ClauseDef;
-impl ClauseDef {
-  fn serialize<'tcx, S>(value: &ty::Clause<'_>, s: S) -> Result<S::Ok, S::Error>
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "Clause"))]
+pub struct ClauseDef<'tcx>(
+  #[serde(with = "Binder__ClauseKindDef")]
+  #[cfg_attr(feature = "testing", ts(type = "any"))]
+  ty::Binder<'tcx, ty::ClauseKind<'tcx>>,
+);
+
+impl<'tcx> ClauseDef<'tcx> {
+  fn serialize<S>(value: &ty::Clause<'tcx>, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    Binder__ClauseKindDef::serialize(&value.kind(), s)
+    Self(value.kind()).serialize(s)
   }
 }
 
@@ -1182,134 +1275,157 @@ impl Slice__ClauseDef {
   }
 }
 
-fn clause_kind__ty_ctxt<'tcx, S>(
-  value: &ir::ClauseKind<ty::TyCtxt<'tcx>>,
-  s: S,
-) -> Result<S::Ok, S::Error>
-where
-  S: serde::Serializer,
-{
-  ClauseKind__TyCtxt::from(value).serialize(s)
-}
-
 #[derive(Serialize)]
-pub enum ClauseKind__TyCtxt<'tcx> {
-  Trait(#[serde(with = "TraitPredicateDef")] ty::TraitPredicate<'tcx>),
-  RegionOutlives(
-    #[serde(with = "RegionOutlivesPredicateDef")]
-    ty::OutlivesPredicate<ty::Region<'tcx>, ty::Region<'tcx>>,
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "ClauseKind"))]
+pub enum ClauseKindDef<'tcx> {
+  Trait(
+    #[serde(with = "TraitPredicateDef")]
+    #[cfg_attr(feature = "testing", ts(type = "TraitPredicate"))]
+    ty::TraitPredicate<'tcx>,
   ),
-  TypeOutlives(
-    #[serde(with = "TypeOutlivesPredicateDef")]
-    ty::OutlivesPredicate<ty::Ty<'tcx>, ty::Region<'tcx>>,
-  ),
+  RegionOutlives(RegionOutlivesRegionDef<'tcx>),
+  TypeOutlives(TyOutlivesRegionDef<'tcx>),
   Projection(
-    #[serde(with = "ProjectionPredicateDef")] ty::ProjectionPredicate<'tcx>,
+    #[serde(with = "ProjectionPredicateDef")]
+    #[cfg_attr(feature = "testing", ts(type = "ProjectionPredicate"))]
+    ty::ProjectionPredicate<'tcx>,
   ),
   ConstArgHasType(
-    #[serde(with = "ConstDef")] ty::Const<'tcx>,
-    #[serde(with = "TyDef")] ty::Ty<'tcx>,
+    #[serde(with = "ConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Const"))]
+    ty::Const<'tcx>,
+    #[serde(with = "TyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+    ty::Ty<'tcx>,
   ),
-  WellFormed(#[serde(with = "GenericArgDef")] ty::GenericArg<'tcx>),
-  ConstEvaluatable(#[serde(with = "ConstDef")] ty::Const<'tcx>),
+  WellFormed(
+    #[serde(with = "GenericArgDef")]
+    #[cfg_attr(feature = "testing", ts(type = "GenericArg"))]
+    ty::GenericArg<'tcx>,
+  ),
+  ConstEvaluatable(
+    #[serde(with = "ConstDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Const"))]
+    ty::Const<'tcx>,
+  ),
 }
 
-impl<'tcx> From<&ir::ClauseKind<ty::TyCtxt<'tcx>>>
-  for ClauseKind__TyCtxt<'tcx>
-{
-  fn from(value: &ir::ClauseKind<ty::TyCtxt<'tcx>>) -> Self {
+impl<'tcx> ClauseKindDef<'tcx> {
+  fn serialize<S>(value: &ty::ClauseKind<'tcx>, s: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    Self::from(value).serialize(s)
+  }
+}
+
+impl<'tcx> From<&ty::ClauseKind<'tcx>> for ClauseKindDef<'tcx> {
+  fn from(value: &ty::ClauseKind<'tcx>) -> Self {
     match value {
-      ty::ClauseKind::Trait(v) => ClauseKind__TyCtxt::Trait(v.clone()),
+      ty::ClauseKind::Trait(v) => Self::Trait(v.clone()),
       ty::ClauseKind::RegionOutlives(v) => {
-        ClauseKind__TyCtxt::RegionOutlives(v.clone())
+        Self::RegionOutlives(RegionOutlivesRegionDef::new(v))
       }
       ty::ClauseKind::TypeOutlives(v) => {
-        ClauseKind__TyCtxt::TypeOutlives(v.clone())
+        Self::TypeOutlives(TyOutlivesRegionDef::new(v))
       }
-      ty::ClauseKind::Projection(v) => {
-        ClauseKind__TyCtxt::Projection(v.clone())
-      }
+      ty::ClauseKind::Projection(v) => Self::Projection(v.clone()),
       ty::ClauseKind::ConstArgHasType(v1, v2) => {
-        ClauseKind__TyCtxt::ConstArgHasType(v1.clone(), v2.clone())
+        Self::ConstArgHasType(v1.clone(), v2.clone())
       }
-      ty::ClauseKind::WellFormed(v) => {
-        ClauseKind__TyCtxt::WellFormed(v.clone())
-      }
-      ty::ClauseKind::ConstEvaluatable(v) => {
-        ClauseKind__TyCtxt::ConstEvaluatable(v.clone())
-      }
+      ty::ClauseKind::WellFormed(v) => Self::WellFormed(v.clone()),
+      ty::ClauseKind::ConstEvaluatable(v) => Self::ConstEvaluatable(v.clone()),
     }
   }
 }
 
 #[derive(Serialize)]
 #[serde(remote = "ty::SubtypePredicate")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "SubtypePredicate"))]
 pub struct SubtypePredicateDef<'tcx> {
   pub a_is_expected: bool,
+
   #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
   pub a: ty::Ty<'tcx>,
+
   #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
   pub b: ty::Ty<'tcx>,
 }
 
 #[derive(Serialize)]
 #[serde(remote = "ty::TraitPredicate")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "TraitPredicate"))]
 pub struct TraitPredicateDef<'tcx> {
   #[serde(with = "TraitRefDef")]
+  #[cfg_attr(feature = "testing", ts(type = "TraitRef"))]
   pub trait_ref: ty::TraitRef<'tcx>,
+
   #[serde(with = "ImplPolarityDef")]
+  #[cfg_attr(feature = "testing", ts(type = "ImplPolarity"))]
   pub polarity: ty::ImplPolarity,
 }
 
-#[derive(Debug, Serialize)]
-pub struct TraitRefPrintOnlyTraitPathDefWrapper<'tcx>(
-  #[serde(with = "TraitRefPrintOnlyTraitPathDef")] pub ty::TraitRef<'tcx>,
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(
+  feature = "testing",
+  ts(export, rename = "TraitRefPrintOnlyTraitPath")
+)]
+pub struct TraitRefPrintOnlyTraitPathDef<'tcx>(
+  #[cfg_attr(feature = "testing", ts(type = "any"))]
+  path::PathDefWithArgs<'tcx>,
 );
+impl<'tcx> TraitRefPrintOnlyTraitPathDef<'tcx> {
+  pub fn new(value: &ty::TraitRef<'tcx>) -> Self {
+    Self(path::PathDefWithArgs::new(value.def_id, value.args))
+  }
 
-pub struct TraitRefPrintOnlyTraitPathDef;
-impl TraitRefPrintOnlyTraitPathDef {
-  pub fn serialize<'tcx, S>(
+  pub fn serialize<S>(
     value: &ty::TraitRef<'tcx>,
     s: S,
   ) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    log::debug!("Serializing TraitRef[path only] {:#?}", value);
-    path::PathDefWithArgs::new(value.def_id, value.args).serialize(s)
+    Self::new(value).serialize(s)
   }
 }
 
-pub struct TraitRefDef;
-impl TraitRefDef {
-  pub fn serialize<'tcx, S>(
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "TraitRef"))]
+pub struct TraitRefDef<'tcx> {
+  #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+  pub self_ty: ty::Ty<'tcx>,
+
+  pub trait_path: TraitRefPrintOnlyTraitPathDef<'tcx>,
+}
+
+impl<'tcx> TraitRefDef<'tcx> {
+  pub fn serialize<S>(
     value: &ty::TraitRef<'tcx>,
     s: S,
   ) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    #[derive(Serialize)]
-    struct Wrapper<'a, 'tcx: 'a> {
-      #[serde(with = "TyDef")]
-      pub self_ty: ty::Ty<'tcx>,
-      #[serde(with = "TraitRefPrintOnlyTraitPathDef")]
-      // NOTE: we can't use the actual TraitRefPrintOnlyTraitPath because
-      // the newtype wrapper makes the .0 field private. However, all it
-      // does is wrap a TraitRef to print differently which we
-      // do in the TraitRefPrintOnlyTraitPathDef::serialize function.
-      pub trait_path: &'a ty::TraitRef<'tcx>,
-    }
-
-    Wrapper {
+    Self {
       self_ty: value.self_ty(),
-      trait_path: value,
+      trait_path: TraitRefPrintOnlyTraitPathDef::new(value),
     }
     .serialize(s)
   }
 }
 
 #[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "ImplPolarity"))]
 #[serde(remote = "ty::ImplPolarity")]
 pub enum ImplPolarityDef {
   Positive,
@@ -1317,68 +1433,48 @@ pub enum ImplPolarityDef {
   Reservation,
 }
 
-pub struct RegionOutlivesPredicateDef;
-impl RegionOutlivesPredicateDef {
-  pub fn serialize<'tcx, S>(
-    value: &ty::OutlivesPredicate<ty::Region<'tcx>, ty::Region<'tcx>>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    OutlivesPredicate__Region__Region::from(value).serialize(s)
-  }
-}
-
 #[derive(Serialize)]
-pub struct OutlivesPredicate__Region__Region<'tcx> {
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "RegionOutlivesRegion"))]
+pub struct RegionOutlivesRegionDef<'tcx> {
   #[serde(with = "RegionDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Region"))]
   pub a: ty::Region<'tcx>,
+
   #[serde(with = "RegionDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Region"))]
   pub b: ty::Region<'tcx>,
 }
 
-impl<'tcx> From<&ty::OutlivesPredicate<ty::Region<'tcx>, ty::Region<'tcx>>>
-  for OutlivesPredicate__Region__Region<'tcx>
-{
-  fn from(
+impl<'tcx> RegionOutlivesRegionDef<'tcx> {
+  pub fn new(
     value: &ty::OutlivesPredicate<ty::Region<'tcx>, ty::Region<'tcx>>,
   ) -> Self {
-    OutlivesPredicate__Region__Region {
+    Self {
       a: value.0.clone(),
       b: value.1.clone(),
     }
   }
 }
 
-pub struct TypeOutlivesPredicateDef;
-impl TypeOutlivesPredicateDef {
-  pub fn serialize<'tcx, S>(
-    value: &ty::OutlivesPredicate<ty::Ty<'tcx>, ty::Region<'tcx>>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    OutlivesPredicate__Ty__Region::from(value).serialize(s)
-  }
-}
-
 #[derive(Serialize)]
-pub struct OutlivesPredicate__Ty__Region<'tcx> {
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "TyOutlivesRegion"))]
+pub struct TyOutlivesRegionDef<'tcx> {
   #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
   pub a: ty::Ty<'tcx>,
+
   #[serde(with = "RegionDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Region"))]
   pub b: ty::Region<'tcx>,
 }
 
-impl<'tcx> From<&ty::OutlivesPredicate<ty::Ty<'tcx>, ty::Region<'tcx>>>
-  for OutlivesPredicate__Ty__Region<'tcx>
-{
-  fn from(
+impl<'tcx> TyOutlivesRegionDef<'tcx> {
+  pub fn new(
     value: &ty::OutlivesPredicate<ty::Ty<'tcx>, ty::Region<'tcx>>,
   ) -> Self {
-    OutlivesPredicate__Ty__Region {
+    Self {
       a: value.0.clone(),
       b: value.1.clone(),
     }
@@ -1387,10 +1483,15 @@ impl<'tcx> From<&ty::OutlivesPredicate<ty::Ty<'tcx>, ty::Region<'tcx>>>
 
 #[derive(Serialize)]
 #[serde(remote = "ty::ProjectionPredicate")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "ProjectionPredicate"))]
 pub struct ProjectionPredicateDef<'tcx> {
   #[serde(with = "AliasTyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "AliasTy"))]
   pub projection_ty: ty::AliasTy<'tcx>,
+
   #[serde(with = "TermDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Term"))]
   pub term: ty::Term<'tcx>,
 }
 
@@ -1403,47 +1504,41 @@ pub struct UniverseIndexDef {
 
 #[derive(Serialize)]
 #[serde(remote = "ty::CoercePredicate")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "CoercePredicate"))]
 pub struct CoercePredicateDef<'tcx> {
   #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
   pub a: ty::Ty<'tcx>,
+
   #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
   pub b: ty::Ty<'tcx>,
 }
 
-// #[derive(Serialize)]
-// #[serde(remote = "ParamConst")]
-// pub struct ParamConstDef {
-//   pub index: u32,
-//   #[serde(with = "SymbolDef")]
-//   pub name: Symbol,
-// }
-
 #[derive(Serialize)]
 #[serde(remote = "ty::ParamTy")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "ParamTy"))]
 pub struct ParamTyDef {
   #[serde(skip)]
   pub index: u32,
+
   #[serde(with = "SymbolDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
   pub name: Symbol,
 }
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS), ts(export, rename = "Symbol"))]
-pub struct SymbolDefDef<'a>(&'a str);
+pub struct SymbolDef<'a>(&'a str);
 
-impl<'a> From<&'a Symbol> for SymbolDefDef<'a> {
-  fn from(value: &'a Symbol) -> Self {
-    SymbolDefDef(value.as_str())
-  }
-}
-
-pub struct SymbolDef;
-impl SymbolDef {
-  pub fn serialize<'tcx, S>(value: &Symbol, s: S) -> Result<S::Ok, S::Error>
+impl<'a> SymbolDef<'a> {
+  pub fn serialize<'tcx, S>(value: &'a Symbol, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    SymbolDefDef::from(value).serialize(s)
+    SymbolDef(value.as_str()).serialize(s)
   }
 }
 
@@ -1477,31 +1572,21 @@ impl Option__SymbolDef {
 
 #[derive(Serialize)]
 #[serde(remote = "ty::AliasRelationDirection")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "AliasRelationDirection"))]
 pub enum AliasRelationDirectionDef {
   Equate,
   Subtype,
 }
 
-pub struct BoundVariable {
-  debruijn_idx: ty::DebruijnIndex,
-  var: ty::BoundVar,
-}
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+pub enum BoundVariable {}
 
 impl BoundVariable {
-  pub fn new(d: ty::DebruijnIndex, v: ty::BoundVar) -> Self {
-    BoundVariable {
-      debruijn_idx: d,
-      var: v,
-    }
-  }
-}
-
-impl Serialize for BoundVariable {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    todo!("see debug_bound_var in RUSTC")
+  pub fn new(debruijn_idx: ty::DebruijnIndex, var: ty::BoundVar) -> Self {
+    todo!("bound variables are not yet possible")
   }
 }
 
@@ -1517,20 +1602,6 @@ pub struct OpaqueFnEntry<'tcx> {
   return_ty: Option<ty::Binder<'tcx, ty::Term<'tcx>>>,
 }
 
-pub struct OpaqueImplType<'tcx> {
-  def_id: DefId,
-  args: &'tcx ty::List<ty::GenericArg<'tcx>>,
-}
-
-impl<'tcx> OpaqueImplType<'tcx> {
-  pub fn new(
-    def_id: DefId,
-    args: &'tcx ty::List<ty::GenericArg<'tcx>>,
-  ) -> Self {
-    OpaqueImplType { def_id, args }
-  }
-}
-
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
@@ -1539,36 +1610,38 @@ pub struct OpaqueImpl<'tcx> {
   fn_traits: Vec<FnTrait<'tcx>>,
   traits: Vec<Trait<'tcx>>,
   #[serde(with = "Slice__RegionDef")]
-  #[cfg_attr(feature = "testing", ts(type = "Region"))]
+  #[cfg_attr(feature = "testing", ts(type = "Region[]"))]
   lifetimes: Vec<ty::Region<'tcx>>,
   has_sized_bound: bool,
   has_negative_sized_bound: bool,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-#[serde(rename_all = "camelCase")]
 pub struct FnTrait<'tcx> {
   #[serde(with = "Slice__TyDef")]
   #[cfg_attr(feature = "testing", ts(type = "Ty[]"))]
   params: Vec<ty::Ty<'tcx>>,
+
   #[serde(with = "Option__TyDef")]
   #[cfg_attr(feature = "testing", ts(type = "Ty | undefined"))]
   ret_ty: Option<ty::Ty<'tcx>>,
+
   kind: FnTraitKind,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-#[serde(rename_all = "camelCase")]
 pub struct Trait<'tcx> {
   #[serde(with = "ImplPolarityDef")]
   #[cfg_attr(feature = "testing", ts(type = "ImplPolarity"))]
   polarity: ty::ImplPolarity,
   #[cfg_attr(feature = "testing", ts(type = "DefinedPath"))]
-  trait_name: TraitRefPrintOnlyTraitPathDefWrapper<'tcx>,
+  trait_name: TraitRefPrintOnlyTraitPathDef<'tcx>,
   #[serde(with = "Slice__GenericArgDef")]
   #[cfg_attr(feature = "testing", ts(type = "GenericArg[]"))]
   own_args: &'tcx [ty::GenericArg<'tcx>],
@@ -1577,7 +1650,7 @@ pub struct Trait<'tcx> {
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
+#[cfg_attr(feature = "testing", ts(export, rename = "AssocItem"))]
 pub struct AssocItemDef<'tcx> {
   #[serde(with = "SymbolDef")]
   #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
@@ -1596,9 +1669,8 @@ pub enum FnTraitKind {
   FnOnce,
 }
 
-impl<'tcx> OpaqueImplType<'tcx> {
+impl<'tcx> OpaqueImpl<'tcx> {
   fn insert_trait_and_projection(
-    &self,
     tcx: ty::TyCtxt<'tcx>,
     trait_ref: ty::PolyTraitRef<'tcx>,
     polarity: ty::ImplPolarity,
@@ -1655,8 +1727,7 @@ impl<'tcx> OpaqueImplType<'tcx> {
   }
 
   // TODO: what the hell should we do with binders ...
-  pub fn wrap_binder<T, O, C: FnOnce(&T, &Self) -> O>(
-    &self,
+  pub fn wrap_binder<T, O, C: FnOnce(&T) -> O>(
     value: &ty::Binder<'tcx, T>,
     f: C,
   ) -> O
@@ -1666,19 +1737,20 @@ impl<'tcx> OpaqueImplType<'tcx> {
     // let old_region_index = self.region_index;
     // let (new_value, _) = self.name_all_regions(value)?;
     let new_value = value.clone().skip_binder();
-    let res = f(&new_value, self);
+    let res = f(&new_value);
     // self.region_index = old_region_index;
     // self.binder_depth -= 1;
     res
   }
 }
 
-impl<'tcx> From<&OpaqueImplType<'tcx>> for OpaqueImpl<'tcx> {
-  fn from(value: &OpaqueImplType<'tcx>) -> Self {
+impl<'tcx> OpaqueImpl<'tcx> {
+  pub fn new(
+    def_id: DefId,
+    args: &'tcx ty::List<ty::GenericArg<'tcx>>,
+  ) -> Self {
     let infcx = get_dynamic_ctx();
     let tcx = infcx.tcx;
-    let this = value;
-    let OpaqueImplType { def_id, args } = this;
 
     // Grab the "TraitA + TraitB" from `impl TraitA + TraitB`,
     // by looking up the projections associated with the def_id.
@@ -1710,7 +1782,7 @@ impl<'tcx> From<&OpaqueImplType<'tcx>> for OpaqueImpl<'tcx> {
             }
           }
 
-          this.insert_trait_and_projection(
+          Self::insert_trait_and_projection(
             tcx,
             trait_ref,
             pred.polarity,
@@ -1726,7 +1798,7 @@ impl<'tcx> From<&OpaqueImplType<'tcx>> for OpaqueImpl<'tcx> {
           // Projection type entry -- the def-id for naming, and the ty.
           let proj_ty = (proj_ref.projection_def_id(), proj_ref.term());
 
-          this.insert_trait_and_projection(
+          Self::insert_trait_and_projection(
             tcx,
             trait_ref,
             ty::ImplPolarity::Positive,
@@ -1751,7 +1823,7 @@ impl<'tcx> From<&OpaqueImplType<'tcx>> for OpaqueImpl<'tcx> {
     };
 
     for (fn_once_trait_ref, entry) in fn_traits {
-      this.wrap_binder(&fn_once_trait_ref, |trait_ref, this| {
+      Self::wrap_binder(&fn_once_trait_ref, |trait_ref| {
         let generics = tcx.generics_of(trait_ref.def_id);
         let own_args = generics.own_args_no_defaults(tcx, trait_ref.args);
 
@@ -1807,8 +1879,8 @@ impl<'tcx> From<&OpaqueImplType<'tcx>> for OpaqueImpl<'tcx> {
 
     // Print the rest of the trait types (that aren't Fn* family of traits)
     for ((trait_ref, polarity), assoc_items) in traits {
-      this.wrap_binder(&trait_ref, |trait_ref, cx| {
-        let trait_name = TraitRefPrintOnlyTraitPathDefWrapper(*trait_ref);
+      Self::wrap_binder(&trait_ref, |trait_ref| {
+        let trait_name = TraitRefPrintOnlyTraitPathDef::new(trait_ref);
 
         let generics = tcx.generics_of(trait_ref.def_id);
         let own_args = generics.own_args_no_defaults(tcx, trait_ref.args);
@@ -1854,14 +1926,5 @@ impl<'tcx> From<&OpaqueImplType<'tcx>> for OpaqueImpl<'tcx> {
     here_opaque_type.has_negative_sized_bound = has_negative_sized_bound;
 
     here_opaque_type
-  }
-}
-
-impl<'tcx> Serialize for OpaqueImplType<'tcx> {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    OpaqueImpl::from(self).serialize(s)
   }
 }

@@ -8,7 +8,7 @@ use serde::Serialize;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
-use super::*;
+use super::{r#const::*, ty::*, *};
 
 pub struct TermDef;
 impl TermDef {
@@ -27,12 +27,12 @@ impl TermDef {
 pub enum TermKindDef<'tcx> {
   Ty(
     #[serde(with = "TyDef")]
-    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    #[cfg_attr(feature = "testing", ts(type = "Ty"))]
     Ty<'tcx>,
   ),
   Const(
     #[serde(with = "ConstDef")]
-    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    #[cfg_attr(feature = "testing", ts(type = "Const"))]
     Const<'tcx>,
   ),
 }
@@ -74,8 +74,9 @@ enum ValTreeKind<'tcx> {
 
   Aggregate {
     #[serde(with = "Slice__ConstDef")]
-    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    #[cfg_attr(feature = "testing", ts(type = "Const[]"))]
     fields: &'tcx [Const<'tcx>],
+
     kind: ValTreeAggregateKind<'tcx>,
   },
 
@@ -95,7 +96,6 @@ enum ValTreeAggregateKind<'tcx> {
   Tuple,
   AdtNoVariants,
   Adt {
-    #[cfg_attr(feature = "testing", ts(type = "any"))]
     data: path::ValuePathWithArgs<'tcx>,
     kind: AdtAggregateKind,
   },
@@ -110,7 +110,7 @@ enum AdtAggregateKind {
   Const,
   Misc {
     #[serde(with = "Slice__SymbolDef")]
-    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    #[cfg_attr(feature = "testing", ts(type = "Symbol[]"))]
     names: Vec<Symbol>,
   },
 }
@@ -275,7 +275,7 @@ pub enum ExprDef<'tcx> {
     #[cfg_attr(feature = "testing", ts(type = "Const"))]
     Const<'tcx>,
     #[serde(with = "TyDef")]
-    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    #[cfg_attr(feature = "testing", ts(type = "Ty"))]
     Ty<'tcx>,
   ),
 }

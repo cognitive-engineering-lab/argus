@@ -34,7 +34,7 @@ export class TreeInfo {
       const node = tree.nodes[n];
       switch (node.type) {
         case "goal": {
-          if (node.data.necessity.type === "yes") {
+          if (node.data.necessity.type === "Yes") {
             return "keep";
           } else {
             return "remove-tree";
@@ -112,41 +112,45 @@ export class TreeInfo {
       leaf => this.view.topology.parent[leaf] !== undefined
     );
 
-    const recommendedOrder = _.sortBy(viewLeaves, [
-      leaf => {
-        const node = this.tree.nodes[leaf];
-        switch (node.type) {
-          case "result": {
-            switch (node.data) {
-              case "no":
-                return 0;
-              case "maybe-overflow":
-              case "maybe-ambiguity":
-                return 1;
-              case "yes":
-                throw new Error("Only expected error leaves.");
-            }
-          }
-          default:
-            throw new Error("Leaves should only be results.");
-        }
-        // if (node.type === "result" && node.data)
-        // switch (leaf.data)
-      },
-      leaf => {
-        const pathToRoot = this.pathToRoot(leaf);
-        const numInferVars = _.map(pathToRoot.path, idx => {
-          const node = this.tree.nodes[idx];
-          switch (node.type) {
-            case "goal":
-              return node.data.numVars;
-            default:
+    const sortErrorsFirst = (leaf: ProofNodeIdx) => {
+      const node = this.tree.nodes[leaf];
+      switch (node.type) {
+        case "result": {
+          switch (node.data) {
+            case "no":
               return 0;
+            case "maybe-overflow":
+            case "maybe-ambiguity":
+              return 1;
+            case "yes":
+              throw new Error("Only expected error leaves.");
           }
-        });
-        // Sort the leaves by the ration of inference variables to path length.
-        return _.reduce(numInferVars, _.add, 0) / pathToRoot.path.length;
-      },
+        }
+        default:
+          throw new Error("Leaves should only be results.");
+      }
+      // if (node.type === "result" && node.data)
+      // switch (leaf.data)
+    };
+
+    const sortWeightPaths = (leaf: ProofNodeIdx) => {
+      const pathToRoot = this.pathToRoot(leaf);
+      const numInferVars = _.map(pathToRoot.path, idx => {
+        const node = this.tree.nodes[idx];
+        switch (node.type) {
+          case "goal":
+            return node.data.numVars;
+          default:
+            return 0;
+        }
+      });
+      // Sort the leaves by the ration of inference variables to path length.
+      return _.reduce(numInferVars, _.add, 0) / pathToRoot.path.length;
+    };
+
+    const recommendedOrder = _.sortBy(viewLeaves, [
+      sortErrorsFirst,
+      sortWeightPaths,
     ]);
 
     return recommendedOrder;

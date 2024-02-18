@@ -1,3 +1,15 @@
+import {
+  AliasRelationDirection,
+  Clause,
+  ClauseKind,
+  GoalPredicate,
+  ParamEnv,
+  PolyPredicateKind,
+  PredicateKind,
+  PredicateObligation,
+  TraitPredicate,
+  TraitRef,
+} from "@argus/common/bindings";
 import _ from "lodash";
 import React from "react";
 
@@ -14,7 +26,7 @@ import {
   PrintTy,
 } from "./ty";
 
-export const PrintPredicateObligation = ({ o }) => {
+export const PrintPredicateObligation = ({ o }: { o: PredicateObligation }) => {
   const hoverContent =
     o.paramEnv.length === 0 ? null : (
       <HoverInfo Content={() => <PrintParamEnv o={o.paramEnv} />}>
@@ -31,13 +43,13 @@ export const PrintPredicateObligation = ({ o }) => {
   );
 };
 
-export const PrintGoalPredicate = ({ o }) => {
+export const PrintGoalPredicate = ({ o }: { o: GoalPredicate }) => {
   // NOTE: goals and obligations aren't the same thing, but they
   // currently have the same semantic structure.
   return <PrintPredicateObligation o={o} />;
 };
 
-export const PrintParamEnv = ({ o }) => {
+export const PrintParamEnv = ({ o }: { o: ParamEnv }) => {
   const innerContent = _.map(o, (clause, idx) => (
     <div className="WhereConstraint" key={idx}>
       <PrintClause o={clause} />
@@ -47,13 +59,15 @@ export const PrintParamEnv = ({ o }) => {
   return <div className="DirNode WhereParamArea">{innerContent}</div>;
 };
 
-export const PrintBinderPredicateKind = ({ o }) => {
-  const inner = o => <PrintPredicateKind o={o} />;
+export const PrintBinderPredicateKind = ({ o }: { o: PolyPredicateKind }) => {
+  const inner = (o: PredicateKind) => <PrintPredicateKind o={o} />;
   return <PrintBinder binder={o} innerF={inner} />;
 };
 
-export const PrintPredicateKind = ({ o }) => {
-  if ("Clause" in o) {
+export const PrintPredicateKind = ({ o }: { o: PredicateKind }) => {
+  if (o === "Ambiguous") {
+    return "ambiguous";
+  } else if ("Clause" in o) {
     return <PrintClauseKind o={o.Clause} />;
   } else if ("ObjectSafe" in o) {
     return (
@@ -83,22 +97,31 @@ export const PrintPredicateKind = ({ o }) => {
         <PrintConst o={a} /> = <PrintConst o={b} />
       </span>
     );
-  } else if ("Ambiguous" in o) {
-    return "ambiguous";
   } else if ("AliasRelate" in o) {
     const [a, b, dir] = o.AliasRelate;
     return (
-      <span>
+      <>
         <PrintTerm o={a} /> <PrintAliasRelationDirection o={dir} />{" "}
         <PrintTerm o={b} />
-      </span>
+      </>
+    );
+  } else if ("NormalizesTo" in o) {
+    return (
+      <>
+        <PrintAliasTy o={o.NormalizesTo.alias} /> normalizes to{" "}
+        <PrintTerm o={o.NormalizesTo.term} />
+      </>
     );
   } else {
     throw new Error("Unknown predicate kind", o);
   }
 };
 
-export const PrintAliasRelationDirection = ({ o }) => {
+export const PrintAliasRelationDirection = ({
+  o,
+}: {
+  o: AliasRelationDirection;
+}) => {
   if (o === "Equate") {
     return "==";
   } else if (o === "Subtype") {
@@ -108,11 +131,12 @@ export const PrintAliasRelationDirection = ({ o }) => {
   }
 };
 
-export const PrintClause = ({ o }) => {
-  return <PrintBinder binder={o} innerF={o => <PrintClauseKind o={o} />} />;
+export const PrintClause = ({ o }: { o: Clause }) => {
+  const inner = (o: ClauseKind) => <PrintClauseKind o={o} />;
+  return <PrintBinder binder={o} innerF={inner} />;
 };
 
-export const PrintClauseKind = ({ o }) => {
+export const PrintClauseKind = ({ o }: { o: ClauseKind }) => {
   if ("Trait" in o) {
     return <PrintTraitPredicate o={o.Trait} />;
   } else if ("RegionOutlives" in o) {
@@ -160,7 +184,7 @@ export const PrintClauseKind = ({ o }) => {
   }
 };
 
-export const PrintTraitPredicate = ({ o }) => {
+export const PrintTraitPredicate = ({ o }: { o: TraitPredicate }) => {
   let polarity = o.polarity === "Negative" ? "!" : "";
   return (
     <>
@@ -170,7 +194,7 @@ export const PrintTraitPredicate = ({ o }) => {
   );
 };
 
-export const PrintTraitRef = ({ o }) => {
+export const PrintTraitRef = ({ o }: { o: TraitRef }) => {
   return (
     <span>
       <PrintTy o={o.self_ty} />: <PrintDefPath o={o.trait_path} />

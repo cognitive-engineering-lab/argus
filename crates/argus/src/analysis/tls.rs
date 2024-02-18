@@ -3,7 +3,6 @@ use std::cell::RefCell;
 
 use index_vec::IndexVec;
 use rustc_data_structures::fx::FxIndexMap;
-use rustc_hir::BodyId;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_span::Span;
 pub use unsafe_tls::{
@@ -13,7 +12,6 @@ pub use unsafe_tls::{
 
 use crate::{
   proof_tree::SerializedTree,
-  serialize::{path::PathDefNoArgs, serialize_to_value},
   types::{intermediate::Provenance, Obligation, ObligationHash},
 };
 
