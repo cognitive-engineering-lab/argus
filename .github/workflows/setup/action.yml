@@ -17,7 +17,7 @@ runs:
       shell: bash
 
     - name: Install Test Libraries
-      run: sudo apt-get install -y libasound2
+      run: sudo apt-get install -y libasound2-dev libudev-dev
       shell: bash
 
     - name: Gen bindings
