@@ -7,16 +7,21 @@ runs:
     - uses: davidB/rust-cargo-make@v1
       with:
         version: '0.36.4'
+
     - name: Install Guile
       run: sudo apt-get install -y guile-3.0
       shell: bash
 
-    - name: Gen bindings
-      run: cargo make init-bindings
-      shell: bash
-
     - name: Install Depot
       run: curl https://raw.githubusercontent.com/cognitive-engineering-lab/depot/main/scripts/install.sh | sh
+      shell: bash
+
+    - name: Install Test Libraries
+      run: sudo apt-get install -y libasound2
+      shell: bash
+
+    - name: Gen bindings
+      run: cargo make init-bindings
       shell: bash
 
     - name: Prepare IDE
