@@ -36,7 +36,7 @@ crate::define_idx! {
 // Same goes for Candidates and Goals.
 #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "testing", derive(TS))]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", ts(export))]
 pub enum Node {
   Result {
     #[serde(with = "EvaluationResultDef")]
@@ -52,10 +52,11 @@ pub enum Node {
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct Goal {
-  #[cfg_attr(feature = "testing", ts(type = "any"))]
+  #[cfg_attr(feature = "testing", ts(type = "GoalPredicate"))]
   goal: serde_json::Value,
 
   #[serde(with = "EvaluationResultDef")]
@@ -70,11 +71,10 @@ pub struct Goal {
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "testing", derive(TS))]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", ts(export))]
 pub enum Candidate {
   Impl {
-    #[cfg_attr(feature = "testing", ts(type = "any"))]
-    // Type is ImplHeader from mod `crate::types`.
+    #[cfg_attr(feature = "testing", ts(type = "ImplHeader"))]
     data: serde_json::Value,
   },
   ParamEnv {
@@ -87,8 +87,9 @@ pub enum Candidate {
 }
 
 #[derive(Serialize, Debug, Clone)]
-#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct SerializedTree {
   pub root: ProofNodeIdx,
   #[cfg_attr(feature = "testing", ts(type = "Node[]"))]
@@ -102,6 +103,7 @@ pub struct SerializedTree {
 
 #[derive(Serialize, Debug, Clone)]
 #[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct ProofCycle(Vec<ProofNodeIdx>);
 
 // ----------------------------------------

@@ -210,16 +210,15 @@ const InExpr = ({ idx }: { idx: ExprIdx }) => {
   );
 
   if (
-    isObject(expr.kind) &&
-    expr.kind.type !== "methodcall" &&
+    !(isObject(expr.kind) && "MethodCall" in expr.kind) &&
     bodyInfo.exprObligations(idx).length === 0
   ) {
     return null;
   }
 
   const content =
-    isObject(expr.kind) && expr.kind.type === "methodcall" ? (
-      <MethodLookupTable lookup={expr.kind.data} />
+    isObject(expr.kind) && "MethodCall" in expr.kind ? (
+      <MethodLookupTable lookup={expr.kind.MethodCall.data} />
     ) : (
       _.map(bodyInfo.exprObligations(idx), (oi, i) => (
         <ObligationFromIdx idx={oi} key={i} />

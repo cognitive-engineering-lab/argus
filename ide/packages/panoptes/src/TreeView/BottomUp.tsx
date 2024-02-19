@@ -9,7 +9,7 @@ const BottomUp = () => {
   const tree = useContext(TreeContext)!;
   const leaves = _.map(tree.errorNodes(), leaf => {
     let curr: ProofNodeIdx | undefined = leaf;
-    while (curr !== undefined && tree.node(curr).type !== "goal") {
+    while (curr !== undefined && !("Goal" in tree.node(curr))) {
       curr = tree.parent(curr);
     }
     return curr;

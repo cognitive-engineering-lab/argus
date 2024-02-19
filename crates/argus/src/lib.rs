@@ -41,9 +41,9 @@ mod ext;
 mod proof_tree;
 mod rustc;
 mod serialize;
-#[cfg(feature = "testing")]
+#[cfg(all(feature = "testing", test))]
 pub mod test_utils;
-#[cfg(feature = "testing")]
+#[cfg(all(feature = "testing", test))]
 mod ts;
 pub mod types;
 

@@ -76,7 +76,7 @@ export const DirNode = ({
 
   const arrows: ElementPair = [<IcoTriangleDown />, <IcoTriangleRight />];
   const dots: ElementPair = [<IcoDot />, <IcoDot />];
-  const icons = node.type === "result" ? dots : arrows;
+  const icons = "Result" in node ? dots : arrows;
   const info = <Node node={node} />;
 
   return (
@@ -101,8 +101,8 @@ export const DirRecursive = ({
   const tree = useContext(TreeContext)!;
   const node = tree.node(level[0]);
   const className = classNames("DirRecursive", {
-    "is-candidate": styleEdges && node?.type === "candidate",
-    "is-subgoal": styleEdges && node?.type === "goal",
+    "is-candidate": styleEdges && "Candidate" in node,
+    "is-subgoal": styleEdges && "Goal" in node,
     "generic-edge": !styleEdges,
   });
 

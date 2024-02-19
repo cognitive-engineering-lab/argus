@@ -21,28 +21,30 @@ export const Result = ({ result }: { result: EvaluationResult }) => {
 };
 
 export const Candidate = ({ candidate }: { candidate: CandidateTy }) => {
-  switch (candidate.type) {
-    case "any":
-      return candidate.data;
-    case "impl":
-      return <PrintImplHeader impl={candidate.data} />;
-    case "paramenv":
-      throw new Error("paramEnv not implemented");
+  if ("Any" in candidate) {
+    return candidate.Any.data;
+  } else if ("Impl" in candidate) {
+    return <PrintImplHeader impl={candidate.Impl.data} />;
+  } else if ("ParamEnv" in candidate) {
+    throw new Error("paramEnv not implemented");
+  } else {
+    throw new Error("Unknown candidate type", candidate);
   }
 };
 
 export const Node = ({ node }: { node: NodeTy }) => {
-  switch (node.type) {
-    case "result":
-      return <Result result={node.data} />;
-    case "goal":
-      return (
-        <>
-          <Result result={node.data.result} />
-          <PrintGoal o={node.data} />
-        </>
-      );
-    case "candidate":
-      return <Candidate candidate={node.data} />;
+  if ("Result" in node) {
+    return <Result result={node.Result.data} />;
+  } else if ("Goal" in node) {
+    return (
+      <>
+        <Result result={node.Goal.data.result} />
+        <PrintGoal o={node.Goal.data} />
+      </>
+    );
+  } else if ("Candidate" in node) {
+    return <Candidate candidate={node.Candidate.data} />;
+  } else {
+    throw new Error("Unknown node type", node);
   }
 };

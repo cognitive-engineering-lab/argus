@@ -40,16 +40,18 @@ crate::define_idx! { usize,
 }
 
 #[derive(Serialize)]
-#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct MethodLookup {
   pub candidates: ExtensionCandidates,
   pub table: Vec<MethodStep>,
 }
 
 #[derive(Serialize)]
-#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct ExtensionCandidates {
   #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath[]"))]
   data: serde_json::Value,
@@ -71,16 +73,18 @@ impl ExtensionCandidates {
 }
 
 #[derive(Serialize)]
-#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct MethodStep {
   pub recvr_ty: ReceiverAdjStep,
   pub trait_predicates: Vec<ObligationIdx>,
 }
 
 #[derive(Serialize)]
-#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct ReceiverAdjStep {
   #[cfg_attr(feature = "testing", ts(type = "Ty"))]
   ty: serde_json::Value,
@@ -97,8 +101,9 @@ impl ReceiverAdjStep {
 }
 
 #[derive(Serialize)]
-#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct Expr {
   pub range: CharRange,
   pub snippet: String,
@@ -110,7 +115,7 @@ pub struct Expr {
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", ts(export))]
 pub enum ExprKind {
   Misc,
   CallableExpr,
@@ -125,8 +130,9 @@ pub enum ExprKind {
 }
 
 #[derive(Serialize)]
-#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct ObligationsInBody {
   #[serde(skip_serializing_if = "Option::is_none")]
   #[cfg_attr(feature = "testing", ts(type = "PathDefNoArgs | undefined"))]
@@ -185,6 +191,7 @@ impl ObligationsInBody {
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct BodyHash(
   #[cfg_attr(feature = "testing", ts(type = "string"))] uuid::Uuid,
 );
@@ -196,8 +203,9 @@ impl BodyHash {
 }
 
 #[derive(Serialize, Clone, Debug)]
-#[cfg_attr(feature = "testing", derive(TS))]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct Obligation {
   #[cfg_attr(feature = "testing", ts(type = "PredicateObligation"))]
   pub obligation: serde_json::Value,
@@ -268,7 +276,7 @@ pub struct ClauseBound<'tcx> {
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "testing", derive(TS))]
-#[serde(tag = "type")]
+#[cfg_attr(feature = "testing", ts(export))]
 pub enum ObligationNecessity {
   No,
   ForProfessionals,
@@ -288,7 +296,7 @@ impl ObligationNecessity {
 
 #[derive(Serialize, Clone, Debug)]
 #[cfg_attr(feature = "testing", derive(TS))]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", ts(export))]
 pub enum ObligationKind {
   Success,
   Ambiguous,
@@ -297,6 +305,7 @@ pub enum ObligationKind {
 
 #[derive(Deserialize, Serialize, Copy, Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct ObligationHash(
   #[serde(with = "string")]
   #[cfg_attr(feature = "testing", ts(type = "string"))]

@@ -32,23 +32,20 @@ export class TreeInfo {
     };
     const cf = (n: ProofNodeIdx): ControlFlow => {
       const node = tree.nodes[n];
-      switch (node.type) {
-        case "goal": {
-          if (node.data.necessity.type === "Yes") {
-            return "keep";
-          } else {
-            return "remove-tree";
-          }
-        }
-        case "candidate": {
-          if (node.data.type === "any") {
-            return "remove-node";
-          } else {
-            return "keep";
-          }
-        }
-        default:
+      if ("Goal" in node) {
+        if (node.Goal.data.necessity === "Yes") {
           return "keep";
+        } else {
+          return "remove-tree";
+        }
+      } else if ("Candidate" in node) {
+        if ("Any" in node.Candidate.data) {
+          return "remove-node";
+        } else {
+          return "keep";
+        }
+      } else {
+        return "keep";
       }
     };
     this.view = makeTreeView(tree.root, cf, childrenOf);
@@ -114,34 +111,29 @@ export class TreeInfo {
 
     const sortErrorsFirst = (leaf: ProofNodeIdx) => {
       const node = this.tree.nodes[leaf];
-      switch (node.type) {
-        case "result": {
-          switch (node.data) {
-            case "no":
-              return 0;
-            case "maybe-overflow":
-            case "maybe-ambiguity":
-              return 1;
-            case "yes":
-              throw new Error("Only expected error leaves.");
-          }
+      if ("Result" in node) {
+        switch (node.Result.data) {
+          case "no":
+            return 0;
+          case "maybe-overflow":
+          case "maybe-ambiguity":
+            return 1;
+          case "yes":
+            throw new Error("Only expected error leaves.");
         }
-        default:
-          throw new Error("Leaves should only be results.");
+      } else {
+        throw new Error("Leaves should only be results.");
       }
-      // if (node.type === "result" && node.data)
-      // switch (leaf.data)
     };
 
     const sortWeightPaths = (leaf: ProofNodeIdx) => {
       const pathToRoot = this.pathToRoot(leaf);
       const numInferVars = _.map(pathToRoot.path, idx => {
         const node = this.tree.nodes[idx];
-        switch (node.type) {
-          case "goal":
-            return node.data.numVars;
-          default:
-            return 0;
+        if ("Goal" in node) {
+          return node.Goal.data.numVars;
+        } else {
+          return 0;
         }
       });
       // Sort the leaves by the ration of inference variables to path length.

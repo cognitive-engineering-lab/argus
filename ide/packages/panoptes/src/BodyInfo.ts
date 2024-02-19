@@ -86,7 +86,7 @@ class BodyInfo {
     if (o === undefined) {
       return false;
     }
-    return o.necessity.type === "Yes" || this.showHidden;
+    return o.necessity === "Yes" || this.showHidden;
   }
 }
 

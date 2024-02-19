@@ -4,14 +4,12 @@ import React, {
   MouseEventHandler,
   useCallback,
   useContext,
-  useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from "react";
 // @ts-ignore
 import Tree, { Orientation, TreeLinkDatum, TreeNodeDatum } from "react-d3-tree";
-import ReactDOM from "react-dom";
 
 import { TreeContext } from "./Context";
 import "./Graph.css";
@@ -37,13 +35,9 @@ const getEdgeClass =
   (tree: TreeInfo) => (link: TreeLinkDatum, orientation: Orientation) => {
     const sourceIdx = link.source.data.name as number;
     const node = tree.node(sourceIdx);
-
-    switch (node.type) {
-      case "goal":
-        return "edge__goal-to-candidate";
-      default:
-        return "edge__candidate-to-goal";
-    }
+    return "Goal" in node
+      ? "edge__goal-to-candidate"
+      : "edge__candidate-to-goal";
   };
 
 const TreeNode = ({

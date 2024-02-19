@@ -11,40 +11,16 @@ macro_rules! ts {
   };
 }
 
-// Legend
-// mod `ty`: types from argus
-// mod `pty`: types from argus::proof_tree
-// mod `(f|u)ty`: types from rustc_utils
 #[test]
-fn export_bindings_all_tys() {
+fn export_bindings_rustc_utils() {
   ts! {
     uty::CharPos,
     uty::CharRange,
     fty::FilenameIndex,
 
-    pty::Node,
-    pty::Candidate,
-    pty::Goal,
-    pty::SerializedTree,
-    pty::TreeTopology,
-    pty::ProofNodeIdx,
-    pty::ProofCycle,
-
-    ty::ObligationIdx,
-    ty::Expr,
     ty::ExprIdx,
-    ty::ExprKind,
-    ty::MethodLookup,
-    ty::ExtensionCandidates,
     ty::MethodLookupIdx,
-    ty::MethodStep,
-    ty::Obligation,
-    ty::ObligationHash,
-
-    ty::BodyHash,
-    ty::ObligationKind,
-    ty::ObligationNecessity,
-    ty::ObligationsInBody,
-    ty::ReceiverAdjStep,
+    ty::ObligationIdx,
+    pty::ProofNodeIdx,
   }
 }
