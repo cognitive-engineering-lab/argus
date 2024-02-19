@@ -24,6 +24,7 @@ pub trait Idx = Copy + PartialEq + Eq + Hash + Debug + Serialize;
 // more convenient to use `ProofNodeIdx` for ts-rs.
 #[derive(Serialize, Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct TreeTopology {
   pub children: HashMap<ProofNodeIdx, HashSet<ProofNodeIdx>>,
   pub parent: HashMap<ProofNodeIdx, ProofNodeIdx>,

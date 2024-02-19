@@ -25,8 +25,8 @@ use crate::{
     safe::{PathDefNoArgs, TraitRefPrintOnlyTraitPathDef},
     serialize_to_value,
     ty::{
-      ImplPolarityDef, Slice__ClauseDef, Slice__GenericArgDef, Slice__TyDef,
-      TyDef,
+      ImplPolarityDef, RegionDef, Slice__ClauseDef, Slice__GenericArgDef,
+      Slice__TyDef, TyDef,
     },
   },
 };
@@ -265,13 +265,19 @@ pub struct ClauseWithBounds<'tcx> {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-pub struct ClauseBound<'tcx> {
-  #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
-  pub path: TraitRefPrintOnlyTraitPathDef<'tcx>,
-
-  #[serde(with = "ImplPolarityDef")]
-  #[cfg_attr(feature = "testing", ts(type = "ImplPolarity"))]
-  pub polarity: ty::ImplPolarity,
+pub enum ClauseBound<'tcx> {
+  Trait(
+    #[serde(with = "ImplPolarityDef")]
+    #[cfg_attr(feature = "testing", ts(type = "ImplPolarity"))]
+    ty::ImplPolarity,
+    #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
+    TraitRefPrintOnlyTraitPathDef<'tcx>,
+  ),
+  Region(
+    #[serde(with = "RegionDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Region"))]
+    ty::Region<'tcx>,
+  ),
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]

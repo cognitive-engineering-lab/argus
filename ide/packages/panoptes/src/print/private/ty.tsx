@@ -4,7 +4,6 @@ import {
   AssocItem,
   BoundTy,
   BoundVariable,
-  Clause,
   CoroutineTyKind,
   CoroutineWitnessTyKind,
   DynamicTyKind,
@@ -13,7 +12,6 @@ import {
   FnSig,
   FnTrait,
   GenericArg,
-  ImplHeader,
   ImplPolarity,
   InferTy,
   IntTy,
@@ -37,8 +35,7 @@ import { Toggle } from "../../Toggle";
 import { anyElems, fnInputsAndOutput, tyIsUnit } from "../../utilities/func";
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
-import { PrintClause } from "./predicate";
-import { Angled, CommaSeparated, DBraced, Kw, PlusSeparated } from "./syntax";
+import { Angled, CommaSeparated, DBraced, PlusSeparated } from "./syntax";
 import { PrintTerm } from "./term";
 
 export const PrintBinder = ({
@@ -49,92 +46,6 @@ export const PrintBinder = ({
   innerF: any;
 }) => {
   return innerF(binder.value);
-};
-
-export const PrintImplHeader = ({ o }: { o: ImplHeader }) => {
-  console.debug("Printing ImplHeader", o);
-  const genArgs = _.map(o.args, arg => () => <PrintGenericArg o={arg} />);
-  const argsWAngle =
-    genArgs.length === 0 ? null : (
-      <Angled>
-        <Toggle
-          summary={".."}
-          Children={() => <CommaSeparated components={genArgs} />}
-        />
-      </Angled>
-    );
-  const trait = <PrintDefPath o={o.name} />;
-  const selfTy = <PrintTy o={o.selfTy} />;
-  const whereClause = (
-    <PrintWhereClause
-      predicates={o.predicates}
-      tysWOBound={o.tysWithoutDefaultBounds}
-    />
-  );
-
-  return (
-    <>
-      <Kw>impl</Kw>
-      {argsWAngle} {trait} <Kw>for</Kw> {selfTy}
-      {whereClause}
-    </>
-  );
-};
-
-export const PrintWhereClause = ({
-  predicates,
-  tysWOBound,
-}: {
-  predicates: any;
-  tysWOBound: Ty[];
-}) => {
-  if (!anyElems(predicates.grouped, predicates.other, tysWOBound)) {
-    return null;
-  }
-
-  const groupedClauses = _.map(predicates.grouped, (group, idx) => (
-    <div className="WhereConstraint" key={idx}>
-      <PrintClauseWithBounds o={group} />
-    </div>
-  ));
-  const noGroupedClauses = _.map(predicates.other, (clause, idx) => (
-    <div className="WhereConstraint" key={idx}>
-      <PrintClause o={clause} />
-    </div>
-  ));
-
-  const whereHoverContent = () => (
-    <div className="DirNode WhereConstraintArea">
-      {groupedClauses}
-      {noGroupedClauses}
-      {_.map(tysWOBound, (ty, idx) => (
-        <div className="WhereConstraint" key={idx}>
-          <PrintTy o={ty} />: ?Sized
-        </div>
-      ))}
-    </div>
-  );
-
-  return (
-    <>
-      {" "}
-      <Kw>where</Kw> <Toggle summary={".."} Children={whereHoverContent} />
-    </>
-  );
-};
-
-const PrintClauseWithBounds = ({ o }: { o: Clause }) => {
-  const boundComponents = _.map(o.bounds, bound => () => (
-    <>
-      <PrintImplPolarity o={bound.polarity} />
-      <PrintDefPath o={bound.path} />
-    </>
-  ));
-  return (
-    <>
-      <PrintTy o={o.ty} />: <PlusSeparated components={boundComponents} />
-    </>
-  );
 };
 
 export const PrintTy = ({ o }: { o: Ty }) => {
@@ -474,7 +385,7 @@ export const PrintBoundVariable = ({ o }: { o: BoundVariable }) => {
   throw new Error("TODO");
 };
 
-const PrintImplPolarity = ({ o }: { o: ImplPolarity }) => {
+export const PrintImplPolarity = ({ o }: { o: ImplPolarity }) => {
   return o === "Negative" ? "!" : null;
 };
 

@@ -26,7 +26,10 @@ use crate::{
     safe::TraitRefPrintOnlyTraitPathDef, serialize_to_value,
     ty::PredicateObligationDef,
   },
-  types::{ImplHeader, Obligation, ObligationNecessity},
+  types::{
+    ClauseBound, ClauseWithBounds, GroupedClauses, ImplHeader, Obligation,
+    ObligationNecessity,
+  },
 };
 
 pub trait CharRangeExt: Copy + Sized {
@@ -210,6 +213,41 @@ impl<'tcx> TyExt<'tcx> for Ty<'tcx> {
   }
 }
 
+fn group_predicates_by_ty<'tcx>(
+  predicates: Vec<ty::Clause<'tcx>>,
+) -> GroupedClauses<'tcx> {
+  // ARGUS: ADDITION: group predicates together based on `self_ty`.
+  let mut grouped: FxIndexMap<_, Vec<_>> = FxIndexMap::default();
+  let mut other = vec![];
+  for p in predicates {
+    // TODO: all this binder skipping is a HACK.
+    if let Some(poly_trait_pred) = p.as_trait_clause() {
+      let ty = poly_trait_pred.self_ty().skip_binder();
+      let trait_ref =
+        poly_trait_pred.map_bound(|tr| tr.trait_ref).skip_binder();
+      let bound = ClauseBound::Trait(
+        poly_trait_pred.polarity(),
+        TraitRefPrintOnlyTraitPathDef(trait_ref),
+      );
+      grouped.entry(ty).or_default().push(bound);
+    } else if let Some(poly_ty_outl) = p.as_type_outlives_clause() {
+      let ty = poly_ty_outl.map_bound(|t| t.0).skip_binder();
+      let r = poly_ty_outl.map_bound(|t| t.1).skip_binder();
+      let bound = ClauseBound::Region(r);
+      grouped.entry(ty).or_default().push(bound);
+    } else {
+      other.push(p);
+    }
+  }
+
+  let grouped = grouped
+    .into_iter()
+    .map(|(ty, bounds)| ClauseWithBounds { ty, bounds })
+    .collect::<Vec<_>>();
+
+  GroupedClauses { grouped, other }
+}
+
 impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
   fn inspect_typeck(
     self,
@@ -261,40 +299,8 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
       pretty_predicates.push(p.clone());
     }
 
-    // ARGUS: ADDITION: group predicates together based on `self_ty`.
-    let mut grouped: FxIndexMap<_, Vec<_>> = FxIndexMap::default();
-    let mut other = vec![];
-    for p in pretty_predicates {
-      // TODO: all this binder skipping is a HACK.
-      if let Some(poly_trait_ref) = p.as_trait_clause() {
-        let ty = poly_trait_ref.self_ty().skip_binder();
-        grouped.entry(ty).or_default().push(poly_trait_ref);
-      } else {
-        other.push(p);
-      }
-    }
-
-    use crate::types::{ClauseBound, ClauseWithBounds, GroupedClauses};
-
-    let grouped = grouped
-      .into_iter()
-      .map(|(ty, trait_refs)| ClauseWithBounds {
-        ty,
-        bounds: trait_refs
-          .into_iter()
-          .map(|poly_trait_ref| {
-            let trait_ref =
-              poly_trait_ref.map_bound(|tr| tr.trait_ref).skip_binder();
-            ClauseBound {
-              path: TraitRefPrintOnlyTraitPathDef(trait_ref),
-              polarity: poly_trait_ref.polarity(),
-            }
-          })
-          .collect::<Vec<_>>(),
-      })
-      .collect::<Vec<_>>();
-
-    let grouped_clauses = GroupedClauses { grouped, other };
+    // Argus addition
+    let grouped_clauses = group_predicates_by_ty(pretty_predicates);
 
     let tys_without_default_bounds =
       types_without_default_bounds.into_iter().collect::<Vec<_>>();

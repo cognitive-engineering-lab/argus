@@ -1136,6 +1136,7 @@ impl<'tcx> Binder__PredicateKind<'tcx> {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "PolyClauseKind"))]
 pub struct Binder__ClauseKindDef<'tcx> {
@@ -1245,7 +1246,7 @@ pub enum ClosureKindDef {
 #[cfg_attr(feature = "testing", ts(export, rename = "Clause"))]
 pub struct ClauseDef<'tcx>(
   #[serde(with = "Binder__ClauseKindDef")]
-  #[cfg_attr(feature = "testing", ts(type = "any"))]
+  #[cfg_attr(feature = "testing", ts(type = "PolyClauseKind"))]
   ty::Binder<'tcx, ty::ClauseKind<'tcx>>,
 );
 
@@ -1376,10 +1377,7 @@ pub struct TraitPredicateDef<'tcx> {
   feature = "testing",
   ts(export, rename = "TraitRefPrintOnlyTraitPath")
 )]
-pub struct TraitRefPrintOnlyTraitPathDef<'tcx>(
-  #[cfg_attr(feature = "testing", ts(type = "any"))]
-  path::PathDefWithArgs<'tcx>,
-);
+pub struct TraitRefPrintOnlyTraitPathDef<'tcx>(path::PathDefWithArgs<'tcx>);
 impl<'tcx> TraitRefPrintOnlyTraitPathDef<'tcx> {
   pub fn new(value: &ty::TraitRef<'tcx>) -> Self {
     Self(path::PathDefWithArgs::new(value.def_id, value.args))

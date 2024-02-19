@@ -5,6 +5,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import ReactJson from "react-json-view";
 
 import "./print.css";
+import { PrintImplHeader as UnsafePrintImplHeader } from "./private/argus";
 import {
   PrintDefPath as UnsafePrintDefPath,
   PrintDefPathFull as UnsafePrintDefPathFull,
@@ -13,10 +14,7 @@ import {
   PrintGoalPredicate as UnsafePrintGoalPredicate,
   PrintPredicateObligation as UnsafePrintPredicateObligation,
 } from "./private/predicate";
-import {
-  PrintImplHeader as UnsafePrintImplHeader,
-  PrintTy as UnsafePrintTy,
-} from "./private/ty";
+import { PrintTy as UnsafePrintTy } from "./private/ty";
 
 // NOTE: please Please PLEASE wrap all printing components in this
 // PrintWithFallback. Pretty printing is still a fragile process and

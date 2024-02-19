@@ -83,8 +83,8 @@ enum PathSegment<'tcx> {
     disambiguator: Option<u32>,
   },
   Ty {
-    #[cfg_attr(feature = "testing", ts(type = "any"))]
     #[serde(with = "serial_ty::TyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Ty"))]
     ty: Ty<'tcx>,
   },
   GenericDelimiters {
@@ -99,7 +99,7 @@ enum PathSegment<'tcx> {
     #[cfg_attr(feature = "testing", ts(type = "DefinedPath"))]
     #[serde(skip_serializing_if = "Option::is_none")]
     path: Option<serial_ty::TraitRefPrintOnlyTraitPathDef<'tcx>>,
-    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    #[cfg_attr(feature = "testing", ts(type = "Ty"))]
     #[serde(with = "serial_ty::TyDef")]
     ty: Ty<'tcx>,
     kind: ImplKind,
@@ -142,9 +142,9 @@ struct PathBuilder<'a, 'tcx: 'a> {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(tag = "type")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-#[serde(tag = "type")]
 pub enum CommaSeparatedKind {
   GenericArg,
 }
