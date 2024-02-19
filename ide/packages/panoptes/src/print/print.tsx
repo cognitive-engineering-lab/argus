@@ -17,10 +17,9 @@ import {
 import { PrintTy as UnsafePrintTy } from "./private/ty";
 
 // NOTE: please Please PLEASE wrap all printing components in this
-// PrintWithFallback. Pretty printing is still a fragile process and
-// I can never be sure if it's working correctly or not.
-//
-// Nothing should ever be imported from the 'private' directory except
+// `PrintWithFallback`. Pretty printing is still a fragile process and
+// I don't have full confidence in it yet.
+// Nothing should be imported from the 'private' directory except
 // from within this file.
 export const PrintWithFallback = ({
   object,
@@ -81,10 +80,14 @@ export const PrintImplHeader = ({ impl }: { impl: any }) => {
 };
 
 export const PrintGoal = ({ o }: { o: Goal }) => {
+  const debugString =
+    o.debugComparison === undefined ? null : (
+      <div style={{ opacity: 0.5 }}>{o.debugComparison}</div>
+    );
   const Content = () => (
     <>
       <UnsafePrintGoalPredicate o={o.goal} />
-      {/* <div style={{ opacity: 0.5 }}>{o.debugComparison}</div> */}
+      {debugString}
     </>
   );
   return <PrintWithFallback object={o} Content={Content} />;

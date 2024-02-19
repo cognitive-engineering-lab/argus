@@ -7,7 +7,7 @@ import {
 } from "@argus/common/bindings";
 import React from "react";
 
-import { PrintValuePath } from "./path";
+import { PrintDefPath, PrintValuePath } from "./path";
 import { PrintExpr, PrintValueTree } from "./term";
 import { PrintBoundVariable, PrintSymbol } from "./ty";
 
@@ -57,9 +57,15 @@ const PrintUnevaluatedConst = ({ o }: { o: UnevaluatedConst }) => {
     case "AnonSnippet": {
       return o.data;
     }
-    // case "nonlocalpath": {
-    //   throw new Error("todo");
-    // }
+    case "AnonLocation": {
+      return (
+        <>
+          <PrintSymbol o={o.krate} />
+          ::
+          <PrintDefPath o={o.path} />
+        </>
+      );
+    }
     default:
       throw new Error("Unknown unevaluated const kind", o);
   }

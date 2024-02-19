@@ -170,15 +170,42 @@ define_helper!(
 
 pub(crate) mod safe {
   use rustc_hir::def_id::DefId;
+  use rustc_trait_selection::traits::solve;
+  #[cfg(feature = "testing")]
+  use ts_rs::TS;
 
   use super::*;
 
   #[derive(Serialize)]
-  pub struct PathDefNoArgs(#[serde(with = "path::PathDefNoArgs")] pub DefId);
+  #[cfg_attr(feature = "testing", derive(TS))]
+  #[cfg_attr(feature = "testing", ts(export))]
+  #[cfg_attr(feature = "testing", ts(rename = "GoalPredicateDefSafeWrapper"))]
+  pub struct GoalPredicateDef<'tcx>(
+    #[serde(with = "ty::Goal__PredicateDef")]
+    #[cfg_attr(feature = "testing", ts(type = "GoalPredicate"))]
+    pub solve::Goal<'tcx, rustc_ty::Predicate<'tcx>>,
+  );
 
   #[derive(Serialize)]
+  #[cfg_attr(feature = "testing", derive(TS))]
+  #[cfg_attr(feature = "testing", ts(export))]
+  #[cfg_attr(feature = "testing", ts(rename = "PathDefNoArgsSafeWrapper"))]
+  pub struct PathDefNoArgs(
+    #[serde(with = "path::PathDefNoArgs")]
+    #[cfg_attr(feature = "testing", ts(type = "PathDefNoArgs"))]
+    pub DefId,
+  );
+
+  #[derive(Serialize)]
+  #[cfg_attr(feature = "testing", derive(TS))]
+  #[cfg_attr(feature = "testing", ts(export))]
+  #[cfg_attr(
+    feature = "testing",
+    ts(rename = "TraitRefPrintOnlyTraitPathDefSafeWrapper")
+  )]
   pub struct TraitRefPrintOnlyTraitPathDef<'tcx>(
     #[serde(with = "ty::TraitRefPrintOnlyTraitPathDef")]
-    pub  rustc_ty::TraitRef<'tcx>,
+    #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
+    pub rustc_ty::TraitRef<'tcx>,
   );
 }

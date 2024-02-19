@@ -45,7 +45,7 @@ export function makeHighlightPosters(range: CharRange, file: Filename) {
   return [addHighlight, removeHighlight];
 }
 
-export function anyElems<T>(...lists: T[][]) {
+export function anyElems(...lists: any[][]) {
   return _.some(lists, l => l.length > 0);
 }
 

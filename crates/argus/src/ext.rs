@@ -43,6 +43,8 @@ pub trait PredicateExt {
   fn is_rhs_lang_item(&self, tcx: &TyCtxt) -> bool;
 
   fn is_trait_pred_rhs(&self, def_id: DefId) -> bool;
+
+  fn is_lhs_ty_var(&self) -> bool;
 }
 
 impl PredicateExt for Predicate<'_> {
@@ -65,6 +67,18 @@ impl PredicateExt for Predicate<'_> {
     ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
       trait_predicate.def_id() == def_id
     })
+  }
+
+  fn is_lhs_ty_var(&self) -> bool {
+    match self.kind().skip_binder() {
+      ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) => {
+        trait_predicate.self_ty().is_ty_var()
+      }
+      ty::PredicateKind::Clause(ty::ClauseKind::TypeOutlives(
+        ty::OutlivesPredicate(ty, _),
+      )) => ty.is_ty_var(),
+      _ => false,
+    }
   }
 }
 

@@ -392,11 +392,7 @@ class BackendCache {
 
     // NOTE: the returned value should be an array of a single tree, however,
     // it is possible that no tree is returned. (Yes, but I'm working on it.)
-    const tree = _.filter(res.value, t => t !== undefined) as Array<
-      SerializedTree | undefined
-    >;
-
-    const tree0 = tree[0];
+    const tree0 = _.compact(res.value)[0];
     if (tree0 === undefined) {
       return;
     }

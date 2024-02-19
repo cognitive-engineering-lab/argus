@@ -65,6 +65,18 @@ impl<'tcx> ValuePathWithArgs<'tcx> {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
+// Useful in scenarios when using a `ValuePathXXX` would cause the
+// pretty printer to enter an infinite loop.
+pub struct BasicPathNoArgs<'tcx>(DefinedPath<'tcx>);
+impl<'tcx> BasicPathNoArgs<'tcx> {
+  pub fn new(def_id: DefId) -> Self {
+    Self(PathBuilder::compile_value_path(def_id, &[]))
+  }
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 struct DefinedPath<'tcx>(Vec<PathSegment<'tcx>>);
 
 #[derive(Serialize)]

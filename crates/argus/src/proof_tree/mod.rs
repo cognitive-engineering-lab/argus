@@ -16,8 +16,8 @@ pub use topology::*;
 use ts_rs::TS;
 
 use crate::{
-  ext::InferCtxtExt,
-  serialize::{serialize_to_value, ty::Goal__PredicateDef},
+  ext::{InferCtxtExt, PredicateExt},
+  serialize::{safe::GoalPredicateDef, serialize_to_value},
   types::{
     intermediate::{EvaluationResult, EvaluationResultDef},
     ImplHeader, ObligationNecessity,
@@ -63,10 +63,13 @@ pub struct Goal {
   #[cfg_attr(feature = "testing", ts(type = "EvaluationResult"))]
   result: EvaluationResult,
 
-  // TODO: remove this is only for debugging
-  debug_comparison: String,
   necessity: ObligationNecessity,
   num_vars: usize,
+  is_lhs_ty_var: bool,
+
+  #[cfg(debug_assertions)]
+  #[cfg_attr(feature = "testing", ts(type = "string | undefined"))]
+  debug_comparison: String,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
@@ -115,24 +118,21 @@ impl Goal {
     goal: &solve::Goal<'tcx, ty::Predicate<'tcx>>,
     result: EvaluationResult,
   ) -> Self {
-    #[derive(Serialize)]
-    struct Wrapper<'a, 'tcx: 'a>(
-      #[serde(with = "Goal__PredicateDef")]
-      &'a solve::Goal<'tcx, ty::Predicate<'tcx>>,
-    );
-    // TODO remove after deubbing
-    let debug_comparison = format!("{:?}", goal.predicate.kind().skip_binder());
     let necessity = infcx.guess_predicate_necessity(&goal.predicate);
     let num_vars =
       serialize::var_counter::count_vars(infcx.tcx, goal.predicate);
-    let goal = serialize_to_value(infcx, &Wrapper(goal))
+    let goal_value = serialize_to_value(infcx, &GoalPredicateDef(*goal))
       .expect("failed to serialize goal");
+
     Self {
-      goal,
+      goal: goal_value,
       result,
-      debug_comparison,
       necessity,
       num_vars,
+      is_lhs_ty_var: goal.predicate.is_lhs_ty_var(),
+
+      #[cfg(debug_assertions)]
+      debug_comparison: format!("{:?}", goal.predicate.kind().skip_binder()),
     }
   }
 }

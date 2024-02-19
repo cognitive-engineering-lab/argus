@@ -170,17 +170,28 @@ impl ParamConstDef {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "UnevaluatedConst"))]
 #[serde(tag = "type")]
-enum UnevaluatedConstKind<'tcx> {
-  ValuePath { data: path::ValuePathWithArgs<'tcx> },
-  AnonSnippet { data: String },
+enum UnevaluatedConstDef<'tcx> {
+  ValuePath {
+    data: path::ValuePathWithArgs<'tcx>,
+  },
+  AnonSnippet {
+    data: String,
+  },
+  AnonLocation {
+    #[serde(with = "SymbolDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
+    krate: Symbol,
+
+    path: path::BasicPathNoArgs<'tcx>,
+  },
 }
 
-impl<'tcx> From<&UnevaluatedConst<'tcx>> for UnevaluatedConstKind<'tcx> {
-  fn from(value: &UnevaluatedConst<'tcx>) -> Self {
+impl<'tcx> UnevaluatedConstDef<'tcx> {
+  fn new(value: &UnevaluatedConst<'tcx>) -> Self {
     let infcx = get_dynamic_ctx();
     let UnevaluatedConst { def, args } = value;
     match infcx.tcx.def_kind(def) {
-      DefKind::Const | DefKind::AssocConst => UnevaluatedConstKind::ValuePath {
+      DefKind::Const | DefKind::AssocConst => Self::ValuePath {
         data: path::ValuePathWithArgs::new(*def, args),
       },
       DefKind::AnonConst => {
@@ -188,26 +199,31 @@ impl<'tcx> From<&UnevaluatedConst<'tcx>> for UnevaluatedConstKind<'tcx> {
           && let span = infcx.tcx.def_span(def)
           && let Ok(snip) = infcx.tcx.sess.source_map().span_to_snippet(span)
         {
-          UnevaluatedConstKind::AnonSnippet { data: snip }
+          Self::AnonSnippet { data: snip }
         } else {
-          todo!()
+          // Do not call `print_value_path` as if a parent of this anon const is an impl it will
+          // attempt to print out the impl trait ref i.e. `<T as Trait>::{constant#0}`. This would
+          // cause printing to enter an infinite recursion if the anon const is in the self type i.e.
+          // `impl<T: Default> Default for [T; 32 - 1 - 1 - 1] {`
+          // where we would try to print `<[T; /* print `constant#0` again */] as Default>::{constant#0}`
+          Self::AnonLocation {
+            krate: infcx.tcx.crate_name(def.krate),
+            path: path::BasicPathNoArgs::new(*def),
+          }
         }
       }
       defkind => panic!("unexpected defkind {:?} {:?}", defkind, value),
     }
   }
-}
 
-pub struct UnevaluatedConstDef;
-impl UnevaluatedConstDef {
-  pub fn serialize<'tcx, S>(
+  pub fn serialize<S>(
     value: &UnevaluatedConst<'tcx>,
     s: S,
   ) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    UnevaluatedConstKind::from(value).serialize(s)
+    Self::new(value).serialize(s)
   }
 }
 
