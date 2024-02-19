@@ -1,4 +1,4 @@
-import { TreeTopology } from "@argus/common/bindings";
+import { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
 import _ from "lodash";
 import React, {
   MouseEventHandler,
@@ -52,6 +52,7 @@ const TreeNode = ({
   const treeInfo = useContext(TreeContext)!;
   const ref = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const padding = 5;
 
   const idx = nodeDatum.name as number;
   const node = treeInfo.node(idx);
@@ -72,8 +73,8 @@ const TreeNode = ({
         data-sidx={idx}
         x={-dimensions.width / 2}
         y={-dimensions.height / 2}
-        width={dimensions.width}
-        height={dimensions.height}
+        width={dimensions.width + padding}
+        height={dimensions.height + padding}
         strokeWidth="0.5"
         rx="3"
         ry="3"
@@ -114,12 +115,12 @@ const topologyToTreeData = (
   return obj;
 };
 
-const Graph = ({}) => {
+const Graph = ({ root }: { root: ProofNodeIdx }) => {
   const treeInfo = useContext(TreeContext)!;
   const [translate, containerRef] = useCenteredTree();
 
   const topology = treeInfo.topology;
-  const data = topologyToTreeData(topology, treeInfo.root);
+  const data = topologyToTreeData(topology, root);
 
   const customRender = (rd3tProps: any) => {
     return <TreeNode {...rd3tProps} />;

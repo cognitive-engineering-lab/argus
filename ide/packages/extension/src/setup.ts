@@ -7,6 +7,7 @@ import vscode from "vscode";
 
 import { Ctx } from "./ctx";
 import { log } from "./logging";
+import { globals } from "./main";
 
 declare const VERSION: string;
 declare const TOOLCHAIN: {
@@ -68,7 +69,7 @@ export const getArgusOpts = async (cwd: string) => {
 const execNotifyBinary = async (
   cmd: string,
   args: string[],
-  _title: string,
+  title: string,
   opts?: any
 ): Promise<Buffer> => {
   log("Running command: ", cmd, args, opts);
@@ -87,8 +88,11 @@ const execNotifyBinary = async (
     stderrChunks.push(data);
   });
 
+  globals.statusBar.setState("loading", title);
+
   return new Promise<Buffer>((resolve, reject) => {
     proc.addListener("close", _ => {
+      globals.statusBar.setState("idle");
       if (proc.exitCode !== 0) {
         reject(stderrChunks.join(""));
       } else {
@@ -96,6 +100,7 @@ const execNotifyBinary = async (
       }
     });
     proc.addListener("error", e => {
+      globals.statusBar.setState("idle");
       reject(e.toString());
     });
   });

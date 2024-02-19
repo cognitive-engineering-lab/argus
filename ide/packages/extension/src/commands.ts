@@ -3,7 +3,7 @@ import { Filename } from "@argus/common/lib";
 
 import { Cmd, Ctx } from "./ctx";
 
-export function launchArgus(ctx: Ctx): Cmd {
+export function inspect(ctx: Ctx): Cmd {
   return async () => {
     ctx.createOrShowView();
   };

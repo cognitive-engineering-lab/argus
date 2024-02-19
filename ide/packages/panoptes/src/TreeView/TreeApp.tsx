@@ -33,7 +33,7 @@ const TreeApp = ({ tree }: { tree: SerializedTree | undefined }) => {
 
   const tabs: [string, React.FC][] = [
     ["Top Down", TopDown],
-    ["Graph", Graph],
+    ["Graph", () => <Graph root={treeInfo.root} />],
   ];
 
   if (treeInfo.errorNodes().length > 0) {

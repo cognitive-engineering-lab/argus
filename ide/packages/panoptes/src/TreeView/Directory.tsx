@@ -62,14 +62,18 @@ export const CollapsibleElement = ({
   );
 };
 
+type InfoWrapper = React.FC<{ n: ProofNodeIdx; Child: React.FC }>;
+
 export const DirNode = ({
   idx,
   styleEdge,
   Children,
+  Wrapper = ({ n: _, Child }) => <Child />,
 }: {
   idx: number;
   styleEdge: boolean;
   Children: React.FC | null;
+  Wrapper: InfoWrapper;
 }) => {
   const tree = useContext(TreeContext)!;
   const node = tree.node(idx);
@@ -77,7 +81,7 @@ export const DirNode = ({
   const arrows: ElementPair = [<IcoTriangleDown />, <IcoTriangleRight />];
   const dots: ElementPair = [<IcoDot />, <IcoDot />];
   const icons = "Result" in node ? dots : arrows;
-  const info = <Node node={node} />;
+  const info = <Wrapper n={idx} Child={() => <Node node={node} />} />;
 
   return (
     <CollapsibleElement
@@ -93,10 +97,12 @@ export const DirRecursive = ({
   level,
   getNext,
   styleEdges,
+  Wrapper = ({ n: _, Child }) => <Child />,
 }: {
   level: ProofNodeIdx[];
   getNext: (idx: ProofNodeIdx) => ProofNodeIdx[];
   styleEdges: boolean;
+  Wrapper?: InfoWrapper;
 }) => {
   const tree = useContext(TreeContext)!;
   const node = tree.node(level[0]);
@@ -115,6 +121,7 @@ export const DirRecursive = ({
             key={i}
             idx={current}
             styleEdge={styleEdges}
+            Wrapper={Wrapper}
             Children={
               next.length > 0
                 ? () => (
@@ -122,6 +129,7 @@ export const DirRecursive = ({
                       level={next}
                       getNext={getNext}
                       styleEdges={styleEdges}
+                      Wrapper={Wrapper}
                     />
                   )
                 : null

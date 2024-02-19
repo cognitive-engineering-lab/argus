@@ -1,3 +1,4 @@
+import { ArgusError } from "@argus/common/lib";
 import cp from "child_process";
 import newGithubIssueUrl from "new-github-issue-url";
 import os from "os";
@@ -45,3 +46,19 @@ ${logText}`,
     open(url);
   }
 };
+
+export const showError = async (error: ArgusError) => {
+  if (error.type === "build-error") {
+    // TODO: is this how we want to show build errors?
+    await showErrorDialog(error.error);
+  } else if (error.type == "analysis-error") {
+    await showErrorDialog(error.error);
+  } else {
+    await showErrorDialog("Unknown error");
+  }
+};
+
+export async function last_error(context: vscode.ExtensionContext) {
+  const error = context.workspaceState.get("err_log") as string;
+  await showError({ type: "build-error", error });
+}

@@ -1,0 +1,25 @@
+div.with-tree-toggle {
+    display: inline;
+}
+
+span.tree-toggle {
+    cursor: pointer;
+    user-select: none;
+    padding: 0.25em;
+}
+
+span.tree-toggle:hover {
+    color: var(--vscode-input-placeholderForeground);
+}
+
+div.floating-tree {
+    border-radius: 4px;
+    border: 4px solid var(--vscode-focusBorder);
+    box-shadow: 0 0 5px 0 var(--vscode-focusBorder);
+    background-color: var(--vscode-input-background);
+    padding: 5px;
+    max-height: 60vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    width: 80%;
+}

@@ -41,3 +41,7 @@ export const IcoLoop = () => <i className="codicon codicon-sync" />;
 export const IcoNote = () => <i className="codicon codicon-note" />;
 
 export const IcoMegaphone = () => <i className="codicon codicon-megaphone" />;
+
+export const IcoTreeDown = () => (
+  <i className="codicon codicon-type-hierarchy-sub" />
+);

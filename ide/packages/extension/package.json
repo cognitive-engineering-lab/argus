@@ -1,13 +1,17 @@
 {
   "name": "@argus/extension",
   "displayName": "Argus Extension",
-  "description": "Something with types, probably?",
+  "description": "A trait debugger for Rust",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.22.0"
   },
+  "bugs": {
+    "url": "https://github.com/gavinleroy/argus/issues",
+    "email": "gavinleroy6@gmail.com"
+  },
   "categories": [
-    "Other"
+    "Programming Languages"
   ],
   "activationEvents": [
     "onLanguage:rust"

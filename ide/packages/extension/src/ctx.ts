@@ -23,7 +23,9 @@ import {
   traitErrorDecorate,
 } from "./decorate";
 import { showErrorDialog } from "./errors";
+import { globals } from "./main";
 import { setup } from "./setup";
+import { StatusBar } from "./statusbar";
 import {
   RustEditor,
   isDocumentInWorkspace,
@@ -132,7 +134,7 @@ export class Ctx {
   }
 
   async setupBackend() {
-    let b = await setup(this);
+    const b = await setup(this);
     if (b == null) {
       showErrorDialog("Failed to setup Argus");
       return;
@@ -144,6 +146,19 @@ export class Ctx {
 
     // Register the commands with VSCode after the backend is setup.
     this.updateCommands();
+
+    vscode.workspace.onDidChangeTextDocument(event => {
+      const editor = vscode.window.activeTextEditor!;
+      if (
+        editor &&
+        isRustEditor(editor) &&
+        isDocumentInWorkspace(editor.document) &&
+        event.document === editor.document &&
+        editor.document.isDirty
+      ) {
+        globals.statusBar.setState("unsaved");
+      }
+    });
 
     vscode.window.onDidChangeActiveTextEditor(async editor => {
       if (

@@ -78,22 +78,16 @@ export type WebViewToExtensionMsg = CommonData & { type: FROM_WV } & (
 // serde-compatible type
 export type Result<T> = { Ok: T } | { Err: ArgusError };
 
-export type BuildError = {
-  type: "build-error";
-  error: string;
-};
-
-export type ArgusError = {
-  type: "analysis-error";
-  error: string;
-};
+export type ArgusError =
+  | { type: "analysis-error"; error: string }
+  | { type: "build-error"; error: string };
 
 export interface ArgusOutput<T> {
   type: "output";
   value: T;
 }
 
-export type ArgusResult<T> = ArgusOutput<T> | ArgusError | BuildError;
+export type ArgusResult<T> = ArgusOutput<T> | ArgusError;
 
 // TODO: what we really want here is dependent typing ... it
 // might be achievable with TS, but too tired rn to think about that.
