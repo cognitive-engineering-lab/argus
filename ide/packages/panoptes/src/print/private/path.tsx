@@ -49,24 +49,14 @@ export const PrintDefPathShort = ({ o }: { o: DefinedPath }) => {
     );
   });
 
-  return (
-    <span>
-      {_.map(prefix, (segment, i) => {
-        return <PrintPathSegment o={segment} key={i} />;
-      })}
-    </span>
-  );
+  return _.map(prefix, (segment, i) => (
+    <PrintPathSegment o={segment} key={i} />
+  ));
 };
 
 // PathSegment[]
 export const PrintDefPathFull = ({ o }: { o: DefinedPath }) => {
-  return (
-    <>
-      {_.map(o, (segment, i) => {
-        return <PrintPathSegment o={segment} key={i} />;
-      })}
-    </>
-  );
+  return _.map(o, (segment, i) => <PrintPathSegment o={segment} key={i} />);
 };
 
 export const PrintPathSegment = ({ o }: { o: PathSegment }) => {
@@ -89,10 +79,10 @@ export const PrintPathSegment = ({ o }: { o: PathSegment }) => {
           ? `#${o.disambiguator}`
           : null;
       return (
-        <span>
+        <>
           {o.name}
           {suffix}
-        </span>
+        </>
       );
     }
     case "Impl": {
@@ -101,6 +91,8 @@ export const PrintPathSegment = ({ o }: { o: PathSegment }) => {
           return <PrintImplFor path={o.path} ty={o.ty} />;
         case "As":
           return <PrintImplAs path={o.path} ty={o.ty} />;
+        default:
+          throw new Error("Unknown impl kind", o.kind);
       }
     }
     case "AnonImpl": {

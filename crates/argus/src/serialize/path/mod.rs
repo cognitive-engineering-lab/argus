@@ -211,6 +211,7 @@ impl<'a, 'tcx: 'a> PathBuilder<'a, 'tcx> {
     self.infcx.should_print_verbose()
   }
 
+  #[allow(dead_code)]
   pub fn print_value_path(
     &mut self,
     def_id: DefId,

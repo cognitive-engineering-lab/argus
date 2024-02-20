@@ -25,7 +25,6 @@ import {
 import { showErrorDialog } from "./errors";
 import { globals } from "./main";
 import { setup } from "./setup";
-import { StatusBar } from "./statusbar";
 import {
   RustEditor,
   isDocumentInWorkspace,
@@ -409,6 +408,11 @@ class BackendCache {
     // it is possible that no tree is returned. (Yes, but I'm working on it.)
     const tree0 = _.compact(res.value)[0];
     if (tree0 === undefined) {
+      showErrorDialog(`
+      Argus failed to find the appropriate proof tree.
+
+      This is likely a bug in Argus, please report it.
+      `);
       return;
     }
 

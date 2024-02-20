@@ -1,9 +1,5 @@
-use rustc_hir::{def::Namespace, def_id::DefId, definitions::DefPathData};
+use rustc_hir::def_id::DefId;
 use rustc_infer::infer::InferCtxt;
-use rustc_middle::ty::{
-  print::{FmtPrinter, Print},
-  TyCtxt,
-};
 use rustc_trait_selection::{
   solve::inspect::InspectCandidate,
   traits::{
@@ -12,8 +8,10 @@ use rustc_trait_selection::{
   },
 };
 
+use crate::types::intermediate::EvaluationResult;
+
 /// Pretty printing for results.
-pub trait PrettyResultExt {
+pub trait EvaluationResultExt {
   fn pretty(&self) -> String;
   fn is_yes(&self) -> bool;
 }
@@ -25,17 +23,8 @@ pub trait CandidateExt {
   fn is_informative_probe(&self) -> bool;
 }
 
-// -----------------------------------------------
-// Impls
-
-// impl<'a, 'tcx, T: Print<'tcx, FmtPrinter<'a, 'tcx>>> PrettyPrintExt<'a, 'tcx>
-//   for T
-// {
-//   /* intentionally blank */
-// }
-
 /// Pretty printer for results
-impl PrettyResultExt for Result<Certainty, NoSolution> {
+impl EvaluationResultExt for EvaluationResult {
   fn is_yes(&self) -> bool {
     matches!(self, Ok(Certainty::Yes))
   }

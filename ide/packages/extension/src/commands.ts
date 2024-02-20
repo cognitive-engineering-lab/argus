@@ -2,6 +2,7 @@ import { BodyHash, ExprIdx, ObligationHash } from "@argus/common/bindings";
 import { Filename } from "@argus/common/lib";
 
 import { Cmd, Ctx } from "./ctx";
+import * as errors from "./errors";
 
 export function inspect(ctx: Ctx): Cmd {
   return async () => {
@@ -17,5 +18,11 @@ export function openError(ctx: Ctx): Cmd {
     oblHash: ObligationHash
   ) => {
     ctx.view!.blingObligation(file, bh, ei, oblHash);
+  };
+}
+
+export function lastError(ctx: Ctx): Cmd {
+  return async () => {
+    return errors.lastError(ctx.extCtx);
   };
 }

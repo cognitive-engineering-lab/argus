@@ -1,3 +1,7 @@
 span.kw {
   font-weight: bold;
 }
+
+span.placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}

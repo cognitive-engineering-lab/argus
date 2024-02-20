@@ -568,7 +568,6 @@ pub(super) mod intermediate {
     // points to the used `InferCtxt`
     pub full_data: UODIdx,
     pub obligation: PredicateObligation<'tcx>,
-    pub result: EvaluationResult,
   }
 
   pub(crate) struct SyntheticQueriesInBody<'tcx>(

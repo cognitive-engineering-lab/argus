@@ -1,6 +1,7 @@
 import { ArgusError } from "@argus/common/lib";
 import cp from "child_process";
 import newGithubIssueUrl from "new-github-issue-url";
+import open from "open";
 import os from "os";
 import vscode from "vscode";
 
@@ -58,7 +59,7 @@ export const showError = async (error: ArgusError) => {
   }
 };
 
-export async function last_error(context: vscode.ExtensionContext) {
+export async function lastError(context: vscode.ExtensionContext) {
   const error = context.workspaceState.get("err_log") as string;
   await showError({ type: "build-error", error });
 }

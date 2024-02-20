@@ -1,6 +1,7 @@
 import { ArgusArgs, CallArgus, Result } from "@argus/common/lib";
 import cp from "child_process";
 import _ from "lodash";
+import open from "open";
 import os from "os";
 import path from "path";
 import vscode from "vscode";
@@ -89,18 +90,19 @@ const execNotifyBinary = async (
   });
 
   globals.statusBar.setState("loading", title);
-
   return new Promise<Buffer>((resolve, reject) => {
     proc.addListener("close", _ => {
       globals.statusBar.setState("idle");
       if (proc.exitCode !== 0) {
+        globals.statusBar.setState("error");
         reject(stderrChunks.join(""));
       } else {
         resolve(Buffer.concat(stdoutChunks));
       }
     });
+
     proc.addListener("error", e => {
-      globals.statusBar.setState("idle");
+      globals.statusBar.setState("error");
       reject(e.toString());
     });
   });
@@ -217,6 +219,9 @@ const checkVersionAndInstall = async (
       );
 
       if (choice === "Show fix") {
+        open(
+          "https://github.com/gavinleroy/argus/blob/master/README.md#rustup-fails-on-install"
+        );
         await vscode.window.showInformationMessage(
           'Click "Continue" once you have completed the fix.',
           "Continue"
@@ -284,6 +289,7 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
       );
     } catch (e: any) {
       context.extCtx.workspaceState.update("err_log", e);
+      globals.statusBar.setState("error");
       return {
         type: "build-error",
         error: e,
@@ -301,6 +307,7 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
       log("output", output);
       outputTyped = JSON.parse(output);
     } catch (e: any) {
+      globals.statusBar.setState("error");
       return {
         type: "analysis-error",
         error: e.toString(),
@@ -310,6 +317,7 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
     log("Parsed output", outputTyped);
 
     if ("Err" in outputTyped) {
+      globals.statusBar.setState("error");
       return {
         type: "analysis-error",
         error: outputTyped.Err,

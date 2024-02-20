@@ -8,6 +8,7 @@ import {
 import React from "react";
 
 import { PrintDefPath, PrintValuePath } from "./path";
+import { DBraced, Placeholder } from "./syntax";
 import { PrintExpr, PrintValueTree } from "./term";
 import { PrintBoundVariable, PrintSymbol } from "./ty";
 
@@ -15,15 +16,15 @@ export const PrintConst = ({ o }: { o: Const }) => {
   console.debug("Printing const", o);
   switch (o.type) {
     case "Error":
-      return "{{const error}}";
+      return <DBraced>const error</DBraced>;
     case "Param":
       return <PrintParamConst o={o.data} />;
     case "Infer":
       return <PrintInferConst o={o.data} />;
     case "Bound":
       return <PrintBoundVariable o={o.data} />;
-    // case "placeholder":
-    //   throw new Error("TODO");
+    case "Placeholder":
+      return <Placeholder>_</Placeholder>;
     case "Unevaluated":
       return <PrintUnevaluatedConst o={o.data} />;
     case "Value":
@@ -36,12 +37,10 @@ export const PrintConst = ({ o }: { o: Const }) => {
 };
 
 const PrintInferConst = ({ o }: { o: InferConst }) => {
-  switch (o.type) {
-    case "Anon": {
-      return <span>_</span>;
-    }
-    default:
-      throw new Error("Unknown infer const kind", o as any);
+  if (o === "Anon") {
+    return <Placeholder>_</Placeholder>;
+  } else {
+    throw new Error("Unknown infer const kind", o);
   }
 };
 

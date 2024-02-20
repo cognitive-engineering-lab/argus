@@ -22,6 +22,7 @@ import {
   PrintAliasTy,
   PrintBinder,
   PrintGenericArg,
+  PrintImplPolarity,
   PrintRegion,
   PrintTy,
 } from "./ty";
@@ -71,31 +72,31 @@ export const PrintPredicateKind = ({ o }: { o: PredicateKind }) => {
     return <PrintClauseKind o={o.Clause} />;
   } else if ("ObjectSafe" in o) {
     return (
-      <span>
+      <>
         The trait <PrintDefPath o={o.ObjectSafe} /> is object-safe
-      </span>
+      </>
     );
   } else if ("Subtype" in o) {
     const subty = o.Subtype;
     const st = "<:";
     return (
-      <span>
+      <>
         <PrintTy o={subty.a} /> {st} <PrintTy o={subty.b} />
-      </span>
+      </>
     );
   } else if ("Coerce" in o) {
     const coerce = o.Coerce;
     return (
-      <span>
+      <>
         <PrintTy o={coerce.a} /> → <PrintTy o={coerce.b} />
-      </span>
+      </>
     );
   } else if ("ConstEquate" in o) {
     const [a, b] = o.ConstEquate;
     return (
-      <span>
+      <>
         <PrintConst o={a} /> = <PrintConst o={b} />
-      </span>
+      </>
     );
   } else if ("AliasRelate" in o) {
     const [a, b, dir] = o.AliasRelate;
@@ -149,9 +150,9 @@ export const PrintClauseKind = ({ o }: { o: ClauseKind }) => {
   } else if ("TypeOutlives" in o) {
     const to = o.TypeOutlives;
     return (
-      <span>
+      <>
         <PrintTy o={to.a} />: <PrintRegion o={to.b} />
-      </span>
+      </>
     );
   } else if ("Projection" in o) {
     const proj = o.Projection;
@@ -163,21 +164,21 @@ export const PrintClauseKind = ({ o }: { o: ClauseKind }) => {
   } else if ("ConstArgHasType" in o) {
     const [c, ty] = o.ConstArgHasType;
     return (
-      <span>
+      <>
         const <PrintConst o={c} /> as type <PrintTy o={ty} />
-      </span>
+      </>
     );
   } else if ("WellFormed" in o) {
     return (
-      <span>
+      <>
         <PrintGenericArg o={o.WellFormed} /> well-formed
-      </span>
+      </>
     );
   } else if ("ConstEvaluatable" in o) {
     return (
-      <span>
+      <>
         <PrintConst o={o.ConstEvaluatable} /> can be evaluated
-      </span>
+      </>
     );
   } else {
     throw new Error("Unknown clause kind", o);
@@ -185,10 +186,9 @@ export const PrintClauseKind = ({ o }: { o: ClauseKind }) => {
 };
 
 export const PrintTraitPredicate = ({ o }: { o: TraitPredicate }) => {
-  let polarity = o.polarity === "Negative" ? "!" : "";
   return (
     <>
-      <span>{polarity}</span>
+      <PrintImplPolarity o={o.polarity} />
       <PrintTraitRef o={o.trait_ref} />
     </>
   );
@@ -196,8 +196,8 @@ export const PrintTraitPredicate = ({ o }: { o: TraitPredicate }) => {
 
 export const PrintTraitRef = ({ o }: { o: TraitRef }) => {
   return (
-    <span>
+    <>
       <PrintTy o={o.self_ty} />: <PrintDefPath o={o.trait_path} />
-    </span>
+    </>
   );
 };

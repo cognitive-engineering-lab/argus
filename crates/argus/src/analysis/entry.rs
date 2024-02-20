@@ -8,7 +8,6 @@ use rustc_hir::BodyId;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::ty::{Predicate, TyCtxt, TypeckResults};
 use rustc_trait_selection::traits::solve::Goal;
-use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 
 use crate::{
@@ -209,10 +208,6 @@ pub(in crate::analysis) fn build_obligations_in_body<'tcx>(
   body_id: BodyId,
   typeck_results: &'tcx TypeckResults<'tcx>,
 ) -> (FullData<'tcx>, ObligationsInBody) {
-  let hir = tcx.hir();
-  let source_map = tcx.sess.source_map();
-  let body = hir.body(body_id);
-
   let obligations = tls::take_obligations();
   let obligation_data = tls::unsafe_take_data();
 

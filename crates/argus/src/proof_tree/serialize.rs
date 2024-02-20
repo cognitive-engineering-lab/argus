@@ -1,7 +1,7 @@
 use std::{collections::HashSet, ops::ControlFlow};
 
 use anyhow::{bail, Result};
-use ext::*;
+use ext::{CandidateExt, EvaluationResultExt};
 use index_vec::IndexVec;
 use rustc_hir::def_id::DefId;
 use rustc_infer::infer::InferCtxt;
@@ -65,22 +65,26 @@ impl SerializedTreeVisitor {
     })
   }
 
-  fn check_for_cycle_from(&mut self, from: ProofNodeIdx) {
+  // TODO: cycle detection is too expensive for large trees, and strictly
+  // comparing the JSON values is a bad idea in general. We should wait
+  // until the new trait solver has some mechanism for detecting cycles
+  // and piggy back off that.
+  fn check_for_cycle_from(&mut self, _from: ProofNodeIdx) {
     return;
 
-    if self.cycle.is_some() {
-      return;
-    }
+    // if self.cycle.is_some() {
+    //   return;
+    // }
 
-    let to_root = self.topology.path_to_root(from);
+    // let to_root = self.topology.path_to_root(from);
 
-    let node_start = &self.nodes[from];
-    if to_root.iter_exclusive().any(|idx| {
-      let n = &self.nodes[*idx];
-      n == node_start
-    }) {
-      self.cycle = Some(to_root.into());
-    }
+    // let node_start = &self.nodes[from];
+    // if to_root.iter_exclusive().any(|idx| {
+    //   let n = &self.nodes[*idx];
+    //   n == node_start
+    // }) {
+    //   self.cycle = Some(to_root.into());
+    // }
   }
 }
 

@@ -66,12 +66,10 @@ type InfoWrapper = React.FC<{ n: ProofNodeIdx; Child: React.FC }>;
 
 export const DirNode = ({
   idx,
-  styleEdge,
   Children,
   Wrapper = ({ n: _, Child }) => <Child />,
 }: {
   idx: number;
-  styleEdge: boolean;
   Children: React.FC | null;
   Wrapper: InfoWrapper;
 }) => {
@@ -120,7 +118,6 @@ export const DirRecursive = ({
           <DirNode
             key={i}
             idx={current}
-            styleEdge={styleEdges}
             Wrapper={Wrapper}
             Children={
               next.length > 0

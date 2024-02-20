@@ -116,6 +116,7 @@ macro_rules! define_helper {
             pub struct $helper(bool);
 
             impl $helper {
+              #[allow(dead_code)]
                 pub fn new() -> $helper {
                     $helper($tl.with(|c| c.replace(true)))
                 }

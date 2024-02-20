@@ -6,11 +6,9 @@ import {
 } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import React from "react";
-import ReactJson from "react-json-view";
 
 import BottomUp from "./BottomUp";
 import { TreeContext } from "./Context";
-import Graph from "./Graph";
 import TopDown from "./TopDown";
 import "./TreeApp.css";
 import TreeCycle from "./TreeCycle";

@@ -60,6 +60,7 @@
     "glob": "^8.1.0",
     "lodash": "^4.17.21",
     "new-github-issue-url": "^1.0.0",
+    "open": "^8.2.1",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "toml": "^3.0.0",

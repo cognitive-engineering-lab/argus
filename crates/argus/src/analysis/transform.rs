@@ -249,7 +249,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         .filter(|(_, that_id)| self.tcx.is_parent_of(**that_id, this_id))
         .collect::<Vec<_>>();
 
-      let Some((expr_id, hir_id)) =
+      let Some((expr_id, _hir_id)) =
         matching_expressions.iter().copied().find(|(_, this_id)| {
           matching_expressions
             .iter()
@@ -497,7 +497,6 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           let syn_id = self.synthetic_data.add(SyntheticData {
             full_data: full_query_idx,
             obligation: obligation.clone(),
-            result: res,
           });
 
           let with_provenance = compute_provenance(

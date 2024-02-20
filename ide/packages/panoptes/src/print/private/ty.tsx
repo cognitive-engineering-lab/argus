@@ -1,4 +1,5 @@
 import {
+  Abi,
   AliasTy,
   AliasTyKind,
   AssocItem,
@@ -28,14 +29,23 @@ import {
   TypeAndMut,
   UintTy,
 } from "@argus/common/bindings";
-import _ from "lodash";
+import _, { isObject } from "lodash";
 import React from "react";
 
 import { Toggle } from "../../Toggle";
 import { anyElems, fnInputsAndOutput, tyIsUnit } from "../../utilities/func";
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
-import { Angled, CommaSeparated, DBraced, PlusSeparated } from "./syntax";
+import {
+  Angled,
+  CBraced,
+  CommaSeparated,
+  DBraced,
+  Parenthesized,
+  Placeholder,
+  PlusSeparated,
+  SqBraced,
+} from "./syntax";
 import { PrintTerm } from "./term";
 
 export const PrintBinder = ({
@@ -52,8 +62,6 @@ export const PrintTy = ({ o }: { o: Ty }) => {
   return <PrintTyKind o={o} />;
 };
 
-// TODO: enums that don't have an inner object need to use a
-// comparison, instead of the `in` operator.
 export const PrintTyKind = ({ o }: { o: TyKind }) => {
   if ("Bool" === o) {
     return "bool";
@@ -74,25 +82,24 @@ export const PrintTyKind = ({ o }: { o: TyKind }) => {
   } else if ("Adt" in o) {
     return <PrintDefPath o={o.Adt} />;
   } else if ("Array" in o) {
-    console.debug("Printing Array", o);
     const [ty, sz] = o.Array;
     return (
-      <span>
-        [<PrintTy o={ty} />; <PrintConst o={sz} />]
-      </span>
+      <SqBraced>
+        <PrintTy o={ty} />; <PrintConst o={sz} />
+      </SqBraced>
     );
   } else if ("Slice" in o) {
     return (
-      <span>
-        [<PrintTy o={o.Slice} />]
-      </span>
+      <SqBraced>
+        <PrintTy o={o.Slice} />
+      </SqBraced>
     );
   } else if ("RawPtr" in o) {
     const m = o.RawPtr.mutbl === "Not" ? "const" : "mut";
     return (
-      <span>
+      <>
         *{m} <PrintTy o={o.RawPtr.ty} />
-      </span>
+      </>
     );
   } else if ("Ref" in o) {
     const [r, ty, mtbl] = o.Ref;
@@ -101,9 +108,9 @@ export const PrintTyKind = ({ o }: { o: TyKind }) => {
       mutbl: mtbl,
     };
     return (
-      <span>
+      <>
         &<PrintRegion o={r} /> <PrintTypeAndMut o={tyAndMut} />
-      </span>
+      </>
     );
   } else if ("FnDef" in o) {
     return <PrintFnDef o={o.FnDef} />;
@@ -112,9 +119,9 @@ export const PrintTyKind = ({ o }: { o: TyKind }) => {
   } else if ("Tuple" in o) {
     const components = _.map(o.Tuple, t => () => <PrintTy o={t} />);
     return (
-      <span>
-        (<CommaSeparated components={components} />)
-      </span>
+      <Parenthesized>
+        <CommaSeparated components={components} />
+      </Parenthesized>
     );
   } else if ("Placeholder" in o) {
     return <PrintPlaceholderTy o={o.Placeholder} />;
@@ -189,9 +196,9 @@ export const PrintDynamicTy = ({ o }: { o: DynamicTyKind }) => {
   const region = <PrintRegion o={o.region} />;
   const dynKind = o.kind === "Dyn" ? "dyn" : "dyn*";
   return (
-    <>
-      ({dynKind} {head} + {region})
-    </>
+    <Parenthesized>
+      {dynKind} {head} + {region}
+    </Parenthesized>
   );
 };
 
@@ -243,20 +250,56 @@ export const PrintPolyFnSig = ({ o }: { o: PolyFnSig }) => {
     );
     return (
       <>
-        (<CommaSeparated components={inputComponents} />
-        {variadic}){ret}
+        <Parenthesized>
+          <CommaSeparated components={inputComponents} />
+          {variadic}
+        </Parenthesized>
+        {ret}
       </>
     );
   };
 
+  const PrintAbi = ({ abi }: { abi: Abi }) => {
+    if (abi === "Rust") {
+      return null;
+    }
+
+    const propertyAbis = [
+      "C",
+      "Cdecl",
+      "Stdcall",
+      "Fastcall",
+      "Vectorcall",
+      "Thiscall",
+      "Aapcs",
+      "Win64",
+      "SysV64",
+      "System",
+    ];
+
+    const fromString = (abi: string) => {
+      return `extern ${abi.toLowerCase()}`;
+    };
+
+    if (isObject(abi)) {
+      for (const prop in abi) {
+        if (propertyAbis.includes(prop)) {
+          return fromString(prop);
+        }
+      }
+    } else {
+      return fromString(abi);
+    }
+  };
+
   const inner = (o: FnSig) => {
     const unsafetyStr = o.unsafety === "Unsafe" ? "unsafe " : null;
-    // TODO: we could write the ABI here, or expose it at least.
-    const abi = o.abi === "Rust" ? null : "extern ";
+    const abi = <PrintAbi abi={o.abi} />;
     const [inputs, output] = fnInputsAndOutput(o.inputs_and_output);
     return (
       <>
-        fn <InnerSig inputs={inputs} output={output} cVariadic={o.c_variadic} />
+        {unsafetyStr} {abi} fn{" "}
+        <InnerSig inputs={inputs} output={output} cVariadic={o.c_variadic} />
       </>
     );
   };
@@ -270,9 +313,9 @@ export const PrintFnDef = ({ o }: { o: FnDef }) => {
   return (
     <>
       <Toggle summary=".." Children={() => <PrintPolyFnSig o={o.sig} />} />{" "}
-      {"{"}
-      <PrintDefPath o={o.path} />
-      {"}"}
+      <CBraced>
+        <PrintDefPath o={o.path} />
+      </CBraced>
     </>
   );
 };
@@ -312,19 +355,28 @@ export const PrintPlaceholderTy = ({ o }: { o: PlaceholderBoundTy }) => {
 };
 
 export const PrintInferTy = ({ o }: { o: InferTy }) => {
-  switch (o.type) {
-    case "IntVar":
-      return "{{int}}";
-    case "FloatVar":
-      return "{{float}}";
-    case "Named":
-      // NOTE: we also have access to the symbol it came from o.name
-      return <PrintDefPath o={o.pathDef} />;
-    case "Unresolved":
-      return "_";
-    default:
-      throw new Error("Unknown infer ty", o);
-  }
+  const Inner =
+    o === "IntVar"
+      ? () => <DBraced>int</DBraced>
+      : o === "FloatVar"
+      ? () => <DBraced>float</DBraced>
+      : o === "Unresolved"
+      ? () => "_"
+      : "Named" in o
+      ? () => <PrintDefPath o={o.Named[1]} />
+      : "Unnamed" in o
+      ? () => <PrintDefPath o={o.Unnamed} />
+      : "SourceInfo" in o
+      ? () => <code>{o.SourceInfo}</code>
+      : () => {
+          throw new Error("Unknown infer ty", o);
+        };
+
+  return (
+    <Placeholder>
+      <Inner />
+    </Placeholder>
+  );
 };
 
 export const PrintTypeAndMut = ({ o }: { o: TypeAndMut }) => {
@@ -382,7 +434,11 @@ export const PrintIntTy = ({ o }: { o: IntTy }) => {
 };
 
 export const PrintBoundVariable = ({ o }: { o: BoundVariable }) => {
-  throw new Error("TODO");
+  if ("Error" in o) {
+    return <DBraced>{o.Error}</DBraced>;
+  } else {
+    throw new Error("Unknown bound variable", o);
+  }
 };
 
 export const PrintImplPolarity = ({ o }: { o: ImplPolarity }) => {
@@ -402,18 +458,22 @@ export const PrintOpaqueImplType = ({ o }: { o: OpaqueImpl }) => {
         </>
       ) : null;
     return (
-      <span>
-        ({o.kind}(<CommaSeparated components={args} />){ret})
-      </span>
+      <Parenthesized>
+        {o.kind}
+        <Parenthesized>
+          <CommaSeparated components={args} />
+        </Parenthesized>
+        {ret}
+      </Parenthesized>
     );
   };
 
   const PrintAssocItem = ({ o }: { o: AssocItem }) => {
     console.debug("Printing AssocItem", o);
     return (
-      <span>
+      <>
         {o.name} = <PrintTerm o={o.term} />
-      </span>
+      </>
     );
   };
 

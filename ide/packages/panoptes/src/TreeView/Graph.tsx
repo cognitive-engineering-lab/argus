@@ -32,7 +32,7 @@ const useCenteredTree = (
 };
 
 const getEdgeClass =
-  (tree: TreeInfo) => (link: TreeLinkDatum, orientation: Orientation) => {
+  (tree: TreeInfo) => (link: TreeLinkDatum, _orientation: Orientation) => {
     const sourceIdx = link.source.data.name as number;
     const node = tree.node(sourceIdx);
     return "Goal" in node

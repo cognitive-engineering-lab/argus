@@ -106,78 +106,19 @@ impl TreeTopology {
     }
   }
 
-  // pub fn children(
-  //   &self,
-  //   from: ProofNodeIdx,
-  // ) -> impl Iterator<Item = ProofNodeIdx> {
-  //   let v = match self.children.get(&from) {
-  //     // Normally there are relatively few children.
-  //     Some(kids) => kids
-  //       .iter()
-  //       .copied()
-  //       .collect::<SmallVec<[ProofNodeIdx; 8]>>(),
-  //     None => SmallVec::<[ProofNodeIdx; 8]>::default(),
-  //   };
-
-  //   v.into_iter()
-  // }
-
   pub fn parent(&self, to: ProofNodeIdx) -> Option<ProofNodeIdx> {
     self.parent.get(&to).copied()
   }
-
-  // pub fn is_parent_of(
-  //   &self,
-  //   parent: ProofNodeIdx,
-  //   child: ProofNodeIdx,
-  // ) -> bool {
-  //   if let Some(p) = self.parent(child) {
-  //     p == parent
-  //   } else {
-  //     false
-  //   }
-  // }
-
-  // pub fn is_child_of(&self, child: ProofNodeIdx, parent: ProofNodeIdx) -> bool {
-  //   self.is_parent_of(parent, child)
-  // }
-
-  // #[must_use]
-  // pub fn add_in(&mut self, rhs: Self) -> Option<()> {
-  //   let lhs_keys = self.children.keys().collect::<HashSet<_>>();
-  //   for key in rhs.children.keys() {
-  //     if lhs_keys.contains(key) {
-  //       return None;
-  //     }
-  //   }
-
-  //   self.children.extend(rhs.children.into_iter());
-  //   self.parent.extend(rhs.parent.into_iter());
-
-  //   Some(())
-  // }
-
-  // pub fn is_member(&self, node: ProofNodeIdx) -> bool {
-  //   self
-  //     .children
-  //     .keys()
-  //     .chain(self.parent.keys())
-  //     .find(|&&n| n == node)
-  //     .is_some()
-  // }
-
-  // pub fn leaves(&self) -> impl Iterator<Item = ProofNodeIdx> + '_ {
-  //   self.parent.keys().filter(|n| self.is_leaf(**n)).copied()
-  // }
 
   pub fn path_to_root(&self, node: ProofNodeIdx) -> Path<ProofNodeIdx, ToRoot> {
     let mut root = node;
     let mut curr = Some(node);
     let path = std::iter::from_fn(move || {
+      let rootp = &mut root;
       let prev = curr;
       if let Some(n) = curr {
         curr = self.parent(n);
-        root = n;
+        *rootp = n;
       }
 
       prev

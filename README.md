@@ -18,3 +18,17 @@ $ cargo install --path crates/argus_cli
 
 $ cd ide && depot build
 ```
+
+## FAQ
+
+<h3 id="rustup-fails-on-install">rustup fails on installation</h3>
+
+If rustup fails, especially with an error like "could not rename downloaded file", this is probably because Flowistry is running rustup concurrently with another tool (like rust-analyzer). Until [rustup#988](https://github.com/rust-lang/rustup/issues/988) is resolved, there is unfortunately no automated way around this.
+
+To solve the issue, go to the command line and run:
+
+```
+rustup toolchain install nightly-2024-01-21 -c rust-src -c rustc-dev -c llvm-tools-preview
+```
+
+Then go back to VSCode and click "Continue" to let Flowistry continue installing.

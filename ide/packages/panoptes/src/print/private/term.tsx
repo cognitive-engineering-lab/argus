@@ -14,7 +14,13 @@ import React from "react";
 import { PrintConst } from "./const";
 import { PrintConstScalarInt } from "./const";
 import { PrintValuePath } from "./path";
-import { Angled, CommaSeparated, DBraced } from "./syntax";
+import {
+  Angled,
+  CommaSeparated,
+  DBraced,
+  Parenthesized,
+  SqBraced,
+} from "./syntax";
 import { PrintSymbol, PrintTy } from "./ty";
 
 export const PrintTerm = ({ o }: { o: Term }) => {
@@ -49,14 +55,14 @@ export const PrintExpr = ({ o }: { o: ExprDef }) => {
     const [callable, args] = o.FunctionCall;
     const argEs = _.map(args, arg => () => <PrintConst o={arg} />);
     return (
-      <span>
+      <>
         <PrintConst o={callable} />(
         <CommaSeparated components={argEs} />)
-      </span>
+      </>
     );
   } else if ("Cast" in o) {
     // TODO: handle cast kind "use"
-    const [castKind, expr, ty] = o.Cast;
+    const [_castKind, expr, ty] = o.Cast;
     return (
       <Angled>
         <PrintConst o={expr} /> as <PrintTy o={ty} />
@@ -175,9 +181,9 @@ export const PrintValueTree = ({ o }: { o: ValTree }) => {
 const PrintAggregateArray = ({ fields }: { fields: Const[] }) => {
   const components = _.map(fields, field => () => <PrintConst o={field} />);
   return (
-    <span>
-      [<CommaSeparated components={components} />]
-    </span>
+    <SqBraced>
+      <CommaSeparated components={components} />
+    </SqBraced>
   );
 };
 
@@ -185,10 +191,10 @@ const PrintAggregateTuple = ({ fields }: { fields: Const[] }) => {
   const components = _.map(fields, field => () => <PrintConst o={field} />);
   const trailingComma = fields.length === 1 ? "," : null;
   return (
-    <>
-      (<CommaSeparated components={components} />
-      {trailingComma})
-    </>
+    <Parenthesized>
+      <CommaSeparated components={components} />
+      {trailingComma}
+    </Parenthesized>
   );
 };
 
@@ -212,7 +218,10 @@ const PrintAggregateAdt = ({
       const components = _.map(fields, field => () => <PrintConst o={field} />);
       return (
         <>
-          {head}(<CommaSeparated components={components} />)
+          {head}
+          <Parenthesized>
+            <CommaSeparated components={components} />
+          </Parenthesized>
         </>
       );
     }

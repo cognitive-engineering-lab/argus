@@ -29,7 +29,6 @@ impl<'tcx> TyDef<'tcx> {
   }
 }
 
-pub type TysDef = Slice__TyDef;
 pub struct Slice__TyDef;
 impl Slice__TyDef {
   pub fn serialize<'tcx, S>(
@@ -376,16 +375,6 @@ impl<'tcx> PolyExistentialPredicatesDef<'tcx> {
       .collect::<Vec<_>>();
 
     Self { data, auto_traits }
-  }
-
-  pub fn serialize<S>(
-    value: &ty::List<ty::PolyExistentialPredicate<'tcx>>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    Self::new(value).serialize(s)
   }
 }
 
@@ -958,48 +947,66 @@ pub enum GenericArgKindDef<'tcx> {
 
 // TODO: gavinleroy
 #[derive(Serialize)]
-#[serde(tag = "type")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "InferTy"))]
 pub enum InferTyDef<'tcx> {
   IntVar,
   FloatVar,
-  // TODO: We should also include source information
-  #[serde(rename_all = "camelCase")]
-  Named {
+  Named(
     #[serde(with = "SymbolDef")]
     #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
-    name: Symbol,
-    path_def: path::PathDefNoArgs<'tcx>,
-  },
+    Symbol,
+    path::PathDefNoArgs<'tcx>,
+  ),
+  Unnamed(path::PathDefNoArgs<'tcx>),
+  SourceInfo(String),
   Unresolved,
 }
 
 impl<'tcx> InferTyDef<'tcx> {
   pub fn new(value: &ty::InferTy) -> Self {
-    use rustc_infer::infer::type_variable::TypeVariableOriginKind::TypeParameterDefinition;
+    use rustc_infer::infer::type_variable::{
+      TypeVariableOrigin, TypeVariableOriginKind::*,
+    };
 
     let infcx = get_dynamic_ctx();
     let tcx = infcx.tcx;
 
-    let ty = ty::Ty::new_infer(tcx, *value);
-
-    if let Some(type_origin) = infcx.type_var_origin(ty)
-      && let TypeParameterDefinition(name, def_id) = type_origin.kind
-    {
-      Self::Named {
-        name,
-        path_def: path::PathDefNoArgs::new(def_id),
-      }
+    let root_value = if let ty::InferTy::TyVar(v) = value {
+      ty::InferTy::TyVar(infcx.root_var(*v))
     } else {
-      match value {
-        // TODO: can we do any better in these cases??
-        ty::InferTy::TyVar(_) | ty::InferTy::FreshTy(_) => Self::Unresolved,
+      *value
+    };
+
+    let ty = ty::Ty::new_infer(tcx, root_value);
+
+    match infcx.type_var_origin(ty) {
+      Some(TypeVariableOrigin {
+        kind: TypeParameterDefinition(name, def_id),
+        ..
+      }) => Self::Named(name, path::PathDefNoArgs::new(def_id)),
+
+      Some(TypeVariableOrigin {
+        kind: OpaqueTypeInference(def_id),
+        ..
+      }) => Self::Unnamed(path::PathDefNoArgs::new(def_id)),
+
+      Some(TypeVariableOrigin { span, .. }) if !span.is_dummy() => {
+        let span = rustc_span::Span::source_callsite(span);
+        if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(span) {
+          Self::SourceInfo(snippet)
+        } else {
+          Self::Unresolved
+        }
+      }
+
+      _ => match value {
         ty::InferTy::IntVar(_) | ty::InferTy::FreshIntTy(_) => Self::IntVar,
         ty::InferTy::FloatVar(_) | ty::InferTy::FreshFloatTy(_) => {
           Self::FloatVar
         }
-      }
+        ty::InferTy::TyVar(_) | ty::InferTy::FreshTy(_) => Self::Unresolved,
+      },
     }
   }
 
@@ -1494,13 +1501,6 @@ pub struct ProjectionPredicateDef<'tcx> {
 }
 
 #[derive(Serialize)]
-#[serde(remote = "ty::UniverseIndex")]
-pub struct UniverseIndexDef {
-  #[serde(skip)]
-  pub(crate) private: u32,
-}
-
-#[derive(Serialize)]
 #[serde(remote = "ty::CoercePredicate")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "CoercePredicate"))]
@@ -1552,22 +1552,6 @@ impl Slice__SymbolDef {
   }
 }
 
-pub struct Option__SymbolDef;
-impl Option__SymbolDef {
-  pub fn serialize<'tcx, S>(
-    value: &Option<Symbol>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    match value {
-      None => s.serialize_none(),
-      Some(sym) => SymbolDef::serialize(sym, s),
-    }
-  }
-}
-
 #[derive(Serialize)]
 #[serde(remote = "ty::AliasRelationDirection")]
 #[cfg_attr(feature = "testing", derive(TS))]
@@ -1580,11 +1564,16 @@ pub enum AliasRelationDirectionDef {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-pub enum BoundVariable {}
+pub enum BoundVariable {
+  Error(String),
+}
 
 impl BoundVariable {
-  pub fn new(debruijn_idx: ty::DebruijnIndex, var: ty::BoundVar) -> Self {
-    todo!("bound variables are not yet possible")
+  pub fn new(didx: ty::DebruijnIndex, var: ty::BoundVar) -> Self {
+    // FIXME: bound varialbes shouldn't be in serialized types, I haven't
+    // encountered one in the raw output, and before release this was a
+    // `panic`, which never fired.
+    Self::Error(format!("{var:?}^{didx:?}").to_string())
   }
 }
 
@@ -1627,7 +1616,9 @@ pub struct FnTrait<'tcx> {
   #[cfg_attr(feature = "testing", ts(type = "Ty | undefined"))]
   ret_ty: Option<ty::Ty<'tcx>>,
 
-  kind: FnTraitKind,
+  #[serde(with = "ClosureKindDef")]
+  #[cfg_attr(feature = "testing", ts(type = "ClosureKind"))]
+  kind: ty::ClosureKind,
 }
 
 #[derive(Serialize)]
@@ -1656,15 +1647,6 @@ pub struct AssocItemDef<'tcx> {
   #[serde(with = "super::term::TermDef")]
   #[cfg_attr(feature = "testing", ts(type = "Term"))]
   term: ty::Term<'tcx>,
-}
-
-#[derive(Serialize)]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub enum FnTraitKind {
-  FnMut,
-  Fn,
-  FnOnce,
 }
 
 impl<'tcx> OpaqueImpl<'tcx> {
@@ -1830,11 +1812,11 @@ impl<'tcx> OpaqueImpl<'tcx> {
             if matches!(arg_tys.kind(), ty::Tuple(_)) =>
           {
             let kind = if entry.fn_trait_ref.is_some() {
-              FnTraitKind::Fn
+              ty::ClosureKind::Fn
             } else if entry.fn_mut_trait_ref.is_some() {
-              FnTraitKind::FnMut
+              ty::ClosureKind::FnMut
             } else {
-              FnTraitKind::FnOnce
+              ty::ClosureKind::FnOnce
             };
 
             let params = arg_tys.tuple_fields().iter().collect::<Vec<_>>();

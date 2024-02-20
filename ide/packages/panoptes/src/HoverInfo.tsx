@@ -1,5 +1,4 @@
 import {
-  FloatingDelayGroup,
   FloatingPortal,
   offset,
   useFloating,

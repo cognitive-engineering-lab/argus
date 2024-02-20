@@ -30,7 +30,7 @@ export const PrintWithFallback = ({
 }) => {
   const FallbackFromError = ({
     error,
-    resetErrorBoundary,
+    resetErrorBoundary: _,
   }: {
     error: any;
     resetErrorBoundary: (...args: any[]) => void;

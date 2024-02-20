@@ -82,7 +82,7 @@ enum ValTreeKind<'tcx> {
 
   Leaf {
     #[cfg_attr(feature = "testing", ts(type = "ConstScalarInt"))]
-    data: ConstScalarIntDef<'tcx>,
+    data: ConstScalarIntDef,
     kind: LeafKind,
   },
 }

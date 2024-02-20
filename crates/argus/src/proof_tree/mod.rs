@@ -119,9 +119,11 @@ impl Goal {
     result: EvaluationResult,
   ) -> Self {
     let necessity = infcx.guess_predicate_necessity(&goal.predicate);
+    let goal = infcx.resolve_vars_if_possible(*goal);
     let num_vars =
       serialize::var_counter::count_vars(infcx.tcx, goal.predicate);
-    let goal_value = serialize_to_value(infcx, &GoalPredicateDef(*goal))
+
+    let goal_value = serialize_to_value(infcx, &GoalPredicateDef(goal))
       .expect("failed to serialize goal");
 
     Self {

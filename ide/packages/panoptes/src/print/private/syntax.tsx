@@ -9,6 +9,10 @@ import "./syntax.css";
 
 // export const PathRoot: Ident = { name: "{{root}}" };
 
+export const Placeholder = ({ children }: React.PropsWithChildren) => {
+  return <span className="placeholder">{children}</span>;
+};
+
 export const Kw = ({ children }: React.PropsWithChildren) => {
   return <span className="kw">{children}</span>;
 };
@@ -29,6 +33,36 @@ export const DBraced = ({ children }: React.PropsWithChildren) => {
       {"{{"}
       {children}
       {"}}"}
+    </span>
+  );
+};
+
+export const CBraced = ({ children }: React.PropsWithChildren) => {
+  return (
+    <span>
+      {"{"}
+      {children}
+      {"}"}
+    </span>
+  );
+};
+
+export const Parenthesized = ({ children }: React.PropsWithChildren) => {
+  return (
+    <span>
+      {"("}
+      {children}
+      {")"}
+    </span>
+  );
+};
+
+export const SqBraced = ({ children }: React.PropsWithChildren) => {
+  return (
+    <span>
+      {"["}
+      {children}
+      {"]"}
     </span>
   );
 };

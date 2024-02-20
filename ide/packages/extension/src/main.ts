@@ -53,5 +53,6 @@ function createCommands(): Record<string, CommandFactory> {
 
     // Private commands used internally, these should not appear in the command palette.
     openError: { enabled: commands.openError },
+    lastError: { enabled: commands.lastError },
   };
 }

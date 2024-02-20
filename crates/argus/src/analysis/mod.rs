@@ -6,16 +6,18 @@ mod transform;
 use anyhow::Result;
 use fluid_let::fluid_let;
 use rustc_hir::BodyId;
-use rustc_middle::ty::{print, TyCtxt};
+use rustc_middle::ty::TyCtxt;
 pub(crate) use tls::{FullObligationData, SynIdx, UODIdx};
 
+#[cfg(feature = "testing")]
+use crate::types::intermediate::FullData;
 pub(crate) use crate::types::intermediate::{
   EvaluationResult, FulfillmentData,
 };
 use crate::{
   ext::TyCtxtExt,
   proof_tree::SerializedTree,
-  types::{intermediate::FullData, ObligationsInBody, Target},
+  types::{ObligationsInBody, Target},
 };
 
 fluid_let! {

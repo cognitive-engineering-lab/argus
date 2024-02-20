@@ -70,11 +70,7 @@ enum ConstKindDef<'tcx> {
     #[cfg_attr(feature = "testing", ts(type = "BoundVariable"))]
     data: BoundVariable,
   },
-  // TODO:
-  // Placeholder {
-  //   #[serde(skip)] // TODO:
-  //   data: &'a Placeholder<BoundVar>,
-  // },
+  Placeholder,
   Value {
     #[cfg_attr(feature = "testing", ts(type = "ValTree"))]
     data: ValTreeDef<'tcx>,
@@ -93,19 +89,19 @@ impl<'a, 'tcx: 'a> From<&Const<'tcx>> for ConstKindDef<'tcx> {
     let kind = value.kind();
 
     match kind {
-      ConstKind::Unevaluated(uc) => ConstKindDef::Unevaluated { data: uc },
-      ConstKind::Param(v) => ConstKindDef::Param { data: v },
-      ConstKind::Value(v) => ConstKindDef::Value {
+      ConstKind::Unevaluated(uc) => Self::Unevaluated { data: uc },
+      ConstKind::Param(v) => Self::Param { data: v },
+      ConstKind::Value(v) => Self::Value {
         data: ValTreeDef::new(v, self_ty),
       },
-      ConstKind::Expr(e) => ConstKindDef::Expr { data: e },
-      ConstKind::Error(..) => ConstKindDef::Error,
+      ConstKind::Expr(e) => Self::Expr { data: e },
+      ConstKind::Error(..) => Self::Error,
 
-      ConstKind::Bound(didx, bv) => ConstKindDef::Bound {
+      ConstKind::Bound(didx, bv) => Self::Bound {
         data: BoundVariable::new(didx, bv),
       },
-      ConstKind::Infer(ic) => ConstKindDef::Infer { data: ic },
-      ConstKind::Placeholder(..) => todo!(),
+      ConstKind::Infer(ic) => Self::Infer { data: ic },
+      ConstKind::Placeholder(..) => Self::Placeholder,
     }
   }
 }
@@ -113,8 +109,7 @@ impl<'a, 'tcx: 'a> From<&Const<'tcx>> for ConstKindDef<'tcx> {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "InferConst"))]
-#[serde(tag = "type")]
-enum InferConstKindDef {
+pub enum InferConstDef {
   // TODO: the `ConstVariableOrigin` doesn't seem to be publicly exposed.
   // If it were, we could probe the InferCtxt for the origin of an unresolved
   // infer var, potentially resulting in a named constant. But that isn't possible
@@ -126,43 +121,39 @@ enum InferConstKindDef {
   Anon,
 }
 
-pub struct InferConstDef;
 impl InferConstDef {
+  pub fn new(value: &InferConst) -> Self {
+    // TODO: can we get the name of an inference variable?
+    match value {
+      InferConst::Fresh(_) | InferConst::EffectVar(_) | InferConst::Var(_) => {
+        Self::Anon
+      }
+    }
+  }
+
   pub fn serialize<'tcx, S>(value: &InferConst, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    InferConstKindDef::from(value).serialize(s)
-  }
-}
-
-impl From<&InferConst> for InferConstKindDef {
-  fn from(value: &InferConst) -> Self {
-    // TODO: can we get the name of an inference variable?
-    match value {
-      InferConst::Fresh(_) | InferConst::EffectVar(_) | InferConst::Var(_) => {
-        InferConstKindDef::Anon
-      }
-    }
+    Self::new(value).serialize(s)
   }
 }
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "ParamConst"))]
-pub struct ParamConstDefDef(
+pub struct ParamConstDef(
   #[serde(with = "SymbolDef")]
   #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
   Symbol,
 );
 
-pub struct ParamConstDef;
 impl ParamConstDef {
   pub fn serialize<'tcx, S>(value: &ParamConst, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    ParamConstDefDef(value.name).serialize(s)
+    Self(value.name).serialize(s)
   }
 }
 
@@ -227,56 +218,11 @@ impl<'tcx> UnevaluatedConstDef<'tcx> {
   }
 }
 
-pub struct AliasConstDef;
-impl AliasConstDef {
-  pub fn serialize<'tcx, S>(
-    value: &UnevaluatedConst<'tcx>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    UnevaluatedConstDef::serialize(value, s)
-  }
-}
-
-pub struct BoundConstDef;
-impl BoundConstDef {
-  pub fn serialize<'tcx, S>(value: &BoundVar, s: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    // BoundVarDef::serialize(value, s)
-    todo!()
-  }
-}
-
-pub struct ExprConstDef;
-impl ExprConstDef {
-  pub fn serialize<'tcx, S>(value: &Expr<'tcx>, s: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    ExprDef::serialize(value, s)
-  }
-}
-
-pub struct ConstScalarIntDef<'tcx> {
-  int: ScalarInt,
-  ty: Ty<'tcx>,
-}
-
-impl<'tcx> ConstScalarIntDef<'tcx> {
-  pub fn new(int: ScalarInt, ty: Ty<'tcx>) -> Self {
-    Self { int, ty }
-  }
-}
-
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "ConstScalarInt"))]
 #[serde(tag = "type")]
-enum ConstScalarIntDefDef {
+pub enum ConstScalarIntDef {
   False,
   True,
   #[serde(rename_all = "camelCase")]
@@ -295,68 +241,58 @@ enum ConstScalarIntDefDef {
   },
 }
 
-impl<'tcx> From<&ConstScalarIntDef<'tcx>> for ConstScalarIntDefDef {
-  fn from(value: &ConstScalarIntDef<'tcx>) -> Self {
+impl<'tcx> ConstScalarIntDef {
+  pub fn new(int: ScalarInt, ty: Ty<'tcx>) -> Self {
     let infcx = get_dynamic_ctx();
     let tcx = infcx.tcx;
-    let this = value;
 
-    match this.ty.kind() {
-      Bool if this.int == ScalarInt::FALSE => ConstScalarIntDefDef::False,
-      Bool if this.int == ScalarInt::TRUE => ConstScalarIntDefDef::True,
+    match ty.kind() {
+      Bool if int == ScalarInt::FALSE => Self::False,
+      Bool if int == ScalarInt::TRUE => Self::True,
       Float(FloatTy::F32) => {
-        let val = Single::try_from(this.int).unwrap();
-        ConstScalarIntDefDef::Float {
+        let val = Single::try_from(int).unwrap();
+        Self::Float {
           data: format!("{val}"),
           is_finite: val.is_finite(),
         }
       }
       Float(FloatTy::F64) => {
-        let val = Double::try_from(this.int).unwrap();
-        ConstScalarIntDefDef::Float {
+        let val = Double::try_from(int).unwrap();
+        Self::Float {
           data: format!("{val}"),
           is_finite: val.is_finite(),
         }
       }
       Uint(_) | Int(_) => {
-        // let int = ConstInt::new(
-        //   this.int,
-        //   matches!(this.ty.kind(), Int(_)),
-        //   this.ty.is_ptr_sized_integral(),
-        // );
-        ConstScalarIntDefDef::Int {
-          data: format!("{}", this.int),
+        let int = ConstInt::new(
+          int,
+          matches!(ty.kind(), Int(_)),
+          ty.is_ptr_sized_integral(),
+        );
+        Self::Int {
+          data: format!("{:?}", int),
         }
       }
-      Char if char::try_from(this.int).is_ok() => ConstScalarIntDefDef::Char {
-        data: format!("{}", char::try_from(this.int).is_ok()),
+      Char if char::try_from(int).is_ok() => Self::Char {
+        data: format!("{}", char::try_from(int).is_ok()),
       },
       Ref(..) | RawPtr(..) | FnPtr(_) => {
-        let data = this.int.assert_bits(tcx.data_layout.pointer_size);
-        ConstScalarIntDefDef::Misc {
+        let data = int.assert_bits(tcx.data_layout.pointer_size);
+        Self::Misc {
           data: format!("0x{data:x}"),
         }
       }
       _ => {
-        if this.int.size() == Size::ZERO {
-          ConstScalarIntDefDef::Misc {
+        if int.size() == Size::ZERO {
+          Self::Misc {
             data: "transmute(())".to_string(),
           }
         } else {
-          ConstScalarIntDefDef::Misc {
-            data: format!("transmute(0x{:x})", this.int),
+          Self::Misc {
+            data: format!("transmute(0x{:x})", int),
           }
         }
       }
     }
-  }
-}
-
-impl<'tcx> Serialize for ConstScalarIntDef<'tcx> {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    ConstScalarIntDefDef::from(self).serialize(s)
   }
 }
