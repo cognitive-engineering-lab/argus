@@ -3,9 +3,9 @@
 }
 
 .floating {
-    background-color: rgba(0, 0, 0, 0.6);
+    background-color: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    border: 1px solid var(--vscode-dropdown-border);
     border-radius: 4px;
-    color: #ffffff;
     padding: 0.15em;
-    pointer-events: none;
   }

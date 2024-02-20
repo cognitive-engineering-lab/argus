@@ -19,43 +19,50 @@ export const PrintDefPath = ({ o }: { o: DefinedPath }) => {
     return null;
   }
 
+  const hoverContent = () => (
+    <div className="DirNode">
+      <span className="DefPathFull">
+        <PrintDefPathFull o={o} />
+      </span>
+    </div>
+  );
+
+  const [prefix, rest] = pruneToShortPath(o);
+
   return (
     <div className="DefPathContainer">
-      <HoverInfo
-        Content={() => (
-          <div className="DirNode">
-            <span className="DefPathFull">
-              <PrintDefPathFull o={o} />
-            </span>
-          </div>
-        )}
-      >
+      <HoverInfo Content={hoverContent}>
         <span className="DefPathShort">
-          <PrintDefPathShort o={o} />
+          <PrintSegments o={prefix} />
         </span>
       </HoverInfo>
+      <PrintSegments o={rest} />
     </div>
   );
 };
 
-// PathSegment[]
-export const PrintDefPathShort = ({ o }: { o: DefinedPath }) => {
-  console.debug("Printing def path short: ", o);
-  const prefix = takeRightUntil(o, segment => {
-    return (
+function pruneToShortPath(o: DefinedPath): [DefinedPath, DefinedPath] {
+  // Take the rightmost segments that form a full "path".
+  const prefix = takeRightUntil(
+    o,
+    segment =>
       segment.type === "Ty" ||
       segment.type === "DefPathDataName" ||
       segment.type === "Impl"
-    );
-  });
+  );
 
-  return _.map(prefix, (segment, i) => (
-    <PrintPathSegment o={segment} key={i} />
-  ));
+  // Take the leftmost segments that are named, these will have a hover
+  // element attached to them.
+  return [[prefix[0]], _.slice(prefix, 1)];
+}
+
+export const PrintDefPathShort = ({ o }: { o: DefinedPath }) => {};
+
+export const PrintDefPathFull = ({ o }: { o: DefinedPath }) => {
+  return <PrintSegments o={o} />;
 };
 
-// PathSegment[]
-export const PrintDefPathFull = ({ o }: { o: DefinedPath }) => {
+const PrintSegments = ({ o }: { o: PathSegment[] }) => {
   return _.map(o, (segment, i) => <PrintPathSegment o={segment} key={i} />);
 };
 

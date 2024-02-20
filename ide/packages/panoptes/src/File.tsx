@@ -61,6 +61,7 @@ const ObligationTreeWrapper = ({
   range: CharRange;
   obligation: Obligation;
 }) => {
+  const bodyInfo = useContext(BodyInfoContext)!;
   const [tree, setTree] = useState<SerializedTree | undefined | "loading">(
     "loading"
   );
@@ -86,7 +87,7 @@ const ObligationTreeWrapper = ({
     ) : tree === undefined ? (
       <NoTreeFound obligation={obligation} />
     ) : (
-      <TreeApp tree={tree} />
+      <TreeApp tree={tree} showHidden={bodyInfo.viewHiddenObligations} />
     );
 
   return content;
@@ -211,7 +212,7 @@ const InExpr = ({ idx }: { idx: ExprIdx }) => {
 
   if (
     !(isObject(expr.kind) && "MethodCall" in expr.kind) &&
-    bodyInfo.exprObligations(idx).length === 0
+    bodyInfo.visibleObligations(idx).length === 0
   ) {
     return null;
   }
@@ -220,7 +221,7 @@ const InExpr = ({ idx }: { idx: ExprIdx }) => {
     isObject(expr.kind) && "MethodCall" in expr.kind ? (
       <MethodLookupTable lookup={expr.kind.MethodCall.data} />
     ) : (
-      _.map(bodyInfo.exprObligations(idx), (oi, i) => (
+      _.map(bodyInfo.visibleObligations(idx), (oi, i) => (
         <ObligationFromIdx idx={oi} key={i} />
       ))
     );
@@ -277,14 +278,20 @@ const ObligationBody = ({ bodyInfo }: { bodyInfo: BodyInfo }) => {
 const File = ({
   file,
   osibs,
+  showHidden = false,
 }: {
   file: Filename;
   osibs: ObligationsInBody[];
+  showHidden?: boolean;
 }) => {
-  const bodyInfos = _.map(osibs, (osib, idx) => new BodyInfo(osib, idx));
+  const bodyInfos = _.map(
+    osibs,
+    (osib, idx) => new BodyInfo(osib, idx, showHidden)
+  );
   const bodiesWithVisibleExprs = _.filter(bodyInfos, bi =>
     bi.hasVisibleExprs()
   );
+
   return (
     <FileContext.Provider value={file}>
       {_.map(bodiesWithVisibleExprs, (bodyInfo, idx) => (

@@ -278,7 +278,7 @@ export const PrintPolyFnSig = ({ o }: { o: PolyFnSig }) => {
     ];
 
     const fromString = (abi: string) => {
-      return `extern ${abi.toLowerCase()}`;
+      return `extern ${abi.toLowerCase()} `;
     };
 
     if (isObject(abi)) {
@@ -298,7 +298,8 @@ export const PrintPolyFnSig = ({ o }: { o: PolyFnSig }) => {
     const [inputs, output] = fnInputsAndOutput(o.inputs_and_output);
     return (
       <>
-        {unsafetyStr} {abi} fn{" "}
+        {unsafetyStr}
+        {abi}fn{" "}
         <InnerSig inputs={inputs} output={output} cVariadic={o.c_variadic} />
       </>
     );

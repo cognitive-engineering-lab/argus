@@ -5,6 +5,7 @@ import {
   useFloating,
   useInteractions,
 } from "@floating-ui/react";
+import classNames from "classnames";
 import _ from "lodash";
 import React, { useContext, useState } from "react";
 
@@ -23,14 +24,12 @@ export const WrapTreeIco = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-
   const { refs, floatingStyles, context } = useFloating({
     open: isOpen,
     onOpenChange: setIsOpen,
   });
 
   const click = useClick(context);
-
   const { getReferenceProps, getFloatingProps } = useInteractions([click]);
 
   return (
@@ -44,22 +43,18 @@ export const WrapTreeIco = ({
         ref={refs.setReference}
         {...getReferenceProps()}
       >
-        {isHovered && (
-          <>
-            <IcoTreeDown />
-            {isOpen && (
-              <FloatingPortal>
-                <div
-                  className="floating-tree"
-                  ref={refs.setFloating}
-                  style={floatingStyles}
-                  {...getFloatingProps()}
-                >
-                  <Graph root={n} />
-                </div>
-              </FloatingPortal>
-            )}
-          </>
+        {(isHovered || isOpen) && <IcoTreeDown />}
+        {isOpen && (
+          <FloatingPortal>
+            <div
+              className={classNames("floating", "floating-graph")}
+              ref={refs.setFloating}
+              style={floatingStyles}
+              {...getFloatingProps()}
+            >
+              <Graph root={n} />
+            </div>
+          </FloatingPortal>
         )}
       </span>
     </span>

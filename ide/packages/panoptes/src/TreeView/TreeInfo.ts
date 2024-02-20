@@ -77,11 +77,18 @@ export class TreeInfo {
   private maxHeight: Map<ProofNodeIdx, number>;
   private numInferVars: Map<ProofNodeIdx, number>;
 
-  public constructor(private readonly tree: SerializedTree) {
+  public constructor(
+    private readonly tree: SerializedTree,
+    readonly showHidden: boolean = false
+  ) {
     const childrenOf = (n: ProofNodeIdx) => {
       return tree.topology.children[n] ?? [];
     };
     const cf = (n: ProofNodeIdx): ControlFlow => {
+      if (this.showHidden) {
+        return "keep";
+      }
+
       const node = tree.nodes[n];
       if ("Goal" in node) {
         if (node.Goal.data.necessity === "Yes") {

@@ -1,4 +1,4 @@
-import { CharRange, ObligationHash } from "@argus/common/bindings";
+import { CharRange, ObligationHash, Ty } from "@argus/common/bindings";
 import { Filename } from "@argus/common/lib";
 import _ from "lodash";
 
@@ -77,10 +77,8 @@ export function fnInputsAndOutput<T>(args: T[]): [T[], T] {
   return [inputs, output];
 }
 
-// TODO: put these in a typed file about the rustc_middle types (when possible).
+export type Unit = { Tuple: Ty[] };
 
-export type Unit = { Tuple: any[] };
-
-export function tyIsUnit(o: any): o is Unit {
-  return "Tuple" in o && o.Tuple.length === 0;
+export function tyIsUnit(o: Ty): o is Unit {
+  return isObject(o) && "Tuple" in o && o.Tuple.length === 0;
 }

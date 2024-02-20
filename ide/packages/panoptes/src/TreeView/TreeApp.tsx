@@ -14,7 +14,13 @@ import "./TreeApp.css";
 import TreeCycle from "./TreeCycle";
 import TreeInfo from "./TreeInfo";
 
-const TreeApp = ({ tree }: { tree: SerializedTree | undefined }) => {
+const TreeApp = ({
+  tree,
+  showHidden = false,
+}: {
+  tree: SerializedTree | undefined;
+  showHidden?: boolean;
+}) => {
   // FIXME: this shouldn't ever happen, if a properly hashed
   // value is sent and returned. I need to think more about how to handle
   // when we want to display "non-traditional" obligations.
@@ -27,7 +33,7 @@ const TreeApp = ({ tree }: { tree: SerializedTree | undefined }) => {
     );
   }
 
-  const treeInfo = new TreeInfo(tree);
+  const treeInfo = new TreeInfo(tree, showHidden);
 
   const tabs: [string, React.FC][] = [["Top Down", TopDown]];
 

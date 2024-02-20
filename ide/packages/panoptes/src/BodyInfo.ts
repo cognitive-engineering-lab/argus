@@ -39,7 +39,7 @@ class BodyInfo {
   }
 
   hasVisibleExprs() {
-    return _.some(this.exprs, idx => this.exprObligations(idx).length > 0);
+    return _.some(this.exprs, idx => this.visibleObligations(idx).length > 0);
   }
 
   byHash(hash: ObligationHash): Obligation | undefined {
@@ -54,7 +54,7 @@ class BodyInfo {
     return this.oib.exprs[idx];
   }
 
-  exprObligations(idx: ExprIdx): ObligationIdx[] {
+  visibleObligations(idx: ExprIdx): ObligationIdx[] {
     const filtered = _.filter(this.oib.exprs[idx].obligations, i =>
       this.notHidden(i)
     );
@@ -86,7 +86,12 @@ class BodyInfo {
     if (o === undefined) {
       return false;
     }
-    return o.necessity === "Yes" || this.showHidden;
+    return (
+      this.showHidden || o.necessity === "Yes"
+      // TODO: this includes obligations like `(): TRAIT` which seem to happen
+      // way too frequently and even on error shouldn't be shown.
+      // || (o.necessity === "OnError" && o.result === "no")
+    );
   }
 }
 

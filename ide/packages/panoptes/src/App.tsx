@@ -9,19 +9,6 @@ import React, { useEffect, useState } from "react";
 import Workspace from "./Workspace";
 import { highlightedObligation } from "./signals";
 
-// // FIXME: this is wrong, expanding the nodes with JS doesn't cause
-// // a re-render in React. Better to have a signal that collapsible
-// // elements can listen to.
-// function highlightIntoView(id: string) {
-//   const elem = document.getElementById(id);
-//   const className = "bling";
-//     elem.scrollIntoView();
-//     elem.classList.add(className);
-//   } else {
-//     console.error(`Couldn't find element with id ${id} to highlight`);
-//   }
-// }
-
 const App = ({
   initialData,
 }: {

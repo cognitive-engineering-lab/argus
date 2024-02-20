@@ -1,12 +1,13 @@
 import { ObligationsInBody } from "@argus/common/bindings";
 import { Filename } from "@argus/common/lib";
 import {
+  VSCodeCheckbox,
   VSCodePanelTab,
   VSCodePanelView,
   VSCodePanels,
 } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
-import React from "react";
+import React, { useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import File from "./File";
@@ -39,29 +40,49 @@ const Workspace = ({
 }: {
   files: [Filename, ObligationsInBody[]][];
   reset: () => void;
-}) => (
-  <VSCodePanels>
-    {_.map(files, ([filename, _], idx) => (
-      <VSCodePanelTab key={idx} id={`tab-${idx}`}>
-        {basename(filename)}
-      </VSCodePanelTab>
-    ))}
-    {_.map(files, ([filename, content], idx) => (
-      <ErrorBoundary
+}) => {
+  const [showHidden, setShowHidden] = useState(false);
+  const toggleHidden = () => setShowHidden(!showHidden);
+
+  const checkbox = (
+    <div style={{ position: "fixed", top: "0", right: "0" }}>
+      <VSCodeCheckbox onChange={toggleHidden} checked={showHidden}>
+        Show hidden information
+      </VSCodeCheckbox>
+    </div>
+  );
+
+  const tabs = _.map(files, ([filename, _], idx) => (
+    <VSCodePanelTab key={idx} id={`tab-${idx}`}>
+      {basename(filename)}
+    </VSCodePanelTab>
+  ));
+
+  const fileComponents = _.map(files, ([filename, content], idx) => (
+    <ErrorBoundary
+      key={idx}
+      FallbackComponent={FatalErrorPanel}
+      onReset={reset}
+    >
+      <VSCodePanelView
         key={idx}
-        FallbackComponent={FatalErrorPanel}
-        onReset={reset}
+        id={`view-${idx}`}
+        style={{ paddingLeft: 0, paddingRight: 0 }}
       >
-        <VSCodePanelView
-          key={idx}
-          id={`view-${idx}`}
-          style={{ paddingLeft: 0, paddingRight: 0 }}
-        >
-          <File file={filename} osibs={content} />
-        </VSCodePanelView>
-      </ErrorBoundary>
-    ))}
-  </VSCodePanels>
-);
+        <File file={filename} osibs={content} showHidden={showHidden} />
+      </VSCodePanelView>
+    </ErrorBoundary>
+  ));
+
+  return (
+    <>
+      {checkbox}
+      <VSCodePanels>
+        {tabs}
+        {fileComponents}
+      </VSCodePanels>
+    </>
+  );
+};
 
 export default Workspace;
