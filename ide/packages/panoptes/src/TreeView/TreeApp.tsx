@@ -31,10 +31,7 @@ const TreeApp = ({ tree }: { tree: SerializedTree | undefined }) => {
 
   const treeInfo = new TreeInfo(tree);
 
-  const tabs: [string, React.FC][] = [
-    ["Top Down", TopDown],
-    ["Graph", () => <Graph root={treeInfo.root} />],
-  ];
+  const tabs: [string, React.FC][] = [["Top Down", TopDown]];
 
   if (treeInfo.errorNodes().length > 0) {
     tabs.unshift(["Bottom Up", BottomUp]);

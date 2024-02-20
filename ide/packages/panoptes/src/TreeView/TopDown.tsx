@@ -21,6 +21,7 @@ export const WrapTreeIco = ({
   n: ProofNodeIdx;
   Child: React.FC;
 }) => {
+  const [isHovered, setIsHovered] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
   const { refs, floatingStyles, context } = useFloating({
@@ -33,28 +34,35 @@ export const WrapTreeIco = ({
   const { getReferenceProps, getFloatingProps } = useInteractions([click]);
 
   return (
-    <>
+    <span
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <Child />
       <span
         className="tree-toggle"
         ref={refs.setReference}
         {...getReferenceProps()}
       >
-        <IcoTreeDown />
+        {isHovered && (
+          <>
+            <IcoTreeDown />
+            {isOpen && (
+              <FloatingPortal>
+                <div
+                  className="floating-tree"
+                  ref={refs.setFloating}
+                  style={floatingStyles}
+                  {...getFloatingProps()}
+                >
+                  <Graph root={n} />
+                </div>
+              </FloatingPortal>
+            )}
+          </>
+        )}
       </span>
-      {isOpen && (
-        <FloatingPortal>
-          <div
-            className="floating-tree"
-            ref={refs.setFloating}
-            style={floatingStyles}
-            {...getFloatingProps()}
-          >
-            <Graph root={n} />
-          </div>
-        </FloatingPortal>
-      )}
-    </>
+    </span>
   );
 };
 
