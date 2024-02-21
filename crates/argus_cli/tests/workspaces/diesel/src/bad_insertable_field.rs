@@ -9,5 +9,5 @@ table! {
 
 #[derive(Insertable)]
 struct User {
-  name: i32,
+  name: Text,
 }

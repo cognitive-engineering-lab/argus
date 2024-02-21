@@ -133,7 +133,7 @@ struct ObligationsBuilder<'a, 'tcx: 'a> {
   // Structures to be filled in
   exprs_to_hir_id: HashMap<ExprIdx, HirId>,
   ambiguity_errors: IndexSet<ExprIdx>,
-  trait_errors: IndexSet<ExprIdx>,
+  trait_errors: Vec<(ExprIdx, Vec<ObligationHash>)>,
   exprs: IndexVec<ExprIdx, Expr>,
   method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,
 }
@@ -151,7 +151,8 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       kind,
     } in bins
     {
-      let span = hir.span_with_body(hir_id);
+      // let span = hir.span_with_body(hir_id);
+      let span = hir.span(hir_id);
       if let Some((range, snippet)) =
         CharRange::from_span(span, source_map).ok().and_then(|r| {
           let snip = source_map
@@ -231,107 +232,91 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
   // FIXME: this isn't efficient, but the number of obligations per
   // body isn't large, so shouldnt' be an issue.
   fn relate_trait_bound(&mut self) {
-    // 1. take the expressions from the "reported_trait_errors" and find
-    //    all the expressions that they correspond to. we should also
-    //    maintain the order in which they are reported and use this
-    //    sorting to present errors.
     for (span, predicates) in self.reported_trait_errors.iter() {
-      let Some(this_id) =
-        hier_hir::find_most_enclosing_node(&self.tcx, self.body_id, *span)
-      else {
-        log::error!("reported error doesn't have an associated span ...");
-        continue;
-      };
-
-      let matching_expressions = self
-        .exprs_to_hir_id
+      // Search for the obligation hash in our set of computed obligations.
+      let predicates = predicates
         .iter()
-        .filter(|(_, that_id)| self.tcx.is_parent_of(**that_id, this_id))
+        .filter_map(|&p| {
+          self
+            .raw_obligations
+            .iter_enumerated()
+            .find_map(|(obl_id, obl)| (obl.hash == p).then(|| (obl_id, p)))
+        })
         .collect::<Vec<_>>();
 
-      let Some((expr_id, _hir_id)) =
-        matching_expressions.iter().copied().find(|(_, this_id)| {
-          matching_expressions
-            .iter()
-            .all(|(_, that_id)| self.tcx.is_parent_of(**that_id, **this_id))
-        })
-      else {
-        log::error!(
-          "failed to find most enclosing hir id for {:?}",
-          matching_expressions
-        );
-        continue;
-      };
+      // Associate these with an expression, first comes first served.
+      let mut root_expr = None;
+      'outer: for (expr_id, expr) in self.exprs.iter_enumerated() {
+        for (p, _) in predicates.iter() {
+          if expr.obligations.contains(p) {
+            root_expr = Some(expr_id);
+            break 'outer;
+          }
+        }
+      }
 
-      // Mark the found Expr as containing an error.
-      self.trait_errors.insert(*expr_id);
+      let (_, hashes): (Vec<ObligationIdx>, _) = predicates.into_iter().unzip();
 
-      // Sort the Expr obligations according to the reported order.
-      let expr_obligations = &mut self.exprs[*expr_id].obligations;
-      let num_errs = predicates.len();
-      expr_obligations.sort_by_key(|&obl_idx| {
-        let obl = &self.raw_obligations[obl_idx];
-        let obl_hash = obl.hash;
-        let obl_is_certain = obl.result.is_certain();
-        predicates
-          .iter()
-          .position(|&h| h == obl_hash)
-          .unwrap_or_else(|| {
-            if obl_is_certain {
-              // push successful obligations down
-              num_errs + 1
-            } else {
-              num_errs
-            }
-          })
-      })
+      if let Some(expr_id) = root_expr {
+        self.trait_errors.push((expr_id, hashes));
+      }
+      // else {
+      //   todo!("what should I do here?");
+      // }
+
+      //   let Some(err_hir_id) =
+      //     hier_hir::find_most_enclosing_node(&self.tcx, self.body_id, *span)
+      //   else {
+      //     log::error!("reported error doesn't have an associated span ...");
+      //     continue;
+      //   };
+
+      //   let parent_ids_of_error = self
+      //     .exprs_to_hir_id
+      //     .iter()
+      //     .filter(|(_, expr_hir_id)| {
+      //       self.tcx.is_parent_of(**expr_hir_id, err_hir_id)
+      //     })
+      //     .collect::<Vec<_>>();
+
+      //   let Some((expr_id, _hir_id)) =
+      //     parent_ids_of_error.iter().copied().find(|(_, this_id)| {
+      //       // Find child-most expression that contains the error.
+      //       parent_ids_of_error
+      //         .iter()
+      //         .all(|(_, that_id)| self.tcx.is_parent_of(**that_id, **this_id))
+      //     })
+      //   else {
+      //     log::error!(
+      //       "failed to find most enclosing hir id for {:?}",
+      //       parent_ids_of_error
+      //     );
+      //     continue;
+      //   };
+
+      //   // Mark the found Expr as containing an error.
+      //   self.trait_errors.insert(*expr_id);
+
+      //   // Sort the Expr obligations according to the reported order.
+      //   let expr_obligations = &mut self.exprs[*expr_id].obligations;
+      //   let num_errs = predicates.len();
+      //   expr_obligations.sort_by_key(|&obl_idx| {
+      //     let obl = &self.raw_obligations[obl_idx];
+      //     let obl_hash = obl.hash;
+      //     let obl_is_certain = obl.result.is_certain();
+      //     predicates
+      //       .iter()
+      //       .position(|&h| h == obl_hash)
+      //       .unwrap_or_else(|| {
+      //         if obl_is_certain {
+      //           // push successful obligations down
+      //           num_errs + 1
+      //         } else {
+      //           num_errs
+      //         }
+      //       })
+      //   })
     }
-
-    // 2. we also need to search for expressions that are "ambiguous," these
-    //    don't always have associated reported errors. my current thoughts to
-    //    do this are to find obligations that are unsuccessful and have a
-    //    concrete obligations code.
-    //
-    // TODO: this isn't quite doing what I want. We need a way to figure
-    // out which obligations are "reruns" of a previous goal, and
-    // then remove the prior 'ambiguous' answer from the list.
-    //
-    // let is_important_failed_query = |obl_idx: ObligationIdx| {
-    //   use rustc_infer::traits::ObligationCauseCode::*;
-    //   if let Some(prov) = self.obligations.iter().find(|p| ***p == obl_idx)
-    //     && let Some(uodidx) = prov.full_data
-    //   {
-    //     let full_data = self.full_data.get(uodidx);
-    //     !(full_data.result.is_certain()
-    //       || matches!(full_data.obligation.cause.code(), MiscObligation))
-    //   } else {
-    //     false
-    //   }
-    // };
-    // let lift_failed_obligations = |v: &mut Vec<ObligationIdx>| {
-    //   v.sort_by_key(|&idx| {
-    //     if self.raw_obligations[idx].result.is_certain() {
-    //       1
-    //     } else {
-    //       0
-    //     }
-    //   })
-    // };
-    // let unmarked_exprs = self
-    //   .exprs
-    //   .iter_mut_enumerated()
-    //   .filter(|(id, _)| !self.ambiguity_errors.contains(id));
-    // for (expr_id, expr) in unmarked_exprs {
-    //   let contains_failed = expr
-    //     .obligations
-    //     .iter()
-    //     .copied()
-    //     .any(is_important_failed_query);
-    //   if contains_failed {
-    //     self.trait_errors.insert(expr_id);
-    //   }
-    //   lift_failed_obligations(&mut expr.obligations)
-    // }
   }
 
   // 1. build the method call table (see ambiguous / )

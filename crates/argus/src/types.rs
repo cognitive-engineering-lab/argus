@@ -151,7 +151,7 @@ pub struct ObligationsInBody {
   /// Concrete trait errors, this would be when the compiler
   /// can say for certainty that a specific trait bound was required
   /// but not satisfied.
-  pub trait_errors: IndexSet<ExprIdx>,
+  pub trait_errors: Vec<(ExprIdx, Vec<ObligationHash>)>,
 
   #[cfg_attr(feature = "testing", ts(type = "Obligation[]"))]
   pub obligations: IndexVec<ObligationIdx, Obligation>,
@@ -168,7 +168,7 @@ impl ObligationsInBody {
     id: Option<(&InferCtxt, DefId)>,
     range: CharRange,
     ambiguity_errors: IndexSet<ExprIdx>,
-    trait_errors: IndexSet<ExprIdx>,
+    trait_errors: Vec<(ExprIdx, Vec<ObligationHash>)>,
     obligations: IndexVec<ObligationIdx, Obligation>,
     exprs: IndexVec<ExprIdx, Expr>,
     method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,

@@ -87,7 +87,7 @@ pub trait StableHash<'__ctx, 'tcx>:
 {
   fn stable_hash(
     self,
-    infcx: &InferCtxt<'tcx>,
+    infcx: &TyCtxt<'tcx>,
     ctx: &mut StableHashingContext<'__ctx>,
   ) -> Hash64;
 }
@@ -107,6 +107,8 @@ pub trait TyCtxtExt<'tcx> {
 
   /// Test whether `a` is a parent node of `b`.
   fn is_parent_of(&self, a: HirId, b: HirId) -> bool;
+
+  fn predicate_hash(&self, p: &Predicate<'tcx>) -> Hash64;
 }
 
 pub trait TypeckResultsExt<'tcx> {
@@ -207,16 +209,12 @@ where
 {
   fn stable_hash(
     self,
-    infcx: &InferCtxt<'tcx>,
+    tcx: &TyCtxt<'tcx>,
     ctx: &mut StableHashingContext<'__ctx>,
   ) -> Hash64 {
     let mut h = StableHasher::new();
-    let sans_regions = infcx.tcx.erase_regions(self);
-    let mut freshener = rustc_infer::infer::TypeFreshener::new(infcx);
-    // let mut eraser = ty_eraser::TyVarEraserVisitor { infcx };
-    let this = sans_regions.fold_with(&mut freshener);
-    // erase infer vars
-    this.hash_stable(ctx, &mut h);
+    let sans_regions = tcx.erase_regions(self);
+    sans_regions.hash_stable(ctx, &mut h);
     h.finish()
   }
 }
@@ -332,6 +330,10 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
   fn is_parent_of(&self, a: HirId, b: HirId) -> bool {
     a == b || self.hir().parent_iter(b).find(|&(id, _)| id == a).is_some()
   }
+
+  fn predicate_hash(&self, p: &Predicate<'tcx>) -> Hash64 {
+    self.with_stable_hashing_context(|mut hcx| p.stable_hash(self, &mut hcx))
+  }
 }
 
 impl<'tcx> TypeckResultsExt<'tcx> for TypeckResults<'tcx> {
@@ -445,9 +447,9 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
   }
 
   fn predicate_hash(&self, p: &Predicate<'tcx>) -> Hash64 {
-    self
-      .tcx
-      .with_stable_hashing_context(|mut hcx| p.stable_hash(self, &mut hcx))
+    let mut freshener = rustc_infer::infer::TypeFreshener::new(self);
+    let p = p.fold_with(&mut freshener);
+    self.tcx.predicate_hash(&p)
   }
 
   fn bless_fulfilled<'a>(
