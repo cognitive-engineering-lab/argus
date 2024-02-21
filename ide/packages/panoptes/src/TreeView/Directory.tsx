@@ -36,6 +36,18 @@ export const CollapsibleElement = ({
 }) => {
   const [isOpen, setIsOpen] = useState(startOpen);
   const [openIco, closedIco] = icons;
+  let [children, setChildren] = useState<React.ReactElement | undefined>(
+    undefined
+  );
+  useEffect(() => {
+    if (children === undefined && Children !== null && isOpen) {
+      setChildren(<Children />);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    setIsOpen(startOpen || isOpen);
+  }, [startOpen, isOpen]);
 
   const toggleCollapse = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
@@ -47,10 +59,6 @@ export const CollapsibleElement = ({
     collapsed: !isOpen,
   });
 
-  useEffect(() => {
-    setIsOpen(startOpen || isOpen);
-  }, [startOpen, isOpen]);
-
   return (
     <>
       <div className="DirNode" onClick={toggleCollapse}>
@@ -59,9 +67,7 @@ export const CollapsibleElement = ({
         </div>
         <span className="information">{info}</span>
       </div>
-      <div className={collapseCN}>
-        {isOpen && Children !== null ? <Children /> : null}
-      </div>
+      <div className={collapseCN}>{children ?? null}</div>
     </>
   );
 };

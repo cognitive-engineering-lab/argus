@@ -259,43 +259,56 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
 
       if let Some(expr_id) = root_expr {
         self.trait_errors.push((expr_id, hashes));
+        continue;
       }
-      // else {
-      //   todo!("what should I do here?");
-      // }
 
-      //   let Some(err_hir_id) =
-      //     hier_hir::find_most_enclosing_node(&self.tcx, self.body_id, *span)
-      //   else {
-      //     log::error!("reported error doesn't have an associated span ...");
-      //     continue;
-      //   };
+      // A predicate did not match exactly, now we're scrambling
+      // to find an expression by span, and pick an obligation.
 
-      //   let parent_ids_of_error = self
-      //     .exprs_to_hir_id
-      //     .iter()
-      //     .filter(|(_, expr_hir_id)| {
-      //       self.tcx.is_parent_of(**expr_hir_id, err_hir_id)
-      //     })
-      //     .collect::<Vec<_>>();
+      let Some(err_hir_id) =
+        hier_hir::find_most_enclosing_node(&self.tcx, self.body_id, *span)
+      else {
+        log::error!("reported error doesn't have an associated span ...");
+        continue;
+      };
 
-      //   let Some((expr_id, _hir_id)) =
-      //     parent_ids_of_error.iter().copied().find(|(_, this_id)| {
-      //       // Find child-most expression that contains the error.
-      //       parent_ids_of_error
-      //         .iter()
-      //         .all(|(_, that_id)| self.tcx.is_parent_of(**that_id, **this_id))
-      //     })
-      //   else {
-      //     log::error!(
-      //       "failed to find most enclosing hir id for {:?}",
-      //       parent_ids_of_error
-      //     );
-      //     continue;
-      //   };
+      let parent_ids_of_error = self
+        .exprs_to_hir_id
+        .iter()
+        .filter(|(_, expr_hir_id)| {
+          self.tcx.is_parent_of(**expr_hir_id, err_hir_id)
+        })
+        .collect::<Vec<_>>();
 
-      //   // Mark the found Expr as containing an error.
-      //   self.trait_errors.insert(*expr_id);
+      let Some((expr_id, _hir_id)) =
+        parent_ids_of_error.iter().copied().find(|(_, this_id)| {
+          // Find child-most expression that contains the error.
+          parent_ids_of_error
+            .iter()
+            .all(|(_, that_id)| self.tcx.is_parent_of(**that_id, **this_id))
+        })
+      else {
+        log::error!(
+          "failed to find most enclosing hir id for {:?}",
+          parent_ids_of_error
+        );
+        continue;
+      };
+
+      let predicates = self.exprs[*expr_id]
+        .obligations
+        .iter()
+        .filter_map(|&o| {
+          if !self.raw_obligations[o].result.is_certain() {
+            Some(self.raw_obligations[o].hash)
+          } else {
+            None
+          }
+        })
+        .collect::<Vec<_>>();
+
+      // Mark the found Expr as containing an error.
+      self.trait_errors.push((*expr_id, predicates));
 
       //   // Sort the Expr obligations according to the reported order.
       //   let expr_obligations = &mut self.exprs[*expr_id].obligations;

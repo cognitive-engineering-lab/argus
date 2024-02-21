@@ -93,7 +93,10 @@ pub fn process_obligation<'tcx>(
         *span,
         predicates
           .iter()
-          .map(|p| infcx.predicate_hash(p).into())
+          .map(|p| {
+            log::debug!("Predicate was reported as trait error {p:?}");
+            infcx.predicate_hash(p).into()
+          })
           .collect::<Vec<_>>(),
       )
     })
