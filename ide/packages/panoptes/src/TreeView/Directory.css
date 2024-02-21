@@ -29,6 +29,9 @@
 
 .DirNode {
     font-family: Menlo, Monaco, "Courier New", monospace;
+    display: flex;
+    flex-direction: row;
+    gap: 1.00em;
 }
 
 .DirNode > .toggle {
@@ -38,6 +41,10 @@
 
 .DirNode > .toggle > .codicon {
     font-size: 10px;
+}
+
+.information > pre {
+    margin-top: 0;
 }
 
 .information::before {

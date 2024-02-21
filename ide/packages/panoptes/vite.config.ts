@@ -1,9 +1,9 @@
 import fs from "fs";
-import { defineConfig } from "vite";
 import { resolve } from "path";
+import { defineConfig } from "vite";
 
 let manifest = JSON.parse(fs.readFileSync("package.json", "utf-8"));
-export default defineConfig(({mode}) => ({
+export default defineConfig(({ mode }) => ({
   build: {
     lib: {
       entry: resolve(__dirname, "src/main.tsx"),
@@ -11,8 +11,8 @@ export default defineConfig(({mode}) => ({
       formats: ["iife"],
     },
     rollupOptions: {
-      external: Object.keys(manifest.dependencies || {}).concat( ["vscode"])
-    }
+      external: Object.keys(manifest.dependencies || {}).concat(["vscode"]),
+    },
   },
   define: {
     "process.env.NODE_ENV": JSON.stringify(mode),

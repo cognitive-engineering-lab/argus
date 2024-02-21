@@ -3,6 +3,7 @@ import {
   Filename,
   ObligationOutput,
 } from "@argus/common/lib";
+import { useSignals } from "@preact/signals-react/runtime";
 import _ from "lodash";
 import React, { useEffect, useState } from "react";
 
@@ -14,6 +15,8 @@ const App = ({
 }: {
   initialData: [Filename, ObligationOutput[]][];
 }) => {
+  useSignals();
+
   const [openFiles, setOpenFiles] =
     useState<[Filename, ObligationOutput[]][]>(initialData);
 
@@ -36,8 +39,7 @@ const App = ({
       case "open-error": {
         console.debug("Current highlighted obligation", highlightedObligation);
         highlightedObligation.value = payload;
-        return;
-        // return setTimeout(() => (highlightedObligation.value = null), 1000);
+        return setTimeout(() => (highlightedObligation.value = null), 1000);
       }
 
       case "open-file": {

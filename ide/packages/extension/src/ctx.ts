@@ -230,13 +230,13 @@ export class Ctx {
     editor.setDecorations(
       traitErrorDecorate,
       _.flatMap(oib, ob => {
-        return _.map(ob.traitErrors, e => ({
+        return _.map(ob.traitErrors, ([e, hashes]) => ({
           range: rustRangeToVscodeRange(ob.exprs[e].range),
           hoverMessage: this.buildOpenErrorItemCmd(
             editor.document.fileName,
             ob.hash,
             e,
-            ob.obligations[ob.exprs[e].obligations[0]].hash,
+            hashes[0],
             "trait"
           ),
         }));

@@ -1,12 +1,10 @@
 div {
-    transition: background-color 1s ease-out;
+    transition: background-color 1s ease-out, border-color 1s ease-out;
 }
 
 .ObligationCard {
     display: block;
     width: 100%;
-    padding: 1em;
-    margin-bottom: 1em;
 }
 
 span.ErrorCount {
@@ -20,9 +18,9 @@ span.ErrorCount {
     padding: 1em;
 }
 
-div.bling {
-    background-color: var(--vscode-selection-background);
-    transition: background-color 0s;
+.bling {
+    background-color: var(--vscode-inputOption-activeBackground);
+    border: 1px solid var(--vscode-inputValidation-errorBorder);
 }
 
 .ObligationCard > vscode-text-area {
@@ -38,6 +36,6 @@ div.bling {
 .PrettyObligationArea {
     font-family: monospace;
     display: block;
-    padding: 0.15em;
+    padding: 0 0.15em 0.15em 0.15em;
     margin-bottom: 1em;
 }

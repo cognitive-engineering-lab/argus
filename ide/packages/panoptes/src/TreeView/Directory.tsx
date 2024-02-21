@@ -1,7 +1,7 @@
 import { ProofNodeIdx } from "@argus/common/bindings";
 import classNames from "classnames";
 import _ from "lodash";
-import React, { useContext, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 
 import {
   IcoChevronDown,
@@ -47,12 +47,16 @@ export const CollapsibleElement = ({
     collapsed: !isOpen,
   });
 
+  useEffect(() => {
+    setIsOpen(startOpen || isOpen);
+  }, [startOpen, isOpen]);
+
   return (
     <>
       <div className="DirNode" onClick={toggleCollapse}>
-        <span className="toggle">
+        <div className="toggle">
           {Children !== null ? (isOpen ? openIco : closedIco) : null}
-        </span>
+        </div>
         <span className="information">{info}</span>
       </div>
       <div className={collapseCN}>

@@ -56,8 +56,6 @@ function pruneToShortPath(o: DefinedPath): [DefinedPath, DefinedPath] {
   return [[prefix[0]], _.slice(prefix, 1)];
 }
 
-export const PrintDefPathShort = ({ o }: { o: DefinedPath }) => {};
-
 export const PrintDefPathFull = ({ o }: { o: DefinedPath }) => {
   return <PrintSegments o={o} />;
 };

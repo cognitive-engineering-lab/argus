@@ -8,6 +8,7 @@ import {
   SerializedTree,
 } from "@argus/common/bindings";
 import { Filename } from "@argus/common/lib";
+import { useSignals } from "@preact/signals-react/runtime";
 import { VSCodeDivider } from "@vscode/webview-ui-toolkit/react";
 import classNames from "classnames";
 import _ from "lodash";
@@ -16,6 +17,7 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -100,6 +102,8 @@ const ObligationCard = ({
   range: CharRange;
   obligation: Obligation;
 }) => {
+  useSignals();
+
   const file = useContext(FileContext)!;
   const id = obligationCardId(file, obligation.hash);
   const ref = useRef<HTMLSpanElement>(null);
@@ -109,26 +113,25 @@ const ObligationCard = ({
     file
   );
 
-  useEffect(() => {
+  const className = classNames("ObligationCard", {
+    bling: highlightedObligation.value?.hash === obligation.hash,
+  });
+
+  useLayoutEffect(() => {
     if (highlightedObligation.value?.hash === obligation.hash) {
       ref.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, []);
 
-  const className = classNames("result", {
-    bling: highlightedObligation.value?.hash === obligation.hash,
-  });
-
   const header = (
     <span
       id={id}
+      className={className}
       ref={ref}
       onMouseEnter={addHighlight}
       onMouseLeave={removeHighlight}
     >
-      <span className={className}>
-        <Result result={obligation.result} />
-      </span>{" "}
+      <Result result={obligation.result} />
       <PrintObligation obligation={obligation} />
     </span>
   );
@@ -144,6 +147,8 @@ const ObligationCard = ({
 };
 
 const ObligationFromIdx = ({ idx }: { idx: ObligationIdx }) => {
+  useSignals();
+
   const bodyInfo = useContext(BodyInfoContext)!;
   const o = bodyInfo.getObligation(idx);
 
@@ -202,6 +207,8 @@ const MethodLookupTable = ({ lookup }: { lookup: MethodLookupIdx }) => {
 // NOTE: don't access the expression obligations directly, use the BodyInfo
 // to get the obligations that are currently visible.
 const InExpr = ({ idx }: { idx: ExprIdx }) => {
+  useSignals();
+
   const bodyInfo = useContext(BodyInfoContext)!;
   const file = useContext(FileContext)!;
   const expr = bodyInfo.getExpr(idx);
@@ -217,7 +224,7 @@ const InExpr = ({ idx }: { idx: ExprIdx }) => {
     return null;
   }
 
-  const content =
+  const Content = () =>
     isObject(expr.kind) && "MethodCall" in expr.kind ? (
       <MethodLookupTable lookup={expr.kind.MethodCall.data} />
     ) : (
@@ -226,22 +233,28 @@ const InExpr = ({ idx }: { idx: ExprIdx }) => {
       ))
     );
 
-  const openChildren = idx === highlightedObligation.value?.exprIdx;
-
   // TODO: we should limit the length of the expression snippet.
-  const header = <code>{expr.snippet}</code>;
+  const header = <pre>{expr.snippet}</pre>;
+
+  const openChildren = idx === highlightedObligation.value?.exprIdx;
   return (
     <div onMouseEnter={addHighlight} onMouseLeave={removeHighlight}>
       <CollapsibleElement
         info={header}
         startOpen={openChildren}
-        Children={() => content}
+        Children={Content}
       />
     </div>
   );
 };
 
 const ObligationBody = ({ bodyInfo }: { bodyInfo: BodyInfo }) => {
+  useSignals();
+
+  if (!bodyInfo.hasVisibleExprs()) {
+    return null;
+  }
+
   const errCount = bodyInfo.numErrors;
   const bodyName =
     bodyInfo.name === undefined ? (
@@ -249,16 +262,13 @@ const ObligationBody = ({ bodyInfo }: { bodyInfo: BodyInfo }) => {
     ) : (
       <PrintBodyName defPath={bodyInfo.name} />
     );
+
   const header = (
     <span>
       {bodyName}
       {errCount > 0 ? <span className="ErrorCount">({errCount})</span> : null}
     </span>
   );
-
-  if (!bodyInfo.hasVisibleExprs()) {
-    return null;
-  }
 
   const openChildren = bodyInfo.hash === highlightedObligation.value?.bodyIdx;
 
