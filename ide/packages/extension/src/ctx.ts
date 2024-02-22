@@ -181,6 +181,7 @@ export class Ctx {
         editor.document === document &&
         isDocumentInWorkspace(editor.document)
       ) {
+        this.removeDecorationsFrom(editor);
         this.cache.havoc();
         this.view!.reset(await this.getFreshWebViewData());
       }
@@ -193,6 +194,12 @@ export class Ctx {
 
   private findVisibleEditorByName(name: Filename): RustEditor | undefined {
     return _.find(this.visibleEditors, e => e.document.fileName === name);
+  }
+
+  private removeDecorationsFrom(editor: RustEditor) {
+    editor.setDecorations(traitErrorDecorate, []);
+    editor.setDecorations(ambigErrorDecorate, []);
+    editor.setDecorations(rangeHighlight, []);
   }
 
   // Here we load the obligations for a file, and cache the results,

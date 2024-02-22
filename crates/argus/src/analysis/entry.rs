@@ -21,7 +21,7 @@ use crate::{
   serialize::ty::PredicateDef,
   types::{
     intermediate::{
-      ErrorAssemblyCtx, FullData, ObligationQueriesInBody,
+      ErrorAssemblyCtx, Forgettable, FullData, ObligationQueriesInBody,
       SyntheticQueriesInBody,
     },
     ObligationHash, ObligationsInBody,
@@ -69,9 +69,10 @@ pub fn process_obligation<'tcx>(
   let obl = &infcx.resolve_vars_if_possible(obl.clone());
 
   // TODO: we need to figure out when to save the full data.
-  // Saving it for every obligation will consume a ton of memory
-  // and make the tool relatively slow, but I don't have a tight
-  // enough metric as to when it should be ignored.
+  // Saving it for every obligation consumes lots of memory
+  // and this is (one of) the reasons the tool is relatively slow,
+  // but I don't have a tight enough metric as to when it should be ignored.
+  //
   // NOTE: that if the full data doesn't get stored for every obligation,
   // make sure that usages of `provenance.full_data` are guarded, as
   // some currently use `.unwrap()`.
@@ -147,7 +148,9 @@ pub fn build_obligations_output<'tcx>(
   body_id: BodyId,
   typeck_results: &'tcx TypeckResults<'tcx>,
 ) -> Result<ObligationsInBody> {
-  Ok(build_obligations_in_body(tcx, body_id, typeck_results).1)
+  let (_, oib) = build_obligations_in_body(tcx, body_id, typeck_results);
+  log::debug!("Returned from building obligations output");
+  Ok(oib)
 }
 
 pub fn build_tree_output<'tcx>(
@@ -157,15 +160,15 @@ pub fn build_tree_output<'tcx>(
 ) -> Result<SerializedTree> {
   OBLIGATION_TARGET.get(|target| {
     let target = target.ok_or(anyhow!("missing target"))?;
-    let results = build_obligations_in_body(tcx, body_id, typeck_results);
-    pick_tree(target.hash, target.is_synthetic, || &results)
+    let (data, oib) = build_obligations_in_body(tcx, body_id, typeck_results);
+    pick_tree(target.hash, target.is_synthetic, || (&*data, &oib))
   })
 }
 
 pub(crate) fn pick_tree<'a, 'tcx: 'a>(
   hash: ObligationHash,
   needs_search: bool,
-  thunk: impl FnOnce() -> &'a (FullData<'tcx>, ObligationsInBody),
+  thunk: impl FnOnce() -> (&'a FullData<'tcx>, &'a ObligationsInBody),
 ) -> Result<SerializedTree> {
   if !needs_search {
     return tls::take_tree().ok_or(anyhow!(
@@ -210,7 +213,7 @@ pub(in crate::analysis) fn build_obligations_in_body<'tcx>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
   typeck_results: &'tcx TypeckResults<'tcx>,
-) -> (FullData<'tcx>, ObligationsInBody) {
+) -> (Forgettable<FullData<'tcx>>, ObligationsInBody) {
   let obligations = tls::take_obligations();
   let obligation_data = tls::unsafe_take_data();
 
@@ -226,6 +229,7 @@ pub(in crate::analysis) fn build_obligations_in_body<'tcx>(
   };
   let reported_errors = tls::take_reported_errors();
   let bins = hir::associate_obligations_nodes(&ctx);
+
   let oib = transform::transform(
     tcx,
     body_id,
@@ -238,10 +242,10 @@ pub(in crate::analysis) fn build_obligations_in_body<'tcx>(
   );
 
   (
-    FullData {
+    Forgettable::new(FullData {
       obligations: obligation_data,
       synthetic: synthetic_data,
-    },
+    }),
     oib,
   )
 }

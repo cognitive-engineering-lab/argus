@@ -2,9 +2,11 @@ import vscode from "vscode";
 
 // Using the background selection color is sometimes a little too subtle.
 export const rangeHighlight = vscode.window.createTextEditorDecorationType({
-  backgroundColor: "var(--vscode-selection-background)",
+  backgroundColor: new vscode.ThemeColor("editor.selectionBackground"),
   borderRadius: "2px",
 });
+
+// TODO: these need to use the vscode specific colors editor.errorForeground, etc.
 
 export const traitErrorDecorate = vscode.window.createTextEditorDecorationType({
   textDecoration: "underline wavy var(--vscode-editorError-foreground)",

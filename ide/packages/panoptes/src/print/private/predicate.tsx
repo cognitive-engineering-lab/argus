@@ -15,6 +15,8 @@ import React from "react";
 
 import { HoverInfo } from "../../HoverInfo";
 import { IcoNote } from "../../Icons";
+import { anyElems } from "../../utilities/func";
+import { PrintGroupedClauses } from "./argus";
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
 import { PrintTerm } from "./term";
@@ -28,13 +30,15 @@ import {
 } from "./ty";
 
 export const PrintPredicateObligation = ({ o }: { o: PredicateObligation }) => {
-  const hoverContent =
-    o.paramEnv.length === 0 ? null : (
-      <HoverInfo Content={() => <PrintParamEnv o={o.paramEnv} />}>
-        {" "}
-        <IcoNote />
-      </HoverInfo>
-    );
+  const hoverContent = !anyElems(
+    o.paramEnv.grouped,
+    o.paramEnv.other
+  ) ? null : (
+    <HoverInfo Content={() => <PrintParamEnv o={o.paramEnv} />}>
+      {" "}
+      <IcoNote />
+    </HoverInfo>
+  );
 
   return (
     <>
@@ -51,13 +55,11 @@ export const PrintGoalPredicate = ({ o }: { o: GoalPredicate }) => {
 };
 
 export const PrintParamEnv = ({ o }: { o: ParamEnv }) => {
-  const innerContent = _.map(o, (clause, idx) => (
-    <div className="WhereConstraint" key={idx}>
-      <PrintClause o={clause} />
+  return (
+    <div className="WhereConstraintArea">
+      <PrintGroupedClauses o={o} />
     </div>
-  ));
-
-  return <div className="DirNode WhereParamArea">{innerContent}</div>;
+  );
 };
 
 export const PrintBinderPredicateKind = ({ o }: { o: PolyPredicateKind }) => {

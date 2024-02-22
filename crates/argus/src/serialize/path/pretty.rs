@@ -34,15 +34,15 @@ impl<'a, 'tcx: 'a> PathBuilder<'a, 'tcx> {
     def_id: DefId,
     args: &'tcx [GenericArg<'tcx>],
   ) {
-    if args.is_empty() {
-      if self.try_print_trimmed_def_path(def_id) {
-        return;
-      }
+    // if args.is_empty() {
+    //   if self.try_print_trimmed_def_path(def_id) {
+    //     return;
+    //   }
 
-      if self.try_print_visible_def_path(def_id) {
-        return;
-      }
-    }
+    //   if self.try_print_visible_def_path(def_id) {
+    //     return;
+    //   }
+    // }
 
     let key = self.tcx().def_key(def_id);
     if let DefPathData::Impl = key.disambiguated_data.data {

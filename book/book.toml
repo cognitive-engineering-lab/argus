@@ -1,0 +1,9 @@
+[book]
+authors = ["Gavin Gray"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Argus: a trait debugger for Rust"
+
+[output.html]
+curly-quotes = true

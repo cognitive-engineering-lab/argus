@@ -8,8 +8,8 @@ edition = "2021"
 [dependencies]
 argus = { path = "../argus" }
 
-rustc_plugin = "=0.7.4-nightly-2023-08-25"
-rustc_utils = { version = "=0.7.4-nightly-2023-08-25", features = ["serde"] }
+rustc_plugin = "=0.8.0-nightly-2024-01-06"
+rustc_utils = { version = "=0.8.0-nightly-2024-01-06", features = ["serde"] }
 
 # For binaries
 log = "0.4"

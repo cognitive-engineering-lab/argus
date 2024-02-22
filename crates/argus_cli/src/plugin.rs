@@ -13,7 +13,7 @@ use log::{debug, info};
 use rustc_errors::{emitter::HumanEmitter, DiagCtxt};
 use rustc_hir::BodyId;
 use rustc_interface::interface::Result as RustcResult;
-use rustc_middle::ty::{print, TyCtxt};
+use rustc_middle::ty::TyCtxt;
 use rustc_plugin::{CrateFilter, RustcPlugin, RustcPluginArgs, Utf8Path};
 use rustc_span::{FileName, RealFileName};
 use rustc_utils::{
@@ -235,7 +235,7 @@ pub fn run_with_callbacks(
 ) -> ArgusResult<()> {
   let mut args = args.to_vec();
   args.extend(
-    "-Z next-solver -Z trim-diagnostic-paths=true -A warnings"
+    "-Z next-solver -Z print-type-sizes=true -A warnings"
       .split(' ')
       .map(|s| s.to_owned()),
   );
@@ -296,7 +296,7 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
         {
           if target_file.map(|f| f.ends_with(&p)).unwrap_or(true) {
             debug!("analyzing {:?}", body);
-            match print::with_no_trimmed_paths!(analysis.analyze(tcx, body)) {
+            match analysis.analyze(tcx, body) {
               Ok(v) => Some(v),
               Err(_) => None,
             }

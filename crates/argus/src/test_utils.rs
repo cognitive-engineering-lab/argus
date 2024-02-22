@@ -17,7 +17,10 @@ use rustc_utils::{
 use crate::{
   analysis,
   proof_tree::SerializedTree,
-  types::{intermediate::FullData, ObligationHash, ObligationsInBody, Target},
+  types::{
+    intermediate::{Forgettable, FullData},
+    ObligationHash, ObligationsInBody, Target,
+  },
 };
 
 lazy_static::lazy_static! {
@@ -77,7 +80,7 @@ pub(crate) fn load_test_from_file(
 
 pub fn test_obligations_no_crash(
   path: &Path,
-  assert_pass: impl for<'tcx> Fn(FullData<'tcx>, ObligationsInBody)
+  assert_pass: impl for<'tcx> Fn(Forgettable<FullData<'tcx>>, ObligationsInBody)
     + Send
     + Sync
     + Copy,
@@ -100,7 +103,7 @@ pub fn test_obligations_no_crash(
 pub fn test_locate_tree<'a, 'tcx: 'a>(
   hash: ObligationHash,
   needs_search: bool,
-  thunk: impl FnOnce() -> &'a (FullData<'tcx>, ObligationsInBody),
+  thunk: impl FnOnce() -> (&'a FullData<'tcx>, &'a ObligationsInBody),
 ) -> Result<SerializedTree> {
   analysis::entry::pick_tree(hash, needs_search, thunk)
 }

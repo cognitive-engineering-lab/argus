@@ -61,7 +61,7 @@ macro_rules! mk_tests_for {
 mk_tests_for! {
   axum,
   bevy,
-  // chumsky,
+  // chumsky, // NOTE: as of now this consumes too much memory
   diesel,
   easy_ml,
   entrait,

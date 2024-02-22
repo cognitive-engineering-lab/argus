@@ -121,7 +121,8 @@ impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
           &key.disambiguated_data,
         )
       }
-    }
+    };
+    debug!("Returning from default_print_def_path");
   }
 
   fn print_impl_path(

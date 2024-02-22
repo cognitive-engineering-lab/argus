@@ -440,8 +440,8 @@ checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 
 [[package]]
 name = "rustc_plugin"
-version = "0.7.4-nightly-2023-08-25"
-source = "git+https://github.com/gavinleroy/rustc-plugin.git?branch=unsafe-updates#305e85280186241a143e7c9a98c7afa72001e8ce"
+version = "0.8.0-nightly-2024-01-06"
+source = "git+https://github.com/gavinleroy/rustc-plugin.git?branch=dev#b4c4c8c962f18010f83c30fb5eaf5f829b72cad7"
 dependencies = [
  "cargo_metadata",
  "log",
@@ -459,8 +459,8 @@ checksum = "b3c5a95edfa0c893236ae4778bb7c4752760e4c0d245e19b5eff33c5aa5eb9dc"
 
 [[package]]
 name = "rustc_utils"
-version = "0.7.4-nightly-2023-08-25"
-source = "git+https://github.com/gavinleroy/rustc-plugin.git?branch=unsafe-updates#305e85280186241a143e7c9a98c7afa72001e8ce"
+version = "0.8.0-nightly-2024-01-06"
+source = "git+https://github.com/gavinleroy/rustc-plugin.git?branch=dev#b4c4c8c962f18010f83c30fb5eaf5f829b72cad7"
 dependencies = [
  "anyhow",
  "cfg-if",

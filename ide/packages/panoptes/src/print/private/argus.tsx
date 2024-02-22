@@ -1,6 +1,7 @@
 import {
   ClauseBound,
   ClauseWithBounds,
+  GroupedClauses,
   ImplHeader,
   Ty,
 } from "@argus/common/bindings";
@@ -44,32 +45,39 @@ export const PrintImplHeader = ({ o }: { o: ImplHeader }) => {
   );
 };
 
+export const PrintGroupedClauses = ({ o }: { o: GroupedClauses }) => {
+  const groupedClauses = _.map(o.grouped, (group, idx) => (
+    <div className="WhereConstraint" key={idx}>
+      <PrintClauseWithBounds o={group} />
+    </div>
+  ));
+  const noGroupedClauses = _.map(o.other, (clause, idx) => (
+    <div className="WhereConstraint" key={idx}>
+      <PrintClause o={clause} />
+    </div>
+  ));
+  return (
+    <>
+      {groupedClauses}
+      {noGroupedClauses}
+    </>
+  );
+};
+
 export const PrintWhereClause = ({
   predicates,
   tysWOBound,
 }: {
-  predicates: any;
+  predicates: GroupedClauses;
   tysWOBound: Ty[];
 }) => {
   if (!anyElems(predicates.grouped, predicates.other, tysWOBound)) {
     return null;
   }
 
-  const groupedClauses = _.map(predicates.grouped, (group, idx) => (
-    <div className="WhereConstraint" key={idx}>
-      <PrintClauseWithBounds o={group} />
-    </div>
-  ));
-  const noGroupedClauses = _.map(predicates.other, (clause, idx) => (
-    <div className="WhereConstraint" key={idx}>
-      <PrintClause o={clause} />
-    </div>
-  ));
-
   const whereHoverContent = () => (
     <div className="DirNode WhereConstraintArea">
-      {groupedClauses}
-      {noGroupedClauses}
+      <PrintGroupedClauses o={predicates} />
       {_.map(tysWOBound, (ty, idx) => (
         <div className="WhereConstraint" key={idx}>
           <PrintTy o={ty} />: ?Sized

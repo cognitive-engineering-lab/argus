@@ -409,10 +409,10 @@ mod string {
 // to build up intermediate information that *does not* need to
 // be stored in TLS.
 pub(super) mod intermediate {
-
   use std::{
     fmt::{self, Debug, Formatter},
     hash::{Hash, Hasher},
+    mem::ManuallyDrop,
     ops::Deref,
   };
 
@@ -605,6 +605,33 @@ pub(super) mod intermediate {
       &self,
     ) -> impl Iterator<Item = &FullObligationData<'tcx>> {
       self.0.iter()
+    }
+  }
+
+  // FIXME: this is bad. Seriously. The structure is a workaround for
+  // dropping `InferCtxt`s which causes a `delayed_span_bug` panic.
+  // Definitely a result of what we're doing, but I'm not sure exactly
+  // what our "bad behavior" is.
+  pub struct Forgettable<T: Sized>(ManuallyDrop<T>);
+
+  impl<T: Sized> Forgettable<T> {
+    pub fn new(value: T) -> Self {
+      Self(ManuallyDrop::new(value))
+    }
+  }
+
+  impl<T: Sized> Deref for Forgettable<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+      &self.0
+    }
+  }
+
+  impl<T: Sized> Drop for Forgettable<T> {
+    fn drop(&mut self) {
+      let inner = unsafe { ManuallyDrop::take(&mut self.0) };
+      std::mem::forget(inner);
     }
   }
 }

@@ -225,8 +225,8 @@ impl<'tcx> TyExt<'tcx> for Ty<'tcx> {
   }
 }
 
-fn group_predicates_by_ty<'tcx>(
-  predicates: Vec<ty::Clause<'tcx>>,
+pub fn group_predicates_by_ty<'tcx>(
+  predicates: impl IntoIterator<Item = ty::Clause<'tcx>>,
 ) -> GroupedClauses<'tcx> {
   // ARGUS: ADDITION: group predicates together based on `self_ty`.
   let mut grouped: FxIndexMap<_, Vec<_>> = FxIndexMap::default();

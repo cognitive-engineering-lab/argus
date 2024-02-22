@@ -1074,13 +1074,13 @@ impl<'tcx> Goal__PredicateDef<'tcx> {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "ParamEnv"))]
-pub struct ParamEnvDef<'a, 'tcx: 'a>(
-  #[serde(with = "Slice__ClauseDef")]
-  #[cfg_attr(feature = "testing", ts(type = "Clause[]"))]
-  &'a ty::List<ty::Clause<'tcx>>,
-);
+pub struct ParamEnvDef<'tcx>(crate::types::GroupedClauses<'tcx>);
 
-impl<'tcx> ParamEnvDef<'_, 'tcx> {
+impl<'tcx> ParamEnvDef<'tcx> {
+  pub fn new(value: &ty::ParamEnv<'tcx>) -> Self {
+    Self(crate::ext::group_predicates_by_ty(value.caller_bounds()))
+  }
+
   pub fn serialize<S>(
     value: &ty::ParamEnv<'tcx>,
     s: S,
@@ -1088,7 +1088,7 @@ impl<'tcx> ParamEnvDef<'_, 'tcx> {
   where
     S: serde::Serializer,
   {
-    Self(value.caller_bounds()).serialize(s)
+    Self::new(value).serialize(s)
   }
 }
 
