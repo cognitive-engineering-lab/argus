@@ -101,7 +101,6 @@ const execNotifyBinary = async (
     });
 
     proc.addListener("error", e => {
-      globals.statusBar.setState("error");
       reject(e.toString());
     });
   });
@@ -288,7 +287,6 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
       );
     } catch (e: any) {
       context.extCtx.workspaceState.update("err_log", e);
-      globals.statusBar.setState("error");
       return {
         type: "build-error",
         error: e,
@@ -307,7 +305,6 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
       outputTyped = JSON.parse(output);
     } catch (e: any) {
       context.extCtx.workspaceState.update("err_log", e);
-      globals.statusBar.setState("error");
       return {
         type: "analysis-error",
         error: e.toString(),
@@ -315,8 +312,6 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
     }
 
     if ("Err" in outputTyped) {
-      context.extCtx.workspaceState.update("err_log", outputTyped.Err);
-      globals.statusBar.setState("error");
       return {
         type: "analysis-error",
         error: outputTyped.Err,

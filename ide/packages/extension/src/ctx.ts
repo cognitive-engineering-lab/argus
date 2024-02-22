@@ -367,6 +367,7 @@ class BackendCache {
     ]);
 
     if (res.type !== "output") {
+      globals.statusBar.setState("error");
       showErrorDialog(res.error);
       return;
     }
@@ -400,6 +401,7 @@ class BackendCache {
     ]);
 
     if (res.type !== "output") {
+      globals.statusBar.setState("error");
       showErrorDialog(res.error);
       return;
     }
@@ -413,6 +415,7 @@ class BackendCache {
 
       This is likely a bug in Argus, please report it.
       `);
+      globals.statusBar.setState("error");
       return;
     }
 

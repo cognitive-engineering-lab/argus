@@ -52,7 +52,7 @@ const TreeNode = ({
   const treeInfo = useContext(TreeContext)!;
   const ref = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const padding = 5;
+  const padding = 10;
 
   const idx = nodeDatum.name as number;
   const node = treeInfo.node(idx);
@@ -66,21 +66,30 @@ const TreeNode = ({
     }
   }, []);
 
+  const RectangleNode = () => (
+    <rect
+      data-sidx={idx}
+      x={-dimensions.width / 2}
+      y={-dimensions.height / 2}
+      width={dimensions.width + padding}
+      height={dimensions.height + padding}
+      rx="3"
+      ry="3"
+      onClick={toggleNode}
+      onMouseEnter={hoverNode}
+    />
+  );
+
+  const CircleNode = () => (
+    <circle cy={padding / 2} r={(dimensions.width + padding) / 2} />
+  );
+
+  const Shape = "Result" in node ? CircleNode : RectangleNode;
+
   // data-xmlns="http://www.w3.org/1999/xhtml"
   return (
     <g>
-      <rect
-        data-sidx={idx}
-        x={-dimensions.width / 2}
-        y={-dimensions.height / 2}
-        width={dimensions.width + padding}
-        height={dimensions.height + padding}
-        strokeWidth="0.5"
-        rx="3"
-        ry="3"
-        onClick={toggleNode}
-        onMouseEnter={hoverNode}
-      />
+      <Shape />
       <foreignObject
         x={-dimensions.width / 2}
         y={-dimensions.height / 2}

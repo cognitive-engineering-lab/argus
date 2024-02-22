@@ -3,6 +3,7 @@
 }
 
 .tree-toggle:hover {
+    cursor: pointer;
     color: var(--vscode-input-placeholderForeground);
 }
 

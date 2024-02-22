@@ -5,18 +5,35 @@ import {
 } from "@argus/common/bindings";
 import React from "react";
 
+import { HoverInfo } from "../HoverInfo";
 import { IcoAmbiguous, IcoCheck, IcoError, IcoLoop } from "../Icons";
 import { PrintGoal, PrintImplHeader } from "../print/print";
 
 export const Result = ({ result }: { result: EvaluationResult }) => {
   return result === "yes" ? (
-    <IcoCheck />
+    <HoverInfo Content={() => <span>Proved true</span>}>
+      <IcoCheck />
+    </HoverInfo>
   ) : result === "no" ? (
-    <IcoError />
+    <HoverInfo Content={() => <span>Unsatisfiable</span>}>
+      <IcoError />
+    </HoverInfo>
   ) : result === "maybe-overflow" ? (
-    <IcoLoop />
+    <HoverInfo
+      Content={() => (
+        <span>Evaluating this obligation may have caused overflow</span>
+      )}
+    >
+      <IcoLoop />
+    </HoverInfo>
   ) : (
-    <IcoAmbiguous />
+    <HoverInfo
+      Content={() => (
+        <span>Rustc can't determine whether this is true or false</span>
+      )}
+    >
+      <IcoAmbiguous />
+    </HoverInfo>
   );
 };
 

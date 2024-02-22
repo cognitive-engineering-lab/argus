@@ -9,10 +9,22 @@ span.foreign-wrapper {
     min-width: 50px;
 }
 
-rect {
-    fill: var(--vscode-input-background);
+rect, circle {
+    fill: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    stroke: var(--vscode-dropdown-border);
+    stroke-width: 1.5px;
 }
 
-.edge__goal-to-candidate {
+rect {
+    stroke-linejoin: round;
+}
+
+.rd3t-link.edge__candidate-to-goal, .rd3t-link.edge__goal-to-candidate {
+    stroke-width: 1.5px;
+    stroke: var(--vscode-dropdown-foreground);
+}
+
+.rd3t-link.edge__goal-to-candidate {
     stroke-dasharray: 20,10,5,5,5,10;
 }

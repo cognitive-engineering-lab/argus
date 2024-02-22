@@ -237,8 +237,18 @@ const InExpr = ({ idx }: { idx: ExprIdx }) => {
   const header = <pre>{expr.snippet}</pre>;
 
   const openChildren = idx === highlightedObligation.value?.exprIdx;
+  // If there is no targeted obligation then we want to highlight
+  // the expression level div.
+  const className = classNames({
+    bling: highlightedObligation.value && !highlightedObligation.value.hash,
+  });
+
   return (
-    <div onMouseEnter={addHighlight} onMouseLeave={removeHighlight}>
+    <div
+      className={className}
+      onMouseEnter={addHighlight}
+      onMouseLeave={removeHighlight}
+    >
       <CollapsibleElement
         info={header}
         startOpen={openChildren}

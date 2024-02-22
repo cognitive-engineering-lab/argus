@@ -18,7 +18,7 @@ use super::{
   EvaluationResult,
 };
 use crate::{
-  ext::{EvaluationResultExt, InferCtxtExt, PredicateExt, TyCtxtExt},
+  ext::{InferCtxtExt, PredicateExt, TyCtxtExt},
   types::{intermediate::*, *},
 };
 
@@ -230,7 +230,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
   }
 
   // FIXME: this isn't efficient, but the number of obligations per
-  // body isn't large, so shouldnt' be an issue.
+  // body isn't large, so shouldn't be an issue.
   fn relate_trait_bound(&mut self) {
     for (span, predicates) in self.reported_trait_errors.iter() {
       // Search for the obligation hash in our set of computed obligations.
@@ -264,7 +264,6 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
 
       // A predicate did not match exactly, now we're scrambling
       // to find an expression by span, and pick an obligation.
-
       let Some(err_hir_id) =
         hier_hir::find_most_enclosing_node(&self.tcx, self.body_id, *span)
       else {
@@ -295,40 +294,8 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         continue;
       };
 
-      let predicates = self.exprs[*expr_id]
-        .obligations
-        .iter()
-        .filter_map(|&o| {
-          if !self.raw_obligations[o].result.is_certain() {
-            Some(self.raw_obligations[o].hash)
-          } else {
-            None
-          }
-        })
-        .collect::<Vec<_>>();
-
       // Mark the found Expr as containing an error.
-      self.trait_errors.push((*expr_id, predicates));
-
-      //   // Sort the Expr obligations according to the reported order.
-      //   let expr_obligations = &mut self.exprs[*expr_id].obligations;
-      //   let num_errs = predicates.len();
-      //   expr_obligations.sort_by_key(|&obl_idx| {
-      //     let obl = &self.raw_obligations[obl_idx];
-      //     let obl_hash = obl.hash;
-      //     let obl_is_certain = obl.result.is_certain();
-      //     predicates
-      //       .iter()
-      //       .position(|&h| h == obl_hash)
-      //       .unwrap_or_else(|| {
-      //         if obl_is_certain {
-      //           // push successful obligations down
-      //           num_errs + 1
-      //         } else {
-      //           num_errs
-      //         }
-      //       })
-      //   })
+      self.trait_errors.push((*expr_id, vec![]));
     }
   }
 
