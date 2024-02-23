@@ -10,11 +10,18 @@ Argus is a tool to help you with compiler errors related to traits. If you have 
 
 Argus relies on the New Trait Solver for Rust. Therefore, Argus inherets all the limitations of that solver which is also _under active development_. The New Trait Solver is known to be unsound and incomplete — while using Argus you may accidentally run into these areas. This does not mean that Argus is useless. The New Trait Solver is only used to type-check the current workspace and still works if you're using a trait-heavy crate.
 
+
+
+https://github.com/cognitive-engineering-lab/argus/assets/20209337/a4fb0263-6d42-4831-99d8-7522e135f61a
+
+
+
 ## Installation
 
 Argus is available as a VSCode extension. You can install Argus from the [VSCode Marketplace]() or the [Open VSX Registry](). In VSCode:
 
-- Go to the extensions panel by clicking this button in the left margin:
+- Go to the extensions panel by clicking this button in the left margin: <img width="53" alt="Screenshot 2024-02-23 at 23 26 58" src="https://github.com/cognitive-engineering-lab/argus/assets/20209337/10d9297e-3c2a-4866-854f-de79f7de11de">
+
 - Search for "Argus" and click "Install".
 - Open a Rust workspace and wait for Argus to finish installing.
 
