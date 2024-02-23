@@ -1,4 +1,4 @@
-use argus::test_utils as tu;
+use argus_lib::test_utils as tu;
 
 #[test_log::test]
 fn obligations() {

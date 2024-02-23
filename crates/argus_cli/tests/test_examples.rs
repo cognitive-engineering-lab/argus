@@ -1,4 +1,4 @@
-use std::{env, fmt::Debug, fs, path::Path, process::Command, sync::Once};
+use std::{env, fs, path::Path, process::Command, sync::Once};
 
 use anyhow::{ensure, Context, Result};
 

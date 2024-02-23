@@ -6,7 +6,7 @@ use std::{
   time::Instant,
 };
 
-use argus::{
+use argus_lib::{
   emitter::SilentEmitter,
   types::{ObligationHash, ToTarget},
 };
@@ -188,7 +188,7 @@ impl RustcPlugin for ArgusPlugin {
         };
 
         let v = run(
-          argus::analysis::tree,
+          argus_lib::analysis::tree,
           Some(PathBuf::from(&file)),
           compute_target,
           &compiler_args,
@@ -198,7 +198,7 @@ impl RustcPlugin for ArgusPlugin {
       Obligations { file, .. } => {
         let nothing = || None::<(ObligationHash, CharRange)>;
         let v = run(
-          argus::analysis::obligations,
+          argus_lib::analysis::obligations,
           file.map(PathBuf::from),
           nothing,
           &compiler_args,
@@ -323,7 +323,7 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
 
           debug!("target: {target:?}");
 
-          fluid_set!(argus::analysis::OBLIGATION_TARGET, target);
+          fluid_set!(argus_lib::analysis::OBLIGATION_TARGET, target);
 
           find_enclosing_bodies(tcx, body_span)
             .filter_map(|b| inner((body_span, b)))
