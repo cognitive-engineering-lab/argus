@@ -17,7 +17,9 @@ export default defineConfig(({ mode }) => ({
       formats: ["cjs"],
     },
     rollupOptions: {
-      external: Object.keys(manifest.dependencies || {}).concat(builtinModules),
+      external: Object.keys(manifest.dependencies || {})
+        .concat(builtinModules)
+        .concat(["vscode"]),
     },
   },
   define: {

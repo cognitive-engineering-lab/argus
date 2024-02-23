@@ -231,7 +231,7 @@ const checkVersionAndInstall = async (
 
     await execNotify(
       cargo,
-      [...cargoArgs, "install", "argus_cli", "--version", VERSION, "--force"],
+      [...cargoArgs, "install", "argus-cli", "--version", VERSION, "--force"],
       "Installing Argus from source... (this may take a minute)"
     );
 

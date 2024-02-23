@@ -1,21 +1,22 @@
 {
-  "name": "@argus/extension",
-  "displayName": "Argus Extension",
+  "name": "argus",
+  "publisher": "gavinleroy",
+  "displayName": "Argus",
   "description": "A trait debugger for Rust",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "engines": {
-    "vscode": "^1.22.0"
+    "vscode": "^1.79.0"
   },
   "bugs": {
-    "url": "https://github.com/gavinleroy/argus/issues",
+    "url": "https://github.com/cognitive-engineering-lab/argus/issues",
     "email": "gavinleroy6@gmail.com"
   },
-  "categories": [
-    "Programming Languages"
-  ],
-  "activationEvents": [
-    "onLanguage:rust"
-  ],
+  "repository": {
+    "url": "https://github.com/cognitive-engineering-lab/argus",
+    "type": "git"
+  },
+  "categories": ["Programming Languages"],
+  "activationEvents": ["onLanguage:rust"],
   "contributes": {
     "commands": [
       {
@@ -24,13 +25,11 @@
       }
     ]
   },
-  "files": [
-    "dist"
-  ],
-  "main": "./dist/extension.js",
+  "files": ["dist"],
+  "main": "./dist/argus.js",
   "exports": {
     ".": {
-      "default": "./dist/extension.js"
+      "default": "./dist/argus.js"
     },
     "./*": {
       "default": "./dist/*.js"
@@ -43,9 +42,13 @@
   "typedoc": {
     "entryPoint": "./src/main.ts"
   },
-  "dependencies": {
-    "vscode": "*"
+  "vsce": {
+    "dependencies": false
   },
+  "scripts": {
+    "build": "depot build"
+  },
+  "dependencies": {},
   "devDependencies": {
     "@argus/common": "workspace:*",
     "@argus/panoptes": "workspace:*",

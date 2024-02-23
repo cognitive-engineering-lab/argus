@@ -47,7 +47,7 @@ const Workspace = ({
   const [showHidden, setShowHidden] = useState(false);
   const toggleHidden = () => setShowHidden(!showHidden);
 
-  const checkbox = (
+  const _checkbox = (
     <div style={{ position: "fixed", top: "0", right: "0" }}>
       <VSCodeCheckbox onChange={toggleHidden} checked={showHidden}>
         Show hidden information
@@ -79,7 +79,7 @@ const Workspace = ({
 
   return (
     <>
-      {checkbox}
+      {/*checkbox*/}
       <VSCodePanels>
         {tabs}
         {fileComponents}

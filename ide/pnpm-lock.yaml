@@ -46,10 +46,6 @@ importers:
         version: 22.1.0
 
   packages/extension:
-    dependencies:
-      vscode:
-        specifier: '*'
-        version: 0.8.0
     devDependencies:
       '@argus/common':
         specifier: workspace:*
@@ -3764,11 +3760,6 @@ packages:
   /vscode-textmate@8.0.0:
     resolution: {integrity: sha512-AFbieoL7a5LMqcnOF04ji+rpXadgOXnZsxQr//r83kLPr7biP7am3g9zbaZIaBGwBRWeSvoMD4mgPdX3e4NWBg==}
     dev: true
-
-  /vscode@0.8.0:
-    resolution: {integrity: sha512-S2EMtHW71xRD9jwAah/XbOVuz/zHe3JFRGOF0/C7QvkX7GB+ld0Z96Q//2ihTM3XuFgX8y4OS0yU3Uf+DbWuQQ==}
-    deprecated: 'This package is deprecated in favor of @types/vscode and vscode-test. For more information please read: https://code.visualstudio.com/updates/v1_36#_splitting-vscode-package-into-typesvscode-and-vscodetest'
-    dev: false
 
   /w3c-xmlserializer@4.0.0:
     resolution: {integrity: sha512-d+BFHzbiCx6zGfz0HyQ6Rg69w9k19nviJspaj4yNscGjrHu94sVP+aRm75yEbCh+r2/yR+7q6hux9LVtbuTGBw==}
