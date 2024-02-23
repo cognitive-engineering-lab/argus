@@ -1,6 +1,6 @@
 # Example 1, a simple workspace
 
-This first example will walk through how to use Argus to debug a simple trait error. It's meant as an introduction to Argus, the notation and iconography it uses, and the basics to track down a simple error. This uses the [Media Workspace](https://github.com/gavinleroy/argus/tree/examples/media) available in the Argus `examples` repository. It's best to follow along with the workspace open locally as not all code will be provided in the description.
+This first example will walk through how to use Argus to debug a simple trait error. It's meant as an introduction to Argus, the notation and iconography it uses, and the basics to track down a simple error. This uses the [Media Workspace](https://github.com/cognitive-engineering-lab/argus/tree/examples/media) available in the Argus `examples` repository. It's best to follow along with the workspace open locally as not all code will be provided in the description.
 
 ## Your task: a media archiver
 

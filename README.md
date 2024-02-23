@@ -6,7 +6,7 @@ Argus is a tool to help you with compiler errors related to traits. If you have 
 
 > :warning: **Argus is research software and under active development!** :warning:
 
-Argus relies on the New Trait Solver for Rust. Therefore Argus inherets all the limitations of that solver which is also _under active development_. The New Trait Solver is known to be unsound and incomplete — while using Argus you may accidentally run into these areas. This does not mean that Argus is useless. The New Trait Solver is only used to type-check the current workspace and still works if you're using a trait-heavy crate.
+Argus relies on the New Trait Solver for Rust. Therefore, Argus inherets all the limitations of that solver which is also _under active development_. The New Trait Solver is known to be unsound and incomplete — while using Argus you may accidentally run into these areas. This does not mean that Argus is useless. The New Trait Solver is only used to type-check the current workspace and still works if you're using a trait-heavy crate.
 
 ## Installation
 

@@ -25,7 +25,7 @@ const FatalErrorPanel = ({ error, resetErrorBoundary }: any) => (
   <div>
     <p>
       Whoops! This is not a drill, a fatal error occurred. Please{" "}
-      <a href="https://github.com/gavinleroy/argus/issues/new">
+      <a href="https://github.com/cognitive-engineering-lab/argus/issues/new">
         report this error
       </a>{" "}
       to the Argus team, and include the following information:

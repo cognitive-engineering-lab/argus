@@ -218,7 +218,7 @@ const checkVersionAndInstall = async (
 
       if (choice === "Show fix") {
         open(
-          "https://github.com/gavinleroy/argus/blob/master/README.md#rustup-fails-on-install"
+          "https://github.com/cognitive-engineering-lab/argus/blob/master/README.md#rustup-fails-on-install"
         );
         await vscode.window.showInformationMessage(
           'Click "Continue" once you have completed the fix.',
