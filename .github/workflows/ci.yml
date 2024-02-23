@@ -1,4 +1,4 @@
-name: argus
+name: tests
 
 on:
   push:
