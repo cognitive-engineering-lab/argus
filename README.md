@@ -12,7 +12,7 @@ Argus relies on the New Trait Solver for Rust. Therefore, Argus inherets all the
 
 
 
-https://github.com/cognitive-engineering-lab/argus/assets/20209337/a4fb0263-6d42-4831-99d8-7522e135f61a
+https://github.com/cognitive-engineering-lab/argus/assets/20209337/b0373b48-26d1-4346-b241-9bc08ebf0964
 
 
 
