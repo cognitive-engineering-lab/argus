@@ -1,5 +1,5 @@
 [package]
-name = "argus_cli"
+name = "argus-cli"
 version = "0.1.0"
 edition = "2021"
 authors = ["Gavin Gray <gavinleroy6@gmail.com>"]
