@@ -2,6 +2,10 @@
 name = "argus"
 version = "0.1.0"
 edition = "2021"
+authors = ["Gavin Gray <gavinleroy6@gmail.com>"]
+repository = "https://github.com/cognitive-engineering-lab/argus"
+description = "Trait debugger analysis for IDE interactions."
+license = "MIT"
 
 [features]
 testing = ["lazy_static", "ts-rs"]
