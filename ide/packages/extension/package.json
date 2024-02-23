@@ -46,7 +46,8 @@
     "dependencies": false
   },
   "scripts": {
-    "build": "depot build"
+    "build": "depot build",
+    "vscode:prepublish": "depot build"
   },
   "dependencies": {},
   "devDependencies": {
