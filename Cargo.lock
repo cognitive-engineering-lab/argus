@@ -24,6 +24,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "080e9890a082662b09c1ad45f567faeeb47f22b5fb23895fbe1e651e718e25ca"
 
 [[package]]
+name = "argus-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "argus-lib",
+ "clap",
+ "env_logger 0.9.3",
+ "fluid-let",
+ "log",
+ "rustc_plugin",
+ "rustc_utils",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "argus-lib"
 version = "0.1.0"
 dependencies = [
@@ -43,22 +59,6 @@ dependencies = [
  "test-log",
  "ts-rs",
  "uuid",
-]
-
-[[package]]
-name = "argus_cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "argus-lib",
- "clap",
- "env_logger 0.9.3",
- "fluid-let",
- "log",
- "rustc_plugin",
- "rustc_utils",
- "serde",
- "serde_json",
 ]
 
 [[package]]
