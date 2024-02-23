@@ -9,7 +9,6 @@ use std::collections::HashSet;
 use index_vec::IndexVec;
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::ty;
-use rustc_trait_selection::traits::solve;
 use serde::Serialize;
 pub use topology::*;
 #[cfg(feature = "testing")]
@@ -26,7 +25,8 @@ use crate::{
 
 crate::define_idx! {
   usize,
-  ProofNodeIdx
+  ProofNodeIdx,
+  GoalIdx
 }
 
 // FIXME: Nodes shouldn't be PartialEq, or Eq. They are currently
@@ -38,30 +38,44 @@ crate::define_idx! {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub enum Node {
-  Result {
+  Result(
     #[serde(with = "EvaluationResultDef")]
     #[cfg_attr(feature = "testing", ts(type = "EvaluationResult"))]
-    data: EvaluationResult,
-  },
-  Candidate {
-    data: Candidate,
-  },
-  Goal {
-    data: Goal,
-  },
+    EvaluationResult,
+  ),
+  Candidate(Candidate),
+  Goal(
+    GoalIdx,
+    #[serde(with = "EvaluationResultDef")]
+    #[cfg_attr(feature = "testing", ts(type = "EvaluationResult"))]
+    EvaluationResult,
+  ),
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+pub struct Goal {}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+pub enum Candidate {
+  Impl(
+    #[cfg_attr(feature = "testing", ts(type = "ImplHeader"))] serde_json::Value,
+  ),
+  ParamEnv(usize),
+  // TODO remove variant once everything is structured
+  Any(String),
+}
+
+#[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-pub struct Goal {
+pub struct GoalData {
   #[cfg_attr(feature = "testing", ts(type = "GoalPredicate"))]
-  goal: serde_json::Value,
-
-  #[serde(with = "EvaluationResultDef")]
-  #[cfg_attr(feature = "testing", ts(type = "EvaluationResult"))]
-  result: EvaluationResult,
+  value: serde_json::Value,
 
   necessity: ObligationNecessity,
   num_vars: usize,
@@ -72,31 +86,18 @@ pub struct Goal {
   debug_comparison: String,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub enum Candidate {
-  Impl {
-    #[cfg_attr(feature = "testing", ts(type = "ImplHeader"))]
-    data: serde_json::Value,
-  },
-  ParamEnv {
-    idx: usize,
-  },
-  // TODO remove variant once everything is structured
-  Any {
-    data: String,
-  },
-}
-
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct SerializedTree {
   pub root: ProofNodeIdx,
+
   #[cfg_attr(feature = "testing", ts(type = "Node[]"))]
   pub nodes: IndexVec<ProofNodeIdx, Node>,
+  #[cfg_attr(feature = "testing", ts(type = "GoalData[]"))]
+  pub goals: IndexVec<GoalIdx, GoalData>,
+
   pub topology: TreeTopology,
   pub error_leaves: Vec<ProofNodeIdx>,
   pub unnecessary_roots: HashSet<ProofNodeIdx>,
@@ -112,33 +113,6 @@ pub struct ProofCycle(Vec<ProofNodeIdx>);
 // ----------------------------------------
 // impls
 
-impl Goal {
-  fn new<'tcx>(
-    infcx: &InferCtxt<'tcx>,
-    goal: &solve::Goal<'tcx, ty::Predicate<'tcx>>,
-    result: EvaluationResult,
-  ) -> Self {
-    let necessity = infcx.guess_predicate_necessity(&goal.predicate);
-    let goal = infcx.resolve_vars_if_possible(*goal);
-    let num_vars =
-      serialize::var_counter::count_vars(infcx.tcx, goal.predicate);
-
-    let goal_value = serialize_to_value(infcx, &GoalPredicateDef(goal))
-      .expect("failed to serialize goal");
-
-    Self {
-      goal: goal_value,
-      result,
-      necessity,
-      num_vars,
-      is_lhs_ty_var: goal.predicate.is_lhs_ty_var(),
-
-      #[cfg(debug_assertions)]
-      debug_comparison: format!("{:?}", goal.predicate.kind().skip_binder()),
-    }
-  }
-}
-
 impl Candidate {
   fn new_impl_header<'tcx>(
     infcx: &InferCtxt<'tcx>,
@@ -147,12 +121,12 @@ impl Candidate {
     let impl_ =
       serialize_to_value(infcx, impl_).expect("couldn't serialize impl header");
 
-    Self::Impl { data: impl_ }
+    Self::Impl(impl_)
   }
 
   // TODO: we should pass the ParamEnv here for certainty.
   fn new_param_env(idx: usize) -> Self {
-    Self::ParamEnv { idx }
+    Self::ParamEnv(idx)
   }
 }
 
@@ -164,6 +138,6 @@ impl From<&'static str> for Candidate {
 
 impl From<String> for Candidate {
   fn from(value: String) -> Self {
-    Candidate::Any { data: value }
+    Candidate::Any(value)
   }
 }

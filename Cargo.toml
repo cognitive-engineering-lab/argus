@@ -5,7 +5,3 @@ resolver = "2"
 
 [profile.dev.package.similar]
 opt-level = 3
-
-[patch.crates-io]
-rustc_plugin = { git = "https://github.com/gavinleroy/rustc-plugin.git", branch = "dev" }
-rustc_utils = { git = "https://github.com/gavinleroy/rustc-plugin.git", branch = "dev" }

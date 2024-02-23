@@ -1,8 +1,7 @@
 module.exports = {
   "extends": "../../.eslintrc.cjs",
   "ignorePatterns": [
-    "src/bindings", 
-    "src/types.ts"
+    "src/bindings.ts", 
   ],
   "env": {
     "browser": true

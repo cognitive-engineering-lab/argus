@@ -440,8 +440,9 @@ checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 
 [[package]]
 name = "rustc_plugin"
-version = "0.8.0-nightly-2024-01-06"
-source = "git+https://github.com/gavinleroy/rustc-plugin.git?branch=dev#b4c4c8c962f18010f83c30fb5eaf5f829b72cad7"
+version = "0.9.0-nightly-2024-01-24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0abfa69e634af1147ebcfd86ac7e7b745e2b2e9092f2e7f4852358ab99dfb19b"
 dependencies = [
  "cargo_metadata",
  "log",
@@ -459,8 +460,9 @@ checksum = "b3c5a95edfa0c893236ae4778bb7c4752760e4c0d245e19b5eff33c5aa5eb9dc"
 
 [[package]]
 name = "rustc_utils"
-version = "0.8.0-nightly-2024-01-06"
-source = "git+https://github.com/gavinleroy/rustc-plugin.git?branch=dev#b4c4c8c962f18010f83c30fb5eaf5f829b72cad7"
+version = "0.9.0-nightly-2024-01-24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb3ed9a0c4c18c1973477a672cc6cf7b362e4b3d0ae6acdc5c455421e0d5e69d"
 dependencies = [
  "anyhow",
  "cfg-if",

@@ -1,5 +1,6 @@
 import {
   EvaluationResult,
+  GoalIdx,
   ProofNodeIdx,
   SerializedTree,
   TreeTopology,
@@ -16,6 +17,7 @@ interface Path<T, D extends Direction> {
   path: T[];
   d: D;
 }
+
 function makeTreeView(
   root: ProofNodeIdx,
   cf: (n: ProofNodeIdx) => ControlFlow,
@@ -91,13 +93,13 @@ export class TreeInfo {
 
       const node = tree.nodes[n];
       if ("Goal" in node) {
-        if (node.Goal.data.necessity === "Yes") {
+        if (tree.goals[node.Goal[0]].necessity === "Yes") {
           return "keep";
         } else {
           return "remove-tree";
         }
       } else if ("Candidate" in node) {
-        if ("Any" in node.Candidate.data) {
+        if ("Any" in node.Candidate) {
           return "remove-node";
         } else {
           return "keep";
@@ -124,6 +126,10 @@ export class TreeInfo {
     return this.tree.nodes[n];
   }
 
+  public goal(n: GoalIdx) {
+    return this.tree.goals[n];
+  }
+
   public parent(n: ProofNodeIdx): ProofNodeIdx | undefined {
     return this.view.topology.parent[n];
   }
@@ -135,9 +141,9 @@ export class TreeInfo {
   public result(n: ProofNodeIdx): EvaluationResult | undefined {
     const node = this.node(n);
     if ("Result" in node) {
-      return node.Result.data;
+      return node.Result;
     } else if ("Goal" in node) {
-      return node.Goal.data.result;
+      return node.Goal[1];
     } else {
       return undefined;
     }
@@ -188,7 +194,7 @@ export class TreeInfo {
     const sortErrorsFirst = (leaf: ProofNodeIdx) => {
       const node = this.tree.nodes[leaf];
       if ("Result" in node) {
-        switch (node.Result.data) {
+        switch (node.Result) {
           case "no":
             return 0;
           case "maybe-overflow":
@@ -207,7 +213,7 @@ export class TreeInfo {
       const numInferVars = _.map(pathToRoot.path, idx => {
         const node = this.tree.nodes[idx];
         if ("Goal" in node) {
-          return node.Goal.data.numVars;
+          return this.goal(node.Goal[0]).numVars;
         } else {
           return 0;
         }
@@ -233,7 +239,7 @@ export class TreeInfo {
     const niv = _.reduce(
       this.children(n),
       (sum, k) => sum + this.inferVars(k),
-      "Goal" in node ? node.Goal.data.numVars : 0
+      "Goal" in node ? this.goal(node.Goal[0]).numVars : 0
     );
     this.numInferVars.set(n, niv);
     return niv;

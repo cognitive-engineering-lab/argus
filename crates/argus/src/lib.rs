@@ -15,9 +15,7 @@
 extern crate rustc_apfloat;
 extern crate rustc_ast;
 extern crate rustc_data_structures;
-#[cfg(feature = "testing")]
 extern crate rustc_driver;
-#[cfg(feature = "testing")]
 extern crate rustc_errors;
 extern crate rustc_hash;
 extern crate rustc_hir;
@@ -37,6 +35,7 @@ extern crate rustc_trait_selection;
 extern crate rustc_type_ir;
 
 pub mod analysis;
+pub mod emitter;
 mod ext;
 mod proof_tree;
 mod rustc;

@@ -155,14 +155,6 @@ define_helper!(
     fn with_forced_impl_filename_line(ForcedImplGuard, FORCE_IMPL_FILENAME_LINE);
     /// Adds the `crate::` prefix to paths where appropriate.
     fn with_crate_prefix(CratePrefixGuard, SHOULD_PREFIX_WITH_CRATE);
-    /// Prevent path trimming if it is turned on. Path trimming affects `Display` impl
-    /// of various rustc types, for example `std::vec::Vec` would be trimmed to `Vec`,
-    /// if no other `Vec` is found.
-    fn with_no_trimmed_paths(NoTrimmedGuard, NO_TRIMMED_PATH);
-    fn with_forced_trimmed_paths(ForceTrimmedGuard, FORCE_TRIMMED_PATH);
-    /// Prevent selection of visible paths. `Display` impl of DefId will prefer
-    /// visible (public) reexports of types as paths.
-    fn with_no_visible_paths(NoVisibleGuard, NO_VISIBLE_PATH);
 );
 
 pub(crate) mod safe {

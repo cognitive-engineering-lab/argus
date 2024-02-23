@@ -9,11 +9,11 @@ use rustc_hir::BodyId;
 use rustc_middle::ty::TyCtxt;
 pub(crate) use tls::{FullObligationData, SynIdx, UODIdx};
 
-#[cfg(feature = "testing")]
-use crate::types::intermediate::FullData;
 pub(crate) use crate::types::intermediate::{
-  EvaluationResult, Forgettable, FulfillmentData,
+  EvaluationResult, FulfillmentData,
 };
+#[cfg(feature = "testing")]
+use crate::types::intermediate::{Forgettable, FullData};
 use crate::{
   ext::TyCtxtExt,
   proof_tree::SerializedTree,

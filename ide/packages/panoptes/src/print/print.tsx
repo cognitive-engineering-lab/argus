@@ -1,4 +1,8 @@
-import { ExtensionCandidates, Goal, Obligation } from "@argus/common/bindings";
+import {
+  ExtensionCandidates,
+  GoalData,
+  Obligation,
+} from "@argus/common/bindings";
 import _ from "lodash";
 import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -79,14 +83,14 @@ export const PrintImplHeader = ({ impl }: { impl: any }) => {
   );
 };
 
-export const PrintGoal = ({ o }: { o: Goal }) => {
+export const PrintGoal = ({ o }: { o: GoalData }) => {
   const debugString =
     o.debugComparison === undefined ? null : (
       <div style={{ opacity: 0.5 }}>{o.debugComparison}</div>
     );
   const Content = () => (
     <>
-      <UnsafePrintGoalPredicate o={o.goal} />
+      <UnsafePrintGoalPredicate o={o.value} />
       {debugString}
     </>
   );

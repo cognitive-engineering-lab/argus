@@ -12,15 +12,22 @@ macro_rules! ts {
 }
 
 #[test]
+fn export_bindings_indices() {
+  ts! {
+    ty::ExprIdx,
+    ty::MethodLookupIdx,
+    ty::ObligationIdx,
+
+    pty::ProofNodeIdx,
+    pty::GoalIdx,
+  }
+}
+
+#[test]
 fn export_bindings_rustc_utils() {
   ts! {
     uty::CharPos,
     uty::CharRange,
     fty::FilenameIndex,
-
-    ty::ExprIdx,
-    ty::MethodLookupIdx,
-    ty::ObligationIdx,
-    pty::ProofNodeIdx,
   }
 }

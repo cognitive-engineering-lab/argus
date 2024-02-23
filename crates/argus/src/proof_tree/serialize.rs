@@ -3,6 +3,7 @@ use std::{collections::HashSet, ops::ControlFlow};
 use anyhow::{bail, Result};
 use ext::{CandidateExt, EvaluationResultExt};
 use index_vec::IndexVec;
+use rustc_data_structures::{fx::FxHashMap as HashMap, stable_hasher::Hash64};
 use rustc_hir::def_id::DefId;
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::ty::Predicate;
@@ -16,6 +17,50 @@ use rustc_trait_selection::{
 use super::*;
 use crate::{ext::TyCtxtExt, types::intermediate::EvaluationResult};
 
+#[derive(Default)]
+struct GoalInterner {
+  goals: IndexVec<GoalIdx, GoalData>,
+  keys: HashMap<Hash64, GoalIdx>,
+}
+
+impl GoalInterner {
+  pub fn intern<'tcx>(
+    &mut self,
+    infcx: &InferCtxt<'tcx>,
+    goal: &solve::Goal<'tcx, ty::Predicate<'tcx>>,
+  ) -> GoalIdx {
+    let goal = infcx.resolve_vars_if_possible(*goal);
+    let hash = infcx.predicate_hash(&goal.predicate);
+    if let Some(goal_idx) = self.keys.get(&hash) {
+      return *goal_idx;
+    }
+
+    let necessity = infcx.guess_predicate_necessity(&goal.predicate);
+    let num_vars =
+      serialize::var_counter::count_vars(infcx.tcx, goal.predicate);
+    let is_lhs_ty_var = goal.predicate.is_lhs_ty_var();
+    let goal_value = serialize_to_value(infcx, &GoalPredicateDef(goal))
+      .expect("failed to serialize goal");
+
+    let idx = self.goals.push(GoalData {
+      value: goal_value,
+      necessity,
+      num_vars,
+      is_lhs_ty_var,
+
+      #[cfg(feature = "testing")]
+      debug_comparison: format!("{:?}", goal.predicate.kind().skip_binder()),
+    });
+
+    self.keys.insert(hash, idx);
+    idx
+  }
+
+  pub fn take_goals(self) -> IndexVec<GoalIdx, GoalData> {
+    self.goals
+  }
+}
+
 pub struct SerializedTreeVisitor {
   pub def_id: DefId,
   pub root: Option<ProofNodeIdx>,
@@ -25,6 +70,7 @@ pub struct SerializedTreeVisitor {
   pub error_leaves: Vec<ProofNodeIdx>,
   pub unnecessary_roots: HashSet<ProofNodeIdx>,
   pub cycle: Option<ProofCycle>,
+  interner: GoalInterner,
 }
 
 impl SerializedTreeVisitor {
@@ -38,6 +84,7 @@ impl SerializedTreeVisitor {
       error_leaves: Vec::default(),
       unnecessary_roots: HashSet::default(),
       cycle: None,
+      interner: Default::default(),
     }
   }
 
@@ -49,6 +96,7 @@ impl SerializedTreeVisitor {
       error_leaves,
       unnecessary_roots,
       cycle,
+      interner,
       ..
     } = self
     else {
@@ -57,6 +105,7 @@ impl SerializedTreeVisitor {
 
     Ok(SerializedTree {
       root,
+      goals: interner.take_goals(),
       nodes,
       topology,
       error_leaves,
@@ -69,35 +118,37 @@ impl SerializedTreeVisitor {
   // comparing the JSON values is a bad idea in general. We should wait
   // until the new trait solver has some mechanism for detecting cycles
   // and piggy back off that.
-  fn check_for_cycle_from(&mut self, _from: ProofNodeIdx) {
-    return;
+  fn check_for_cycle_from(&mut self, from: ProofNodeIdx) {
+    if self.cycle.is_some() {
+      return;
+    }
 
-    // if self.cycle.is_some() {
-    //   return;
-    // }
+    let Node::Goal(from_idx, result) = &self.nodes[from] else {
+      return;
+    };
 
-    // let to_root = self.topology.path_to_root(from);
+    let to_root = self.topology.path_to_root(from);
+    if to_root.iter_exclusive().any(|idx| {
+      let Node::Goal(here_idx, hresult) = &self.nodes[*idx] else {
+        return false;
+      };
 
-    // let node_start = &self.nodes[from];
-    // if to_root.iter_exclusive().any(|idx| {
-    //   let n = &self.nodes[*idx];
-    //   n == node_start
-    // }) {
-    //   self.cycle = Some(to_root.into());
-    // }
+      here_idx == from_idx && hresult == result
+    }) {
+      self.cycle = Some(to_root.into());
+    }
+  }
+
+  fn mk_goal_node<'tcx>(&mut self, goal: &InspectGoal<'_, 'tcx>) -> Node {
+    let infcx = goal.infcx();
+    let result = goal.result();
+    let goal = goal.goal();
+    let goal_idx = self.interner.intern(infcx, &goal);
+    Node::Goal(goal_idx, result)
   }
 }
 
 impl Node {
-  fn from_goal<'tcx>(goal: &InspectGoal<'_, 'tcx>, _def_id: DefId) -> Self {
-    let infcx = goal.infcx();
-    let result = goal.result();
-    let goal = goal.goal();
-    Node::Goal {
-      data: Goal::new(infcx, &goal, result),
-    }
-  }
-
   fn from_candidate<'tcx>(
     candidate: &InspectCandidate<'_, 'tcx>,
     _def_id: DefId,
@@ -124,7 +175,7 @@ impl Node {
       },
     };
 
-    Node::Candidate { data: can }
+    Node::Candidate(can)
   }
 
   fn from_impl(infcx: &InferCtxt, def_id: DefId) -> Candidate {
@@ -152,9 +203,7 @@ impl Node {
   }
 
   fn from_result(result: &EvaluationResult) -> Self {
-    Node::Result {
-      data: result.clone(),
-    }
+    Node::Result(result.clone())
   }
 }
 
@@ -165,7 +214,8 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
     &mut self,
     goal: &InspectGoal<'_, 'tcx>,
   ) -> ControlFlow<Self::BreakTy> {
-    let here_node = Node::from_goal(goal, self.def_id);
+    let here_node = self.mk_goal_node(goal);
+
     let here_idx = self.nodes.push(here_node.clone());
 
     if self.root.is_none() {

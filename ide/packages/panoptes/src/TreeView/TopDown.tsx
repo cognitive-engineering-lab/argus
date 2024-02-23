@@ -1,7 +1,11 @@
 import { ProofNodeIdx } from "@argus/common/bindings";
 import {
+  FloatingFocusManager,
   FloatingPortal,
+  offset,
+  shift,
   useClick,
+  useDismiss,
   useFloating,
   useInteractions,
 } from "@floating-ui/react";
@@ -27,10 +31,16 @@ export const WrapTreeIco = ({
   const { refs, floatingStyles, context } = useFloating({
     open: isOpen,
     onOpenChange: setIsOpen,
+    placement: "bottom",
+    middleware: [offset(() => 5), shift()],
   });
 
   const click = useClick(context);
-  const { getReferenceProps, getFloatingProps } = useInteractions([click]);
+  const dismiss = useDismiss(context);
+  const { getReferenceProps, getFloatingProps } = useInteractions([
+    click,
+    dismiss,
+  ]);
 
   return (
     <span
@@ -44,8 +54,10 @@ export const WrapTreeIco = ({
         {...getReferenceProps()}
       >
         {(isHovered || isOpen) && <IcoTreeDown />}
-        {isOpen && (
-          <FloatingPortal>
+      </span>
+      {isOpen && (
+        <FloatingPortal>
+          <FloatingFocusManager context={context}>
             <div
               className={classNames("floating", "floating-graph")}
               ref={refs.setFloating}
@@ -54,9 +66,9 @@ export const WrapTreeIco = ({
             >
               <Graph root={n} />
             </div>
-          </FloatingPortal>
-        )}
-      </span>
+          </FloatingFocusManager>
+        </FloatingPortal>
+      )}
     </span>
   );
 };
@@ -90,7 +102,7 @@ const TopDown = () => {
       },
       k => {
         const node = tree.node(k);
-        "Goal" in node && node.Goal.data.isLhsTyVar ? 1 : 0;
+        "Goal" in node && tree.goal(node.Goal[0]).isLhsTyVar ? 1 : 0;
       }
     );
   };

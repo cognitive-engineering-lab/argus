@@ -3,11 +3,12 @@ import {
   EvaluationResult,
   Node as NodeTy,
 } from "@argus/common/bindings";
-import React from "react";
+import React, { useContext } from "react";
 
 import { HoverInfo } from "../HoverInfo";
 import { IcoAmbiguous, IcoCheck, IcoError, IcoLoop } from "../Icons";
 import { PrintGoal, PrintImplHeader } from "../print/print";
+import { TreeContext } from "./Context";
 
 export const Result = ({ result }: { result: EvaluationResult }) => {
   return result === "yes" ? (
@@ -39,9 +40,9 @@ export const Result = ({ result }: { result: EvaluationResult }) => {
 
 export const Candidate = ({ candidate }: { candidate: CandidateTy }) => {
   if ("Any" in candidate) {
-    return candidate.Any.data;
+    return candidate.Any;
   } else if ("Impl" in candidate) {
-    return <PrintImplHeader impl={candidate.Impl.data} />;
+    return <PrintImplHeader impl={candidate.Impl} />;
   } else if ("ParamEnv" in candidate) {
     throw new Error("paramEnv not implemented");
   } else {
@@ -50,17 +51,18 @@ export const Candidate = ({ candidate }: { candidate: CandidateTy }) => {
 };
 
 export const Node = ({ node }: { node: NodeTy }) => {
+  const treeInfo = useContext(TreeContext)!;
   if ("Result" in node) {
-    return <Result result={node.Result.data} />;
+    return <Result result={node.Result} />;
   } else if ("Goal" in node) {
     return (
       <>
-        <Result result={node.Goal.data.result} />
-        <PrintGoal o={node.Goal.data} />
+        <Result result={node.Goal[1]} />
+        <PrintGoal o={treeInfo.goal(node.Goal[0])} />
       </>
     );
   } else if ("Candidate" in node) {
-    return <Candidate candidate={node.Candidate.data} />;
+    return <Candidate candidate={node.Candidate} />;
   } else {
     throw new Error("Unknown node type", node);
   }

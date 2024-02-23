@@ -5,17 +5,15 @@ use rustc_errors::DiagCtxt;
 use rustc_hir::BodyId;
 use rustc_middle::ty::TyCtxt;
 use rustc_span::source_map::FileLoader;
-use rustc_utils::{
-  errors::silent_emitter::SilentEmitter,
-  source_map::{
-    filename::{Filename, FilenameIndex},
-    find_bodies::{find_bodies, find_enclosing_bodies},
-    range::{CharRange, ToSpan},
-  },
+use rustc_utils::source_map::{
+  filename::{Filename, FilenameIndex},
+  find_bodies::{find_bodies, find_enclosing_bodies},
+  range::{CharRange, ToSpan},
 };
 
 use crate::{
   analysis,
+  emitter::SilentEmitter,
   proof_tree::SerializedTree,
   types::{
     intermediate::{Forgettable, FullData},
@@ -246,7 +244,7 @@ where
 {
   fn config(&mut self, config: &mut rustc_interface::Config) {
     config.parse_sess_created = Some(Box::new(|sess| {
-      sess.dcx = DiagCtxt::with_emitter(Box::new(SilentEmitter));
+      sess.dcx = DiagCtxt::with_emitter(SilentEmitter::boxed());
     }));
   }
 

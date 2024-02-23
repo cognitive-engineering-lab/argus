@@ -6,11 +6,14 @@ use std::{
   time::Instant,
 };
 
-use argus::types::{ObligationHash, ToTarget};
+use argus::{
+  emitter::SilentEmitter,
+  types::{ObligationHash, ToTarget},
+};
 use clap::{Parser, Subcommand};
 use fluid_let::fluid_set;
 use log::{debug, info};
-use rustc_errors::{emitter::HumanEmitter, DiagCtxt};
+use rustc_errors::DiagCtxt;
 use rustc_hir::BodyId;
 use rustc_interface::interface::Result as RustcResult;
 use rustc_middle::ty::TyCtxt;
@@ -265,15 +268,17 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
 {
   fn config(&mut self, config: &mut rustc_interface::Config) {
     config.parse_sess_created = Some(Box::new(|sess| {
-      // Create a new emitter writer which consumes *silently* all
-      // errors. There most certainly is a *better* way to do this,
-      // if you, the reader, know what that is, please open an issue :)
-      let fallback_bundle = rustc_errors::fallback_fluent_bundle(
-        rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
-        false,
-      );
-      let emitter = HumanEmitter::new(Box::new(io::sink()), fallback_bundle);
-      sess.dcx = DiagCtxt::with_emitter(Box::new(emitter));
+      // // Create a new emitter writer which consumes *silently* all
+      // // errors. There most certainly is a *better* way to do this,
+      // // if you, the reader, know what that is, please open an issue :)
+      // let fallback_bundle = rustc_errors::fallback_fluent_bundle(
+      //   rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
+      //   false,
+      // );
+      // let emitter = HumanEmitter::new(Box::new(io::sink()), fallback_bundle);
+      // sess.dcx = DiagCtxt::with_emitter(Box::new(emitter));
+
+      sess.dcx = DiagCtxt::with_emitter(SilentEmitter::boxed());
     }));
   }
 

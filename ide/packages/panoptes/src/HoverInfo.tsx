@@ -1,6 +1,8 @@
 import {
   FloatingPortal,
+  flip,
   offset,
+  shift,
   useFloating,
   useHover,
   useInteractions,
@@ -18,13 +20,16 @@ export const HoverInfo = ({
   const { refs, floatingStyles, context } = useFloating({
     open: isOpen,
     onOpenChange: setIsOpen,
-    middleware: [offset(() => 5)],
+    placement: "top",
+    middleware: [offset(() => 5), flip(), shift()],
   });
+
   const hover = useHover(context, {
     delay: {
       open: 500,
     },
   });
+
   const { getReferenceProps, getFloatingProps } = useInteractions([hover]);
 
   return (
