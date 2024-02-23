@@ -1,5 +1,7 @@
 # Argus: a Trait Debugger for Rust
 
+[![tests](https://github.com/cognitive-engineering-lab/argus/actions/workflows/ci.yml/badge.svg)](https://github.com/cognitive-engineering-lab/argus/actions/workflows/ci.yml)
+
 Argus is a tool to help you with compiler errors related to traits. If you have ever seen an error that says `the trait bound ... is not satisfied`, that is a good opportunity to use Argus. An IDE exension is available for VSCode which provides the Argus Inspection Panel.
 
 ## Limitations
