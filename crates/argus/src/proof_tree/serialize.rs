@@ -48,7 +48,7 @@ impl GoalInterner {
       num_vars,
       is_lhs_ty_var,
 
-      #[cfg(feature = "testing")]
+      #[cfg(debug_assertions)]
       debug_comparison: format!("{:?}", goal.predicate.kind().skip_binder()),
     });
 
