@@ -18,7 +18,7 @@ https://github.com/cognitive-engineering-lab/argus/assets/20209337/b0373b48-26d1
 
 ## Installation
 
-Argus is available as a VSCode extension. You can install Argus from the [VSCode Marketplace]() or the [Open VSX Registry](). In VSCode:
+Argus is available as a VSCode extension. You can install Argus from the [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=gavinleroy.argus) or the [Open VSX Registry](https://open-vsx.org/extension/gavinleroy/argus). In VSCode:
 
 - Go to the extensions panel by clicking this button in the left margin: <img width="53" alt="Screenshot 2024-02-23 at 23 26 58" src="https://github.com/cognitive-engineering-lab/argus/assets/20209337/10d9297e-3c2a-4866-854f-de79f7de11de">
 
