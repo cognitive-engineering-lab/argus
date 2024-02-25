@@ -214,8 +214,7 @@ export class View {
   ) {
     const panoptesDir = vscode.Uri.joinPath(
       this.extensionUri,
-      "node_modules",
-      "@argus",
+      "dist",
       "panoptes"
     );
 

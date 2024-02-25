@@ -1,14 +1,26 @@
 import fs from "fs";
 import { builtinModules } from "module";
 import { resolve } from "path";
+import path from "path";
 import toml from "toml";
 import { defineConfig } from "vite";
+import { viteStaticCopy } from "vite-plugin-static-copy";
 
 const manifest = JSON.parse(fs.readFileSync("package.json", "utf-8"));
 const rustToolchain = toml.parse(
   fs.readFileSync("../../../rust-toolchain.toml", "utf-8")
 );
 export default defineConfig(({ mode }) => ({
+  plugins: [
+    viteStaticCopy({
+      targets: [
+        {
+          src: path.resolve(__dirname, "./node_modules/@argus") + "/[!.]*",
+          dest: "./",
+        },
+      ],
+    }),
+  ],
   build: {
     target: "node16",
     lib: {
