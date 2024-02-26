@@ -1,14 +1,14 @@
-# Argus: a Trait Debugger for Rust
+# <img src="https://github.com/cognitive-engineering-lab/argus/blob/main/ide/packages/extension/argus-logo-128.png?raw=true" height="64" /> Argus: a Trait Debugger for Rust
 
 [![tests](https://github.com/cognitive-engineering-lab/argus/actions/workflows/ci.yml/badge.svg)](https://github.com/cognitive-engineering-lab/argus/actions/workflows/ci.yml)
 
-Argus is a tool to help you with compiler errors related to traits. If you have ever seen an error that says `the trait bound ... is not satisfied`, that is a good opportunity to use Argus. An IDE exension is available for VSCode which provides the Argus Inspection Panel.
+Argus is a tool to help you with compiler errors related to traits. If you have ever seen an error that says `the trait bound ... is not satisfied`, that is a good opportunity to use Argus. An IDE extension is available for VSCode which provides the Argus Inspection Panel.
 
 ## Limitations
 
-> :warning: **Argus is research software and under active development!** :warning:
+> :warning: **Argus is research software and is under active development!** :warning:
 
-Argus relies on the New Trait Solver for Rust. Therefore, Argus inherets all the limitations of that solver which is also _under active development_. The New Trait Solver is known to be unsound and incomplete — while using Argus you may accidentally run into these areas. This does not mean that Argus is useless. The New Trait Solver is only used to type-check the current workspace and still works if you're using a trait-heavy crate.
+Argus relies on the New Trait Solver for Rust. Therefore, Argus inherits all the limitations of that solver which is also _under active development_. The New Trait Solver is known to be unsound and incomplete — while using Argus you may accidentally run into these areas. This does not mean that Argus is useless. The New Trait Solver is only used to type-check the current workspace and still works if you're using a trait-heavy crate.
 
 
 
@@ -27,7 +27,7 @@ Argus is available as a VSCode extension. You can install Argus from the [VSCode
 
 ### Building from source
 
-Some additional software is needed to build Argus from source. For the TypeScript bindings you need to install the language [Guile](https://www.gnu.org/software/guile/). The frontend requires [Depot](https://github.com/cognitive-engineering-lab/depot), a JS "devtool orchestrator." After this simply run the following:
+Some additional software is needed to build Argus from source. For the TypeScript bindings, you need to install the language [Guile](https://www.gnu.org/software/guile/). The IDE requires [Depot](https://github.com/cognitive-engineering-lab/depot), a JS "devtool orchestrator." After this simply run the following:
 
 ```sh
 $ cargo make init-bindings
@@ -41,7 +41,7 @@ $ cd ide && depot build
 
 <h3 id="rustup-fails-on-install">rustup fails on installation</h3>
 
-If rustup fails, especially with an error like "could not rename downloaded file", this is probably because Argus is running rustup concurrently with another tool (like rust-analyzer). Until [rustup#988](https://github.com/rust-lang/rustup/issues/988) is resolved, there is unfortunately no automated way around this.
+If rustup fails, especially with an error like "could not rename the downloaded file", this is probably because Argus is running rustup concurrently with another tool (like rust-analyzer). Until [rustup#988](https://github.com/rust-lang/rustup/issues/988) is resolved, there is, unfortunately, no automated way around this.
 
 To solve the issue, go to the command line and run:
 
