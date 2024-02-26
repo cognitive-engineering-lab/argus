@@ -32,40 +32,14 @@ crate::define_idx! {
   ResultIdx
 }
 
-// FIXME: Nodes shouldn't be PartialEq, or Eq. They are currently
-// so we can "detect cycles" by doing a raw comparison of the nodes.
-// Of course, this isn't robust and should be removed ASAP.
-//
-// Same goes for Candidates and Goals.
-#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub enum Node {
-  Result(ResultIdx),
+  Goal(GoalIdx),
   Candidate(CandidateIdx),
-  Goal(GoalIdx, ResultIdx),
+  Result(ResultIdx),
 }
-
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub enum CandidateData {
-  Impl(
-    #[cfg_attr(feature = "testing", ts(type = "ImplHeader"))] serde_json::Value,
-  ),
-  ParamEnv(usize),
-  // TODO remove variant once everything is structured
-  Any(String),
-}
-
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub struct ResultData(
-  #[serde(with = "EvaluationResultDef")]
-  #[cfg_attr(feature = "testing", ts(type = "EvaluationResult"))]
-  EvaluationResult,
-);
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -78,11 +52,33 @@ pub struct GoalData {
   necessity: ObligationNecessity,
   num_vars: usize,
   is_lhs_ty_var: bool,
+  result: ResultIdx,
 
   #[cfg(debug_assertions)]
   #[cfg_attr(feature = "testing", ts(type = "string | undefined"))]
   debug_comparison: String,
 }
+
+#[derive(Serialize, Clone, Debug)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+pub enum CandidateData {
+  Impl(
+    #[cfg_attr(feature = "testing", ts(type = "ImplHeader"))] serde_json::Value,
+  ),
+  ParamEnv(usize),
+  // TODO remove variant once everything is structured
+  Any(String),
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+pub struct ResultData(
+  #[serde(with = "EvaluationResultDef")]
+  #[cfg_attr(feature = "testing", ts(type = "EvaluationResult"))]
+  EvaluationResult,
+);
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]

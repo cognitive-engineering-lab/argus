@@ -102,7 +102,7 @@ const TopDown = () => {
       },
       k => {
         const node = tree.node(k);
-        "Goal" in node && tree.goal(node.Goal[0]).isLhsTyVar ? 1 : 0;
+        "Goal" in node && tree.goal(node.Goal).isLhsTyVar ? 1 : 0;
       }
     );
   };

@@ -64,10 +64,11 @@ export const Node = ({ node }: { node: NodeTy }) => {
   if ("Result" in node) {
     return <Result idx={node.Result} />;
   } else if ("Goal" in node) {
+    const goal = treeInfo.goal(node.Goal);
     return (
       <>
-        <Result idx={node.Goal[1]} />
-        <PrintGoal o={treeInfo.goal(node.Goal[0])} />
+        <Result idx={goal.result} />
+        <PrintGoal o={goal} />
       </>
     );
   } else if ("Candidate" in node) {

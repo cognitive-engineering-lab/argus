@@ -137,8 +137,7 @@ export const PrintImplFor = ({ path, ty }: { path?: DefinedPath; ty: any }) => {
   const p =
     path === undefined ? null : (
       <>
-        <PrintDefPathFull o={path} />
-        <Kw>for</Kw>{" "}
+        <PrintDefPathFull o={path} /> <Kw>for</Kw>{" "}
       </>
     );
 
@@ -162,7 +161,8 @@ export const PrintImplAs = ({ path, ty }: { path?: DefinedPath; ty: any }) => {
 
   return (
     <>
-      <PrintTy o={ty} /> {p}
+      <PrintTy o={ty} />
+      {p}
     </>
   );
 };

@@ -6,41 +6,75 @@ import { TreeContext } from "./Context";
 import { CollapsibleElement, DirRecursive } from "./Directory";
 import { TreeInfo, TreeView } from "./TreeInfo";
 
+type TreeViewWithRoot = TreeView & { root: ProofNodeIdx };
+
 class TopologyBuilder {
   private topo: TreeTopology;
-  constructor() {
+  constructor(readonly root: ProofNodeIdx, readonly tree: TreeInfo) {
     this.topo = { children: {}, parent: {} };
+  }
+
+  public toView(): TreeViewWithRoot {
+    return { topology: this.topo, root: this.root };
   }
 
   get topology() {
     return this.topo;
   }
 
-  public add(parent: ProofNodeIdx, child: ProofNodeIdx) {
-    if (!this.topo.children[parent]) {
-      this.topo.children[parent] = [];
+  add(from: ProofNodeIdx, to: ProofNodeIdx) {
+    if (this.topo.children[from] === undefined) {
+      this.topo.children[from] = [];
     }
-    this.topo.children[parent]!.push(child);
-    this.topo.parent[child] = parent;
+    this.topo.children[from].push(to);
+    this.topo.parent[to] = from;
   }
-}
 
-/**
- *
- * @param inputArray array to generate windows across
- * @param size the size of window to generate
- * @returns an array of windows of size `size` across `inputArray`. Final window may be smaller than `size`.
- */
-function toWindows<T>(arr: T[], size: number): T[][] {
-  let windowed = [];
-  for (let idx = 0; idx < arr.length; idx += size) {
-    windowed.push(_.slice(arr, idx, idx + size));
+  /**
+   *
+   * @param root the root node from where this path should start.
+   * @param path a path to be added uniquely to the tree.
+   */
+  public addPathFromRoot(path: ProofNodeIdx[]) {
+    console.debug(
+      "Adding path",
+      _.keys(this.topo.children).length,
+      _.keys(this.topo.parent).length,
+      path
+    );
+    const thisRoot = _.head(path);
+    if (
+      thisRoot === undefined ||
+      !_.isEqual(this.tree.node(thisRoot), this.tree.node(this.root))
+    ) {
+      console.error("Path does not start from the root", {
+        a: thisRoot,
+        b: this.root,
+        c: this.tree.node(thisRoot!),
+        d: this.tree.node(this.root),
+      });
+      throw new Error("Path does not start from the root");
+    }
+
+    let previous = this.root;
+    _.forEach(_.tail(path), node => {
+      // We want to add a node from `previous` to `node` only if an
+      // equivalent connection does not already exist. Equivalent is
+      // defined by the `Node` the `ProofNodeIdx` points to.
+      const currKids = this.topo.children[previous] ?? [];
+      const myNode = this.tree.node(node);
+      const hasEquivalent = _.find(
+        currKids,
+        kid => this.tree.node(kid) === myNode
+      );
+      if (hasEquivalent === undefined) {
+        this.add(previous, node);
+        previous = node;
+      } else {
+        previous = hasEquivalent;
+      }
+    });
   }
-  return windowed;
-}
-
-function toPairs<T>(inputArray: T[]): [T, T][] {
-  return toWindows(inputArray, 2) as any;
 }
 
 /**
@@ -52,37 +86,40 @@ function toPairs<T>(inputArray: T[]): [T, T][] {
 function invertViewWithRoots(
   leaves: ProofNodeIdx[],
   tree: TreeInfo
-): Array<TreeView & { root: ProofNodeIdx }> {
-  const groupedLeaves = _.groupBy(leaves, leaf => {
-    const node = tree.node(leaf);
-    if ("Goal" in node) {
-      console.debug("Grouping by goalidx", node.Goal[0]);
-      return node.Goal[0];
-    } else {
-      throw new Error("Leaves should only be goals");
-    }
-  });
-
-  console.debug("groupedLeaves", groupedLeaves);
-
-  const groups: ProofNodeIdx[][] = _.values(groupedLeaves);
+): Array<TreeViewWithRoot> {
+  const groups: ProofNodeIdx[][] = _.values(
+    _.groupBy(leaves, leaf => {
+      const node = tree.node(leaf);
+      if ("Goal" in node) {
+        return node.Goal;
+      } else {
+        throw new Error("Leaves must be goals");
+      }
+    })
+  );
 
   return _.map(groups, group => {
-    const builder = new TopologyBuilder();
-    const root = group[0];
-    const parents = _.map(leaves, leaf => tree.parent(leaf));
-    const pathsToRoot = _.map(
-      _.compact(parents),
-      parent => tree.pathToRoot(parent).path
+    // Each element of the group is equivalent, so just take the first
+    const builder = new TopologyBuilder(group[0], tree);
+
+    // Get the paths to the root from all leaves
+    const pathsToRoot = _.map(group, parent => tree.pathToRoot(parent).path);
+
+    console.debug(
+      "Paths to root",
+      _.sortBy(
+        _.map(pathsToRoot, p => _.map(p, n => tree.node(n))),
+        l => l.length
+      )
     );
+
     _.forEach(pathsToRoot, path => {
-      builder.add(root, path[0]);
-      _.forEach(toPairs(path), ([a, b]) => {
-        builder.add(a, b);
-      });
+      // No need to take the tail, `addPathFromRoot` checks that the
+      // roots are equal and then skips the first element.
+      builder.addPathFromRoot(path);
     });
 
-    return { topology: builder.topology, root };
+    return builder.toView();
   });
 }
 
@@ -107,8 +144,8 @@ const BottomUp = () => {
   const [argusRecommended, others] = _.partition(invertedViews, view => {
     const node = tree.node(view.root);
     if ("Goal" in node) {
-      const goal = tree.goal(node.Goal[0]);
-      const result = tree.result(node.Goal[1]);
+      const goal = tree.goal(node.Goal);
+      const result = tree.result(goal.result);
       return result === "no" || result === "maybe-overflow" || !goal.isLhsTyVar;
     } else {
       // Leaves should only be goals...
@@ -116,11 +153,7 @@ const BottomUp = () => {
     }
   });
 
-  const LeafElement = ({
-    leaf,
-  }: {
-    leaf: TreeView & { root: ProofNodeIdx };
-  }) => (
+  const LeafElement = ({ leaf }: { leaf: TreeViewWithRoot }) => (
     <DirRecursive
       level={[leaf.root]}
       getNext={mkGetChildren(leaf)}

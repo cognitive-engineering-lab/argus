@@ -29,7 +29,7 @@ pub fn obligations<'tcx>(
   body_id: BodyId,
 ) -> Result<ObligationsInBody> {
   rustc_middle::ty::print::with_no_trimmed_paths! {{
-    log::debug!("Typeck'ing body {body_id:?}");
+    log::info!("Typeck'ing body {body_id:?}");
 
     let typeck_results = tcx.inspect_typeck(body_id, entry::process_obligation);
 

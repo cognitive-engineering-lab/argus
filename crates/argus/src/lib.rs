@@ -37,6 +37,8 @@ extern crate rustc_type_ir;
 pub mod analysis;
 pub mod emitter;
 mod ext;
+// TODO: remove when upstreamed to rustc-plugin
+pub mod find_bodies;
 mod proof_tree;
 mod rustc;
 mod serialize;

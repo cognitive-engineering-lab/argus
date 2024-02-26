@@ -182,6 +182,11 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
               );
             };
 
+            log::info!(
+              "Building table for method call: {}",
+              self.tcx.hir().node_to_string(call_expr.hir_id)
+            );
+
             if let Some((idx, error_recvr, error_call)) = self
               .relate_method_call(
                 call_expr,
@@ -192,12 +197,14 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
                 &obligations,
               )
             {
+              log::info!("built table!");
               ambiguous_call = error_recvr || error_call;
               MethodCall {
                 data: idx,
                 error_recvr,
               }
             } else {
+              log::info!("Failed to build table...");
               Misc
             }
           }
@@ -330,22 +337,24 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     let (necessary_queries, trait_candidates): (Vec<_>, Vec<_>) = obligations
       .iter()
       .filter_map(|&idx| {
-        let Some(fdata) = self.obligations[idx]
+        let fdata = self.obligations[idx]
           .full_data
-          .map(|fdidx| self.full_data.get(fdidx))
-        else {
-          return None;
-        };
+          .map(|fdidx| self.full_data.get(fdidx))?;
 
-        let is_necessary = fdata.obligation.predicate.is_trait_predicate() &&
-        fdata
-          .infcx
-          .obligation_necessity(&fdata.obligation)
-          .is_necessary(fdata.result)
+        if fdata.obligation.predicate.is_trait_predicate() {
+          log::info!(
+            "Predicate is a trait predicate {:?}",
+            fdata.obligation.predicate
+          );
+        }
+
+        let is_necessary =
+        // Bounds for extension method calls are always trait predicates.
+          fdata.obligation.predicate.is_trait_predicate() &&
           // TODO: Obligations for method calls are registered
           // usder 'misc,' this of course can change. Find a better
           // way to gather the attempted traits!
-          && matches!(
+          matches!(
             fdata.obligation.cause.code(),
             ObligationCauseCode::MiscObligation
           );
@@ -376,12 +385,16 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       }
     }
 
-    let (full_query_idx, query) =
+    let Some((full_query_idx, query)) =
       necessary_queries.first().and_then(|&idx| {
         self.obligations[idx]
           .full_data
           .map(|fdidx| (fdidx, self.full_data.get(fdidx)))
-      })?;
+      })
+    else {
+      log::error!("necessary queries empty! {:?}", necessary_queries);
+      return None;
+    };
 
     let infcx = &query.infcx;
     let o = &query.obligation;

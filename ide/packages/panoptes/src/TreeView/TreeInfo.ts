@@ -96,7 +96,7 @@ export class TreeInfo {
 
       const node = tree.nodes[n];
       if ("Goal" in node) {
-        if (tree.goals[node.Goal[0]].necessity === "Yes") {
+        if (tree.goals[node.Goal].necessity === "Yes") {
           return "keep";
         } else {
           return "remove-tree";
@@ -150,12 +150,16 @@ export class TreeInfo {
     return this.tree.results[n];
   }
 
+  public resultOfGoal(n: GoalIdx): EvaluationResult {
+    return this.result(this.goal(n).result);
+  }
+
   public nodeResult(n: ProofNodeIdx): EvaluationResult | undefined {
     const node = this.node(n);
     if ("Result" in node) {
       return this.result(node.Result);
     } else if ("Goal" in node) {
-      return this.result(node.Goal[1]);
+      return this.resultOfGoal(node.Goal);
     } else {
       return undefined;
     }
@@ -225,7 +229,7 @@ export class TreeInfo {
       const numInferVars = _.map(pathToRoot.path, idx => {
         const node = this.tree.nodes[idx];
         if ("Goal" in node) {
-          return this.goal(node.Goal[0]).numVars;
+          return this.goal(node.Goal).numVars;
         } else {
           return 0;
         }
@@ -251,7 +255,7 @@ export class TreeInfo {
     const niv = _.reduce(
       this.children(n),
       (sum, k) => sum + this.inferVars(k),
-      "Goal" in node ? this.goal(node.Goal[0]).numVars : 0
+      "Goal" in node ? this.goal(node.Goal).numVars : 0
     );
     this.numInferVars.set(n, niv);
     return niv;

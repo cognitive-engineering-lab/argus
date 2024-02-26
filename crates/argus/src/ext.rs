@@ -370,9 +370,19 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
         .any(|(_lang_item, def_id)| p.is_trait_pred_rhs(def_id))
     };
 
-    if !p.is_trait_predicate() {
+    let is_writeable = || {
+      use rustc_type_ir::ClauseKind::*;
+      matches!(
+        p.kind().skip_binder(),
+        ty::PredicateKind::Clause(
+          Trait(..) | RegionOutlives(..) | TypeOutlives(..) | Projection(..)
+        )
+      )
+    };
+
+    if !is_writeable() {
       ForProfessionals
-    } else if is_rhs_lang_item() {
+    } else if p.is_trait_predicate() && is_rhs_lang_item() {
       OnError
     } else {
       Yes

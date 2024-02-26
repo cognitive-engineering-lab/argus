@@ -79,18 +79,12 @@ impl SerializedTreeVisitor {
       return;
     }
 
-    let Node::Goal(from_idx, result) = &self.nodes[from] else {
-      return;
-    };
-
     let to_root = self.topology.path_to_root(from);
-    if to_root.iter_exclusive().any(|idx| {
-      let Node::Goal(here_idx, hresult) = &self.nodes[*idx] else {
-        return false;
-      };
-
-      here_idx == from_idx && hresult == result
-    }) {
+    let from_node = self.nodes[from];
+    if to_root
+      .iter_exclusive()
+      .any(|middle| self.nodes[*middle] == from_node)
+    {
       self.cycle = Some(to_root.into());
     }
   }

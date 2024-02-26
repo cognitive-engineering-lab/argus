@@ -96,7 +96,7 @@ impl Interners {
     let result_idx = self.intern_result(goal.result());
     let goal = goal.goal();
     let goal_idx = self.intern_goal(infcx, &goal, result_idx);
-    Node::Goal(goal_idx, result_idx)
+    Node::Goal(goal_idx)
   }
 
   pub fn mk_candidate_node<'tcx>(
@@ -164,6 +164,7 @@ impl Interners {
       necessity,
       num_vars,
       is_lhs_ty_var,
+      result: result_idx,
 
       #[cfg(debug_assertions)]
       debug_comparison: format!("{:?}", goal.predicate.kind().skip_binder()),
@@ -193,10 +194,8 @@ impl Interners {
       return i;
     }
 
-    let tcx = infcx.tcx;
-
     // First, try to get an impl header from the def_id ty
-    if let Some(header) = tcx.get_impl_header(def_id) {
+    if let Some(header) = infcx.tcx.get_impl_header(def_id) {
       return self.candidates.insert(
         CanKey::Impl(def_id),
         CandidateData::new_impl_header(infcx, &header),
@@ -204,10 +203,12 @@ impl Interners {
     }
 
     // Second, try to get the span of the impl or just default to a fallback.
-    let string = tcx
+    let string = infcx
+      .tcx
       .span_of_impl(def_id)
       .map(|sp| {
-        tcx
+        infcx
+          .tcx
           .sess
           .source_map()
           .span_to_snippet(sp)

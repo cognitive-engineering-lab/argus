@@ -7,12 +7,13 @@ use std::{
 };
 
 use argus_lib::{
+  analysis,
   emitter::SilentEmitter,
+  find_bodies::{find_bodies, find_enclosing_bodies},
   types::{ObligationHash, ToTarget},
 };
 use clap::{Parser, Subcommand};
 use fluid_let::fluid_set;
-use log::{debug, info};
 use rustc_errors::DiagCtxt;
 use rustc_hir::BodyId;
 use rustc_interface::interface::Result as RustcResult;
@@ -22,7 +23,6 @@ use rustc_span::{FileName, RealFileName};
 use rustc_utils::{
   source_map::{
     filename::Filename,
-    find_bodies::{find_bodies, find_enclosing_bodies},
     range::{CharPos, CharRange},
   },
   timer::elapsed,
@@ -188,7 +188,7 @@ impl RustcPlugin for ArgusPlugin {
         };
 
         let v = run(
-          argus_lib::analysis::tree,
+          analysis::tree,
           Some(PathBuf::from(&file)),
           compute_target,
           &compiler_args,
@@ -198,7 +198,7 @@ impl RustcPlugin for ArgusPlugin {
       Obligations { file, .. } => {
         let nothing = || None::<(ObligationHash, CharRange)>;
         let v = run(
-          argus_lib::analysis::obligations,
+          analysis::obligations,
           file.map(PathBuf::from),
           nothing,
           &compiler_args,
@@ -224,7 +224,7 @@ fn run<A: ArgusAnalysis, T: ToTarget>(
     rustc_start: Instant::now(),
   };
 
-  info!("Starting rustc analysis...");
+  log::info!("Starting rustc analysis...");
 
   #[allow(unused_must_use)]
   let _ = run_with_callbacks(args, &mut callbacks);
@@ -300,13 +300,16 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
           get_file_of_body(tcx, body)
         {
           if target_file.map(|f| f.ends_with(&p)).unwrap_or(true) {
-            debug!("analyzing {:?}", body);
+            log::info!("analyzing {:?}", body);
             match analysis.analyze(tcx, body) {
               Ok(v) => Some(v),
-              Err(_) => None,
+              Err(e) => {
+                log::error!("Error analyzing body {:?} {:?}", body, e);
+                None
+              }
             }
           } else {
-            debug!("Skipping file {:?} due to target {:?}", p, self.file);
+            log::debug!("Skipping file {:?} due to target {:?}", p, self.file);
             None
           }
         } else {
@@ -316,26 +319,18 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
 
       self.result = match (self.compute_target.take().unwrap())() {
         Some(target) => {
-          log::debug!("Getting target");
           let target = target.to_target(tcx).expect("Couldn't compute target");
-          log::debug!("Got target");
           let body_span = target.span.clone();
-
-          debug!("target: {target:?}");
-
-          fluid_set!(argus_lib::analysis::OBLIGATION_TARGET, target);
+          fluid_set!(analysis::OBLIGATION_TARGET, target);
 
           find_enclosing_bodies(tcx, body_span)
             .filter_map(|b| inner((body_span, b)))
             .collect::<Vec<_>>()
         }
-        None => {
-          debug!("no target");
-          find_bodies(tcx)
-            .into_iter()
-            .filter_map(inner)
-            .collect::<Vec<_>>()
-        }
+        None => find_bodies(tcx)
+          .into_iter()
+          .filter_map(inner)
+          .collect::<Vec<_>>(),
       };
     });
 

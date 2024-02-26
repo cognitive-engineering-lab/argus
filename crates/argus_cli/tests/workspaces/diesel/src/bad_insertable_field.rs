@@ -1,4 +1,4 @@
-use diesel::prelude::*;
+use diesel::{prelude::*, sql_types::Text};
 
 table! {
     users(id) {
