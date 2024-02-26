@@ -1,6 +1,7 @@
 //! Proof tree types sent to the Argus frontend.
 
 pub mod ext;
+pub(self) mod interners;
 pub(super) mod serialize;
 pub mod topology;
 
@@ -26,7 +27,9 @@ use crate::{
 crate::define_idx! {
   usize,
   ProofNodeIdx,
-  GoalIdx
+  GoalIdx,
+  CandidateIdx,
+  ResultIdx
 }
 
 // FIXME: Nodes shouldn't be PartialEq, or Eq. They are currently
@@ -38,29 +41,15 @@ crate::define_idx! {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub enum Node {
-  Result(
-    #[serde(with = "EvaluationResultDef")]
-    #[cfg_attr(feature = "testing", ts(type = "EvaluationResult"))]
-    EvaluationResult,
-  ),
-  Candidate(Candidate),
-  Goal(
-    GoalIdx,
-    #[serde(with = "EvaluationResultDef")]
-    #[cfg_attr(feature = "testing", ts(type = "EvaluationResult"))]
-    EvaluationResult,
-  ),
+  Result(ResultIdx),
+  Candidate(CandidateIdx),
+  Goal(GoalIdx, ResultIdx),
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-pub struct Goal {}
-
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub enum Candidate {
+pub enum CandidateData {
   Impl(
     #[cfg_attr(feature = "testing", ts(type = "ImplHeader"))] serde_json::Value,
   ),
@@ -68,6 +57,15 @@ pub enum Candidate {
   // TODO remove variant once everything is structured
   Any(String),
 }
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+pub struct ResultData(
+  #[serde(with = "EvaluationResultDef")]
+  #[cfg_attr(feature = "testing", ts(type = "EvaluationResult"))]
+  EvaluationResult,
+);
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -95,8 +93,15 @@ pub struct SerializedTree {
 
   #[cfg_attr(feature = "testing", ts(type = "Node[]"))]
   pub nodes: IndexVec<ProofNodeIdx, Node>,
+
   #[cfg_attr(feature = "testing", ts(type = "GoalData[]"))]
   pub goals: IndexVec<GoalIdx, GoalData>,
+
+  #[cfg_attr(feature = "testing", ts(type = "CandidateData[]"))]
+  pub candidates: IndexVec<CandidateIdx, CandidateData>,
+
+  #[cfg_attr(feature = "testing", ts(type = "ResultData[]"))]
+  pub results: IndexVec<ResultIdx, ResultData>,
 
   pub topology: TreeTopology,
   pub error_leaves: Vec<ProofNodeIdx>,
@@ -113,31 +118,25 @@ pub struct ProofCycle(Vec<ProofNodeIdx>);
 // ----------------------------------------
 // impls
 
-impl Candidate {
+impl CandidateData {
   fn new_impl_header<'tcx>(
     infcx: &InferCtxt<'tcx>,
     impl_: &ImplHeader<'tcx>,
   ) -> Self {
     let impl_ =
       serialize_to_value(infcx, impl_).expect("couldn't serialize impl header");
-
     Self::Impl(impl_)
-  }
-
-  // TODO: we should pass the ParamEnv here for certainty.
-  fn new_param_env(idx: usize) -> Self {
-    Self::ParamEnv(idx)
   }
 }
 
-impl From<&'static str> for Candidate {
+impl From<&'static str> for CandidateData {
   fn from(value: &'static str) -> Self {
     value.to_string().into()
   }
 }
 
-impl From<String> for Candidate {
+impl From<String> for CandidateData {
   fn from(value: String) -> Self {
-    Candidate::Any(value)
+    Self::Any(value)
   }
 }

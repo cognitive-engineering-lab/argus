@@ -108,7 +108,7 @@ const BottomUp = () => {
     const node = tree.node(view.root);
     if ("Goal" in node) {
       const goal = tree.goal(node.Goal[0]);
-      const result = node.Goal[1];
+      const result = tree.result(node.Goal[1]);
       return result === "no" || result === "maybe-overflow" || !goal.isLhsTyVar;
     } else {
       // Leaves should only be goals...

@@ -20,6 +20,8 @@ fn export_bindings_indices() {
 
     pty::ProofNodeIdx,
     pty::GoalIdx,
+    pty::CandidateIdx,
+    pty::ResultIdx,
   }
 }
 

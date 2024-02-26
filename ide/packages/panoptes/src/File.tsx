@@ -25,7 +25,7 @@ import React, {
 import BodyInfo from "./BodyInfo";
 import "./File.css";
 import { CollapsibleElement } from "./TreeView/Directory";
-import { Result } from "./TreeView/Node";
+import { ResultRaw } from "./TreeView/Node";
 import TreeApp from "./TreeView/TreeApp";
 import { WaitingOn } from "./WaitingOn";
 import {
@@ -131,7 +131,7 @@ const ObligationCard = ({
       onMouseEnter={addHighlight}
       onMouseLeave={removeHighlight}
     >
-      <Result result={obligation.result} />
+      <ResultRaw result={obligation.result} />
       <PrintObligation obligation={obligation} />
     </span>
   );
@@ -158,7 +158,7 @@ const ObligationFromIdx = ({ idx }: { idx: ObligationIdx }) => {
 const ObligationResultFromIdx = ({ idx }: { idx: ObligationIdx }) => {
   const bodyInfo = useContext(BodyInfoContext)!;
   const o = bodyInfo.getObligation(idx);
-  return <Result result={o.result} />;
+  return <ResultRaw result={o.result} />;
 };
 
 const MethodLookupTable = ({ lookup }: { lookup: MethodLookupIdx }) => {
@@ -274,10 +274,10 @@ const ObligationBody = ({ bodyInfo }: { bodyInfo: BodyInfo }) => {
     );
 
   const header = (
-    <span>
+    <>
       {bodyName}
       {errCount > 0 ? <span className="ErrorCount">({errCount})</span> : null}
-    </span>
+    </>
   );
 
   const openChildren = bodyInfo.hash === highlightedObligation.value?.bodyIdx;

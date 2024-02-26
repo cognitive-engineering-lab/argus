@@ -3,63 +3,15 @@ use std::{collections::HashSet, ops::ControlFlow};
 use anyhow::{bail, Result};
 use ext::{CandidateExt, EvaluationResultExt};
 use index_vec::IndexVec;
-use rustc_data_structures::{fx::FxHashMap as HashMap, stable_hasher::Hash64};
 use rustc_hir::def_id::DefId;
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::ty::Predicate;
 use rustc_trait_selection::{
-  solve::inspect::{
-    InspectCandidate, InspectGoal, ProofTreeInferCtxtExt, ProofTreeVisitor,
-  },
+  solve::inspect::{InspectGoal, ProofTreeInferCtxtExt, ProofTreeVisitor},
   traits::solve,
 };
 
-use super::*;
-use crate::{ext::TyCtxtExt, types::intermediate::EvaluationResult};
-
-#[derive(Default)]
-struct GoalInterner {
-  goals: IndexVec<GoalIdx, GoalData>,
-  keys: HashMap<Hash64, GoalIdx>,
-}
-
-impl GoalInterner {
-  pub fn intern<'tcx>(
-    &mut self,
-    infcx: &InferCtxt<'tcx>,
-    goal: &solve::Goal<'tcx, ty::Predicate<'tcx>>,
-  ) -> GoalIdx {
-    let goal = infcx.resolve_vars_if_possible(*goal);
-    let hash = infcx.predicate_hash(&goal.predicate);
-    if let Some(goal_idx) = self.keys.get(&hash) {
-      return *goal_idx;
-    }
-
-    let necessity = infcx.guess_predicate_necessity(&goal.predicate);
-    let num_vars =
-      serialize::var_counter::count_vars(infcx.tcx, goal.predicate);
-    let is_lhs_ty_var = goal.predicate.is_lhs_ty_var();
-    let goal_value = serialize_to_value(infcx, &GoalPredicateDef(goal))
-      .expect("failed to serialize goal");
-
-    let idx = self.goals.push(GoalData {
-      value: goal_value,
-      necessity,
-      num_vars,
-      is_lhs_ty_var,
-
-      #[cfg(debug_assertions)]
-      debug_comparison: format!("{:?}", goal.predicate.kind().skip_binder()),
-    });
-
-    self.keys.insert(hash, idx);
-    idx
-  }
-
-  pub fn take_goals(self) -> IndexVec<GoalIdx, GoalData> {
-    self.goals
-  }
-}
+use super::{interners::Interners, *};
 
 pub struct SerializedTreeVisitor {
   pub def_id: DefId,
@@ -70,7 +22,7 @@ pub struct SerializedTreeVisitor {
   pub error_leaves: Vec<ProofNodeIdx>,
   pub unnecessary_roots: HashSet<ProofNodeIdx>,
   pub cycle: Option<ProofCycle>,
-  interner: GoalInterner,
+  interners: Interners,
 }
 
 impl SerializedTreeVisitor {
@@ -84,7 +36,7 @@ impl SerializedTreeVisitor {
       error_leaves: Vec::default(),
       unnecessary_roots: HashSet::default(),
       cycle: None,
-      interner: Default::default(),
+      interners: Interners::default(),
     }
   }
 
@@ -96,16 +48,20 @@ impl SerializedTreeVisitor {
       error_leaves,
       unnecessary_roots,
       cycle,
-      interner,
+      interners,
       ..
     } = self
     else {
       bail!("missing root node!");
     };
 
+    let (goals, candidates, results) = interners.take();
+
     Ok(SerializedTree {
       root,
-      goals: interner.take_goals(),
+      goals,
+      candidates,
+      results,
       nodes,
       topology,
       error_leaves,
@@ -115,9 +71,9 @@ impl SerializedTreeVisitor {
   }
 
   // TODO: cycle detection is too expensive for large trees, and strictly
-  // comparing the JSON values is a bad idea in general. We should wait
-  // until the new trait solver has some mechanism for detecting cycles
-  // and piggy back off that.
+  // comparing the JSON values is a bad idea in general. (This is what comparing
+  // interned keys does essentially). We should wait until the new trait solver
+  // has some mechanism for detecting cycles and piggy back off that.
   fn check_for_cycle_from(&mut self, from: ProofNodeIdx) {
     if self.cycle.is_some() {
       return;
@@ -138,73 +94,6 @@ impl SerializedTreeVisitor {
       self.cycle = Some(to_root.into());
     }
   }
-
-  fn mk_goal_node<'tcx>(&mut self, goal: &InspectGoal<'_, 'tcx>) -> Node {
-    let infcx = goal.infcx();
-    let result = goal.result();
-    let goal = goal.goal();
-    let goal_idx = self.interner.intern(infcx, &goal);
-    Node::Goal(goal_idx, result)
-  }
-}
-
-impl Node {
-  fn from_candidate<'tcx>(
-    candidate: &InspectCandidate<'_, 'tcx>,
-    _def_id: DefId,
-  ) -> Self {
-    use rustc_trait_selection::traits::solve::{
-      inspect::ProbeKind, CandidateSource,
-    };
-
-    let can = match candidate.kind() {
-      ProbeKind::Root { .. } => "root".into(),
-      ProbeKind::NormalizedSelfTyAssembly => "normalized-self-ty-asm".into(),
-      ProbeKind::UnsizeAssembly => "unsize-asm".into(),
-      ProbeKind::CommitIfOk => "commit-if-ok".into(),
-      ProbeKind::UpcastProjectionCompatibility => "upcase-proj-compat".into(),
-      ProbeKind::MiscCandidate { .. } => "misc".into(),
-      ProbeKind::TraitCandidate { source, .. } => match source {
-        CandidateSource::BuiltinImpl(_built_impl) => "builtin".into(),
-        CandidateSource::AliasBound => "alias-bound".into(),
-        // The only two we really care about.
-        CandidateSource::ParamEnv(idx) => Candidate::new_param_env(idx),
-        CandidateSource::Impl(def_id) => {
-          Self::from_impl(candidate.infcx(), def_id)
-        }
-      },
-    };
-
-    Node::Candidate(can)
-  }
-
-  fn from_impl(infcx: &InferCtxt, def_id: DefId) -> Candidate {
-    let tcx = infcx.tcx;
-    // First, try to get an impl header from the def_id ty
-    tcx
-      .get_impl_header(def_id)
-      .map(|header| Candidate::new_impl_header(infcx, &header))
-      // Second, scramble to find a suitable span, or some error string.
-      .unwrap_or_else(|| {
-        tcx
-          .span_of_impl(def_id)
-          .map(|sp| {
-            tcx
-              .sess
-              .source_map()
-              .span_to_snippet(sp)
-              .unwrap_or_else(|_| "failed to find impl".to_string())
-          })
-          .unwrap_or_else(|symb| {
-            format!("foreign impl from: {}", symb.as_str())
-          })
-          .into()
-      })
-  }
-
-  fn from_result(result: &EvaluationResult) -> Self {
-    Node::Result(result.clone())
-  }
 }
 
 impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
@@ -214,7 +103,7 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
     &mut self,
     goal: &InspectGoal<'_, 'tcx>,
   ) -> ControlFlow<Self::BreakTy> {
-    let here_node = self.mk_goal_node(goal);
+    let here_node = self.interners.mk_goal_node(goal);
 
     let here_idx = self.nodes.push(here_node.clone());
 
@@ -235,7 +124,7 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
     self.previous = Some(here_idx);
 
     for c in goal.candidates() {
-      let here_candidate = Node::from_candidate(&c, self.def_id);
+      let here_candidate = self.interners.mk_candidate_node(&c);
       let candidate_idx = self.nodes.push(here_candidate);
 
       let prev_idx = if c.is_informative_probe() {
@@ -250,7 +139,7 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
 
       if self.topology.is_leaf(prev_idx) {
         let result = goal.result();
-        let leaf = Node::from_result(&result);
+        let leaf = self.interners.mk_result_node(result);
         let leaf_idx = self.nodes.push(leaf);
         self.topology.add(prev_idx, leaf_idx);
         if !result.is_yes() {

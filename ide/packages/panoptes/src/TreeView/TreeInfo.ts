@@ -1,7 +1,10 @@
 import {
+  CandidateData,
+  CandidateIdx,
   EvaluationResult,
   GoalIdx,
   ProofNodeIdx,
+  ResultIdx,
   SerializedTree,
   TreeTopology,
 } from "@argus/common/bindings";
@@ -99,7 +102,8 @@ export class TreeInfo {
           return "remove-tree";
         }
       } else if ("Candidate" in node) {
-        if ("Any" in node.Candidate) {
+        const candidate = this.candidate(node.Candidate);
+        if ("Any" in candidate) {
           return "remove-node";
         } else {
           return "keep";
@@ -126,6 +130,10 @@ export class TreeInfo {
     return this.tree.nodes[n];
   }
 
+  public candidate(n: CandidateIdx): CandidateData {
+    return this.tree.candidates[n];
+  }
+
   public goal(n: GoalIdx) {
     return this.tree.goals[n];
   }
@@ -138,12 +146,16 @@ export class TreeInfo {
     return this.view.topology.children[n] ?? [];
   }
 
-  public result(n: ProofNodeIdx): EvaluationResult | undefined {
+  public result(n: ResultIdx): EvaluationResult {
+    return this.tree.results[n];
+  }
+
+  public nodeResult(n: ProofNodeIdx): EvaluationResult | undefined {
     const node = this.node(n);
     if ("Result" in node) {
-      return node.Result;
+      return this.result(node.Result);
     } else if ("Goal" in node) {
-      return node.Goal[1];
+      return this.result(node.Goal[1]);
     } else {
       return undefined;
     }
@@ -194,7 +206,7 @@ export class TreeInfo {
     const sortErrorsFirst = (leaf: ProofNodeIdx) => {
       const node = this.tree.nodes[leaf];
       if ("Result" in node) {
-        switch (node.Result) {
+        switch (this.result(node.Result)) {
           case "no":
             return 0;
           case "maybe-overflow":
