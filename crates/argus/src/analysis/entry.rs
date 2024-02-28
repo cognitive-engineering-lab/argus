@@ -61,7 +61,7 @@ pub fn process_obligation<'tcx>(
     return;
   };
 
-  if INCLUDE_SUCCESSES.copied().unwrap_or(false) && result.is_yes() {
+  if !INCLUDE_SUCCESSES.copied().unwrap_or(false) && result.is_yes() {
     log::debug!("Skipping successful obligation {obl:?}");
     return;
   }

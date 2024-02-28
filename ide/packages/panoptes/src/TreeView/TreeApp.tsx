@@ -37,7 +37,7 @@ const TreeApp = ({
 
   const tabs: [string, React.FC][] = [["Top Down", TopDown]];
 
-  if (treeInfo.errorNodes().length > 0) {
+  if (treeInfo.errorLeaves().length > 0) {
     tabs.unshift(["Bottom Up", BottomUp]);
   }
 

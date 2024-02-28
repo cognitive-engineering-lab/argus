@@ -87,6 +87,14 @@ impl Interners {
     )
   }
 
+  pub fn goal(&self, g: GoalIdx) -> &GoalData {
+    &self.goals.values[g]
+  }
+
+  pub fn candidate(&self, c: CandidateIdx) -> &CandidateData {
+    &self.candidates.values[c]
+  }
+
   pub fn mk_result_node(&mut self, result: EvaluationResult) -> Node {
     Node::Result(self.intern_result(result))
   }

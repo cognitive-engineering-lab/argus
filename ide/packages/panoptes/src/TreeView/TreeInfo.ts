@@ -195,17 +195,33 @@ export class TreeInfo {
     };
   }
 
-  public errorNodes(): ProofNodeIdx[] {
-    const allLeaves = this.tree.errorLeaves;
-    const viewLeaves = _.filter(
-      allLeaves,
-      leaf => this.view.topology.parent[leaf] !== undefined
-    );
-    return viewLeaves;
+  public errorLeaves(): ProofNodeIdx[] {
+    if (this.nodeResult(this.root) === "yes") {
+      return [];
+    }
+
+    let errorLeaves = [];
+    let stack = [this.root];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      const children = this.children(current);
+      if (children.length === 0 && this.nodeResult(current) !== "yes") {
+        const node = this.node(current);
+        if ("Result" in node) {
+          errorLeaves.push(current);
+        } else {
+          console.error("Node has no children but isn't a leaf", node);
+        }
+      } else {
+        const errorKids = _.filter(children, n => this.nodeResult(n) !== "yes");
+        stack.push(...errorKids);
+      }
+    }
+    return errorLeaves;
   }
 
-  public errorNodesRecommendedOrder(): ProofNodeIdx[] {
-    const viewLeaves = this.errorNodes();
+  public errorLeavesRecommendedOrder(): ProofNodeIdx[] {
+    const viewLeaves = this.errorLeaves();
 
     const sortErrorsFirst = (leaf: ProofNodeIdx) => {
       const node = this.tree.nodes[leaf];

@@ -100,7 +100,6 @@ pub struct SerializedTree {
   pub results: IndexVec<ResultIdx, ResultData>,
 
   pub topology: TreeTopology,
-  pub error_leaves: Vec<ProofNodeIdx>,
   pub unnecessary_roots: HashSet<ProofNodeIdx>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub cycle: Option<ProofCycle>,

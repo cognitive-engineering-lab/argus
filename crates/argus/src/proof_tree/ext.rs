@@ -66,15 +66,9 @@ impl CandidateExt for InspectCandidate<'_, '_> {
   }
 
   fn is_informative_probe(&self) -> bool {
-    matches!(
-      self.kind(),
-      ProbeKind::TraitCandidate {
-        source: CandidateSource::Impl(_),
-        ..
-      } | ProbeKind::TraitCandidate {
-        source: CandidateSource::BuiltinImpl(_),
-        ..
-      }
-    )
+    matches!(self.kind(), ProbeKind::TraitCandidate {
+      source: CandidateSource::Impl(_) | CandidateSource::ParamEnv(_),
+      ..
+    })
   }
 }

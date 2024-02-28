@@ -24,7 +24,7 @@ use crate::{
 
 macro_rules! property_is_ok {
   ($prop:expr, $t:tt) => {{
-    #[cfg(feature = "testing")]
+    #[cfg(any(feature = "testing", debug_assertions))]
     {
       let it = $prop;
       if !it.is_ok() {
@@ -66,6 +66,17 @@ pub fn compute_provenance<'tcx>(
   }
 }
 
+fn expect_trait_ref<'tcx>(
+  p: &ty::Predicate<'tcx>,
+) -> ty::Binder<'tcx, ty::TraitPredicate<'tcx>> {
+  p.kind().map_bound(|f| {
+    let ty::PredicateKind::Clause(ty::ClauseKind::Trait(tr)) = f else {
+      unreachable!();
+    };
+    tr
+  })
+}
+
 pub fn transform<'a, 'tcx: 'a>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
@@ -76,7 +87,7 @@ pub fn transform<'a, 'tcx: 'a>(
   reported_trait_errors: &FxIndexMap<Span, Vec<ObligationHash>>,
   bins: Vec<Bin>,
 ) -> ObligationsInBody {
-  #[cfg(feature = "testing")]
+  #[cfg(debug_assertions)]
   {
     assert!(synthetic_data.is_empty(), "synthetic data not empty");
     assert!(
@@ -543,7 +554,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     ))
   }
 
-  #[cfg(feature = "testing")]
+  #[cfg(any(feature = "testing", debug_assertions))]
   fn is_valid(&self) -> anyhow::Result<()> {
     for obl in self.raw_obligations.iter() {
       if obl.is_synthetic {
@@ -563,15 +574,4 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
 
     Ok(())
   }
-}
-
-fn expect_trait_ref<'tcx>(
-  p: &ty::Predicate<'tcx>,
-) -> ty::Binder<'tcx, ty::TraitPredicate<'tcx>> {
-  p.kind().map_bound(|f| {
-    let ty::PredicateKind::Clause(ty::ClauseKind::Trait(tr)) = f else {
-      unreachable!();
-    };
-    tr
-  })
 }

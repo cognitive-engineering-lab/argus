@@ -120,7 +120,8 @@ export const PrintBodyName = ({ defPath }: { defPath: any }) => {
   return (
     <PrintWithFallback
       object={defPath}
-      Content={() => <UnsafePrintDefPathFull o={defPath} />}
+      // Content={() => <UnsafePrintDefPathFull o={defPath} />}
+      Content={() => <UnsafePrintDefPath o={defPath} />}
     />
   );
 };

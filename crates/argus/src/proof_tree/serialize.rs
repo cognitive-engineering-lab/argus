@@ -1,7 +1,7 @@
 use std::{collections::HashSet, ops::ControlFlow};
 
 use anyhow::{bail, Result};
-use ext::{CandidateExt, EvaluationResultExt};
+use ext::CandidateExt;
 use index_vec::IndexVec;
 use rustc_hir::def_id::DefId;
 use rustc_infer::infer::InferCtxt;
@@ -19,7 +19,6 @@ pub struct SerializedTreeVisitor {
   pub previous: Option<ProofNodeIdx>,
   pub nodes: IndexVec<ProofNodeIdx, Node>,
   pub topology: TreeTopology,
-  pub error_leaves: Vec<ProofNodeIdx>,
   pub unnecessary_roots: HashSet<ProofNodeIdx>,
   pub cycle: Option<ProofCycle>,
   interners: Interners,
@@ -33,19 +32,49 @@ impl SerializedTreeVisitor {
       previous: None,
       nodes: IndexVec::default(),
       topology: TreeTopology::new(),
-      error_leaves: Vec::default(),
       unnecessary_roots: HashSet::default(),
       cycle: None,
       interners: Interners::default(),
     }
   }
 
+  #[cfg(debug_assertions)]
+  fn is_valid(&self) -> Result<()> {
+    for (pidx, node) in self.nodes.iter_enumerated() {
+      match node {
+        Node::Goal(g) => {
+          anyhow::ensure!(
+            !self.topology.is_leaf(pidx),
+            "non-leaf node (goal) has no children {:?}",
+            self.interners.goal(*g)
+          );
+        }
+        Node::Candidate(c) => {
+          anyhow::ensure!(
+            !self.topology.is_leaf(pidx),
+            "non-leaf node (candidate) has no children {:?}",
+            self.interners.candidate(*c)
+          );
+        }
+        Node::Result(..) => {
+          anyhow::ensure!(
+            self.topology.is_leaf(pidx),
+            "result node is not a leaf"
+          );
+        }
+      }
+    }
+    Ok(())
+  }
+
   pub fn into_tree(self) -> Result<SerializedTree> {
+    #[cfg(debug_assertions)]
+    self.is_valid()?;
+
     let SerializedTreeVisitor {
       root: Some(root),
       nodes,
       topology,
-      error_leaves,
       unnecessary_roots,
       cycle,
       interners,
@@ -64,7 +93,6 @@ impl SerializedTreeVisitor {
       results,
       nodes,
       topology,
-      error_leaves,
       unnecessary_roots,
       cycle,
     })
@@ -98,7 +126,6 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
     goal: &InspectGoal<'_, 'tcx>,
   ) -> ControlFlow<Self::BreakTy> {
     let here_node = self.interners.mk_goal_node(goal);
-
     let here_idx = self.nodes.push(here_node.clone());
 
     if self.root.is_none() {
@@ -114,35 +141,32 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
     // how the solver actually works, and is ignorant of inference vars.
     self.check_for_cycle_from(here_idx);
 
-    let prev = self.previous.clone();
-    self.previous = Some(here_idx);
+    let here_parent = self.previous.clone();
+
+    let add_result_if_empty = |this: &mut Self, n: ProofNodeIdx| {
+      if this.topology.is_leaf(n) {
+        let result = goal.result();
+        let leaf = this.interners.mk_result_node(result);
+        let leaf_idx = this.nodes.push(leaf);
+        this.topology.add(n, leaf_idx);
+      }
+    };
 
     for c in goal.candidates() {
+      if !c.is_informative_probe() {
+        continue;
+      }
+
       let here_candidate = self.interners.mk_candidate_node(&c);
       let candidate_idx = self.nodes.push(here_candidate);
-
-      let prev_idx = if c.is_informative_probe() {
-        self.topology.add(here_idx, candidate_idx);
-        self.previous = Some(candidate_idx);
-        candidate_idx
-      } else {
-        here_idx
-      };
-
+      self.topology.add(here_idx, candidate_idx);
+      self.previous = Some(candidate_idx);
       c.visit_nested(self)?;
-
-      if self.topology.is_leaf(prev_idx) {
-        let result = goal.result();
-        let leaf = self.interners.mk_result_node(result);
-        let leaf_idx = self.nodes.push(leaf);
-        self.topology.add(prev_idx, leaf_idx);
-        if !result.is_yes() {
-          self.error_leaves.push(leaf_idx);
-        }
-      }
+      add_result_if_empty(self, candidate_idx);
     }
 
-    self.previous = prev;
+    add_result_if_empty(self, here_idx);
+    self.previous = here_parent;
 
     ControlFlow::Continue(())
   }

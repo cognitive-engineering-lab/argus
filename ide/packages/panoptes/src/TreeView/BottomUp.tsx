@@ -102,7 +102,8 @@ function invertViewWithRoots(
     // Each element of the group is equivalent, so just take the first
     const builder = new TopologyBuilder(group[0], tree);
 
-    // Get the paths to the root from all leaves
+    // Get the paths to the root from all leaves, filter paths that
+    // contain successful nodes.
     const pathsToRoot = _.map(group, parent => tree.pathToRoot(parent).path);
 
     console.debug(
@@ -128,16 +129,16 @@ const BottomUp = () => {
   const mkGetChildren = (view: TreeView) => (idx: ProofNodeIdx) =>
     view.topology.children[idx] ?? [];
 
-  const leaves = _.map(tree.errorNodesRecommendedOrder(), leaf => {
-    let curr: ProofNodeIdx | undefined = leaf;
+  const liftToGoal = (idx: ProofNodeIdx) => {
+    let curr: ProofNodeIdx | undefined = idx;
     while (curr !== undefined && !("Goal" in tree.node(curr))) {
       curr = tree.parent(curr);
     }
     return curr;
-  });
+  };
 
+  const leaves = _.map(tree.errorLeavesRecommendedOrder(), liftToGoal);
   const invertedViews = invertViewWithRoots(_.compact(leaves), tree);
-
   // The "Argus recommended" errors are shown expanded, and the
   // "others" are collapsed. Argus recommended errors are the ones
   // that failed or are ambiguous with a concrete type on the LHS.
@@ -149,7 +150,7 @@ const BottomUp = () => {
       return result === "no" || result === "maybe-overflow" || !goal.isLhsTyVar;
     } else {
       // Leaves should only be goals...
-      return false;
+      throw new Error(`Leaves should only be goals ${node}`);
     }
   });
 
