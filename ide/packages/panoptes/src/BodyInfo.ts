@@ -4,12 +4,15 @@ import {
   ExprIdx,
   MethodLookup,
   MethodLookupIdx,
+  MethodStep,
   Obligation,
   ObligationHash,
   ObligationIdx,
   ObligationsInBody,
 } from "@argus/common/bindings";
 import _ from "lodash";
+
+import { isObject } from "./utilities/func";
 
 class BodyInfo {
   constructor(
@@ -52,6 +55,26 @@ class BodyInfo {
 
   getExpr(idx: ExprIdx): Expr {
     return this.oib.exprs[idx];
+  }
+
+  isErrorMethodCall(expr: Expr): boolean {
+    if (!(isObject(expr.kind) && "MethodCall" in expr.kind)) {
+      return false;
+    }
+
+    if (expr.kind.MethodCall.errorRecvr) {
+      return true;
+    }
+
+    const lookup = this.getMethodLookup(expr.kind.MethodCall.data);
+
+    // This is an error method call if there doesn't exist an entry with a result "yes".
+    return !_.some(lookup.table, step =>
+      _.some(
+        step.traitPredicates,
+        idx => this.getObligation(idx).result === "yes"
+      )
+    );
   }
 
   visibleObligations(idx: ExprIdx): ObligationIdx[] {

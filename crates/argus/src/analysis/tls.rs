@@ -11,8 +11,9 @@ pub use unsafe_tls::{
 };
 
 use crate::{
-  ext::InferCtxtExt,
+  ext::{EvaluationResultExt, InferCtxtExt},
   proof_tree::SerializedTree,
+  rustc::InferCtxtExt as RustcInferCtxtExt,
   types::{intermediate::Provenance, Obligation, ObligationHash},
 };
 
@@ -29,6 +30,70 @@ thread_local! {
   static TREE: RefCell<Option<SerializedTree>> = Default::default();
 
   static REPORTED_ERRORS: RefCell<FxIndexMap<Span, Vec<ObligationHash>>> = Default::default();
+}
+
+pub fn store_obligation(obl: Provenance<Obligation>) {
+  OBLIGATIONS.with(|obls| {
+    if obls
+      .borrow()
+      .iter()
+      .find(|o| *o.hash == *obl.hash)
+      .is_none()
+    {
+      obls.borrow_mut().push(obl)
+    }
+  })
+}
+
+pub fn drain_implied_ambiguities<'tcx>(
+  infcx: &InferCtxt<'tcx>,
+  obligation: &PredicateObligation<'tcx>,
+) {
+  OBLIGATIONS.with(|obls| {
+    obls.borrow_mut().retain(|o| {
+      // Drain all elements that are:
+      // 1. Ambiguous, and--
+      // 2. Implied by the passed obligation
+      let should_remove = o.result.is_maybe()
+        && o
+          .full_data
+          .map(|idx| {
+            unsafe_tls::borrow_in(idx, |fdata| {
+              fdata.infcx.universe() == infcx.universe()
+                && infcx.error_implies(
+                  obligation.predicate.clone(),
+                  fdata.obligation.predicate.clone(),
+                )
+            })
+          })
+          .unwrap_or(false);
+      !should_remove
+    })
+  })
+}
+
+pub fn take_obligations() -> Vec<Provenance<Obligation>> {
+  OBLIGATIONS.with(|obls| obls.take())
+}
+
+pub fn replace_reported_errors(errs: FxIndexMap<Span, Vec<ObligationHash>>) {
+  REPORTED_ERRORS.with(|rerrs| rerrs.replace(errs));
+}
+
+pub fn take_reported_errors() -> FxIndexMap<Span, Vec<ObligationHash>> {
+  REPORTED_ERRORS.with(|rerrs| rerrs.take())
+}
+
+pub fn store_tree(new_tree: SerializedTree) {
+  TREE.with(|tree| {
+    if tree.borrow().is_none() {
+      tree.replace(Some(new_tree));
+    }
+  })
+}
+
+pub fn take_tree() -> Option<SerializedTree> {
+  TREE.with(|tree| tree.take())
 }
 
 // This is for complex obligations and their inference contexts.
@@ -88,6 +153,22 @@ mod unsafe_tls {
     })
   }
 
+  // NOTE: ignore the 'tcx lifetime on the resulting reference. This data
+  // lives as long as the thread does, but the function can only be used
+  // from within this module so it shouldn't be an issue.
+  pub(super) fn borrow_in<'tcx, R>(
+    idx: UODIdx,
+    f: impl FnOnce(&'tcx FullObligationData<'tcx>) -> R,
+  ) -> R {
+    OBLIGATION_DATA.with(|data| {
+      let data = data.borrow();
+      let ud = data.get(idx);
+      let d: &'tcx FullObligationData<'tcx> =
+        unsafe { std::mem::transmute(ud) };
+      f(d)
+    })
+  }
+
   pub fn take<'tcx>() -> IndexVec<UODIdx, FullObligationData<'tcx>> {
     OBLIGATION_DATA.with(|data| {
       data
@@ -101,41 +182,4 @@ mod unsafe_tls {
         .collect()
     })
   }
-}
-
-pub fn store_obligation(obl: Provenance<Obligation>) {
-  OBLIGATIONS.with(|obls| {
-    if obls
-      .borrow()
-      .iter()
-      .find(|o| *o.hash == *obl.hash)
-      .is_none()
-    {
-      obls.borrow_mut().push(obl)
-    }
-  })
-}
-
-pub fn take_obligations() -> Vec<Provenance<Obligation>> {
-  OBLIGATIONS.with(|obls| obls.take())
-}
-
-pub fn replace_reported_errors(errs: FxIndexMap<Span, Vec<ObligationHash>>) {
-  REPORTED_ERRORS.with(|rerrs| rerrs.replace(errs));
-}
-
-pub fn take_reported_errors() -> FxIndexMap<Span, Vec<ObligationHash>> {
-  REPORTED_ERRORS.with(|rerrs| rerrs.take())
-}
-
-pub fn store_tree(new_tree: SerializedTree) {
-  TREE.with(|tree| {
-    if tree.borrow().is_none() {
-      tree.replace(Some(new_tree));
-    }
-  })
-}
-
-pub fn take_tree() -> Option<SerializedTree> {
-  TREE.with(|tree| tree.take())
 }

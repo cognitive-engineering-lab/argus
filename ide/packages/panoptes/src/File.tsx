@@ -218,7 +218,7 @@ const InExpr = ({ idx }: { idx: ExprIdx }) => {
   );
 
   if (
-    !(isObject(expr.kind) && "MethodCall" in expr.kind) &&
+    !bodyInfo.isErrorMethodCall(expr) &&
     bodyInfo.visibleObligations(idx).length === 0
   ) {
     return null;
@@ -234,6 +234,7 @@ const InExpr = ({ idx }: { idx: ExprIdx }) => {
     );
 
   // TODO: we should limit the length of the expression snippet.
+  // or at the very least syntax highlight it in some way...
   const header = <pre>{expr.snippet}</pre>;
 
   const openChildren = idx === highlightedObligation.value?.exprIdx;

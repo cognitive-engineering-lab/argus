@@ -61,17 +61,25 @@ pub fn process_obligation<'tcx>(
     return;
   };
 
+  // Use this to get rid of any resolved inference variables,
+  // these could have been resolved while trying to solve the obligation
+  // and we want to present it as such to the user.
+  let obl = &infcx.resolve_vars_if_possible(obl.clone());
+
+  // HACK: Remove ambiguous obligations if a "stronger" result was found and
+  // the predicate implies the  previous. This is necessary because we
+  // can't (currently) distinguish between a subsequent solving attempt
+  // of a previous obligation.
+  if result.is_yes() || result.is_no() {
+    tls::drain_implied_ambiguities(infcx, &obl);
+  }
+
   if !INCLUDE_SUCCESSES.copied().unwrap_or(false) && result.is_yes() {
     log::debug!("Skipping successful obligation {obl:?}");
     return;
   }
 
   log::debug!("Processing obligation {obl:?}");
-
-  // Use this to get rid of any resolved inference variables,
-  // these could have been resolved while trying to solve the obligation
-  // and we want to present it as such to the user.
-  let obl = &infcx.resolve_vars_if_possible(obl.clone());
 
   // TODO: we need to figure out when to save the full data.
   // Saving it for every obligation consumes lots of memory

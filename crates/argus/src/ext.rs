@@ -16,6 +16,7 @@ use rustc_middle::ty::{
   TypeckResults,
 };
 use rustc_query_system::ich::StableHashingContext;
+use rustc_trait_selection::traits::solve::Certainty;
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 
@@ -116,6 +117,7 @@ pub trait TypeckResultsExt<'tcx> {
 
 pub trait EvaluationResultExt {
   fn is_yes(&self) -> bool;
+  fn is_maybe(&self) -> bool;
   fn is_no(&self) -> bool;
 }
 
@@ -197,8 +199,11 @@ impl CharRangeExt for CharRange {
 
 impl EvaluationResultExt for EvaluationResult {
   fn is_yes(&self) -> bool {
-    use rustc_trait_selection::traits::solve::Certainty;
     matches!(self, EvaluationResult::Ok(Certainty::Yes))
+  }
+
+  fn is_maybe(&self) -> bool {
+    matches!(self, EvaluationResult::Ok(Certainty::Maybe(..)))
   }
 
   fn is_no(&self) -> bool {

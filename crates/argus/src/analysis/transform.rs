@@ -1,5 +1,6 @@
 use index_vec::IndexVec;
 use indexmap::IndexSet;
+use itertools::Itertools;
 use rustc_data_structures::fx::{FxHashMap as HashMap, FxIndexMap};
 use rustc_hir::{self as hir, intravisit::Map, BodyId, HirId};
 use rustc_infer::{
@@ -397,6 +398,9 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         })
       })
       .unzip();
+
+    let trait_candidates =
+      trait_candidates.into_iter().unique().collect::<Vec<_>>();
 
     let mut param_env = None;
     for &idx in &necessary_queries {
