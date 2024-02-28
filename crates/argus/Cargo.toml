@@ -36,6 +36,7 @@ argus-lib = { path = ".", features = ["testing"] }
 rustc_utils = { version = "=0.9.0-nightly-2024-01-24", features = ["serde", "ts-rs"] }
 test-log = "0.2.11"
 env_logger = "0.9.3"
+text-diff = "0.4"
 
 [package.metadata.rust-analyzer]
 # This crate uses #[feature(rustc_private)].

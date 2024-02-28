@@ -22,6 +22,7 @@ use crate::{
 
 fluid_let! {
   pub static OBLIGATION_TARGET: Target;
+  pub static INCLUDE_SUCCESSES: bool;
 }
 
 pub fn obligations<'tcx>(

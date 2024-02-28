@@ -78,10 +78,9 @@ pub(crate) fn load_test_from_file(
 
 pub fn test_obligations_no_crash(
   path: &Path,
-  assert_pass: impl for<'tcx> Fn(Forgettable<FullData<'tcx>>, ObligationsInBody)
+  mut assert_pass: impl for<'tcx> FnMut(Forgettable<FullData<'tcx>>, ObligationsInBody)
     + Send
-    + Sync
-    + Copy,
+    + Sync,
 ) {
   let inner = || -> Result<()> {
     let (source, _cfg) = load_test_from_file(path)?;
@@ -89,6 +88,19 @@ pub fn test_obligations_no_crash(
       for_each_body(tcx, |body_id, tcx| {
         let (full_data, obligations_in_body) =
           analysis::body_data(tcx, body_id).expect("failed to get obligations");
+
+        let missing_data_obligations = obligations_in_body
+          .obligations
+          .iter()
+          .filter(|obl| !full_data.iter().any(|(_, hash, _)| hash == obl.hash))
+          .collect::<Vec<_>>();
+
+        assert!(
+          missing_data_obligations.is_empty(),
+          "missing data for {:?}",
+          missing_data_obligations
+        );
+
         assert_pass(full_data, obligations_in_body);
       })
     });

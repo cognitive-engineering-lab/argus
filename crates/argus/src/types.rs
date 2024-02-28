@@ -189,7 +189,7 @@ impl ObligationsInBody {
   }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct BodyHash(
@@ -309,7 +309,18 @@ pub enum ObligationKind {
   Failure,
 }
 
-#[derive(Deserialize, Serialize, Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(
+  Deserialize,
+  Serialize,
+  Copy,
+  Clone,
+  Debug,
+  Hash,
+  PartialEq,
+  Eq,
+  PartialOrd,
+  Ord,
+)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct ObligationHash(
@@ -460,6 +471,15 @@ pub(super) mod intermediate {
     }
   }
 
+  impl Provenance<Obligation> {
+    pub(crate) fn mark_as_synthetic(&mut self, idx: SynIdx) {
+      if self.synthetic_data.is_none() {
+        self.synthetic_data = Some(idx);
+        self.it.is_synthetic = true;
+      }
+    }
+  }
+
   impl<T: Debug> Debug for Provenance<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
       write!(f, "Provenance<{:?}>", self.it)
@@ -536,30 +556,27 @@ pub(super) mod intermediate {
     pub obligation_data: &'a ObligationQueriesInBody<'tcx>,
   }
 
+  #[derive(PartialEq)]
   pub struct FullData<'tcx> {
     pub(crate) obligations: ObligationQueriesInBody<'tcx>,
     pub(crate) synthetic: SyntheticQueriesInBody<'tcx>,
   }
 
   impl<'tcx> FullData<'tcx> {
-    pub(crate) fn iter<'me>(
+    pub fn iter<'me>(
       &'me self,
     ) -> impl Iterator<
-      Item = (&PredicateObligation<'tcx>, &FullObligationData<'tcx>),
+      Item = (&PredicateObligation<'tcx>, ObligationHash, &InferCtxt<'tcx>),
     > + 'me {
       self
         .synthetic
         .iter()
-        .map(|sdata| {
-          let fdata = &*self.obligations.get(sdata.full_data);
-          let obligation = &sdata.obligation;
-          (obligation, fdata)
-        })
+        .map(|sdata| (&sdata.obligation, sdata.hash, &sdata.infcx))
         .chain(
           self
             .obligations
             .iter()
-            .map(|fdata| (&fdata.obligation, fdata)),
+            .map(|fdata| (&fdata.obligation, fdata.hash, &fdata.infcx)),
         )
     }
   }
@@ -568,8 +585,21 @@ pub(super) mod intermediate {
     // points to the used `InferCtxt`
     pub full_data: UODIdx,
     pub obligation: PredicateObligation<'tcx>,
+    pub hash: ObligationHash,
+    // TODO: get rid of this, but it seems that the internal
+    // mutability is screwing something up so the hashes can
+    // no longer be found after they're added (for synthetic
+    // data only).
+    pub infcx: InferCtxt<'tcx>,
   }
 
+  impl PartialEq for SyntheticData<'_> {
+    fn eq(&self, other: &Self) -> bool {
+      self.obligation == other.obligation && self.full_data == other.full_data
+    }
+  }
+
+  #[derive(PartialEq)]
   pub(crate) struct SyntheticQueriesInBody<'tcx>(
     IndexVec<SynIdx, SyntheticData<'tcx>>,
   );
@@ -577,6 +607,10 @@ pub(super) mod intermediate {
   impl<'tcx> SyntheticQueriesInBody<'tcx> {
     pub fn new() -> Self {
       SyntheticQueriesInBody(Default::default())
+    }
+
+    pub fn is_empty(&self) -> bool {
+      self.0.is_empty()
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = &SyntheticData<'tcx>> {
@@ -588,6 +622,7 @@ pub(super) mod intermediate {
     }
   }
 
+  #[derive(PartialEq)]
   pub(crate) struct ObligationQueriesInBody<'tcx>(
     IndexVec<UODIdx, FullObligationData<'tcx>>,
   );
@@ -613,6 +648,12 @@ pub(super) mod intermediate {
   // Definitely a result of what we're doing, but I'm not sure exactly
   // what our "bad behavior" is.
   pub struct Forgettable<T: Sized>(ManuallyDrop<T>);
+
+  impl<T: Sized + PartialEq> PartialEq for Forgettable<T> {
+    fn eq(&self, other: &Self) -> bool {
+      self.0 == other.0
+    }
+  }
 
   impl<T: Sized> Forgettable<T> {
     pub fn new(value: T) -> Self {

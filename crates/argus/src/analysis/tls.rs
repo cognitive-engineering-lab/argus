@@ -11,6 +11,7 @@ pub use unsafe_tls::{
 };
 
 use crate::{
+  ext::InferCtxtExt,
   proof_tree::SerializedTree,
   types::{intermediate::Provenance, Obligation, ObligationHash},
 };
@@ -42,17 +43,26 @@ mod unsafe_tls {
       Default::default();
   }
 
-  index_vec::define_index_type! {
-    pub struct UODIdx = usize;
-  }
-  index_vec::define_index_type! {
-    pub struct SynIdx = usize;
+  crate::define_idx! {
+    usize,
+    UODIdx,
+    SynIdx
   }
 
   pub struct FullObligationData<'tcx> {
     pub infcx: InferCtxt<'tcx>,
+    pub hash: ObligationHash,
     pub obligation: PredicateObligation<'tcx>,
     pub result: EvaluationResult,
+  }
+
+  impl PartialEq for FullObligationData<'_> {
+    fn eq(&self, other: &Self) -> bool {
+      self.infcx.universe() == other.infcx.universe()
+        && self.hash == other.hash
+        && self.obligation == other.obligation
+        && self.result == other.result
+    }
   }
 
   pub fn store<'tcx>(
@@ -63,6 +73,7 @@ mod unsafe_tls {
     OBLIGATION_DATA.with(|data| {
       let infcx = infer_ctxt.fork();
       let obl = obligation.clone();
+      let hash = infcx.predicate_hash(&obligation.predicate).into();
 
       let infcx: InferCtxt<'static> = unsafe { std::mem::transmute(infcx) };
       let obligation: PredicateObligation<'static> =
@@ -70,6 +81,7 @@ mod unsafe_tls {
 
       data.borrow_mut().push(Some(FullObligationData {
         infcx,
+        hash,
         obligation,
         result,
       }))

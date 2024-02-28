@@ -992,7 +992,7 @@ impl<'tcx> InferTyDef<'tcx> {
       }) => Self::Unnamed(path::PathDefNoArgs::new(def_id)),
 
       Some(TypeVariableOrigin { span, .. }) if !span.is_dummy() => {
-        let span = rustc_span::Span::source_callsite(span);
+        let span = span.source_callsite();
         if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(span) {
           Self::SourceInfo(snippet)
         } else {

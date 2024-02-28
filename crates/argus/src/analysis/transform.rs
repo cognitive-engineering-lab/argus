@@ -14,7 +14,7 @@ use rustc_utils::source_map::range::CharRange;
 
 use super::{
   hir::{self as hier_hir, Bin, BinKind},
-  tls::{SynIdx, UODIdx},
+  tls::UODIdx,
   EvaluationResult,
 };
 use crate::{
@@ -22,19 +22,31 @@ use crate::{
   types::{intermediate::*, *},
 };
 
+macro_rules! property_is_ok {
+  ($prop:expr, $t:tt) => {{
+    #[cfg(feature = "testing")]
+    {
+      let it = $prop;
+      if !it.is_ok() {
+        log::error!("property {} failed: {:?}", stringify!($prop), it);
+        assert!(false, $t);
+      }
+    }
+  }};
+}
+
 pub fn compute_provenance<'tcx>(
   infcx: &InferCtxt<'tcx>,
   obligation: &PredicateObligation<'tcx>,
   result: EvaluationResult,
   dataid: Option<UODIdx>,
-  synid: Option<SynIdx>,
 ) -> Provenance<Obligation> {
   let Some(ldef_id) = infcx.body_id() else {
     unreachable!("argus analysis should only happen on local bodies");
   };
 
   let hir = infcx.tcx.hir();
-  let fdata = infcx.bless_fulfilled(obligation, result, synid.is_some());
+  let fdata = infcx.bless_fulfilled(obligation, result, false);
 
   // If the span is coming from a macro, point to the callsite.
   let callsite_cause_span = fdata.obligation.cause.span.source_callsite();
@@ -49,7 +61,7 @@ pub fn compute_provenance<'tcx>(
   Provenance {
     hir_id,
     full_data: dataid,
-    synthetic_data: synid,
+    synthetic_data: None,
     it: infcx.erase_non_local_data(body_id, fdata),
   }
 }
@@ -64,6 +76,15 @@ pub fn transform<'a, 'tcx: 'a>(
   reported_trait_errors: &FxIndexMap<Span, Vec<ObligationHash>>,
   bins: Vec<Bin>,
 ) -> ObligationsInBody {
+  #[cfg(feature = "testing")]
+  {
+    assert!(synthetic_data.is_empty(), "synthetic data not empty");
+    assert!(
+      obligations.iter().all(|p| !p.is_synthetic),
+      "synthetic obligations exist before method call table construction"
+    );
+  }
+
   let mut obligations_idx = IndexVec::<ObligationIdx, _>::default();
 
   let obligations_with_idx = obligations
@@ -81,7 +102,7 @@ pub fn transform<'a, 'tcx: 'a>(
     typeck_results,
 
     raw_obligations: obligations_idx,
-    obligations: obligations_with_idx,
+    obligations: &obligations_with_idx,
     full_data: obligation_data,
     synthetic_data,
     reported_trait_errors,
@@ -94,7 +115,10 @@ pub fn transform<'a, 'tcx: 'a>(
   };
 
   builder.sort_bins(bins);
+  property_is_ok!(builder.is_valid(), "builder is invalid");
+
   builder.relate_trait_bound();
+  property_is_ok!(builder.is_valid(), "builder is invalid");
 
   let hir = tcx.hir();
   let source_map = tcx.sess.source_map();
@@ -123,14 +147,16 @@ pub fn transform<'a, 'tcx: 'a>(
 struct ObligationsBuilder<'a, 'tcx: 'a> {
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
-  raw_obligations: IndexVec<ObligationIdx, Obligation>,
-  obligations: Vec<Provenance<ObligationIdx>>,
   full_data: &'a ObligationQueriesInBody<'tcx>,
-  synthetic_data: &'a mut SyntheticQueriesInBody<'tcx>,
   typeck_results: &'tcx TypeckResults<'tcx>,
   reported_trait_errors: &'a FxIndexMap<Span, Vec<ObligationHash>>,
 
+  // Mutable for adding synthetic data
+  obligations: &'a Vec<Provenance<ObligationIdx>>,
+  synthetic_data: &'a mut SyntheticQueriesInBody<'tcx>,
+
   // Structures to be filled in
+  raw_obligations: IndexVec<ObligationIdx, Obligation>,
   exprs_to_hir_id: HashMap<ExprIdx, HirId>,
   ambiguity_errors: IndexSet<ExprIdx>,
   trait_errors: Vec<(ExprIdx, Vec<ObligationHash>)>,
@@ -151,8 +177,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       kind,
     } in bins
     {
-      // let span = hir.span_with_body(hir_id);
-      let span = hir.span(hir_id);
+      let span = hir.span_with_body(hir_id).source_callsite();
       if let Some((range, snippet)) =
         CharRange::from_span(span, source_map).ok().and_then(|r| {
           let snip = source_map
@@ -182,11 +207,6 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
               );
             };
 
-            log::info!(
-              "Building table for method call: {}",
-              self.tcx.hir().node_to_string(call_expr.hir_id)
-            );
-
             if let Some((idx, error_recvr, error_call)) = self
               .relate_method_call(
                 call_expr,
@@ -197,14 +217,16 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
                 &obligations,
               )
             {
-              log::info!("built table!");
               ambiguous_call = error_recvr || error_call;
               MethodCall {
                 data: idx,
                 error_recvr,
               }
             } else {
-              log::info!("Failed to build table...");
+              log::warn!(
+                "failed to build method call table for {}",
+                self.tcx.hir().node_to_string(call_expr.hir_id)
+              );
               Misc
             }
           }
@@ -351,9 +373,9 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         let is_necessary =
         // Bounds for extension method calls are always trait predicates.
           fdata.obligation.predicate.is_trait_predicate() &&
-          // TODO: Obligations for method calls are registered
-          // usder 'misc,' this of course can change. Find a better
-          // way to gather the attempted traits!
+          // FIXME: Obligations for method calls are registered under 'misc,'
+          // this of course could change. There should be a stronger way
+          // to gather the attempted traits.
           matches!(
             fdata.obligation.cause.code(),
             ObligationCauseCode::MiscObligation
@@ -372,14 +394,14 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         .map(|fdidx| self.full_data.get(fdidx))
         .unwrap();
 
-      if let Some(pe) = param_env
-        && pe == query.obligation.param_env
-      {
-        log::warn!(
-          "param environments are expected to match {:?} != {:?}",
-          pe,
-          query.obligation.param_env
-        );
+      if let Some(pe) = param_env {
+        if pe != query.obligation.param_env {
+          log::error!(
+            "param environments are expected to match {:?} != {:?}",
+            pe,
+            query.obligation.param_env
+          );
+        }
       } else {
         param_env = Some(query.obligation.param_env);
       }
@@ -392,7 +414,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           .map(|fdidx| (fdidx, self.full_data.get(fdidx)))
       })
     else {
-      log::error!("necessary queries empty! {:?}", necessary_queries);
+      log::warn!("necessary queries empty! {:?}", necessary_queries);
       return None;
     };
 
@@ -443,60 +465,73 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       .collect::<Vec<_>>();
 
     let mut table = Vec::default();
-    for ty_adjust in ty_mutators.into_iter() {
-      let mut method_steps = Vec::default();
-      for step in steps.steps.iter() {
-        let InferOk {
-          value: self_ty,
-          obligations: _,
-        } = infcx
-          .instantiate_query_response_and_region_obligations(
-            &traits::ObligationCause::misc(call_span, o.cause.body_id),
-            param_env,
-            &original_values,
-            &step.self_ty,
-          )
-          .unwrap_or_else(|_| unreachable!("whelp, that didn't work :("));
 
-        let self_ty = ty_adjust(self_ty);
-        let step = ReceiverAdjStep::new(infcx, self_ty);
+    infcx.probe(|_| {
+      for ty_adjust in ty_mutators.into_iter() {
+        let mut method_steps = Vec::default();
+        for step in steps.steps.iter() {
+          let InferOk {
+            value: self_ty,
+            obligations: _,
+          } = infcx
+            .instantiate_query_response_and_region_obligations(
+              &traits::ObligationCause::misc(call_span, o.cause.body_id),
+              param_env,
+              &original_values,
+              &step.self_ty,
+            )
+            .unwrap_or_else(|_| unreachable!("whelp, that didn't work :("));
 
-        let mut trait_predicates = Vec::default();
-        for trait_ref in trait_candidates.iter() {
-          let trait_ref = trait_ref.with_self_ty(tcx, self_ty);
+          let self_ty = ty_adjust(self_ty);
+          let step = ReceiverAdjStep::new(infcx, self_ty);
 
-          let predicate: ty::Predicate<'tcx> =
-            ty::Binder::dummy(trait_ref).to_predicate(self.tcx);
-          let obligation =
-            traits::Obligation::new(tcx, o.cause.clone(), param_env, predicate);
+          let mut trait_predicates = Vec::default();
+          for trait_ref in trait_candidates.iter() {
+            let trait_ref = trait_ref.with_self_ty(tcx, self_ty);
 
-          let res = infcx.evaluate_obligation(&obligation);
+            let predicate: ty::Predicate<'tcx> =
+              ty::Binder::dummy(trait_ref).to_predicate(self.tcx);
+            let obligation = traits::Obligation::new(
+              tcx,
+              o.cause.clone(),
+              param_env,
+              predicate,
+            );
 
-          let syn_id = self.synthetic_data.add(SyntheticData {
-            full_data: full_query_idx,
-            obligation: obligation.clone(),
-          });
+            infcx.probe(|_| {
+              let res = infcx.evaluate_obligation(&obligation);
 
-          let with_provenance = compute_provenance(
-            &infcx, // HACK very bad, get rid
-            &obligation,
-            res,
-            None,
-            Some(syn_id), // TODO:
-          );
+              let mut with_provenance =
+                compute_provenance(&infcx, &obligation, res, None);
 
-          trait_predicates
-            .push(self.raw_obligations.push(with_provenance.forget()))
+              let syn_id = self.synthetic_data.add(SyntheticData {
+                full_data: full_query_idx,
+                hash: with_provenance.hash,
+                obligation: obligation.clone(),
+                infcx: infcx.fork(),
+              });
+
+              with_provenance.mark_as_synthetic(syn_id);
+
+              trait_predicates
+                .push(self.raw_obligations.push(with_provenance.forget()))
+            });
+
+            property_is_ok!(
+              self.is_valid(),
+              "obligation invalidated the builder: {obligation:?}"
+            );
+          }
+
+          method_steps.push(MethodStep {
+            recvr_ty: step,
+            trait_predicates,
+          })
         }
 
-        method_steps.push(MethodStep {
-          recvr_ty: step,
-          trait_predicates,
-        })
+        table.extend(method_steps);
       }
-
-      table.extend(method_steps);
-    }
+    });
 
     Some((
       self.method_lookups.push(MethodLookup {
@@ -506,6 +541,27 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       error_recvr,
       error_call,
     ))
+  }
+
+  #[cfg(feature = "testing")]
+  fn is_valid(&self) -> anyhow::Result<()> {
+    for obl in self.raw_obligations.iter() {
+      if obl.is_synthetic {
+        // assert that synthetic obligation exists
+        let exists = self
+          .synthetic_data
+          .iter()
+          .any(|sdata| obl.hash == sdata.hash);
+
+        anyhow::ensure!(exists, "synthetic data not found for {:?}", obl)
+      } else {
+        let exists = self.full_data.iter().any(|fdata| fdata.hash == obl.hash);
+
+        anyhow::ensure!(exists, "full data not found for {:?}", obl)
+      }
+    }
+
+    Ok(())
   }
 }
 

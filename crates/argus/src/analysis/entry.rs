@@ -14,9 +14,9 @@ use crate::{
   analysis::{
     hir,
     tls::{self},
-    transform, EvaluationResult, OBLIGATION_TARGET,
+    transform, EvaluationResult, INCLUDE_SUCCESSES, OBLIGATION_TARGET,
   },
-  ext::InferCtxtExt,
+  ext::{EvaluationResultExt, InferCtxtExt},
   proof_tree::{serialize::serialize_proof_tree, SerializedTree},
   serialize::ty::PredicateDef,
   types::{
@@ -61,6 +61,11 @@ pub fn process_obligation<'tcx>(
     return;
   };
 
+  if INCLUDE_SUCCESSES.copied().unwrap_or(false) && result.is_yes() {
+    log::debug!("Skipping successful obligation {obl:?}");
+    return;
+  }
+
   log::debug!("Processing obligation {obl:?}");
 
   // Use this to get rid of any resolved inference variables,
@@ -78,8 +83,7 @@ pub fn process_obligation<'tcx>(
   // some currently use `.unwrap()`.
   let dataid = Some(tls::unsafe_store_data(infcx, obl, result));
 
-  let obligation =
-    transform::compute_provenance(infcx, obl, result, dataid, None);
+  let obligation = transform::compute_provenance(infcx, obl, result, dataid);
 
   tls::store_obligation(obligation);
 
@@ -116,13 +120,18 @@ pub fn process_obligation_for_tree<'tcx>(
 
     // A synthetic target requires that we do the method call queries.
     if target.is_synthetic {
-      log::debug!("Skipping synthetic obligation");
+      log::debug!("Deferring synthetic obligation tree search");
       process_obligation(infcx, obl, result);
       return;
     }
 
     // Must go after the synthetic check.
     guard_inspection! {}
+
+    // Use this to get rid of any resolved inference variables,
+    // these could have been resolved while trying to solve the obligation
+    // and we want to present it as such to the user.
+    let obl = &infcx.resolve_vars_if_possible(obl.clone());
 
     let fdata = infcx.bless_fulfilled(obl, result, false);
 
@@ -180,10 +189,9 @@ pub(crate) fn pick_tree<'a, 'tcx: 'a>(
 
   let res: Result<SerializedTree> = data
     .iter()
-    .find_map(|(obligation, full_data)| {
-      let infcx = &full_data.infcx;
-      let fdata = infcx.bless_fulfilled(obligation, full_data.result, false);
-      if fdata.hash == hash {
+    .find_map(|(obligation, this_hash, infcx)| {
+      if this_hash == hash {
+        log::info!("Generating synthetic tree for obligation {:?}", obligation);
         Some(generate_tree(infcx, &obligation))
       } else {
         None

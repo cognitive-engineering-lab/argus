@@ -16,7 +16,6 @@ use rustc_middle::ty::{
   TypeckResults,
 };
 use rustc_query_system::ich::StableHashingContext;
-use rustc_span::Span;
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 
@@ -116,7 +115,8 @@ pub trait TypeckResultsExt<'tcx> {
 }
 
 pub trait EvaluationResultExt {
-  fn is_certain(&self) -> bool;
+  fn is_yes(&self) -> bool;
+  fn is_no(&self) -> bool;
 }
 
 pub trait PredicateObligationExt {
@@ -133,7 +133,7 @@ impl PredicateObligationExt for PredicateObligation<'_> {
 
     // Backup span of the DefId
 
-    let original_span = Span::source_callsite(self.cause.span);
+    let original_span = self.cause.span.source_callsite();
     let span = if original_span.is_dummy() {
       body_span
     } else {
@@ -196,9 +196,13 @@ impl CharRangeExt for CharRange {
 }
 
 impl EvaluationResultExt for EvaluationResult {
-  fn is_certain(&self) -> bool {
+  fn is_yes(&self) -> bool {
     use rustc_trait_selection::traits::solve::Certainty;
     matches!(self, EvaluationResult::Ok(Certainty::Yes))
+  }
+
+  fn is_no(&self) -> bool {
+    matches!(self, EvaluationResult::Err(..))
   }
 }
 
