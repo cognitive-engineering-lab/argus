@@ -166,6 +166,19 @@ const MethodLookupTable = ({ lookup }: { lookup: MethodLookupIdx }) => {
   const lookupInfo = bodyInfo.getMethodLookup(lookup);
   const numCans = lookupInfo.candidates.data.length ?? 0;
 
+  const [hoveredObligation, setActiveObligation] = useState<
+    ObligationIdx | undefined
+  >(undefined);
+
+  const [clickedObligation, setClickedObligation] = useState<
+    [ObligationIdx, React.ReactElement] | null
+  >(null);
+
+  const onTDHover = (idx: ObligationIdx) => () => setActiveObligation(idx);
+  const onTableMouseExit = () => setActiveObligation(undefined);
+  const onClick = (idx: ObligationIdx) => () =>
+    setClickedObligation([idx, <ObligationFromIdx idx={idx} />]);
+
   const headingRow = (
     <tr>
       <th>Receiver Ty</th>
@@ -189,7 +202,14 @@ const MethodLookupTable = ({ lookup }: { lookup: MethodLookupIdx }) => {
         <PrintTy ty={step.recvrTy.ty} />
       </td>
       {_.map(step.traitPredicates, (queryIdx, idx) => (
-        <td key={idx}>
+        <td
+          key={idx}
+          className={classNames({
+            active: queryIdx === clickedObligation?.[0],
+          })}
+          onMouseEnter={onTDHover(queryIdx)}
+          onClick={onClick(queryIdx)}
+        >
           <ObligationResultFromIdx idx={queryIdx} />
         </td>
       ))}
@@ -197,10 +217,17 @@ const MethodLookupTable = ({ lookup }: { lookup: MethodLookupIdx }) => {
   ));
 
   return (
-    <table>
-      {headingRow}
-      {bodyRows}
-    </table>
+    <>
+      <table className="MethodCallTable" onMouseLeave={onTableMouseExit}>
+        {headingRow}
+        {bodyRows}
+      </table>
+      {hoveredObligation !== undefined ? (
+        <ObligationFromIdx idx={hoveredObligation} />
+      ) : (
+        clickedObligation?.[1]
+      )}
+    </>
   );
 };
 
