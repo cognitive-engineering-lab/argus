@@ -1,6 +1,6 @@
 [package]
 name = "argus-lib"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Gavin Gray <gavinleroy6@gmail.com>"]
 repository = "https://github.com/cognitive-engineering-lab/argus"
