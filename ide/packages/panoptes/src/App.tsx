@@ -9,6 +9,7 @@ import React, { useEffect, useState } from "react";
 
 import Workspace from "./Workspace";
 import { highlightedObligation } from "./signals";
+import { bringToFront } from "./utilities/func";
 
 const App = ({
   initialData,
@@ -44,10 +45,14 @@ const App = ({
 
       case "open-file": {
         return setOpenFiles(currFiles => {
-          if (_.find(currFiles, ([filename, _]) => filename === payload.file)) {
-            return currFiles;
+          const idx = _.findIndex(
+            currFiles,
+            ([filename, _]) => filename === payload.file
+          );
+          if (idx === -1) {
+            return [[payload.file, payload.data], ...currFiles];
           }
-          return [[payload.file, payload.data], ...currFiles];
+          return bringToFront(currFiles, idx);
         });
       }
 
@@ -56,7 +61,7 @@ const App = ({
         return setOpenFiles(payload.data);
       }
 
-      // Everthing else must be ignored.
+      // Everything else must be ignored.
       default:
         return;
     }

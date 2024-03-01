@@ -204,7 +204,7 @@ const MethodLookupTable = ({ lookup }: { lookup: MethodLookupIdx }) => {
       {_.map(step.traitPredicates, (queryIdx, idx) => (
         <td
           key={idx}
-          className={classNames({
+          className={classNames("with-result", {
             active: queryIdx === clickedObligation?.[0],
           })}
           onMouseEnter={onTDHover(queryIdx)}
@@ -231,9 +231,7 @@ const MethodLookupTable = ({ lookup }: { lookup: MethodLookupIdx }) => {
   );
 };
 
-// NOTE: don't access the expression obligations directly, use the BodyInfo
-// to get the obligations that are currently visible.
-const InExpr = ({ idx }: { idx: ExprIdx }) => {
+const Expr = ({ idx }: { idx: ExprIdx }) => {
   useSignals();
 
   const bodyInfo = useContext(BodyInfoContext)!;
@@ -316,7 +314,7 @@ const ObligationBody = ({ bodyInfo }: { bodyInfo: BodyInfo }) => {
         info={header}
         startOpen={openChildren}
         Children={() =>
-          _.map(bodyInfo.exprs, (i, idx) => <InExpr idx={i} key={idx} />)
+          _.map(bodyInfo.exprs, (i, idx) => <Expr idx={i} key={idx} />)
         }
       />
     </BodyInfoContext.Provider>

@@ -13,6 +13,10 @@ export function obligationCardId(file: Filename, hash: ObligationHash) {
   return `obl--${name}-${hash}`;
 }
 
+export function bringToFront<T>(data: T[], index: number): T[] {
+  return [data[index], ...data.slice(0, index), ...data.slice(index + 1)];
+}
+
 export function errorCardId(
   file: Filename,
   bodyIdx: number,

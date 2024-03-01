@@ -1,5 +1,5 @@
 //! Thread local storage for storing data processed in rustc.
-use std::cell::RefCell;
+use std::{cell::RefCell, panic};
 
 use index_vec::IndexVec;
 use rustc_data_structures::fx::FxIndexMap;
@@ -45,25 +45,39 @@ pub fn store_obligation(obl: Provenance<Obligation>) {
   })
 }
 
+// TODO: using `infcx` for error implication panics, but using
+// stored contexts doesn't. Investigate why, as this certainly
+// isn't a "solution."
 pub fn drain_implied_ambiguities<'tcx>(
-  infcx: &InferCtxt<'tcx>,
+  _infcx: &InferCtxt<'tcx>,
   obligation: &PredicateObligation<'tcx>,
 ) {
+  use std::panic::AssertUnwindSafe;
   OBLIGATIONS.with(|obls| {
-    obls.borrow_mut().retain(|o| {
+    let mut obls = obls.borrow_mut();
+    obls.retain(|provenance| {
       // Drain all elements that are:
       // 1. Ambiguous, and--
       // 2. Implied by the passed obligation
-      let should_remove = o.result.is_maybe()
-        && o
+      let should_remove = provenance.result.is_maybe()
+        && provenance
           .full_data
           .map(|idx| {
             unsafe_tls::borrow_in(idx, |fdata| {
-              fdata.infcx.universe() == infcx.universe()
-                && infcx.error_implies(
+              // NOTE: using the inference context in this was is problematic as
+              // we can't know for sure whether variables won't be leaked. (I.e.,
+              // used in a context they don't live in.) The open snapshot check is
+              // trying to mitigate this happening, but it's not foolproof and we
+              // certainly don't want to crash the program.
+              // Furthermore, this closure is unwind safe because the inference contexts
+              // are forked, and no one outside this thread can access them.
+              panic::catch_unwind(AssertUnwindSafe(|| {
+                fdata.infcx.error_implies(
                   obligation.predicate.clone(),
                   fdata.obligation.predicate.clone(),
                 )
+              }))
+              .unwrap_or(false)
             })
           })
           .unwrap_or(false);

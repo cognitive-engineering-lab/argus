@@ -44,7 +44,6 @@ span.ErrorCount {
     border-spacing: 0.15em;
 }
 
-/* select TH elements of the MethodCallTable class */
 .MethodCallTable th {
     text-align: left;
 }
@@ -53,11 +52,15 @@ span.ErrorCount {
     vertical-align: middle;
 }
 
-.MethodCallTable td.active {
+.MethodCallTable td.with-result {
+    cursor: pointer;
+}
+
+.MethodCallTable td.with-result.active {
     border: 2px solid var(--vscode-focusBorder);
     border-radius: 3px;
 }
 
-.MethodCallTable td:hover {
+.MethodCallTable td.with-result:hover {
     box-shadow: 10px 10px 5px var(--vscode-dropdown-background);
 }
