@@ -1,0 +1,45 @@
+name: publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish-crates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/install@v0.1
+        with:
+          crate: cargo-workspaces
+          version: latest
+          use-tool-cache: true
+      - name: Setup
+        uses: ./.github/workflows/setup
+      - run: cargo ws publish --from-git --yes --token ${{ secrets.CRATES_IO }}
+
+  publish-ide:
+    runs-on: ubuntu-latest
+    needs: publish-crates
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup
+        uses: ./.github/workflows/setup
+
+      - name: Publish to Open VSX Registry
+        uses: HaaLeo/publish-vscode-extension@v1
+        id: publishToOpenVSX
+        with:
+          pat: ${{ secrets.OVSX_MRKT }}
+
+      - name: Publish to Visual Studio Marketplace
+        uses: HaaLeo/publish-vscode-extension@v1
+        with:
+          pat: ${{ secrets.VSCODE_MRKT }}
+          registryUrl: https://marketplace.visualstudio.com
+          extensionFile: ${{ steps.publishToOpenVSX.outputs.vsixPath }}
