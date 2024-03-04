@@ -220,27 +220,22 @@ export class TreeInfo {
     return errorLeaves;
   }
 
-  public errorLeavesRecommendedOrder(): ProofNodeIdx[] {
-    const viewLeaves = this.errorLeaves();
-
-    const sortErrorsFirst = (leaf: ProofNodeIdx) => {
-      const node = this.tree.nodes[leaf];
-      if ("Result" in node) {
-        switch (this.result(node.Result)) {
-          case "no":
-            return 0;
-          case "maybe-overflow":
-          case "maybe-ambiguity":
-            return 1;
-          case "yes":
-            throw new Error("Only expected error leaves.");
-        }
-      } else {
-        throw new Error("Leaves should only be results.");
+  public sortByRecommendedOrder<T>(data: T[], f: (t: T) => ProofNodeIdx): T[] {
+    const sortErrorsFirst = (t: T) => {
+      const leaf = f(t);
+      switch (this.nodeResult(leaf)) {
+        case "no":
+          return 0;
+        case "maybe-overflow":
+        case "maybe-ambiguity":
+          return 1;
+        case "yes":
+          return 2;
       }
     };
 
-    const sortWeightPaths = (leaf: ProofNodeIdx) => {
+    const sortWeightPaths = (t: T) => {
+      const leaf = f(t);
       const pathToRoot = this.pathToRoot(leaf);
       const numInferVars = _.map(pathToRoot.path, idx => {
         const node = this.tree.nodes[idx];
@@ -251,15 +246,19 @@ export class TreeInfo {
         }
       });
       // Sort the leaves by the ration of inference variables to path length.
-      return _.reduce(numInferVars, _.add, 0) / pathToRoot.path.length;
+      const nV = _.reduce(numInferVars, _.add, 0);
+      const len = pathToRoot.path.length;
+      return nV / len;
     };
 
-    const recommendedOrder = _.sortBy(viewLeaves, [
-      sortErrorsFirst,
-      sortWeightPaths,
-    ]);
+    const recommendedOrder = _.sortBy(data, [sortErrorsFirst, sortWeightPaths]);
 
     return recommendedOrder;
+  }
+
+  public errorLeavesRecommendedOrder(): ProofNodeIdx[] {
+    const viewLeaves = this.errorLeaves();
+    return this.sortByRecommendedOrder(viewLeaves, _.identity);
   }
 
   public inferVars(n: ProofNodeIdx): number {

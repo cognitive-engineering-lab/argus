@@ -44,7 +44,9 @@ pub trait PredicateExt {
 
   fn is_trait_pred_rhs(&self, def_id: DefId) -> bool;
 
-  fn is_lhs_ty_var(&self) -> bool;
+  fn is_main_ty_var(&self) -> bool;
+
+  fn is_projection_ty_var(&self) -> bool;
 }
 
 impl PredicateExt for Predicate<'_> {
@@ -69,7 +71,7 @@ impl PredicateExt for Predicate<'_> {
     })
   }
 
-  fn is_lhs_ty_var(&self) -> bool {
+  fn is_main_ty_var(&self) -> bool {
     match self.kind().skip_binder() {
       ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) => {
         trait_predicate.self_ty().is_ty_var()
@@ -77,8 +79,15 @@ impl PredicateExt for Predicate<'_> {
       ty::PredicateKind::Clause(ty::ClauseKind::TypeOutlives(
         ty::OutlivesPredicate(ty, _),
       )) => ty.is_ty_var(),
+      ty::PredicateKind::Clause(ty::ClauseKind::Projection(proj)) => {
+        proj.self_ty().is_ty_var()
+      }
       _ => false,
     }
+  }
+
+  fn is_projection_ty_var(&self) -> bool {
+    todo!()
   }
 }
 

@@ -163,7 +163,7 @@ impl Interners {
     let necessity = infcx.guess_predicate_necessity(&goal.predicate);
     let num_vars =
       serialize::var_counter::count_vars(infcx.tcx, goal.predicate);
-    let is_lhs_ty_var = goal.predicate.is_lhs_ty_var();
+    let is_main_tv = goal.predicate.is_main_ty_var();
     let goal_value = serialize_to_value(infcx, &GoalPredicateDef(goal))
       .expect("failed to serialize goal");
 
@@ -171,7 +171,7 @@ impl Interners {
       value: goal_value,
       necessity,
       num_vars,
-      is_lhs_ty_var,
+      is_main_tv,
       result: result_idx,
 
       #[cfg(debug_assertions)]

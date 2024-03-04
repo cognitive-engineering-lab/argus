@@ -1,6 +1,6 @@
 import { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
 import _ from "lodash";
-import React, { useContext } from "react";
+import React, { Fragment, useContext } from "react";
 
 import { TreeContext } from "./Context";
 import { CollapsibleElement, DirRecursive } from "./Directory";
@@ -87,6 +87,8 @@ function invertViewWithRoots(
   leaves: ProofNodeIdx[],
   tree: TreeInfo
 ): Array<TreeViewWithRoot> {
+  console.debug("Initial leaves", leaves);
+
   const groups: ProofNodeIdx[][] = _.values(
     _.groupBy(leaves, leaf => {
       const node = tree.node(leaf);
@@ -97,6 +99,8 @@ function invertViewWithRoots(
       }
     })
   );
+
+  console.debug("Grouped leaves", groups);
 
   return _.map(groups, group => {
     // Each element of the group is equivalent, so just take the first
@@ -137,7 +141,8 @@ const BottomUp = () => {
     return curr;
   };
 
-  const leaves = _.map(tree.errorLeavesRecommendedOrder(), liftToGoal);
+  const leaves = _.map(tree.errorLeaves(), liftToGoal);
+
   const invertedViews = invertViewWithRoots(_.compact(leaves), tree);
   // The "Argus recommended" errors are shown expanded, and the
   // "others" are collapsed. Argus recommended errors are the ones
@@ -147,7 +152,7 @@ const BottomUp = () => {
     if ("Goal" in node) {
       const goal = tree.goal(node.Goal);
       const result = tree.result(goal.result);
-      return result === "no" || result === "maybe-overflow" || !goal.isLhsTyVar;
+      return !goal.isMainTv && (result === "no" || result === "maybe-overflow");
     } else {
       // Leaves should only be goals...
       throw new Error(`Leaves should only be goals ${node}`);
@@ -162,7 +167,11 @@ const BottomUp = () => {
     />
   );
 
-  const recommended = _.map(argusRecommended, (leaf, i) => (
+  const recommendedSortedViews = tree.sortByRecommendedOrder(
+    argusRecommended,
+    v => v.root
+  );
+  const recommended = _.map(recommendedSortedViews, (leaf, i) => (
     <LeafElement key={i} leaf={leaf} />
   ));
 

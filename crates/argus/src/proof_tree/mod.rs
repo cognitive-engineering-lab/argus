@@ -51,7 +51,10 @@ pub struct GoalData {
 
   necessity: ObligationNecessity,
   num_vars: usize,
-  is_lhs_ty_var: bool,
+  /// Is one of the main components a type variable?
+  ///
+  /// This would be a trait clause like `_: TRAIT` or a projection where `PROJ == _`.
+  is_main_tv: bool,
   result: ResultIdx,
 
   #[cfg(debug_assertions)]
