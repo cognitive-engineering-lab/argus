@@ -8,6 +8,7 @@ import {
   SerializedTree,
 } from "@argus/common/bindings";
 import {
+  ErrorJumpTargetInfo,
   ExtensionToWebViewMsg,
   Filename,
   ObligationOutput,
@@ -42,16 +43,18 @@ export class View {
   constructor(
     extensionUri: vscode.Uri,
     initialData: [Filename, ObligationsInBody[]][],
+    target?: ErrorJumpTargetInfo,
     column: vscode.ViewColumn = vscode.ViewColumn.Beside
   ) {
     this.extensionUri = extensionUri;
     this.isPanelDisposed = true;
     // getPanel creates a new panel if it doesn't exist.
-    this.panel = this.getPanel(initialData, column);
+    this.panel = this.getPanel(initialData, target, column);
   }
 
   public getPanel(
     initialData: [Filename, ObligationsInBody[]][] = [],
+    target?: ErrorJumpTargetInfo,
     column: vscode.ViewColumn = vscode.ViewColumn.Beside
   ): vscode.WebviewPanel {
     if (!this.isPanelDisposed) {
@@ -65,11 +68,18 @@ export class View {
     this.isPanelDisposed = false;
 
     // Set the webview's initial html content
-    this.panel.webview.html = this.getHtmlForWebview(initialData);
+    this.panel.webview.html = this.getHtmlForWebview(initialData, target);
 
     // Listen for when the panel is disposed
     // This happens when the user closes the panel or when the panel is closed programatically
-    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+    this.panel.onDidDispose(
+      () => {
+        globals.ctx.view = undefined;
+        this.dispose();
+      },
+      null,
+      this.disposables
+    );
 
     // Handle messages from the webview
     this.panel.webview.onDidReceiveMessage(
@@ -210,7 +220,8 @@ export class View {
   }
 
   private getHtmlForWebview(
-    initialData: [Filename, ObligationsInBody[]][] = []
+    initialData: [Filename, ObligationsInBody[]][] = [],
+    target?: ErrorJumpTargetInfo
   ) {
     const panoptesDir = vscode.Uri.joinPath(
       this.extensionUri,
@@ -245,7 +256,13 @@ export class View {
           <title>Argus Inspector</title>
           <link rel="stylesheet" type="text/css" href=${styleUri}>
           <link rel="stylesheet" type="text/css" href=${codiconsUri}>
-          <script>window.initialData = ${JSON.stringify(initialData)};</script>
+
+          <script>
+            (function () {
+              window.data = ${JSON.stringify(initialData)};
+              window.target = ${JSON.stringify(target)};
+            })()
+          </script>
       </head>
       <body>
           <div id="root"></div>

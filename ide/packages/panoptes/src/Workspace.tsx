@@ -1,6 +1,5 @@
 import { ObligationsInBody } from "@argus/common/bindings";
 import { Filename } from "@argus/common/lib";
-import { useSignals } from "@preact/signals-react/runtime";
 import {
   VSCodeCheckbox,
   VSCodePanelTab,
@@ -42,8 +41,6 @@ const Workspace = ({
   files: [Filename, ObligationsInBody[]][];
   reset: () => void;
 }) => {
-  useSignals();
-
   const [showHidden, setShowHidden] = useState(false);
   const toggleHidden = () => setShowHidden(!showHidden);
 

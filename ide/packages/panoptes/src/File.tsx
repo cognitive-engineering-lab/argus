@@ -8,10 +8,10 @@ import {
   SerializedTree,
 } from "@argus/common/bindings";
 import { Filename } from "@argus/common/lib";
-import { useSignals } from "@preact/signals-react/runtime";
 import { VSCodeDivider } from "@vscode/webview-ui-toolkit/react";
 import classNames from "classnames";
 import _ from "lodash";
+import { observer } from "mobx-react";
 import React, {
   Fragment,
   createContext,
@@ -95,60 +95,55 @@ const ObligationTreeWrapper = ({
   return content;
 };
 
-const ObligationCard = ({
-  range,
-  obligation,
-}: {
-  range: CharRange;
-  obligation: Obligation;
-}) => {
-  useSignals();
+const ObligationCard = observer(
+  ({ range, obligation }: { range: CharRange; obligation: Obligation }) => {
+    const file = useContext(FileContext)!;
+    const id = obligationCardId(file, obligation.hash);
+    const ref = useRef<HTMLSpanElement>(null);
 
-  const file = useContext(FileContext)!;
-  const id = obligationCardId(file, obligation.hash);
-  const ref = useRef<HTMLSpanElement>(null);
+    const [addHighlight, removeHighlight] = makeHighlightPosters(
+      obligation.range,
+      file
+    );
 
-  const [addHighlight, removeHighlight] = makeHighlightPosters(
-    obligation.range,
-    file
-  );
+    const isTargetObligation =
+      highlightedObligation.value?.hash === obligation.hash;
+    const className = classNames("ObligationCard", {
+      bling: isTargetObligation,
+    });
 
-  const className = classNames("ObligationCard", {
-    bling: highlightedObligation.value?.hash === obligation.hash,
-  });
+    useLayoutEffect(() => {
+      if (highlightedObligation.value?.hash === obligation.hash) {
+        ref.current?.scrollIntoView({ behavior: "smooth" });
+      }
+    }, []);
 
-  useLayoutEffect(() => {
-    if (highlightedObligation.value?.hash === obligation.hash) {
-      ref.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, []);
+    const header = (
+      <span
+        id={id}
+        className={className}
+        ref={ref}
+        onMouseEnter={addHighlight}
+        onMouseLeave={removeHighlight}
+      >
+        <ResultRaw result={obligation.result} />
+        <PrintObligation obligation={obligation} />
+      </span>
+    );
 
-  const header = (
-    <span
-      id={id}
-      className={className}
-      ref={ref}
-      onMouseEnter={addHighlight}
-      onMouseLeave={removeHighlight}
-    >
-      <ResultRaw result={obligation.result} />
-      <PrintObligation obligation={obligation} />
-    </span>
-  );
-
-  return (
-    <CollapsibleElement
-      info={header}
-      Children={() => (
-        <ObligationTreeWrapper range={range} obligation={obligation} />
-      )}
-    />
-  );
-};
+    return (
+      <CollapsibleElement
+        info={header}
+        startOpen={isTargetObligation}
+        Children={() => (
+          <ObligationTreeWrapper range={range} obligation={obligation} />
+        )}
+      />
+    );
+  }
+);
 
 const ObligationFromIdx = ({ idx }: { idx: ObligationIdx }) => {
-  useSignals();
-
   const bodyInfo = useContext(BodyInfoContext)!;
   const o = bodyInfo.getObligation(idx);
 
@@ -231,9 +226,7 @@ const MethodLookupTable = ({ lookup }: { lookup: MethodLookupIdx }) => {
   );
 };
 
-const Expr = ({ idx }: { idx: ExprIdx }) => {
-  useSignals();
-
+const Expr = observer(({ idx }: { idx: ExprIdx }) => {
   const bodyInfo = useContext(BodyInfoContext)!;
   const file = useContext(FileContext)!;
   const expr = bodyInfo.getExpr(idx);
@@ -282,11 +275,9 @@ const Expr = ({ idx }: { idx: ExprIdx }) => {
       />
     </div>
   );
-};
+});
 
-const ObligationBody = ({ bodyInfo }: { bodyInfo: BodyInfo }) => {
-  useSignals();
-
+const ObligationBody = observer(({ bodyInfo }: { bodyInfo: BodyInfo }) => {
   if (!bodyInfo.hasVisibleExprs()) {
     return null;
   }
@@ -319,7 +310,7 @@ const ObligationBody = ({ bodyInfo }: { bodyInfo: BodyInfo }) => {
       />
     </BodyInfoContext.Provider>
   );
-};
+});
 
 const File = ({
   file,

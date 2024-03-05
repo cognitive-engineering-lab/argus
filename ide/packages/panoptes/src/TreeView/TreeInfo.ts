@@ -10,6 +10,8 @@ import {
 } from "@argus/common/bindings";
 import _ from "lodash";
 
+import { isTraitClause } from "../utilities/func";
+
 type MultiRecord<K extends number, T> = Record<K, T[]>;
 
 type Direction = "to-root" | "from-root";
@@ -245,13 +247,27 @@ export class TreeInfo {
           return 0;
         }
       });
-      // Sort the leaves by the ration of inference variables to path length.
-      const nV = _.reduce(numInferVars, _.add, 0);
+      // Sort the leaves by the ratio of inference variables to path length.
+      // const nV = _.reduce(numInferVars, _.add, 0);
       const len = pathToRoot.path.length;
-      return nV / len;
+      // return nV / len;
+      return -len;
     };
 
-    const recommendedOrder = _.sortBy(data, [sortErrorsFirst, sortWeightPaths]);
+    const bubbleTraitClauses = (t: T) => {
+      const leaf = f(t);
+      const n = this.node(leaf);
+      if ("Goal" in n && isTraitClause(this.goal(n.Goal).value.predicate)) {
+        return 0;
+      }
+      return 1;
+    };
+
+    const recommendedOrder = _.sortBy(data, [
+      bubbleTraitClauses,
+      sortErrorsFirst,
+      sortWeightPaths,
+    ]);
 
     return recommendedOrder;
   }

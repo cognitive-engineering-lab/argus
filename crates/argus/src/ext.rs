@@ -81,6 +81,7 @@ impl PredicateExt for Predicate<'_> {
       )) => ty.is_ty_var(),
       ty::PredicateKind::Clause(ty::ClauseKind::Projection(proj)) => {
         proj.self_ty().is_ty_var()
+          || proj.term.ty().map(|t| t.is_ty_var()).unwrap_or(false)
       }
       _ => false,
     }

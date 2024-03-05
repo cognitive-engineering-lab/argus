@@ -17,6 +17,14 @@ export function openError(ctx: Ctx): Cmd {
     ei: ExprIdx,
     oblHash: ObligationHash
   ) => {
+    if (ctx.view === undefined) {
+      await ctx.createOrShowView({
+        file,
+        bodyIdx: bh,
+        exprIdx: ei,
+        hash: oblHash,
+      });
+    }
     ctx.view!.blingObligation(file, bh, ei, oblHash);
   };
 }

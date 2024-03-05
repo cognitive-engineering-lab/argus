@@ -100,8 +100,6 @@ function invertViewWithRoots(
     })
   );
 
-  console.debug("Grouped leaves", groups);
-
   return _.map(groups, group => {
     // Each element of the group is equivalent, so just take the first
     const builder = new TopologyBuilder(group[0], tree);
@@ -109,14 +107,6 @@ function invertViewWithRoots(
     // Get the paths to the root from all leaves, filter paths that
     // contain successful nodes.
     const pathsToRoot = _.map(group, parent => tree.pathToRoot(parent).path);
-
-    console.debug(
-      "Paths to root",
-      _.sortBy(
-        _.map(pathsToRoot, p => _.map(p, n => tree.node(n))),
-        l => l.length
-      )
-    );
 
     _.forEach(pathsToRoot, path => {
       // No need to take the tail, `addPathFromRoot` checks that the

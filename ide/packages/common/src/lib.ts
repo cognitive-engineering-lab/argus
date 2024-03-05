@@ -14,6 +14,13 @@ export type ObligationOutput = ObligationsInBody;
 export type TreeOutput = SerializedTree | undefined;
 export type ArgusOutputs = ObligationOutput | TreeOutput;
 
+export interface ErrorJumpTargetInfo {
+  file: Filename;
+  bodyIdx: BodyHash;
+  exprIdx: ExprIdx;
+  hash: ObligationHash;
+}
+
 // ----------------------------------------------------
 // Interface between the webview and extension
 

@@ -1,4 +1,9 @@
-import { CharRange, ObligationHash, Ty } from "@argus/common/bindings";
+import {
+  CharRange,
+  ObligationHash,
+  Predicate,
+  Ty,
+} from "@argus/common/bindings";
 import { Filename } from "@argus/common/lib";
 import _ from "lodash";
 
@@ -85,4 +90,16 @@ export type Unit = { Tuple: Ty[] };
 
 export function tyIsUnit(o: Ty): o is Unit {
   return isObject(o) && "Tuple" in o && o.Tuple.length === 0;
+}
+
+export function isTraitClause(predicate: Predicate): boolean {
+  const value = predicate.value;
+  if (isObject(value) && "Clause" in value) {
+    const clause = value.Clause;
+    if ("Trait" in clause) {
+      return true;
+    }
+  }
+
+  return false;
 }

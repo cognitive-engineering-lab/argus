@@ -10,6 +10,7 @@ import {
 import {
   ArgusArgs,
   ArgusResult,
+  ErrorJumpTargetInfo,
   Filename,
   ObligationOutput,
   TreeOutput,
@@ -114,17 +115,17 @@ export class Ctx {
     _.forEach(this.commandDisposables, d => d.dispose());
   }
 
-  async createOrShowView() {
+  async createOrShowView(target?: ErrorJumpTargetInfo) {
     if (this.view) {
       this.view.getPanel().reveal();
     } else {
       const initialData = await this.getFreshWebViewData();
-      this.view = new View(this.extCtx.extensionUri, initialData);
+      this.view = new View(this.extCtx.extensionUri, initialData, target);
     }
   }
 
   get activeRustEditor(): RustEditor | undefined {
-    let editor = vscode.window.activeTextEditor;
+    const editor = vscode.window.activeTextEditor;
     return editor && isRustEditor(editor) ? editor : undefined;
   }
 
@@ -142,6 +143,10 @@ export class Ctx {
     // Compile the workspace with the Argus version of rustc.
     await b(["preload"], true);
     this.cache = new BackendCache(b);
+
+    await Promise.all(
+      _.map(this.visibleEditors, editor => this.openEditor(editor))
+    );
 
     // Register the commands with VSCode after the backend is setup.
     this.updateCommands();
@@ -165,11 +170,7 @@ export class Ctx {
         isRustEditor(editor) &&
         isDocumentInWorkspace(editor.document)
       ) {
-        // Load the obligations in the file, while we have the editor.
-        const obl = await this.loadObligations(editor);
-        if (obl) {
-          return this.view?.openEditor(editor, obl);
-        }
+        this.openEditor(editor);
       }
     });
 
@@ -192,6 +193,14 @@ export class Ctx {
     return _.filter(vscode.window.visibleTextEditors, isRustEditor);
   }
 
+  private async openEditor(editor: RustEditor) {
+    // Load the obligations in the file, while we have the editor.
+    const obl = await this.loadObligations(editor);
+    if (obl) {
+      return this.view?.openEditor(editor, obl);
+    }
+  }
+
   private findVisibleEditorByName(name: Filename): RustEditor | undefined {
     return _.find(this.visibleEditors, e => e.document.fileName === name);
   }
@@ -212,7 +221,8 @@ export class Ctx {
     if (obligations === undefined) {
       return;
     }
-    this.registerBodyInfo(editor, obligations);
+
+    this.refreshDiagnostics(editor, obligations);
     return obligations;
   }
 
@@ -224,14 +234,14 @@ export class Ctx {
     return this.cache.getTreeForObligation(filename, obligation, range);
   }
 
-  // TODO: this isn't updated to the new ambiguity / error boundaries cases.
-  private registerBodyInfo(editor: RustEditor, info: ObligationsInBody[]) {
+  // ------------------------------------
+  // Diagnostic helpers
+
+  private refreshDiagnostics(editor: RustEditor, info: ObligationsInBody[]) {
+    console.debug(`refreshing diagnostics in ${editor.document.fileName}`);
     this.setTraitErrors(editor, info);
     this.setAmbiguityErrors(editor, info);
   }
-
-  // ------------------------------------
-  // Diagnostic helpers
 
   private setTraitErrors(editor: RustEditor, oib: ObligationsInBody[]) {
     editor.setDecorations(

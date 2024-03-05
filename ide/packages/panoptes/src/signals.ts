@@ -1,13 +1,26 @@
-import { BodyHash, ExprIdx, ObligationHash } from "@argus/common/bindings";
-import { Filename } from "@argus/common/lib";
-import { signal } from "@preact/signals-react";
+import { ErrorJumpTargetInfo } from "@argus/common/lib";
 import _ from "lodash";
+import { action, makeObservable, observable } from "mobx";
 
-export interface HighlightTarget {
-  file: Filename;
-  bodyIdx: BodyHash;
-  exprIdx: ExprIdx;
-  hash: ObligationHash;
+class HighlightTarget {
+  value?: ErrorJumpTargetInfo;
+
+  constructor() {
+    makeObservable(this, {
+      value: observable,
+      reset: action,
+      set: action,
+    });
+    this.value = undefined;
+  }
+
+  set(info: ErrorJumpTargetInfo) {
+    this.value = info;
+  }
+
+  reset() {
+    this.value = undefined;
+  }
 }
 
-export const highlightedObligation = signal<HighlightTarget | null>(null);
+export const highlightedObligation = new HighlightTarget();

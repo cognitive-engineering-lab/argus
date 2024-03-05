@@ -8,8 +8,6 @@
     "@argus/common": "workspace:*",
     "@estruyf/vscode": "^1.1.0",
     "@floating-ui/react": "^0.26.8",
-    "@preact/signals-react": "^2.0.0",
-    "@preact/signals-react-transform": "^0.3.0",
     "@types/classnames": "^2.3.1",
     "@types/d3-graphviz": "^2.6.8",
     "@types/lodash": "^4.14.195",

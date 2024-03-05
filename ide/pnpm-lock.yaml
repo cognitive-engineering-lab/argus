@@ -34,7 +34,7 @@ importers:
         version: 5.2.2
       vite:
         specifier: ^4.4.9
-        version: 4.4.9(@types/node@20.8.0)
+        version: 4.4.9(@types/node@20.2.5)
       vitest:
         specifier: ^0.34.6
         version: 0.34.6
@@ -122,12 +122,6 @@ importers:
       '@floating-ui/react':
         specifier: ^0.26.8
         version: 0.26.8(react-dom@18.0.0)(react@18.0.0)
-      '@preact/signals-react':
-        specifier: ^2.0.0
-        version: 2.0.0(react@18.0.0)
-      '@preact/signals-react-transform':
-        specifier: ^0.3.0
-        version: 0.3.0(@babel/core@7.23.9)(react@18.0.0)
       '@types/classnames':
         specifier: ^2.3.1
         version: 2.3.1
@@ -193,7 +187,7 @@ importers:
         version: 1.21.3(@types/react@18.2.14)(react-dom@18.0.0)(react@18.0.0)
       vite:
         specifier: ^4.4.9
-        version: 4.4.9(@types/node@20.8.0)
+        version: 4.4.9(@types/node@20.2.5)
 
 packages:
 
@@ -950,37 +944,6 @@ packages:
     dev: true
     optional: true
 
-  /@preact/signals-core@1.5.1:
-    resolution: {integrity: sha512-dE6f+WCX5ZUDwXzUIWNMhhglmuLpqJhuy3X3xHrhZYI0Hm2LyQwOu0l9mdPiWrVNsE+Q7txOnJPgtIqHCYoBVA==}
-    dev: true
-
-  /@preact/signals-react-transform@0.3.0(@babel/core@7.23.9)(react@18.0.0):
-    resolution: {integrity: sha512-dv7X2a40jclERpCN+LQENysZZgR6JHESNZBc5z4VwHlbQRo8BE//fo1Rn2pPGN0XPj9CiDs7bTg6AH2TEhKUgA==}
-    peerDependencies:
-      '@babel/core': ^7.0.0
-      react: ^16.14.0 || 17.x || 18.x
-    dependencies:
-      '@babel/core': 7.23.9
-      '@babel/helper-module-imports': 7.22.15
-      '@babel/helper-plugin-utils': 7.22.5
-      '@preact/signals-react': 2.0.0(react@18.0.0)
-      debug: 4.3.4(supports-color@8.1.1)
-      react: 18.0.0
-      use-sync-external-store: 1.2.0(react@18.0.0)
-    transitivePeerDependencies:
-      - supports-color
-    dev: true
-
-  /@preact/signals-react@2.0.0(react@18.0.0):
-    resolution: {integrity: sha512-tMVi2SXFXlojaiPNWa8dlYaidR/XvEgMSp+iymKJgMssBM/QVtUQrodKZek1BJju+dkVHiyeuQHmkuLOI9oyNw==}
-    peerDependencies:
-      react: ^16.14.0 || 17.x || 18.x
-    dependencies:
-      '@preact/signals-core': 1.5.1
-      react: 18.0.0
-      use-sync-external-store: 1.2.0(react@18.0.0)
-    dev: true
-
   /@sinclair/typebox@0.27.8:
     resolution: {integrity: sha512-+Fj43pSMwJs4KRrH/938Uf+uAELIgVBmQzg/q1YG10djyfA3TnrU8N8XzqCh/okZdszqBQTZf96idMfE5lnwTA==}
     dev: true
@@ -1315,7 +1278,7 @@ packages:
       '@babel/plugin-transform-react-jsx-source': 7.23.3(@babel/core@7.23.9)
       '@types/babel__core': 7.20.5
       react-refresh: 0.14.0
-      vite: 4.4.9(@types/node@20.8.0)
+      vite: 4.4.9(@types/node@20.2.5)
     transitivePeerDependencies:
       - supports-color
     dev: true

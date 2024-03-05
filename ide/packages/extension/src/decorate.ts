@@ -9,13 +9,13 @@ export const rangeHighlight = vscode.window.createTextEditorDecorationType({
 // TODO: these need to use the vscode specific colors editor.errorForeground, etc.
 
 export const traitErrorDecorate = vscode.window.createTextEditorDecorationType({
-  textDecoration: "underline wavy var(--vscode-editorError-foreground)",
+  borderWidth: "0 0 1px 0",
+  borderStyle: "solid",
+  borderColor: new vscode.ThemeColor("editorError.border"),
 });
 
 export const ambigErrorDecorate = vscode.window.createTextEditorDecorationType({
-  textDecoration: "underline wavy var(--vscode-editorWarning-foreground)",
-});
-
-export const exprRangeDecorate = vscode.window.createTextEditorDecorationType({
-  textDecoration: "underline wavy var(--vscode-editorInfo-foreground)",
+  borderWidth: "0 0 1px 0",
+  borderStyle: "solid",
+  borderColor: new vscode.ThemeColor("editorWarning.border"),
 });
