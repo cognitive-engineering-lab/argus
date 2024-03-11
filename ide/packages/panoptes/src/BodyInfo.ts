@@ -4,7 +4,6 @@ import {
   ExprIdx,
   MethodLookup,
   MethodLookupIdx,
-  MethodStep,
   Obligation,
   ObligationHash,
   ObligationIdx,

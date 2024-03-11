@@ -90,8 +90,29 @@ pub fn take_obligations() -> Vec<Provenance<Obligation>> {
   OBLIGATIONS.with(|obls| obls.take())
 }
 
-pub fn replace_reported_errors(errs: FxIndexMap<Span, Vec<ObligationHash>>) {
-  REPORTED_ERRORS.with(|rerrs| rerrs.replace(errs));
+pub fn replace_reported_errors(infcx: &InferCtxt) {
+  REPORTED_ERRORS.with(|rerrs| {
+    if infcx.reported_trait_errors.borrow().len() == rerrs.borrow().len() {
+      return;
+    }
+
+    let hashed_error_tree = infcx
+      .reported_trait_errors
+      .borrow()
+      .iter()
+      .map(|(span, predicates)| {
+        (
+          *span,
+          predicates
+            .iter()
+            .map(|p| infcx.predicate_hash(p).into())
+            .collect::<Vec<_>>(),
+        )
+      })
+      .collect::<FxIndexMap<_, _>>();
+
+    rerrs.replace(hashed_error_tree);
+  });
 }
 
 pub fn take_reported_errors() -> FxIndexMap<Span, Vec<ObligationHash>> {

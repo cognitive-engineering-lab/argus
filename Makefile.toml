@@ -6,7 +6,7 @@ default_to_workspace = false
 script = "cargo watch -i frontend -x 'install --path crates/argus_cli'"
 
 [tasks.watch-front-debug]
-script = "cargo watch -i frontend -x 'install --path crates/argus_cli --debug'"
+script = "cargo watch -i frontend -x 'install --path crates/argus_cli --frozen --offline --debug'"
 
 [tasks.watch.run_task]
 name = ["watch-front"]

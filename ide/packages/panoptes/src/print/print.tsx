@@ -10,10 +10,7 @@ import ReactJson from "react-json-view";
 
 import "./print.css";
 import { PrintImplHeader as UnsafePrintImplHeader } from "./private/argus";
-import {
-  PrintDefPath as UnsafePrintDefPath,
-  PrintDefPathFull as UnsafePrintDefPathFull,
-} from "./private/path";
+import { PrintDefPath as UnsafePrintDefPath } from "./private/path";
 import {
   PrintGoalPredicate as UnsafePrintGoalPredicate,
   PrintPredicateObligation as UnsafePrintPredicateObligation,

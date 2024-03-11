@@ -1,4 +1,4 @@
-use std::{ops::Deref, str::FromStr};
+use std::{hash::Hash, ops::Deref, str::FromStr};
 
 use anyhow::Result;
 use index_vec::IndexVec;
@@ -133,6 +133,38 @@ pub enum ExprKind {
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
+pub struct AmbiguityError {
+  pub idx: ExprIdx,
+  pub range: CharRange,
+}
+
+impl Hash for AmbiguityError {
+  fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    self.idx.hash(state)
+  }
+}
+
+impl Eq for AmbiguityError {}
+impl PartialEq for AmbiguityError {
+  fn eq(&self, other: &Self) -> bool {
+    self.idx.eq(&other.idx)
+  }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+pub struct TraitError {
+  pub idx: ExprIdx,
+  pub range: CharRange,
+  pub hashes: Vec<ObligationHash>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
 pub struct ObligationsInBody {
   #[serde(skip_serializing_if = "Option::is_none")]
   #[cfg_attr(feature = "testing", ts(type = "PathDefNoArgs | undefined"))]
@@ -146,12 +178,12 @@ pub struct ObligationsInBody {
   /// All ambiguous expression in the body. These *could* involve
   /// trait errors, so it's important that we can map the specific
   /// obligations to these locations. (That is, if they occur.)
-  pub ambiguity_errors: IndexSet<ExprIdx>,
+  pub ambiguity_errors: IndexSet<AmbiguityError>,
 
   /// Concrete trait errors, this would be when the compiler
   /// can say for certainty that a specific trait bound was required
   /// but not satisfied.
-  pub trait_errors: Vec<(ExprIdx, Vec<ObligationHash>)>,
+  pub trait_errors: Vec<TraitError>,
 
   #[cfg_attr(feature = "testing", ts(type = "Obligation[]"))]
   pub obligations: IndexVec<ObligationIdx, Obligation>,
@@ -167,8 +199,8 @@ impl ObligationsInBody {
   pub fn new(
     id: Option<(&InferCtxt, DefId)>,
     range: CharRange,
-    ambiguity_errors: IndexSet<ExprIdx>,
-    trait_errors: Vec<(ExprIdx, Vec<ObligationHash>)>,
+    ambiguity_errors: IndexSet<AmbiguityError>,
+    trait_errors: Vec<TraitError>,
     obligations: IndexVec<ObligationIdx, Obligation>,
     exprs: IndexVec<ExprIdx, Expr>,
     method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,

@@ -129,7 +129,7 @@ pub fn transform<'a, 'tcx: 'a>(
   builder.sort_bins(bins);
   property_is_ok!(builder.is_valid(), "builder is invalid");
 
-  builder.relate_trait_bound();
+  builder.relate_trait_bounds();
   property_is_ok!(builder.is_valid(), "builder is invalid");
 
   let hir = tcx.hir();
@@ -170,8 +170,8 @@ struct ObligationsBuilder<'a, 'tcx: 'a> {
   // Structures to be filled in
   raw_obligations: IndexVec<ObligationIdx, Obligation>,
   exprs_to_hir_id: HashMap<ExprIdx, HirId>,
-  ambiguity_errors: IndexSet<ExprIdx>,
-  trait_errors: Vec<(ExprIdx, Vec<ObligationHash>)>,
+  ambiguity_errors: IndexSet<AmbiguityError>,
+  trait_errors: Vec<TraitError>,
   exprs: IndexVec<ExprIdx, Expr>,
   method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,
 }
@@ -198,7 +198,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           Some((r, snip))
         })
       {
-        let mut ambiguous_call = false;
+        let mut ambiguous_call = None;
         let kind = match kind {
           BinKind::Misc => Misc,
           BinKind::CallableExpr => CallableExpr,
@@ -229,7 +229,10 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
                 &obligations,
               )
             {
-              ambiguous_call = error_recvr || error_call;
+              if error_recvr || error_call {
+                ambiguous_call = Some(call_span);
+              }
+
               MethodCall {
                 data: idx,
                 error_recvr,
@@ -258,8 +261,13 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           is_body,
         });
         self.exprs_to_hir_id.insert(expr_idx, hir_id);
-        if ambiguous_call {
-          self.ambiguity_errors.insert(expr_idx);
+        if let Some(call_span) = ambiguous_call {
+          let range = CharRange::from_span(*call_span, source_map)
+            .expect("failed to get range for ambiguous call");
+          self.ambiguity_errors.insert(AmbiguityError {
+            idx: expr_idx,
+            range,
+          });
         }
       } else {
         log::error!(
@@ -270,18 +278,47 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     }
   }
 
-  // FIXME: this isn't efficient, but the number of obligations per
-  // body isn't large, so shouldn't be an issue.
-  fn relate_trait_bound(&mut self) {
+  fn exact_predicate_search(
+    &self,
+    needle: ObligationHash,
+  ) -> Option<ObligationIdx> {
+    self
+      .raw_obligations
+      .iter_enumerated()
+      .find_map(|(obl_id, obl)| (obl.hash == needle).then(|| obl_id))
+  }
+
+  fn shallow_tree_predicate_search(
+    &self,
+    needle: ObligationHash,
+  ) -> Option<ObligationIdx> {
+    self.obligations.iter().find_map(|prov| {
+      let uoidx = prov.full_data?;
+      let full_data = self.full_data.get(uoidx);
+      tree_search::tree_contains_in_branchless(
+        // something
+        &full_data.infcx,
+        // something
+        &full_data.obligation,
+        needle,
+      )
+      .then(|| prov.it)
+    })
+  }
+
+  fn relate_trait_bounds(&mut self) {
     for (span, predicates) in self.reported_trait_errors.iter() {
+      let range = CharRange::from_span(*span, self.tcx.sess.source_map())
+        .expect("failed to get range for reported trait error");
+
       // Search for the obligation hash in our set of computed obligations.
       let predicates = predicates
         .iter()
         .filter_map(|&p| {
           self
-            .raw_obligations
-            .iter_enumerated()
-            .find_map(|(obl_id, obl)| (obl.hash == p).then(|| (obl_id, p)))
+            .exact_predicate_search(p)
+            .or_else(|| self.shallow_tree_predicate_search(p))
+            .map(|h| (h, p))
         })
         .collect::<Vec<_>>();
 
@@ -296,11 +333,20 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         }
       }
 
-      let (_, hashes): (Vec<ObligationIdx>, _) = predicates.into_iter().unzip();
-
       if let Some(expr_id) = root_expr {
-        self.trait_errors.push((expr_id, hashes));
+        let (_, hashes): (Vec<ObligationIdx>, _) =
+          predicates.into_iter().unzip();
+
+        self.trait_errors.push(TraitError {
+          idx: expr_id,
+          range,
+          hashes,
+        });
         continue;
+      } else {
+        log::error!(
+          "failed to find root expression for {span:?} {predicates:?}"
+        );
       }
 
       // A predicate did not match exactly, now we're scrambling
@@ -336,7 +382,11 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       };
 
       // Mark the found Expr as containing an error.
-      self.trait_errors.push((*expr_id, vec![]));
+      self.trait_errors.push(TraitError {
+        idx: *expr_id,
+        range,
+        hashes: vec![],
+      });
     }
   }
 
@@ -577,5 +627,90 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     }
 
     Ok(())
+  }
+}
+
+mod tree_search {
+  use std::ops::ControlFlow;
+
+  use rustc_trait_selection::{
+    solve::inspect::{InspectGoal, ProofTreeInferCtxtExt, ProofTreeVisitor},
+    traits::solve::Goal,
+  };
+
+  use super::*;
+
+  /// Search for the target obligation along the non-branching tree path.
+  ///
+  /// This is usefull if a predicate, reported as a trait error, does not
+  /// match one of the stored roots. This can happen when the start of
+  /// the "trait tree" is a stick, e.g.,
+  ///
+  /// ```text
+  ///  Ty: TRAIT_0
+  ///       |
+  ///  Ty: Trait_1
+  ///    /   \
+  ///  ...   ...
+  /// ```
+  ///
+  /// rustc will report that `Ty` doesn't implement `Trait_1`, even thought the root
+  /// obligation was for `TRAIT_0`.
+  pub(super) fn tree_contains_in_branchless<'tcx>(
+    infcx: &InferCtxt<'tcx>,
+    obligation: &PredicateObligation<'tcx>,
+    needle: ObligationHash,
+  ) -> bool {
+    infcx.probe(|_| {
+      let goal = Goal {
+        predicate: obligation.predicate,
+        param_env: obligation.param_env,
+      };
+      let mut finder = BranchlessSearch::new(needle);
+      infcx.visit_proof_tree(goal, &mut finder);
+      finder.was_found()
+    })
+  }
+
+  struct BranchlessSearch {
+    needle: ObligationHash,
+    found: bool,
+  }
+
+  impl BranchlessSearch {
+    fn new(needle: ObligationHash) -> Self {
+      Self {
+        needle,
+        found: false,
+      }
+    }
+
+    fn was_found(self) -> bool {
+      self.found
+    }
+  }
+
+  impl<'tcx> ProofTreeVisitor<'tcx> for BranchlessSearch {
+    type BreakTy = ();
+
+    fn visit_goal(
+      &mut self,
+      goal: &InspectGoal<'_, 'tcx>,
+    ) -> ControlFlow<Self::BreakTy> {
+      let infcx = goal.infcx();
+      let predicate = &goal.goal().predicate;
+      let hash = infcx.predicate_hash(predicate).into();
+      if self.needle == hash {
+        self.found = true;
+        return ControlFlow::Break(());
+      }
+
+      let candidates = goal.candidates();
+      if 1 == candidates.len() {
+        ControlFlow::Break(())
+      } else {
+        candidates[0].visit_nested(self)
+      }
+    }
   }
 }

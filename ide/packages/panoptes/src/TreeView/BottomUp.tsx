@@ -1,6 +1,6 @@
 import { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
 import _ from "lodash";
-import React, { Fragment, useContext } from "react";
+import React, { useContext } from "react";
 
 import { TreeContext } from "./Context";
 import { CollapsibleElement, DirRecursive } from "./Directory";

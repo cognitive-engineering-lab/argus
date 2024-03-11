@@ -3,7 +3,6 @@
 
 use anyhow::{anyhow, bail, Result};
 use fluid_let::fluid_let;
-use rustc_data_structures::fx::FxIndexMap;
 use rustc_hir::BodyId;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::ty::{Predicate, TyCtxt, TypeckResults};
@@ -95,27 +94,7 @@ pub fn process_obligation<'tcx>(
 
   tls::store_obligation(obligation);
 
-  // Look at the `reported_trait_errors` and store an updated version.
-
-  let hashed_error_tree = infcx
-    .reported_trait_errors
-    .borrow()
-    .iter()
-    .map(|(span, predicates)| {
-      (
-        *span,
-        predicates
-          .iter()
-          .map(|p| {
-            log::debug!("Predicate was reported as trait error {p:?}");
-            infcx.predicate_hash(p).into()
-          })
-          .collect::<Vec<_>>(),
-      )
-    })
-    .collect::<FxIndexMap<_, _>>();
-
-  tls::replace_reported_errors(hashed_error_tree);
+  tls::replace_reported_errors(infcx);
 }
 
 pub fn process_obligation_for_tree<'tcx>(

@@ -239,18 +239,7 @@ export class TreeInfo {
     const sortWeightPaths = (t: T) => {
       const leaf = f(t);
       const pathToRoot = this.pathToRoot(leaf);
-      const numInferVars = _.map(pathToRoot.path, idx => {
-        const node = this.tree.nodes[idx];
-        if ("Goal" in node) {
-          return this.goal(node.Goal).numVars;
-        } else {
-          return 0;
-        }
-      });
-      // Sort the leaves by the ratio of inference variables to path length.
-      // const nV = _.reduce(numInferVars, _.add, 0);
       const len = pathToRoot.path.length;
-      // return nV / len;
       return -len;
     };
 
