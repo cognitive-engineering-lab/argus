@@ -7,5 +7,5 @@ fn test() {
   let m1 = CsrMatrix::from(&coo1);
   let m2 = CsrMatrix::from(&coo2);
 
-  &m1 * &m2;
+  std::ops::Mul::mul(&m1, &m2);
 }

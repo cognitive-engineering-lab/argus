@@ -1,5 +1,6 @@
 import {
   CharRange,
+  Obligation,
   ObligationHash,
   Predicate,
   Ty,
@@ -102,4 +103,10 @@ export function isTraitClause(predicate: Predicate): boolean {
   }
 
   return false;
+}
+
+export function isHiddenObl(o: { necessity: string; result: string }) {
+  return (
+    o.necessity === "Yes" || (o.necessity === "OnError" && o.result === "no")
+  );
 }

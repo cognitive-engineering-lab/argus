@@ -11,7 +11,7 @@ import {
 } from "@argus/common/bindings";
 import _ from "lodash";
 
-import { isObject } from "./utilities/func";
+import { isHiddenObl, isObject } from "./utilities/func";
 
 class BodyInfo {
   constructor(
@@ -108,12 +108,7 @@ class BodyInfo {
     if (o === undefined) {
       return false;
     }
-    return (
-      this.showHidden || o.necessity === "Yes"
-      // TODO: this includes obligations like `(): TRAIT` which seem to happen
-      // way too frequently and even on error shouldn't be shown.
-      // || (o.necessity === "OnError" && o.result === "no")
-    );
+    return this.showHidden || isHiddenObl(o);
   }
 }
 

@@ -10,7 +10,7 @@ import {
 } from "@argus/common/bindings";
 import _ from "lodash";
 
-import { isTraitClause } from "../utilities/func";
+import { isHiddenObl, isTraitClause } from "../utilities/func";
 
 type MultiRecord<K extends number, T> = Record<K, T[]>;
 
@@ -27,7 +27,7 @@ function makeTreeView(
   root: ProofNodeIdx,
   cf: (n: ProofNodeIdx) => ControlFlow,
   childrenOf: (n: ProofNodeIdx) => ProofNodeIdx[]
-): TreeView {
+): TreeView | undefined {
   const children: MultiRecord<ProofNodeIdx, ProofNodeIdx> = {};
   const parent: Record<ProofNodeIdx, ProofNodeIdx> = {};
   const addChildRel = (from: ProofNodeIdx, to: ProofNodeIdx) => {
@@ -63,13 +63,11 @@ function makeTreeView(
 
   iterate(root);
 
-  if (children[root] === undefined) {
-    throw new Error("Root has no children");
+  if (children[root] !== undefined) {
+    return {
+      topology: { children, parent },
+    };
   }
-
-  return {
-    topology: { children, parent },
-  };
 }
 
 export interface TreeView {
@@ -80,42 +78,45 @@ export interface TreeView {
 type ControlFlow = "keep" | "remove-tree" | "remove-node";
 
 export class TreeInfo {
-  private view: TreeView;
   private maxHeight: Map<ProofNodeIdx, number>;
   private numInferVars: Map<ProofNodeIdx, number>;
 
-  public constructor(
-    private readonly tree: SerializedTree,
-    readonly showHidden: boolean = false
-  ) {
+  static new(tree: SerializedTree, showHidden: boolean = false) {
     const childrenOf = (n: ProofNodeIdx) => {
       return tree.topology.children[n] ?? [];
     };
     const cf = (n: ProofNodeIdx): ControlFlow => {
-      if (this.showHidden) {
+      if (showHidden) {
         return "keep";
       }
 
       const node = tree.nodes[n];
       if ("Goal" in node) {
-        if (tree.goals[node.Goal].necessity === "Yes") {
-          return "keep";
-        } else {
-          return "remove-tree";
-        }
+        return "keep";
+        // const goalData = tree.goals[node.Goal];
+        // const result = tree.results[goalData.result];
+        // return isHiddenObl({ necessity: goalData.necessity, result })
+        //   ? "remove-tree"
+        //   : "keep";
       } else if ("Candidate" in node) {
-        const candidate = this.candidate(node.Candidate);
-        if ("Any" in candidate) {
-          return "remove-node";
-        } else {
-          return "keep";
-        }
+        const candidate = tree.candidates[node.Candidate];
+        return "Any" in candidate ? "remove-node" : "keep";
       } else {
         return "keep";
       }
     };
 
-    this.view = makeTreeView(tree.root, cf, childrenOf);
+    const view = makeTreeView(tree.root, cf, childrenOf);
+    if (view !== undefined) {
+      return new TreeInfo(tree, showHidden, view);
+    }
+  }
+
+  constructor(
+    private readonly tree: SerializedTree,
+    readonly showHidden: boolean = false,
+    readonly view: TreeView
+  ) {
     this.maxHeight = new Map();
     this.numInferVars = new Map();
   }

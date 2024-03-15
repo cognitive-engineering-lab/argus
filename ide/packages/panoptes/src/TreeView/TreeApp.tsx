@@ -24,16 +24,21 @@ const TreeApp = ({
   // FIXME: this shouldn't ever happen, if a properly hashed
   // value is sent and returned. I need to think more about how to handle
   // when we want to display "non-traditional" obligations.
+  const ErrorMessage = () => (
+    <div className="Error">
+      <p>Whoops! Something went wrong:</p>
+      <pre>No debug information found.</pre>
+    </div>
+  );
+
   if (tree === undefined) {
-    return (
-      <div className="Error">
-        <p>Whoops! Something went wrong:</p>
-        <pre>No debug information found.</pre>
-      </div>
-    );
+    return <ErrorMessage />;
   }
 
-  const treeInfo = new TreeInfo(tree, showHidden);
+  const treeInfo = TreeInfo.new(tree, showHidden);
+  if (treeInfo === undefined) {
+    return <ErrorMessage />;
+  }
 
   const tabs: [string, React.FC][] = [["Top Down", TopDown]];
 

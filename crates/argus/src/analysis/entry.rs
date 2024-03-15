@@ -145,7 +145,6 @@ pub fn build_obligations_output<'tcx>(
   typeck_results: &'tcx TypeckResults<'tcx>,
 ) -> Result<ObligationsInBody> {
   let (_, oib) = build_obligations_in_body(tcx, body_id, typeck_results);
-  log::debug!("Returned from building obligations output");
   Ok(oib)
 }
 

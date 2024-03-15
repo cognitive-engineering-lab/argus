@@ -40,6 +40,8 @@ pub trait CharRangeExt: Copy + Sized {
 pub trait PredicateExt {
   fn is_trait_predicate(&self) -> bool;
 
+  fn is_lhs_unit(&self) -> bool;
+
   fn is_rhs_lang_item(&self, tcx: &TyCtxt) -> bool;
 
   fn is_trait_pred_rhs(&self, def_id: DefId) -> bool;
@@ -55,6 +57,13 @@ impl PredicateExt for Predicate<'_> {
       self.kind().skip_binder(),
       ty::PredicateKind::Clause(ty::ClauseKind::Trait(..))
     )
+  }
+
+  fn is_lhs_unit(&self) -> bool {
+    matches!(self.kind().skip_binder(),
+    ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
+      trait_predicate.self_ty().is_unit()
+    })
   }
 
   fn is_rhs_lang_item(&self, tcx: &TyCtxt) -> bool {
@@ -399,7 +408,7 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
       )
     };
 
-    if !is_writeable() {
+    if !is_writeable() || p.is_lhs_unit() {
       ForProfessionals
     } else if p.is_trait_predicate() && is_rhs_lang_item() {
       OnError
@@ -426,19 +435,10 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     let p = &obligation.predicate;
     let code = obligation.cause.code();
 
-    let is_lhs_unit = || {
-      matches!(p.kind().skip_binder(),
-      ty::PredicateKind::Clause(ty::ClauseKind::Trait(trait_predicate)) if {
-        trait_predicate.self_ty().is_unit()
-      })
-    };
-
-    if matches!(code, SizedReturnType) && is_lhs_unit() {
+    if matches!(code, SizedReturnType) && p.is_lhs_unit() {
       No
     } else if matches!(code, MiscObligation) {
       ForProfessionals
-    } else if is_lhs_unit() {
-      OnError
     } else {
       self.guess_predicate_necessity(p)
     }
