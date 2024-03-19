@@ -19,7 +19,7 @@ use super::{
   EvaluationResult,
 };
 use crate::{
-  ext::{InferCtxtExt, PredicateExt, TyCtxtExt},
+  ext::{InferCtxtExt, PredicateExt, TyCtxtExt, TypeckResultsExt},
   types::{intermediate::*, *},
 };
 
@@ -131,6 +131,17 @@ pub fn transform<'a, 'tcx: 'a>(
 
   builder.relate_trait_bounds();
   property_is_ok!(builder.is_valid(), "builder is invalid");
+
+  // Relating arbitrary errors in the HIR to failed obligations can overwhelm
+  // guaranteed reported errors. We only want to build these when no other errors
+  // where found but type-checking failed.
+  if builder.trait_errors.is_empty()
+    && builder.ambiguity_errors.is_empty()
+    && builder.typeck_results.tainted_by_errors.is_some()
+  {
+    builder.relate_unreported_errors();
+    property_is_ok!(builder.is_valid(), "builder is invalid");
+  }
 
   let hir = tcx.hir();
   let source_map = tcx.sess.source_map();
@@ -606,6 +617,41 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       error_recvr,
       error_call,
     ))
+  }
+
+  /// Find error nodes in the HIR and search for failed obligation failures in the node.
+  fn relate_unreported_errors(&mut self) {
+    // for all error nodes in the HIR, find a binned failure in that same node.
+    for hir_id in self.typeck_results.error_nodes() {
+      let Some((eid, _)) =
+        self.exprs_to_hir_id.iter().find(|(_, hid)| **hid == hir_id)
+      else {
+        continue;
+      };
+
+      let expr = &self.exprs[*eid];
+      let span = self.tcx.hir().span(hir_id);
+      let range = CharRange::from_span(span, self.tcx.sess.source_map())
+        .expect("failed to get range for reported trait error");
+
+      let hashes = expr
+        .obligations
+        .iter()
+        .filter_map(|&idx| {
+          let obligation = &self.raw_obligations[idx];
+          match obligation.result {
+            Ok(..) => None,
+            Err(..) => Some(obligation.hash),
+          }
+        })
+        .collect::<Vec<_>>();
+
+      self.trait_errors.push(TraitError {
+        idx: *eid,
+        range,
+        hashes,
+      });
+    }
   }
 
   #[cfg(any(feature = "testing", debug_assertions))]
