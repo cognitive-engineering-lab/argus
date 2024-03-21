@@ -150,11 +150,7 @@ const BottomUp = () => {
   });
 
   const LeafElement = ({ leaf }: { leaf: TreeViewWithRoot }) => (
-    <DirRecursive
-      level={[leaf.root]}
-      getNext={mkGetChildren(leaf)}
-      styleEdges={false}
-    />
+    <DirRecursive level={[leaf.root]} getNext={mkGetChildren(leaf)} />
   );
 
   const recommendedSortedViews = tree.sortByRecommendedOrder(
@@ -169,13 +165,9 @@ const BottomUp = () => {
     others.length === 0 ? null : (
       <CollapsibleElement
         info={<span>Other failures ...</span>}
-        Children={() => (
-          <>
-            {_.map(others, (leaf, i) => (
-              <LeafElement key={i} leaf={leaf} />
-            ))}
-          </>
-        )}
+        Children={() =>
+          _.map(others, (leaf, i) => <LeafElement key={i} leaf={leaf} />)
+        }
       />
     );
 

@@ -99,7 +99,7 @@ const ObligationCard = observer(
   ({ range, obligation }: { range: CharRange; obligation: Obligation }) => {
     const file = useContext(FileContext)!;
     const id = obligationCardId(file, obligation.hash);
-    const ref = useRef<HTMLSpanElement>(null);
+    const ref = useRef<HTMLDivElement>(null);
 
     const [addHighlight, removeHighlight] = makeHighlightPosters(
       obligation.range,
@@ -119,7 +119,7 @@ const ObligationCard = observer(
     }, []);
 
     const header = (
-      <span
+      <div
         id={id}
         className={className}
         ref={ref}
@@ -128,7 +128,7 @@ const ObligationCard = observer(
       >
         <ResultRaw result={obligation.result} />
         <PrintObligation obligation={obligation} />
-      </span>
+      </div>
     );
 
     return (

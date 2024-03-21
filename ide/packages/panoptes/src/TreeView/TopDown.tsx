@@ -15,7 +15,7 @@ import React, { useContext, useState } from "react";
 
 import { IcoTreeDown } from "../Icons";
 import { TreeContext } from "./Context";
-import { DirRecursive } from "./Directory";
+import { DirRecursive, TreeRenderContext, TreeRenderParams } from "./Directory";
 import Graph from "./Graph";
 import "./TopDown.css";
 
@@ -24,7 +24,7 @@ export const WrapTreeIco = ({
   Child,
 }: {
   n: ProofNodeIdx;
-  Child: React.FC;
+  Child: React.ReactElement;
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -47,13 +47,15 @@ export const WrapTreeIco = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <Child />
+      {Child}
       <span
         className="tree-toggle"
         ref={refs.setReference}
         {...getReferenceProps()}
       >
-        {(isHovered || isOpen) && <IcoTreeDown />}
+        <IcoTreeDown
+          style={{ visibility: isHovered || isOpen ? "visible" : "hidden" }}
+        />
       </span>
       {isOpen && (
         <FloatingPortal>
@@ -76,17 +78,16 @@ export const WrapTreeIco = ({
 const TopDown = () => {
   const tree = useContext(TreeContext)!;
 
-  const getGoalChildren = (kids: ProofNodeIdx[]) => {
-    // Sort the candidates by the #infer vars / height of the tree
-    return _.sortBy(kids, k => {
+  // Sort the candidates by the #infer vars / height of the tree
+  const getGoalChildren = (kids: ProofNodeIdx[]) =>
+    _.sortBy(kids, k => {
       const inferVars = tree.inferVars(k);
       const height = tree.maxHeigh(k);
       return inferVars / height;
     });
-  };
 
-  const getCandidateChildren = (kids: ProofNodeIdx[]) => {
-    return _.sortBy(
+  const getCandidateChildren = (kids: ProofNodeIdx[]) =>
+    _.sortBy(
       kids,
       k => {
         switch (tree.result(k) ?? "yes") {
@@ -105,7 +106,6 @@ const TopDown = () => {
         "Goal" in node && tree.goal(node.Goal).isMainTv ? 1 : 0;
       }
     );
-  };
 
   const getChildren = (idx: ProofNodeIdx) => {
     const node = tree.node(idx);
@@ -118,13 +118,16 @@ const TopDown = () => {
       return [];
     }
   };
+
+  let renderParams: TreeRenderParams = {
+    Wrapper: WrapTreeIco,
+    styleEdges: true,
+  };
+
   return (
-    <DirRecursive
-      level={[tree.root]}
-      getNext={getChildren}
-      styleEdges={true}
-      Wrapper={WrapTreeIco}
-    />
+    <TreeRenderContext.Provider value={renderParams}>
+      <DirRecursive level={[tree.root]} getNext={getChildren} />
+    </TreeRenderContext.Provider>
   );
 };
 

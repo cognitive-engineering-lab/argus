@@ -3,7 +3,7 @@ import _ from "lodash";
 import React, { useContext } from "react";
 
 import { TreeContext } from "./Context";
-import { DirRecursive } from "./Directory";
+import { DirRecursive, TreeRenderContext } from "./Directory";
 
 const TreeCycle = ({ path }: { path: ProofCycle }) => {
   const tree = useContext(TreeContext)!;
@@ -18,7 +18,9 @@ const TreeCycle = ({ path }: { path: ProofCycle }) => {
   };
 
   return (
-    <DirRecursive level={[tree.root]} getNext={getChildren} styleEdges={true} />
+    <TreeRenderContext.Provider value={{ styleEdges: true }}>
+      <DirRecursive level={[tree.root]} getNext={getChildren} />
+    </TreeRenderContext.Provider>
   );
 };
 
