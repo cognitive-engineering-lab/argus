@@ -19,7 +19,10 @@ use super::{
   EvaluationResult,
 };
 use crate::{
-  ext::{InferCtxtExt, PredicateExt, TyCtxtExt, TypeckResultsExt},
+  ext::{
+    EvaluationResultExt, InferCtxtExt, PredicateExt, TyCtxtExt,
+    TypeckResultsExt,
+  },
   types::{intermediate::*, *},
 };
 
@@ -665,7 +668,10 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           .any(|sdata| obl.hash == sdata.hash);
 
         anyhow::ensure!(exists, "synthetic data not found for {:?}", obl)
-      } else {
+      } else if matches!(obl.necessity, ObligationNecessity::Yes)
+        || (matches!(obl.necessity, ObligationNecessity::OnError)
+          && obl.result.is_no())
+      {
         let exists = self.full_data.iter().any(|fdata| fdata.hash == obl.hash);
 
         anyhow::ensure!(exists, "full data not found for {:?}", obl)

@@ -90,6 +90,10 @@ const TopDown = () => {
     _.sortBy(
       kids,
       k => {
+        const node = tree.node(k);
+        return "Goal" in node && tree.goal(node.Goal).isMainTv ? 1 : 0;
+      },
+      k => {
         switch (tree.result(k) ?? "yes") {
           case "no":
             return 0;
@@ -99,11 +103,9 @@ const TopDown = () => {
             return 2;
           case "yes":
             return 3;
+          default:
+            return 4;
         }
-      },
-      k => {
-        const node = tree.node(k);
-        "Goal" in node && tree.goal(node.Goal).isMainTv ? 1 : 0;
       }
     );
 
@@ -119,7 +121,7 @@ const TopDown = () => {
     }
   };
 
-  let renderParams: TreeRenderParams = {
+  const renderParams: TreeRenderParams = {
     Wrapper: WrapTreeIco,
     styleEdges: true,
   };

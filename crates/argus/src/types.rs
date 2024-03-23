@@ -317,7 +317,6 @@ pub enum ClauseBound<'tcx> {
 #[cfg_attr(feature = "testing", ts(export))]
 pub enum ObligationNecessity {
   No,
-  ForProfessionals,
   OnError,
   Yes,
 }

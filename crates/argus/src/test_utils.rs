@@ -89,18 +89,6 @@ pub fn test_obligations_no_crash(
         let (full_data, obligations_in_body) =
           analysis::body_data(tcx, body_id).expect("failed to get obligations");
 
-        let missing_data_obligations = obligations_in_body
-          .obligations
-          .iter()
-          .filter(|obl| !full_data.iter().any(|(_, hash, _)| hash == obl.hash))
-          .collect::<Vec<_>>();
-
-        assert!(
-          missing_data_obligations.is_empty(),
-          "missing data for {:?}",
-          missing_data_obligations
-        );
-
         assert_pass(full_data, obligations_in_body);
       })
     });

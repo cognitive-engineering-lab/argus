@@ -23,7 +23,7 @@ use crate::{
       ErrorAssemblyCtx, Forgettable, FullData, ObligationQueriesInBody,
       SyntheticQueriesInBody,
     },
-    ObligationHash, ObligationsInBody,
+    ObligationHash, ObligationNecessity, ObligationsInBody,
   },
 };
 
@@ -80,15 +80,14 @@ pub fn process_obligation<'tcx>(
 
   log::debug!("Processing obligation {obl:?}");
 
-  // TODO: we need to figure out when to save the full data.
-  // Saving it for every obligation consumes lots of memory
-  // and this is (one of) the reasons the tool is relatively slow,
-  // but I don't have a tight enough metric as to when it should be ignored.
-  //
-  // NOTE: that if the full data doesn't get stored for every obligation,
-  // make sure that usages of `provenance.full_data` are guarded, as
-  // some currently use `.unwrap()`.
-  let dataid = Some(tls::unsafe_store_data(infcx, obl, result));
+  let necessity = infcx.obligation_necessity(obl);
+  let dataid = if matches!(necessity, ObligationNecessity::Yes)
+    || (matches!(necessity, ObligationNecessity::OnError) && result.is_no())
+  {
+    Some(tls::unsafe_store_data(infcx, obl, result))
+  } else {
+    None
+  };
 
   let obligation = transform::compute_provenance(infcx, obl, result, dataid);
 

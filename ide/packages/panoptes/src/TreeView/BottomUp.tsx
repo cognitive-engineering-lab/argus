@@ -36,23 +36,11 @@ class TopologyBuilder {
    * @param path a path to be added uniquely to the tree.
    */
   public addPathFromRoot(path: ProofNodeIdx[]) {
-    console.debug(
-      "Adding path",
-      _.keys(this.topo.children).length,
-      _.keys(this.topo.parent).length,
-      path
-    );
     const thisRoot = _.head(path);
     if (
       thisRoot === undefined ||
       !_.isEqual(this.tree.node(thisRoot), this.tree.node(this.root))
     ) {
-      console.error("Path does not start from the root", {
-        a: thisRoot,
-        b: this.root,
-        c: this.tree.node(thisRoot!),
-        d: this.tree.node(this.root),
-      });
       throw new Error("Path does not start from the root");
     }
 
@@ -87,8 +75,6 @@ function invertViewWithRoots(
   leaves: ProofNodeIdx[],
   tree: TreeInfo
 ): Array<TreeViewWithRoot> {
-  console.debug("Initial leaves", leaves);
-
   const groups: ProofNodeIdx[][] = _.values(
     _.groupBy(leaves, leaf => {
       const node = tree.node(leaf);
@@ -123,38 +109,47 @@ const BottomUp = () => {
   const mkGetChildren = (view: TreeView) => (idx: ProofNodeIdx) =>
     view.topology.children[idx] ?? [];
 
-  const liftToGoal = (idx: ProofNodeIdx) => {
+  const liftTo = (idx: ProofNodeIdx, target: "Goal" | "Candidate") => {
     let curr: ProofNodeIdx | undefined = idx;
-    while (curr !== undefined && !("Goal" in tree.node(curr))) {
+    while (curr !== undefined && !(target in tree.node(curr))) {
       curr = tree.parent(curr);
     }
     return curr;
   };
 
-  const leaves = _.map(tree.errorLeaves(), liftToGoal);
+  const leaves = _.compact(_.map(tree.errorLeaves(), n => liftTo(n, "Goal")));
+  const invertedViews = invertViewWithRoots(leaves, tree);
+  const groupedAndViews = _.groupBy(invertedViews, v =>
+    liftTo(v.root, "Candidate")
+  );
 
-  const invertedViews = invertViewWithRoots(_.compact(leaves), tree);
   // The "Argus recommended" errors are shown expanded, and the
   // "others" are collapsed. Argus recommended errors are the ones
   // that failed or are ambiguous with a concrete type on the LHS.
-  const [argusRecommended, others] = _.partition(invertedViews, view => {
-    const node = tree.node(view.root);
-    if ("Goal" in node) {
-      const goal = tree.goal(node.Goal);
-      const result = tree.result(goal.result);
-      return !goal.isMainTv && (result === "no" || result === "maybe-overflow");
-    } else {
-      // Leaves should only be goals...
-      throw new Error(`Leaves should only be goals ${node}`);
-    }
-  });
+  const [argusRecommended, others] = _.partition(
+    _.values(groupedAndViews),
+    views =>
+      _.every(views, view => {
+        const node = tree.node(view.root);
+        if ("Goal" in node) {
+          const goal = tree.goal(node.Goal);
+          const result = tree.result(goal.result);
+          return (
+            !goal.isMainTv && (result === "no" || result === "maybe-overflow")
+          );
+        } else {
+          // Leaves should only be goals...
+          throw new Error(`Leaves should only be goals ${node}`);
+        }
+      })
+  );
 
   const LeafElement = ({ leaf }: { leaf: TreeViewWithRoot }) => (
     <DirRecursive level={[leaf.root]} getNext={mkGetChildren(leaf)} />
   );
 
   const recommendedSortedViews = tree.sortByRecommendedOrder(
-    argusRecommended,
+    _.flatten(argusRecommended),
     v => v.root
   );
   const recommended = _.map(recommendedSortedViews, (leaf, i) => (
@@ -166,7 +161,9 @@ const BottomUp = () => {
       <CollapsibleElement
         info={<span>Other failures ...</span>}
         Children={() =>
-          _.map(others, (leaf, i) => <LeafElement key={i} leaf={leaf} />)
+          _.map(_.flatten(others), (leaf, i) => (
+            <LeafElement key={i} leaf={leaf} />
+          ))
         }
       />
     );

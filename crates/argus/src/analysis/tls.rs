@@ -17,6 +17,8 @@ use crate::{
   types::{intermediate::Provenance, Obligation, ObligationHash},
 };
 
+const DRAIN_WINDOW: usize = 50;
+
 // NOTE: we use thread local storage to accumulate obligations
 // accross call to the obligation inspector in `typeck_inspect`.
 // DO NOT set this directly, make sure to use the function `push_obligaion`.
@@ -55,7 +57,15 @@ pub fn drain_implied_ambiguities<'tcx>(
   use std::panic::AssertUnwindSafe;
   OBLIGATIONS.with(|obls| {
     let mut obls = obls.borrow_mut();
-    obls.retain(|provenance| {
+
+    let mut set = Vec::new();
+
+    let lower_bound = obls.len().saturating_sub(DRAIN_WINDOW);
+    let upper_bound = obls.len();
+
+    for i in lower_bound .. upper_bound {
+      let provenance = &obls[i];
+
       // Drain all elements that are:
       // 1. Ambiguous, and--
       // 2. Implied by the passed obligation
@@ -81,8 +91,17 @@ pub fn drain_implied_ambiguities<'tcx>(
             })
           })
           .unwrap_or(false);
-      !should_remove
-    })
+
+      if should_remove {
+        set.push(i);
+      }
+    }
+
+    // TODO: we can make this faster by swapping elements to the end
+    // then truncating the vector.
+    for i in set.into_iter().rev() {
+      obls.remove(i);
+    }
   })
 }
 

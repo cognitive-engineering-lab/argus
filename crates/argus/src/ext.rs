@@ -409,8 +409,10 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     };
 
     if !is_writeable() || p.is_lhs_unit() {
-      ForProfessionals
-    } else if p.is_trait_predicate() && is_rhs_lang_item() {
+      No
+    } else if (p.is_trait_predicate() && is_rhs_lang_item())
+      || !p.is_trait_predicate()
+    {
       OnError
     } else {
       Yes
@@ -438,7 +440,7 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     if matches!(code, SizedReturnType) && p.is_lhs_unit() {
       No
     } else if matches!(code, MiscObligation) {
-      ForProfessionals
+      No
     } else {
       self.guess_predicate_necessity(p)
     }

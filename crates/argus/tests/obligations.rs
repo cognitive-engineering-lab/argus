@@ -1,4 +1,4 @@
-use argus_lib::test_utils as tu;
+use argus_lib::{test_utils as tu, types::ObligationNecessity};
 
 #[test_log::test]
 fn obligations() {
@@ -8,9 +8,14 @@ fn obligations() {
       let t = (&*full_data, &obligations);
 
       for obl in t.1.obligations.iter() {
-        let res = tu::test_locate_tree(obl.hash, true, || t);
-        if res.is_err() {
-          missing.push((res, obl))
+        if obl.necessity == ObligationNecessity::Yes
+          || (obl.necessity == ObligationNecessity::OnError
+            && obl.result.is_err())
+        {
+          let res = tu::test_locate_tree(obl.hash, true, || t);
+          if res.is_err() {
+            missing.push((res, obl))
+          }
         }
       }
 
