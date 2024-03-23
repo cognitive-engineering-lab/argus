@@ -78,7 +78,7 @@ export interface TreeView {
 type ControlFlow = "keep" | "remove-tree" | "remove-node";
 
 export class TreeInfo {
-  private maxHeight: Map<ProofNodeIdx, number>;
+  private _maxHeight: Map<ProofNodeIdx, number>;
   private numInferVars: Map<ProofNodeIdx, number>;
 
   static new(tree: SerializedTree, showHidden: boolean = false) {
@@ -117,7 +117,7 @@ export class TreeInfo {
     readonly showHidden: boolean = false,
     readonly view: TreeView
   ) {
-    this.maxHeight = new Map();
+    this._maxHeight = new Map();
     this.numInferVars = new Map();
   }
 
@@ -282,14 +282,14 @@ export class TreeInfo {
     return niv;
   }
 
-  public maxHeigh(n: ProofNodeIdx): number {
-    const current = this.maxHeight.get(n);
+  public maxHeight(n: ProofNodeIdx): number {
+    const current = this._maxHeight.get(n);
     if (current !== undefined) {
       return current;
     }
-    const childHeights = _.map(this.children(n), k => this.maxHeigh(k));
+    const childHeights = _.map(this.children(n), k => this.maxHeight(k));
     const height = 1 + (_.max(childHeights) ?? 0);
-    this.maxHeight.set(n, height);
+    this._maxHeight.set(n, height);
     return height;
   }
 }

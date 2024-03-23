@@ -10,7 +10,7 @@ import {
   useInteractions,
 } from "@floating-ui/react";
 import classNames from "classnames";
-import _ from "lodash";
+import _, { sortBy } from "lodash";
 import React, { useContext, useState } from "react";
 
 import { IcoTreeDown } from "../Icons";
@@ -80,21 +80,16 @@ const TopDown = () => {
 
   // Sort the candidates by the #infer vars / height of the tree
   const getGoalChildren = (kids: ProofNodeIdx[]) =>
-    _.sortBy(kids, k => {
-      const inferVars = tree.inferVars(k);
-      const height = tree.maxHeigh(k);
-      return inferVars / height;
-    });
+    _.sortBy(kids, [k => -tree.maxHeight(k)]);
 
   const getCandidateChildren = (kids: ProofNodeIdx[]) =>
-    _.sortBy(
-      kids,
+    _.sortBy(_.uniq(kids), [
       k => {
         const node = tree.node(k);
         return "Goal" in node && tree.goal(node.Goal).isMainTv ? 1 : 0;
       },
       k => {
-        switch (tree.result(k) ?? "yes") {
+        switch (tree.nodeResult(k)) {
           case "no":
             return 0;
           case "maybe-overflow":
@@ -106,8 +101,8 @@ const TopDown = () => {
           default:
             return 4;
         }
-      }
-    );
+      },
+    ]);
 
   const getChildren = (idx: ProofNodeIdx) => {
     const node = tree.node(idx);
