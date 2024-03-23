@@ -313,10 +313,8 @@ export const PrintFnDef = ({ o }: { o: FnDef }) => {
   // We should show both (somehow), not sure what's the best way to present it.
   return (
     <>
-      <Toggle summary=".." Children={() => <PrintPolyFnSig o={o.sig} />} />{" "}
-      <CBraced>
-        <PrintDefPath o={o.path} />
-      </CBraced>
+      <PrintDefPath o={o.path} />{" "}
+      <Toggle summary=".." Children={() => <PrintPolyFnSig o={o.sig} />} />
     </>
   );
 };

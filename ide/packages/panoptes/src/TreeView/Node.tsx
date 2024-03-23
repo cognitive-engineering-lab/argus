@@ -62,7 +62,11 @@ export const Candidate = ({ idx }: { idx: CandidateIdx }) => {
 export const Node = ({ node }: { node: NodeTy }) => {
   const treeInfo = useContext(TreeContext)!;
   if ("Result" in node) {
-    return <Result idx={node.Result} />;
+    return (
+      <>
+        <Result idx={node.Result} /> (end of tree)
+      </>
+    );
   } else if ("Goal" in node) {
     const goal = treeInfo.goal(node.Goal);
     return (

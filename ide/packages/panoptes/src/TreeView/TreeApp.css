@@ -1,6 +1,6 @@
 .App {
-  width: 100vw;
-  height: 100vh;
+  /* width: 100vw;
+  height: 100vh; */
   display: grid;
   /* grid-template-areas: 
       "tree-interact tree-interact node-info"

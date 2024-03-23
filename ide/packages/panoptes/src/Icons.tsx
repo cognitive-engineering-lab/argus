@@ -42,6 +42,6 @@ export const IcoNote = () => <i className="codicon codicon-note" />;
 
 export const IcoMegaphone = () => <i className="codicon codicon-megaphone" />;
 
-export const IcoTreeDown = () => (
-  <i className="codicon codicon-type-hierarchy-sub" />
-);
+export const IcoTreeDown: React.FC<
+  React.HTMLAttributes<HTMLElement>
+> = props => <i className="codicon codicon-type-hierarchy-sub" {...props} />;

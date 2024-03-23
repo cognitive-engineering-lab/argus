@@ -13,7 +13,7 @@ import Tree, { Orientation, TreeLinkDatum, TreeNodeDatum } from "react-d3-tree";
 
 import { TreeContext } from "./Context";
 import "./Graph.css";
-import { Node } from "./Node";
+import { Node, Result } from "./Node";
 import { TreeInfo } from "./TreeInfo";
 
 const useCenteredTree = (
@@ -97,7 +97,11 @@ const TreeNode = ({
         height="100%"
       >
         <span ref={ref} className="foreign-wrapper">
-          <Node node={node} />
+          {"Result" in node ? (
+            <Result idx={node.Result} />
+          ) : (
+            <Node node={node} />
+          )}
         </span>
       </foreignObject>
     </g>
@@ -131,9 +135,7 @@ const Graph = ({ root }: { root: ProofNodeIdx }) => {
   const topology = treeInfo.topology;
   const data = topologyToTreeData(topology, root);
 
-  const customRender = (rd3tProps: any) => {
-    return <TreeNode {...rd3tProps} />;
-  };
+  const customRender = (rd3tProps: any) => <TreeNode {...rd3tProps} />;
 
   const nodeSize = { x: 250, y: 100 };
 
@@ -141,11 +143,12 @@ const Graph = ({ root }: { root: ProofNodeIdx }) => {
     <div className="TreeArea" ref={containerRef}>
       <Tree
         data={data}
-        orientation="vertical"
+        orientation="horizontal"
         translate={translate}
         nodeSize={nodeSize}
         renderCustomNodeElement={customRender}
         pathClassFunc={getEdgeClass(treeInfo)}
+        separation={{ siblings: 1, nonSiblings: 1 }}
       />
     </div>
   );

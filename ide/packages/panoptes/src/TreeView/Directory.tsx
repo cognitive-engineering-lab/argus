@@ -51,45 +51,54 @@ export const CollapsibleElement = ({
 
   const toggleCollapse = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsOpen(!isOpen);
   };
 
-  const collapseCN = classNames("Collapsible", {
+  const collapseCN = classNames("DirNodeChildren", {
     indent: indentChildren,
     collapsed: !isOpen,
   });
 
   return (
-    <>
-      <div className="DirNode" onClick={toggleCollapse}>
+    <div className="DirNode">
+      <div className="DirNodeLabel" onClick={toggleCollapse}>
         <div className="toggle">
           {Children !== null ? (isOpen ? openIco : closedIco) : null}
         </div>
-        <span className="information">{info}</span>
+        <div className="label">{info}</div>
       </div>
-      <div className={collapseCN}>{children ?? null}</div>
-    </>
+      <div className={collapseCN}>{children}</div>
+    </div>
   );
 };
 
-type InfoWrapper = React.FC<{ n: ProofNodeIdx; Child: React.FC }>;
+export type InfoWrapper = React.FC<{
+  n: ProofNodeIdx;
+  Child: React.ReactElement;
+}>;
+export interface TreeRenderParams {
+  Wrapper?: InfoWrapper;
+  styleEdges?: boolean;
+}
+export let TreeRenderContext = React.createContext<TreeRenderParams>({});
 
 export const DirNode = ({
   idx,
   Children,
-  Wrapper = ({ n: _, Child }) => <Child />,
 }: {
   idx: number;
   Children: React.FC | null;
-  Wrapper: InfoWrapper;
 }) => {
   const tree = useContext(TreeContext)!;
+  const { Wrapper } = useContext(TreeRenderContext);
   const node = tree.node(idx);
 
   const arrows: ElementPair = [<IcoTriangleDown />, <IcoTriangleRight />];
   const dots: ElementPair = [<IcoDot />, <IcoDot />];
   const icons = "Result" in node ? dots : arrows;
-  const info = <Wrapper n={idx} Child={() => <Node node={node} />} />;
+  const infoChild = <Node node={node} />;
+  const info = Wrapper ? <Wrapper n={idx} Child={infoChild} /> : infoChild;
 
   return (
     <CollapsibleElement
@@ -104,15 +113,12 @@ export const DirNode = ({
 export const DirRecursive = ({
   level,
   getNext,
-  styleEdges,
-  Wrapper = ({ n: _, Child }) => <Child />,
 }: {
   level: ProofNodeIdx[];
   getNext: (idx: ProofNodeIdx) => ProofNodeIdx[];
-  styleEdges: boolean;
-  Wrapper?: InfoWrapper;
 }) => {
   const tree = useContext(TreeContext)!;
+  const { styleEdges } = useContext(TreeRenderContext);
   const node = tree.node(level[0]);
   const className = classNames("DirRecursive", {
     "is-candidate": styleEdges && "Candidate" in node,
@@ -124,25 +130,11 @@ export const DirRecursive = ({
     <div className={className}>
       {_.map(level, (current, i) => {
         const next = getNext(current);
-        return (
-          <DirNode
-            key={i}
-            idx={current}
-            Wrapper={Wrapper}
-            Children={
-              next.length > 0
-                ? () => (
-                    <DirRecursive
-                      level={next}
-                      getNext={getNext}
-                      styleEdges={styleEdges}
-                      Wrapper={Wrapper}
-                    />
-                  )
-                : null
-            }
-          />
-        );
+        const Children =
+          next.length > 0
+            ? () => <DirRecursive level={next} getNext={getNext} />
+            : null;
+        return <DirNode key={i} idx={current} Children={Children} />;
       })}
     </div>
   );
