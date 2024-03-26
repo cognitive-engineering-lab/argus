@@ -133,6 +133,15 @@ export class TreeInfo {
     return this.tree.nodes[n];
   }
 
+  public depth(n: ProofNodeIdx) {
+    return this.pathToRoot(n).path.length;
+  }
+
+  public goalOfNode(n: ProofNodeIdx) {
+    const node = this.node(n);
+    return "Goal" in node ? this.goal(node.Goal) : undefined;
+  }
+
   public candidate(n: CandidateIdx): CandidateData {
     return this.tree.candidates[n];
   }
@@ -241,7 +250,13 @@ export class TreeInfo {
       const leaf = f(t);
       const pathToRoot = this.pathToRoot(leaf);
       const len = pathToRoot.path.length;
-      return -len;
+      const numVars = _.reduce(
+        pathToRoot.path,
+        (sum, k) => sum + this.inferVars(k),
+        0
+      );
+
+      return numVars / len;
     };
 
     const bubbleTraitClauses = (t: T) => {

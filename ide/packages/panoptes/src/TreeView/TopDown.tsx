@@ -84,10 +84,10 @@ const TopDown = () => {
 
   const getCandidateChildren = (kids: ProofNodeIdx[]) =>
     _.sortBy(_.uniq(kids), [
-      k => {
-        const node = tree.node(k);
-        return "Goal" in node && tree.goal(node.Goal).isMainTv ? 1 : 0;
-      },
+      // k => {
+      //   const node = tree.node(k);
+      //   return "Goal" in node && tree.goal(node.Goal).isMainTv ? 1 : 0;
+      // },
       k => {
         switch (tree.nodeResult(k)) {
           case "no":

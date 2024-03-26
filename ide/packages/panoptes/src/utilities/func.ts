@@ -110,3 +110,33 @@ export function isHiddenObl(o: { necessity: string; result: string }) {
     o.necessity === "Yes" || (o.necessity === "OnError" && o.result === "no")
   );
 }
+
+export function searchObject(obj: any, target: any) {
+  for (let key in obj) {
+    if (obj[key] === target) {
+      return true;
+    }
+
+    if (typeof obj[key] === "object" && obj[key] !== null) {
+      if (searchObject(obj[key], target)) {
+        return true;
+      }
+    }
+  }
+
+  return obj === target;
+}
+
+export function mean(arr: number[]) {
+  return _.sum(arr) / arr.length;
+}
+
+export function mode(arr: number[]) {
+  const counts = _.countBy(arr);
+  const max = _.max(_.values(counts));
+  return _.findKey(counts, v => v === max);
+}
+
+export function stdDev(arr: number[], avg: number) {
+  return Math.sqrt(_.sum(_.map(arr, n => Math.pow(n - avg, 2))) / arr.length);
+}
