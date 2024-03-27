@@ -28,6 +28,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "diesel-tests"
+version = "0.1.0"
+dependencies = [
+ "diesel",
+]
+
+[[package]]
 name = "diesel_derives"
 version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -53,13 +60,6 @@ name = "itoa"
 version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1a46d1a171d865aa5f83f92695765caa047a9b4cbae2cbf37dbd613a793fd4c"
-
-[[package]]
-name = "overflow"
-version = "0.1.0"
-dependencies = [
- "diesel",
-]
 
 [[package]]
 name = "pq-sys"

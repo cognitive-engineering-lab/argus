@@ -1,9 +1,7 @@
-use super::*;
-
 async fn handler() -> bool {
-    false
+  false
 }
 
-fn test() {
-    use_as_handler(handler);
+async fn test() {
+  crate::use_as_handler!(handler);
 }

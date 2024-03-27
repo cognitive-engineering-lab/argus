@@ -7,11 +7,9 @@ table! {
     }
 }
 
-fn test() {
-  let mut conn = PgConnection::establish("_").unwrap();
-
+fn test(conn: &mut PgConnection) {
   users::table
     .into_boxed()
     .group_by(users::id)
-    .load::<(i32, String)>(&mut conn);
+    .load::<(i32, String)>(conn);
 }

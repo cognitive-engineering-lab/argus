@@ -15,8 +15,10 @@ fn t3(deps: &impl T4) {}
 
 trait T4 {}
 
+// Note: The reason this fails is that T4 is not implemented for entriat::Impl<T>:
+// impl<T> T4 for Impl<T> {}
+
 fn test() {
   let app = Impl::new(());
-  // Note: The reason this fails is that T4 is not implemented for entriat::Impl<T>:
   app.t1();
 }

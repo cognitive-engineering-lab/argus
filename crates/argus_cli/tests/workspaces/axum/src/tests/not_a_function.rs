@@ -1,7 +1,5 @@
-use super::*;
-
 struct A;
 
-fn test() {
-  use_as_handler(A);
+async fn test() {
+  crate::use_as_handler!(A);
 }

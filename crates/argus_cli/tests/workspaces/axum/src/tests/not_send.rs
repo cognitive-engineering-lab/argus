@@ -1,10 +1,9 @@
-use super::*;
-
 async fn handler() {
-    let rc = std::rc::Rc::new(());
-    async {}.await;
+  let _rc = std::rc::Rc::new(());
+  // let _arc = std::sync::Arc::new(());
+  async {}.await;
 }
 
-fn test() {
-    use_as_handler(handler);
+async fn test() {
+  crate::use_as_handler!(handler);
 }

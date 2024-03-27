@@ -93,7 +93,8 @@ fn parser() -> impl Parser<char, Json, Error = Simple<char>> {
       .or(number.map(Json::Num))
       // SWAP THESE LINES
       .or(string)
-      //.or(string.map(Json::Str))
+      // .or(string.map(Json::Str))
+      // ^^^^^^^^^^^^^^^^^^^^^^^^^^
       .or(array)
       .or(object)
       .recover_with(nested_delimiters('{', '}', [('[', ']')], |_| {

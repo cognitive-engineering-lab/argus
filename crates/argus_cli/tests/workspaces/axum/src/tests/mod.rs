@@ -13,15 +13,14 @@ mod request_not_last;
 mod too_many_extractors;
 mod wrong_return_type;
 
-use axum::handler::Handler;
-
-pub fn use_as_handler<H, T, S>(handler: H)
-where
-  H: Handler<T, S>,
-  T: 'static,
-  S: Clone + Send + Sync + 'static,
-{
-  use axum::{routing::get, Router};
-  let app = Router::new().route("/", get(handler));
-  unreachable!()
+#[macro_export]
+macro_rules! use_as_handler {
+  ($handler:expr) => {
+    #[allow(unreachable_code)]
+    {
+      use axum::{routing::get, Router};
+      let _app = Router::new().route("/", get($handler));
+      axum::serve(todo!(), _app).await.unwrap();
+    }
+  };
 }

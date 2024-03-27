@@ -5,4 +5,4 @@ authors = [ "gavinleroy <gavinleroy6@gmail.com>" ]
 edition = "2021"
 
 [dependencies]
-chumsky = "0.9"
+chumsky = "0.8.0"

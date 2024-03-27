@@ -1,18 +1,10 @@
-use std::net::SocketAddr;
+use axum::Json;
 
-use axum::{routing::post, Json, Router};
-
-async fn fake_main() {
-  let app = Router::new().route("/test", post(test));
-
-  let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-  axum_server::Server::bind(addr)
-    .serve(app.into_make_service())
-    .await
-    .unwrap();
-}
-
-// #[derive(serde::Deserialize)] Without this the error is caused
+// #[derive(serde::Deserialize)] // Without this the error is caused
 struct Test {}
 
-async fn test(Json(_): Json<Test>) {}
+async fn handler(Json(_): Json<Test>) {}
+
+async fn test() {
+  crate::use_as_handler!(handler)
+}
