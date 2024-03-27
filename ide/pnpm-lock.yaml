@@ -62,6 +62,9 @@ importers:
       '@types/lodash':
         specifier: ^4.14.195
         version: 4.14.195
+      '@types/mocha':
+        specifier: ^10.0.6
+        version: 10.0.6
       '@types/node':
         specifier: 20.2.5
         version: 20.2.5
@@ -78,14 +81,17 @@ importers:
         specifier: ^0.0.6
         version: 0.0.6
       '@vscode/test-electron':
-        specifier: ^2.3.2
-        version: 2.3.2
+        specifier: ^2.3.9
+        version: 2.3.9
       glob:
         specifier: ^8.1.0
         version: 8.1.0
       lodash:
         specifier: ^4.17.21
         version: 4.17.21
+      mocha:
+        specifier: ^10.4.0
+        version: 10.4.0
       new-github-issue-url:
         specifier: ^1.0.0
         version: 1.0.0
@@ -110,6 +116,9 @@ importers:
       vite-plugin-static-copy:
         specifier: ^1.0.1
         version: 1.0.1(vite@4.4.9)
+      wait-for-expect:
+        specifier: ^3.0.2
+        version: 3.0.2
 
   packages/panoptes:
     devDependencies:
@@ -1335,13 +1344,13 @@ packages:
       enhanced-resolve: 5.15.0
       glob: 10.3.10
       minimatch: 9.0.3
-      mocha: 10.3.0
+      mocha: 10.4.0
       supports-color: 9.4.0
       yargs: 17.7.2
     dev: true
 
-  /@vscode/test-electron@2.3.2:
-    resolution: {integrity: sha512-CRfQIs5Wi5Ok5SUCC3PTvRRXa74LD43cSXHC8EuNlmHHEPaJa/AGrv76brcA1hVSxrdja9tiYwp95Lq8kwY0tw==}
+  /@vscode/test-electron@2.3.9:
+    resolution: {integrity: sha512-z3eiChaCQXMqBnk2aHHSEkobmC2VRalFQN0ApOAtydL172zXGxTwGrRtviT5HnUB+Q+G3vtEYFtuQkYqBzYgMA==}
     engines: {node: '>=16'}
     dependencies:
       http-proxy-agent: 4.0.1
@@ -3123,8 +3132,8 @@ packages:
     resolution: {integrity: sha512-B1UGC3ieK3boCjnMEcZSwxqRDMdzX65H/8zOHbuTY8ZhvrIjTUoLRR2TP2bPqIgYRfb3+dUigu8yMZufNjn0LQ==}
     dev: true
 
-  /mocha@10.3.0:
-    resolution: {integrity: sha512-uF2XJs+7xSLsrmIvn37i/wnc91nw7XjOQB8ccyx5aEgdnohr7n+rEiZP23WkCYHjilR6+EboEnbq/ZQDz4LSbg==}
+  /mocha@10.4.0:
+    resolution: {integrity: sha512-eqhGB8JKapEYcC4ytX/xrzKforgEc3j1pGlAXVy3eRwrtAy5/nIfT1SvgGzfN0XZZxeLq0aQWkOUAmqIJiv+bA==}
     engines: {node: '>= 14.0.0'}
     hasBin: true
     dependencies:
@@ -4180,6 +4189,10 @@ packages:
     engines: {node: '>=14'}
     dependencies:
       xml-name-validator: 4.0.0
+    dev: true
+
+  /wait-for-expect@3.0.2:
+    resolution: {integrity: sha512-cfS1+DZxuav1aBYbaO/kE06EOS8yRw7qOFoD3XtjTkYvCvh3zUvNST8DXK/nPaeqIzIv3P3kL3lRJn8iwOiSag==}
     dev: true
 
   /warning@3.0.0:
