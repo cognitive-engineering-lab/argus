@@ -1,0 +1,19 @@
+{
+  "name": "@argus/test-runner",
+  "version": "0.1.0",
+  "bin": {
+    "test-runner": "dist/test-runner.cjs"
+  },
+  "type": "module",
+  "depot": {
+    "platform": "node"
+  },
+  "dependencies": {
+    "@argus/tests": "workspace:*"
+  },
+  "devDependencies": {
+    "@vscode/test-cli": "^0.0.6",
+    "@vscode/test-electron": "^2.3.9",
+    "vite": "^4.4.9"
+  }
+}

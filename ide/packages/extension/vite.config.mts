@@ -40,8 +40,7 @@ export default defineConfig(({ mode }) => ({
     VERSION: JSON.stringify(require("./package.json").version),
   },
   test: {
-    environment: "node",
-    include: ["tests/runTests.ts"],
+    environment: "jsdom",
     deps: {
       inline: [/^(?!.*vitest).*$/],
     },

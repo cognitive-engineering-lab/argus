@@ -1,18 +1,24 @@
-import { downloadAndUnzipVSCode, runTests } from "@vscode/test-electron";
+import { runTests } from "@vscode/test-electron";
 import fs from "fs";
 import path from "path";
-import { test } from "vitest";
 
 import { TEST_WORKSPACES } from "./constants";
 
 async function runOnWorkspace(workspace: string) {
   // The folder containing the Extension Manifest package.json
   // Passed to `--extensionDevelopmentPath`
-  const extensionDevelopmentPath = path.resolve(__dirname, "../");
+  const extensionDevelopmentPath = path.resolve(__dirname, "../../extension");
 
   // The path to the extension test runner script
   // Passed to --extensionTestsPath
-  const extensionTestsPath = path.resolve(__dirname, "./suite/index");
+  const extensionTestsPath = path.resolve(
+    __dirname,
+    "..",
+    "node_modules",
+    "@argus/tests",
+    "dist",
+    "tests.cjs"
+  );
 
   // Get all .rs files in ${workspace}/src/**.rs
   const workspaceFiles = path.resolve(workspace, "src/**/*.rs");
@@ -29,7 +35,14 @@ async function runOnWorkspace(workspace: string) {
 }
 
 async function main() {
-  const workspaceDirectory = path.resolve(__dirname, TEST_WORKSPACES);
+  const workspaceDirectory = path.resolve(
+    __dirname,
+    "..",
+    "src",
+    TEST_WORKSPACES
+  );
+
+  console.debug("Workspace directory: ", workspaceDirectory);
 
   // Get all subdirectories of TEST_WORKSPACES
   const workspaces = fs.readdirSync(workspaceDirectory);
@@ -51,6 +64,7 @@ async function main() {
   await Promise.all(testingWorkspaces);
 }
 
-test("Run extension tests", async () => {
-  await main();
-}, 1000000);
+main().catch(err => {
+  console.log(err);
+  process.exit(1);
+});
