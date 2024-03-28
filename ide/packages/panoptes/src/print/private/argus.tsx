@@ -46,6 +46,7 @@ export const PrintImplHeader = ({ o }: { o: ImplHeader }) => {
 };
 
 export const PrintGroupedClauses = ({ o }: { o: GroupedClauses }) => {
+  console.debug("Printing GroupedClauses", o);
   const groupedClauses = _.map(o.grouped, (group, idx) => (
     <div className="WhereConstraint" key={idx}>
       <PrintClauseWithBounds o={group} />

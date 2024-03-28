@@ -190,6 +190,7 @@ export class Ctx {
         isRustEditor(editor) &&
         isDocumentInWorkspace(editor.document)
       ) {
+        console.debug(`Opening ${editor.document.fileName}`);
         this.openEditor(editor);
       }
     });
@@ -216,6 +217,9 @@ export class Ctx {
     // Load the obligations in the file, while we have the editor.
     const obl = await this.loadObligations(editor);
     if (obl) {
+      if (this.view === undefined) {
+        console.debug("View not initialized, skipping editor open.");
+      }
       return this.view?.openEditor(editor, obl);
     }
   }

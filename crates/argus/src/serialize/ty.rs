@@ -1365,17 +1365,79 @@ pub struct SubtypePredicateDef<'tcx> {
 }
 
 #[derive(Serialize)]
-#[serde(remote = "ty::TraitPredicate")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+pub enum BoundConstness {
+  C,
+  // TC,
+  No,
+}
+
+#[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "TraitPredicate"))]
 pub struct TraitPredicateDef<'tcx> {
-  #[serde(with = "TraitRefDef")]
-  #[cfg_attr(feature = "testing", ts(type = "TraitRef"))]
-  pub trait_ref: ty::TraitRef<'tcx>,
+  #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+  pub self_ty: ty::Ty<'tcx>,
+
+  pub constness: BoundConstness,
+
+  pub trait_ref: TraitRefPrintSugaredDef<'tcx>,
 
   #[serde(with = "ImplPolarityDef")]
   #[cfg_attr(feature = "testing", ts(type = "ImplPolarity"))]
   pub polarity: ty::ImplPolarity,
+}
+
+impl<'tcx> TraitPredicateDef<'tcx> {
+  fn new(value: &ty::TraitPredicate<'tcx>) -> Self {
+    Self {
+      self_ty: value.trait_ref.self_ty(),
+      constness: Self::bound_constness(&value.trait_ref),
+      trait_ref: TraitRefPrintSugaredDef::new(&value.trait_ref),
+      polarity: value.polarity,
+    }
+  }
+  fn bound_constness(trait_ref: &ty::TraitRef<'tcx>) -> BoundConstness {
+    let infcx = get_dynamic_ctx();
+    let tcx = &infcx.tcx;
+    let Some(idx) = tcx.generics_of(trait_ref.def_id).host_effect_index else {
+      return BoundConstness::No;
+    };
+    let arg = trait_ref.args.const_at(idx);
+
+    if arg == tcx.consts.false_ {
+      BoundConstness::C
+      // FIXME: const infer is a newer feature we'll need to handle in the future
+      // } else if arg != tcx.consts.true_ && !arg.has_infer() {
+      //   BoundConstness::TC
+    } else {
+      BoundConstness::No
+    }
+  }
+  pub fn serialize<S>(
+    value: &ty::TraitPredicate<'tcx>,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    Self::new(value).serialize(s)
+  }
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(
+  feature = "testing",
+  ts(export, rename = "TraitRefPrintTraitSugared")
+)]
+pub struct TraitRefPrintSugaredDef<'tcx>(path::PathDefWithArgs<'tcx>);
+impl<'tcx> TraitRefPrintSugaredDef<'tcx> {
+  pub fn new(value: &ty::TraitRef<'tcx>) -> Self {
+    Self(path::PathDefWithArgs::new(value.def_id, value.args))
+  }
 }
 
 #[derive(Serialize)]
@@ -1398,33 +1460,6 @@ impl<'tcx> TraitRefPrintOnlyTraitPathDef<'tcx> {
     S: serde::Serializer,
   {
     Self::new(value).serialize(s)
-  }
-}
-
-#[derive(Serialize)]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export, rename = "TraitRef"))]
-pub struct TraitRefDef<'tcx> {
-  #[serde(with = "TyDef")]
-  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
-  pub self_ty: ty::Ty<'tcx>,
-
-  pub trait_path: TraitRefPrintOnlyTraitPathDef<'tcx>,
-}
-
-impl<'tcx> TraitRefDef<'tcx> {
-  pub fn serialize<S>(
-    value: &ty::TraitRef<'tcx>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    Self {
-      self_ty: value.self_ty(),
-      trait_path: TraitRefPrintOnlyTraitPathDef::new(value),
-    }
-    .serialize(s)
   }
 }
 

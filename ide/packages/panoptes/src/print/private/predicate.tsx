@@ -1,5 +1,6 @@
 import {
   AliasRelationDirection,
+  BoundConstness,
   Clause,
   ClauseKind,
   GoalPredicate,
@@ -8,7 +9,6 @@ import {
   PredicateKind,
   PredicateObligation,
   TraitPredicate,
-  TraitRef,
 } from "@argus/common/bindings";
 import _ from "lodash";
 import React from "react";
@@ -187,19 +187,20 @@ export const PrintClauseKind = ({ o }: { o: ClauseKind }) => {
   }
 };
 
+export const PrintBoundConstness = ({ o }: { o: BoundConstness }) => {
+  if (o === "C") {
+    return "const ";
+  } else {
+    return null;
+  }
+};
+
 export const PrintTraitPredicate = ({ o }: { o: TraitPredicate }) => {
   return (
     <>
+      <PrintTy o={o.self_ty} />: <PrintBoundConstness o={o.constness} />
       <PrintImplPolarity o={o.polarity} />
-      <PrintTraitRef o={o.trait_ref} />
-    </>
-  );
-};
-
-export const PrintTraitRef = ({ o }: { o: TraitRef }) => {
-  return (
-    <>
-      <PrintTy o={o.self_ty} />: <PrintDefPath o={o.trait_path} />
+      <PrintDefPath o={o.trait_ref} />
     </>
   );
 };

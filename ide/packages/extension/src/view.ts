@@ -63,6 +63,7 @@ export class View {
 
     this.panel = vscode.window.createWebviewPanel("argus", "Argus", column, {
       enableScripts: true,
+      retainContextWhenHidden: true,
       localResourceRoots: [this.extensionUri],
     });
     this.isPanelDisposed = false;
@@ -130,6 +131,7 @@ export class View {
   }
 
   public async openEditor(editor: RustEditor, data: ObligationOutput[]) {
+    console.debug("Sending open file message", editor.document.fileName);
     this.messageWebview<Filename>("open-file", {
       type: "FROM_EXTENSION",
       command: "open-file",

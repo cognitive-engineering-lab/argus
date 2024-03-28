@@ -22,6 +22,7 @@ use serde::Serialize;
 
 use crate::{
   analysis::{EvaluationResult, FulfillmentData},
+  rustc,
   serialize::{
     safe::TraitRefPrintOnlyTraitPathDef, serialize_to_value,
     ty::PredicateObligationDef,
@@ -305,6 +306,11 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
     let impl_def_id = def_id;
 
     // From [`rustc_trait_selection::traits::specialize`]
+    log::debug!(
+      "Serializing this impl header\n{}",
+      rustc::to_pretty_impl_header(tcx, impl_def_id)
+        .unwrap_or(String::from("{failed to get header}"))
+    );
 
     let trait_ref = tcx.impl_trait_ref(impl_def_id)?.instantiate_identity();
     let args = ty::GenericArgs::identity_for_item(tcx, impl_def_id);
@@ -338,6 +344,8 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
       }
       pretty_predicates.push(p.clone());
     }
+
+    log::debug!("pretty predicates for impl header {:#?}", pretty_predicates);
 
     // Argus addition
     let grouped_clauses = group_predicates_by_ty(pretty_predicates);

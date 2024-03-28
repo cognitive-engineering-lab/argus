@@ -81,7 +81,7 @@ const ObligationTreeWrapper = ({
       setTree(tree.tree);
     };
     getData();
-  }, []);
+  }, [file, obligation, range]);
 
   const content =
     tree === "loading" ? (
