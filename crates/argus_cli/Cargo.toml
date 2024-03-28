@@ -1,6 +1,6 @@
 [package]
 name = "argus-cli"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 authors = ["Gavin Gray <gavinleroy6@gmail.com>"]
 repository = "https://github.com/cognitive-engineering-lab/argus"
@@ -10,7 +10,7 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-argus-lib = { version = "0.1.5", path = "../argus" }
+argus-lib = { version = "0.1.6", path = "../argus" }
 rustc_plugin = "=0.9.0-nightly-2024-01-24"
 rustc_utils = { version = "=0.9.0-nightly-2024-01-24", features = ["serde"] }
 
