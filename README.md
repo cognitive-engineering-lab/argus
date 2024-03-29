@@ -58,3 +58,7 @@ Argus or Argos Panoptes (Ancient Greek: Ἄργος Πανόπτης, "All-seein
 > Argus was Hera's servant. His great service to the Olympian pantheon was to slay the chthonic serpent-legged monster Echidna as she slept in her cave. Hera's defining task for Argus was to guard the white heifer Io from Zeus, who was attracted to her, keeping her chained to the sacred olive tree at the Argive Heraion. She required someone who had at least a hundred eyes spread out, always watching in all directions, someone who would stay awake despite being asleep. _Argos was meant to be the perfect guardian_.
 
 —[Wikipedia](https://en.wikipedia.org/wiki/Argus_Panoptes)
+
+## Having trouble? (or providing feedback!)
+
+If you want to use Argus but are having trouble finding the relevant information, please leave an issue or email us at <gavin.gray@inf.ethz.ch> and <wcrichto@brown.edu>. Feedback and comments are always welcome as we iterate in the design and development of Argus!
