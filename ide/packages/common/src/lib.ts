@@ -8,12 +8,6 @@ import {
   SerializedTree,
 } from "./bindings";
 
-// TODO: we should probably just get rid of these,
-// don't think they'll be needed anymore.
-export type ObligationOutput = ObligationsInBody;
-export type TreeOutput = SerializedTree | undefined;
-export type ArgusOutputs = ObligationOutput | TreeOutput;
-
 export interface ErrorJumpTargetInfo {
   file: Filename;
   bodyIdx: BodyHash;
@@ -36,12 +30,11 @@ export type CommonData = {
   file: Filename;
 };
 
-export type ExtensionReturn<T extends ExtensionToWebViewMsg["command"]> =
-  T extends "tree"
-    ? { tree: TreeOutput }
-    : T extends "obligations"
-    ? { obligations: ObligationOutput[] }
-    : {};
+export type SystemReturn<T extends PanoptesToSystemCmds> = T extends "tree"
+  ? { tree?: SerializedTree }
+  : T extends "obligations"
+  ? { obligations: ObligationsInBody[] }
+  : {};
 
 export interface OpenErrorPayload {
   command: "open-error";
@@ -52,35 +45,74 @@ export interface OpenErrorPayload {
 
 export type PayloadTypes = {
   "open-error": Omit<OpenErrorPayload, "command">;
-  "open-file": { data: ObligationOutput[] };
-  obligations: { obligations: ObligationOutput[] };
-  tree: { tree: TreeOutput };
+  "open-file": { data: ObligationsInBody[] };
+  obligations: { obligations: ObligationsInBody[] };
+  tree: { tree?: SerializedTree };
 };
 
-export type ExtensionToWebViewMsg = { type: FROM_EXT } & (
-  | { command: "reset"; data: [Filename, ObligationsInBody[]][] }
-  | (CommonData &
-      (
-        | OpenErrorPayload
-        | { command: "open-file"; data: ObligationOutput[] }
-        | { command: "obligations"; obligations: ObligationOutput[] }
-        | { command: "tree"; tree: TreeOutput }
-      ))
-);
+export type SystemToPanoptesCmds =
+  | "reset"
+  | "open-file"
+  | "open-error"
+  | "obligations"
+  | "tree";
 
-export type WebViewToExtensionMsg = CommonData & { type: FROM_WV } & (
-    | { command: "obligations" }
-    | {
-        command: "tree";
-        predicate: Obligation;
-        range: CharRange;
-      }
-    | { command: "add-highlight"; range: CharRange }
-    | { command: "remove-highlight"; range: CharRange }
-  );
+export type SystemToPanoptesMsg<T extends SystemToPanoptesCmds> = {
+  command: T;
+  type: FROM_EXT;
+} & (T extends "reset"
+  ? { data: [Filename, ObligationsInBody[]][] }
+  : CommonData &
+      (T extends "open-file"
+        ? { data: ObligationsInBody[] }
+        : T extends "open-error"
+        ? {
+            bodyIdx: BodyHash;
+            exprIdx: ExprIdx;
+            hash: ObligationHash;
+          }
+        : T extends "obligations"
+        ? { obligations: ObligationsInBody[] }
+        : T extends "tree"
+        ? { tree?: SerializedTree }
+        : never));
+
+export type PanoptesToSystemCmds =
+  | "obligations"
+  | "tree"
+  | "add-highlight"
+  | "remove-highlight";
+export type PanoptesToSystemMsg<T extends PanoptesToSystemCmds> = CommonData & {
+  command: T;
+  type: FROM_WV;
+} & (T extends "obligations"
+    ? {}
+    : T extends "tree"
+    ? { predicate: Obligation; range: CharRange }
+    : T extends "add-highlight" | "remove-highlight"
+    ? { range: CharRange }
+    : never);
 
 // ------------------------------------------------------
-// Interface between the extension and rustc plugin
+// Interface between the system and rustc plugin
+
+export type ArgusCliOptions = "preload" | "tree" | "obligations";
+
+export type ArgusArgs<T extends ArgusCliOptions> = T extends "preload"
+  ? ["preload"]
+  : T extends "obligations"
+  ? ["obligations", Filename]
+  : T extends "tree"
+  ? ["tree", Filename, string, number, number, number, number, boolean]
+  : never;
+
+export type ArgusReturn<T extends ArgusCliOptions> = T extends "preload"
+  ? void
+  : T extends "tree"
+  ? Array<SerializedTree | undefined>
+  : T extends "obligations"
+  ? ObligationsInBody[]
+  : never;
 
 // serde-compatible type
 export type Result<T> = { Ok: T } | { Err: ArgusError };
@@ -94,17 +126,57 @@ export interface ArgusOutput<T> {
   value: T;
 }
 
-export type ArgusResult<T> = ArgusOutput<T> | ArgusError;
+export type ArgusResult<T extends ArgusCliOptions> =
+  | ArgusOutput<ArgusReturn<T>>
+  | ArgusError;
 
 // TODO: what we really want here is dependent typing ... it
 // might be achievable with TS, but too tired rn to think about that.
-export type CallArgus = <T>(
-  _args: ArgusArgs,
+export type CallArgus = <T extends ArgusCliOptions>(
+  _args: ArgusArgs<T>,
   _no_output?: boolean
 ) => Promise<ArgusResult<T>>;
 
-export type ArgusArgs =
-  | ["preload"] // => void
-  | ["obligations", Filename] // => ObligationsInBody[]
-  // NOTE: the hashes need to remain a string, otherwise JS cuts off the higher bits on bignums.
-  | ["tree", Filename, string, number, number, number, number, boolean]; // => [SerializedTree | undefined]
+// Type predicates (these shouldn't really exist ...)
+
+export function isSysMsgOpenError(
+  msg: SystemToPanoptesMsg<SystemToPanoptesCmds>
+): msg is SystemToPanoptesMsg<"open-error"> {
+  return msg.command === "open-error";
+}
+
+export function isSysMsgOpenFile(
+  msg: SystemToPanoptesMsg<SystemToPanoptesCmds>
+): msg is SystemToPanoptesMsg<"open-file"> {
+  return msg.command === "open-file";
+}
+
+export function isSysMsgReset(
+  msg: SystemToPanoptesMsg<SystemToPanoptesCmds>
+): msg is SystemToPanoptesMsg<"reset"> {
+  return msg.command === "reset";
+}
+
+export function isPanoMsgTree(
+  msg: PanoptesToSystemMsg<PanoptesToSystemCmds>
+): msg is PanoptesToSystemMsg<"tree"> {
+  return msg.command === "tree";
+}
+
+export function isPanoMsgObligations(
+  msg: PanoptesToSystemMsg<PanoptesToSystemCmds>
+): msg is PanoptesToSystemMsg<"obligations"> {
+  return msg.command === "obligations";
+}
+
+export function isPanoMsgAddHighlight(
+  msg: PanoptesToSystemMsg<PanoptesToSystemCmds>
+): msg is PanoptesToSystemMsg<"add-highlight"> {
+  return msg.command === "add-highlight";
+}
+
+export function isPanoMsgRemoveHighlight(
+  msg: PanoptesToSystemMsg<PanoptesToSystemCmds>
+): msg is PanoptesToSystemMsg<"remove-highlight"> {
+  return msg.command === "remove-highlight";
+}

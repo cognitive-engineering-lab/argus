@@ -1,5 +1,4 @@
 import {
-  AmbiguityError,
   BodyHash,
   CharRange,
   ExprIdx,
@@ -7,16 +6,8 @@ import {
   ObligationHash,
   ObligationsInBody,
   SerializedTree,
-  TraitError,
 } from "@argus/common/bindings";
-import {
-  ArgusArgs,
-  ArgusResult,
-  ErrorJumpTargetInfo,
-  Filename,
-  ObligationOutput,
-  TreeOutput,
-} from "@argus/common/lib";
+import { CallArgus, ErrorJumpTargetInfo, Filename } from "@argus/common/lib";
 import _ from "lodash";
 import * as vscode from "vscode";
 
@@ -78,11 +69,6 @@ export type CommandFactory = {
 
 // We can modify this if the initializations state changes.
 export type CtxInit = Ctx;
-
-type CallBackend = <T>(
-  _args: ArgusArgs,
-  _noOutput?: boolean
-) => Promise<ArgusResult<T>>;
 
 export class Ctx {
   // Ranges used for highlighting code in the current Rust Editor.
@@ -404,7 +390,7 @@ export class Ctx {
   }
 
   private async getFreshWebViewData(): Promise<
-    [Filename, ObligationOutput[]][]
+    [Filename, ObligationsInBody[]][]
   > {
     const initialData = await Promise.all(
       _.map(this.visibleEditors, async e => [
@@ -438,9 +424,9 @@ class BackendCache {
     Filename,
     Record<ObligationHash, Promise<SerializedTree | undefined>>
   >;
-  private backend: CallBackend;
+  private backend: CallArgus;
 
-  constructor(backend: CallBackend) {
+  constructor(backend: CallArgus) {
     this.obligationCache = {};
     this.treeCache = {};
     this.backend = backend;
@@ -457,10 +443,7 @@ class BackendCache {
     }
 
     const thunk = async () => {
-      const res = await this.backend<ObligationOutput[]>([
-        "obligations",
-        filename,
-      ]);
+      const res = await this.backend<"obligations">(["obligations", filename]);
 
       if (res.type !== "output") {
         globals.statusBar.setState("error");
@@ -488,7 +471,7 @@ class BackendCache {
     }
 
     const thunk = async () => {
-      const res = await this.backend<TreeOutput[]>([
+      const res = await this.backend<"tree">([
         "tree",
         filename,
         obl.hash,

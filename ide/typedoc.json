@@ -8,6 +8,7 @@
   "entryPoints": [
     "packages/extension",
     "packages/common",
-    "packages/panoptes"
+    "packages/panoptes",
+    "packages/itests"
   ]
 }

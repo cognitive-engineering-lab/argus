@@ -28,6 +28,7 @@ import { CollapsibleElement } from "./TreeView/Directory";
 import { ResultRaw } from "./TreeView/Node";
 import TreeApp from "./TreeView/TreeApp";
 import { WaitingOn } from "./WaitingOn";
+import { MessageSystemContext } from "./communication";
 import {
   PrintBodyName,
   PrintExtensionCandidate,
@@ -40,7 +41,6 @@ import {
   makeHighlightPosters,
   obligationCardId,
 } from "./utilities/func";
-import { requestFromExtension } from "./utilities/vscode";
 
 const FileContext = createContext<Filename | undefined>(undefined);
 const BodyInfoContext = createContext<BodyInfo | undefined>(undefined);
@@ -68,10 +68,11 @@ const ObligationTreeWrapper = ({
     "loading"
   );
   const file = useContext(FileContext)!;
+  const messageSystem = useContext(MessageSystemContext)!;
 
   useEffect(() => {
     const getData = async () => {
-      const tree = await requestFromExtension<"tree">({
+      const tree = await messageSystem.requestData<"tree">({
         type: "FROM_WEBVIEW",
         file: file,
         command: "tree",
@@ -100,8 +101,10 @@ const ObligationCard = observer(
     const file = useContext(FileContext)!;
     const id = obligationCardId(file, obligation.hash);
     const ref = useRef<HTMLDivElement>(null);
+    const messageSystem = useContext(MessageSystemContext)!;
 
     const [addHighlight, removeHighlight] = makeHighlightPosters(
+      messageSystem,
       obligation.range,
       file
     );
@@ -230,7 +233,9 @@ const Expr = observer(({ idx }: { idx: ExprIdx }) => {
   const bodyInfo = useContext(BodyInfoContext)!;
   const file = useContext(FileContext)!;
   const expr = bodyInfo.getExpr(idx);
+  const messageSystem = useContext(MessageSystemContext)!;
   const [addHighlight, removeHighlight] = makeHighlightPosters(
+    messageSystem,
     expr.range,
     file
   );

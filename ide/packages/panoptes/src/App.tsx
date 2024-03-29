@@ -1,14 +1,19 @@
+import { ObligationsInBody } from "@argus/common/bindings";
 import {
   ErrorJumpTargetInfo,
-  ExtensionToWebViewMsg,
   Filename,
-  ObligationOutput,
+  SystemToPanoptesCmds,
+  SystemToPanoptesMsg,
+  isSysMsgOpenError,
+  isSysMsgOpenFile,
+  isSysMsgReset,
 } from "@argus/common/lib";
 import _ from "lodash";
 import { observer } from "mobx-react";
 import React, { useEffect, useState } from "react";
 
 import Workspace from "./Workspace";
+import { MessageSystem, MessageSystemContext } from "./communication";
 import { highlightedObligation } from "./signals";
 import { bringToFront } from "./utilities/func";
 
@@ -22,58 +27,41 @@ const App = observer(
   ({
     data,
     target,
+    messageSystem,
   }: {
-    data: [Filename, ObligationOutput[]][];
+    data: [Filename, ObligationsInBody[]][];
+    messageSystem: MessageSystem;
     target?: ErrorJumpTargetInfo;
   }) => {
     const [openFiles, setOpenFiles] =
-      useState<[Filename, ObligationOutput[]][]>(data);
+      useState<[Filename, ObligationsInBody[]][]>(data);
 
     // NOTE: this listener should only listen for posted messages, not
     // for things that could be an expected response from a webview request.
     const listener = (e: MessageEvent) => {
       const {
-        command,
         payload,
-      }: { command: string; payload: ExtensionToWebViewMsg } = e.data;
+      }: {
+        payload: SystemToPanoptesMsg<SystemToPanoptesCmds>;
+      } = e.data;
 
-      console.debug("Received message from extension", command, payload);
+      console.debug("Received message from system", payload);
 
-      if (command != payload.command) {
-        console.error("Received message with mismatched commands", e.data);
-        return;
-      }
-
-      switch (payload.command) {
-        case "open-error": {
-          console.debug(
-            "Current highlighted obligation",
-            highlightedObligation
+      if (isSysMsgOpenError(payload)) {
+        return blingObserver(payload);
+      } else if (isSysMsgOpenFile(payload)) {
+        return setOpenFiles(currFiles => {
+          const idx = _.findIndex(
+            currFiles,
+            ([filename, _]) => filename === payload.file
           );
-          return blingObserver(payload);
-        }
-
-        case "open-file": {
-          return setOpenFiles(currFiles => {
-            const idx = _.findIndex(
-              currFiles,
-              ([filename, _]) => filename === payload.file
-            );
-            if (idx === -1) {
-              return [[payload.file, payload.data], ...currFiles];
-            }
-            return bringToFront(currFiles, idx);
-          });
-        }
-
-        case "reset": {
-          // Re-render the open files.
-          return setOpenFiles(payload.data);
-        }
-
-        // Everything else must be ignored.
-        default:
-          return;
+          if (idx === -1) {
+            return [[payload.file, payload.data], ...currFiles];
+          }
+          return bringToFront(currFiles, idx);
+        });
+      } else if (isSysMsgReset(payload)) {
+        return setOpenFiles(payload.data);
       }
     };
 
@@ -89,7 +77,11 @@ const App = observer(
       return setOpenFiles(currFiles => currFiles);
     };
 
-    return <Workspace files={openFiles} reset={resetState} />;
+    return (
+      <MessageSystemContext.Provider value={messageSystem}>
+        <Workspace files={openFiles} reset={resetState} />
+      </MessageSystemContext.Provider>
+    );
   }
 );
 

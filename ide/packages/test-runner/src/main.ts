@@ -15,20 +15,19 @@ async function runOnWorkspace(workspace: string) {
     __dirname,
     "..",
     "node_modules",
-    "@argus/tests",
+    "@argus/itests",
     "dist",
-    "tests.cjs"
+    "lib.js"
   );
 
   // Get all .rs files in ${workspace}/src/**.rs
-  const workspaceFiles = path.resolve(workspace, "src/**/*.rs");
-
-  const launchArgs = ["--disable-extensions", workspace, ...workspaceFiles];
+  // const workspaceFiles = path.resolve(workspace, "src/**/*.rs");
+  const launchArgs = ["--disable-extensions", workspace];
 
   // Download VS Code, unzip it and run the integration test
   await runTests({
     version: "stable",
-    launchArgs,
+    // launchArgs,
     extensionDevelopmentPath,
     extensionTestsPath,
   });
@@ -42,26 +41,30 @@ async function main() {
     TEST_WORKSPACES
   );
 
-  console.debug("Workspace directory: ", workspaceDirectory);
-
-  // Get all subdirectories of TEST_WORKSPACES
-  const workspaces = fs.readdirSync(workspaceDirectory);
-
-  // for each subdirectory of TEST_WORKSPACES, run the tests
-  const testingWorkspaces = workspaces.map(async workspace => {
-    // FIXME: remove after testing
-    if (workspace === "bevy") {
-      await runOnWorkspace(path.resolve(workspaceDirectory, workspace)).catch(
-        err => {
-          console.error(`Failed to run tests on workspace: ${workspace}`);
-          console.error(err);
-          throw new Error(err);
-        }
-      );
-    }
+  await runOnWorkspace(path.resolve(workspaceDirectory, "bevy")).catch(err => {
+    // console.error(`Failed to run tests on workspace: ${workspace}`);
+    console.error(err);
+    throw new Error(err);
   });
 
-  await Promise.all(testingWorkspaces);
+  // // Get all subdirectories of TEST_WORKSPACES
+  // const workspaces = fs.readdirSync(workspaceDirectory);
+
+  // // for each subdirectory of TEST_WORKSPACES, run the tests
+  // const testingWorkspaces = workspaces.map(async workspace => {
+  //   // FIXME: remove after testing
+  //   if (workspace === "bevy") {
+  //     await runOnWorkspace(path.resolve(workspaceDirectory, workspace)).catch(
+  //       err => {
+  //         console.error(`Failed to run tests on workspace: ${workspace}`);
+  //         console.error(err);
+  //         throw new Error(err);
+  //       }
+  //     );
+  //   }
+  // });
+
+  // await Promise.all(testingWorkspaces);
 }
 
 main().catch(err => {

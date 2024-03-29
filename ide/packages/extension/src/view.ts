@@ -5,35 +5,33 @@ import {
   Obligation,
   ObligationHash,
   ObligationsInBody,
-  SerializedTree,
 } from "@argus/common/bindings";
 import {
   ErrorJumpTargetInfo,
-  ExtensionToWebViewMsg,
   Filename,
-  ObligationOutput,
-  OpenErrorPayload,
-  WebViewToExtensionMsg,
+  PanoptesToSystemCmds,
+  PanoptesToSystemMsg,
+  SystemToPanoptesCmds,
+  SystemToPanoptesMsg,
+  isPanoMsgAddHighlight,
+  isPanoMsgObligations,
+  isPanoMsgRemoveHighlight,
+  isPanoMsgTree,
 } from "@argus/common/lib";
 import { MessageHandlerData } from "@estruyf/vscode";
 import _ from "lodash";
 import vscode from "vscode";
 
-import { log } from "./logging";
 import { globals } from "./main";
 import { RustEditor } from "./utils";
 
 // Wraps around the MessageHandler data types from @estruyf/vscode.
-type BlessedMessage = {
+type BlessedMessage<T extends PanoptesToSystemCmds> = {
   command: string;
   requestId: string;
-  payload: WebViewToExtensionMsg;
+  payload: PanoptesToSystemMsg<T>;
 };
 
-// TODO: instead of having a single view, with a static panel,
-// we should have a view field on the Ctx, this makes all commands
-// routed through the Ctx and we don't have to play the static
-// shenanigans.
 export class View {
   private panel: vscode.WebviewPanel;
   private isPanelDisposed: boolean;
@@ -106,8 +104,8 @@ export class View {
 
   // Public API, using static methods >:(
 
-  public async reset(newData: [Filename, ObligationOutput[]][]) {
-    this.messageWebview<[Filename, ObligationOutput[]][]>("invalidate", {
+  public async reset(newData: [Filename, ObligationsInBody[]][]) {
+    this.messageWebview("reset", {
       type: "FROM_EXTENSION",
       command: "reset",
       data: newData,
@@ -120,7 +118,7 @@ export class View {
     exprIdx: ExprIdx,
     obligation: ObligationHash
   ) {
-    this.messageWebview<Omit<OpenErrorPayload, "command">>("open-error", {
+    this.messageWebview("open-error", {
       type: "FROM_EXTENSION",
       command: "open-error",
       file,
@@ -130,9 +128,9 @@ export class View {
     });
   }
 
-  public async openEditor(editor: RustEditor, data: ObligationOutput[]) {
+  public async openEditor(editor: RustEditor, data: ObligationsInBody[]) {
     console.debug("Sending open file message", editor.document.fileName);
-    this.messageWebview<Filename>("open-file", {
+    this.messageWebview("open-file", {
       type: "FROM_EXTENSION",
       command: "open-file",
       file: editor.document.fileName,
@@ -140,52 +138,29 @@ export class View {
     });
   }
 
-  private async handleMessage(message: BlessedMessage) {
-    const { command, requestId, payload } = message;
+  private async handleMessage(message: BlessedMessage<PanoptesToSystemCmds>) {
+    const { requestId, payload } = message;
 
-    if (command !== payload.command) {
-      log(
-        `
-        Command mismatch 
-          expected: ${payload.command} 
-          but got: ${command}
-        `
+    if (isPanoMsgObligations(payload)) {
+      return this.getObligations(requestId, payload.file);
+    } else if (isPanoMsgTree(payload)) {
+      return this.getTree(
+        requestId,
+        payload.file,
+        payload.predicate,
+        payload.range
       );
-      return;
-    }
-
-    switch (payload.command) {
-      case "obligations": {
-        this.getObligations(requestId, payload.file);
-        return;
-      }
-      case "tree": {
-        this.getTree(requestId, payload.file, payload.predicate, payload.range);
-        return;
-      }
-
-      // These messages don't require a response.
-      // TODO: but they need to interact with the Ctx.
-      //
-      case "add-highlight": {
-        globals.ctx.addHighlightRange(payload.file, payload.range);
-        return;
-      }
-      case "remove-highlight": {
-        globals.ctx.removeHighlightRange(payload.file, payload.range);
-        return;
-      }
-      default: {
-        log(`Message not understood ${message}`);
-        return;
-      }
+    } else if (isPanoMsgAddHighlight(payload)) {
+      return globals.ctx.addHighlightRange(payload.file, payload.range);
+    } else if (isPanoMsgRemoveHighlight(payload)) {
+      return globals.ctx.removeHighlightRange(payload.file, payload.range);
     }
   }
 
   private async getObligations(requestId: string, host: Filename) {
     const obligations = await globals.ctx.getObligations(host);
     if (obligations !== undefined) {
-      this.messageWebview<ObligationOutput[]>(requestId, {
+      this.messageWebview(requestId, {
         type: "FROM_EXTENSION",
         file: host,
         command: "obligations",
@@ -202,7 +177,7 @@ export class View {
   ) {
     const tree = await globals.ctx.getTree(file, obl, range);
     if (tree !== undefined) {
-      this.messageWebview<SerializedTree>(requestId, {
+      this.messageWebview(requestId, {
         type: "FROM_EXTENSION",
         file,
         command: "tree",
@@ -211,14 +186,14 @@ export class View {
     }
   }
 
-  // FIXME: the type T here is wrong, it should be a response message similar to
-  // how the webview encodes the return value.
-  private messageWebview<T>(requestId: string, msg: ExtensionToWebViewMsg) {
+  private messageWebview<T extends SystemToPanoptesCmds>(
+    requestId: string,
+    msg: SystemToPanoptesMsg<T>
+  ) {
     this.panel.webview.postMessage({
-      command: msg.command,
       requestId: requestId,
       payload: msg,
-    } as MessageHandlerData<T>);
+    } as MessageHandlerData<SystemToPanoptesMsg<T>>);
   }
 
   private getHtmlForWebview(

@@ -4,6 +4,6 @@
     "src"
   ],
   "compilerOptions": {
-    "noEmit": true
+    "outDir": "dist"
   }
 }

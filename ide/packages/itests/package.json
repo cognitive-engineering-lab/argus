@@ -1,0 +1,29 @@
+{
+  "name": "@argus/itests",
+  "version": "0.1.0",
+  "files": [
+    "dist"
+  ],
+  "main": "dist/lib.js",
+  "exports": {
+    ".": {
+      "default": "./dist/lib.js"
+    },
+    "./*": {
+      "default": "./dist/*.js"
+    }
+  },
+  "type": "module",
+  "depot": {
+    "platform": "node"
+  },
+  "typedoc": {
+    "entryPoint": "./src/lib.ts"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.6",
+    "glob": "^8.1.0",
+    "mocha": "^10.4.0"
+  }
+}

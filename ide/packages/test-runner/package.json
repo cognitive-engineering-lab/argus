@@ -9,7 +9,8 @@
     "platform": "node"
   },
   "dependencies": {
-    "@argus/tests": "workspace:*"
+    "@argus/itests": "workspace:*",
+    "mocha": "^10.4.0"
   },
   "devDependencies": {
     "@vscode/test-cli": "^0.0.6",

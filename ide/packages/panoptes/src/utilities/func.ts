@@ -8,7 +8,7 @@ import {
 import { Filename } from "@argus/common/lib";
 import _ from "lodash";
 
-import { postToExtension } from "./vscode";
+import { MessageSystem } from "../communication";
 
 export function isObject(x: any): x is object {
   return typeof x === "object" && x !== null;
@@ -33,9 +33,13 @@ export function errorCardId(
   return `err--${name}-${bodyIdx}-${errType}-${errIdx}`;
 }
 
-export function makeHighlightPosters(range: CharRange, file: Filename) {
+export function makeHighlightPosters(
+  messageSystem: MessageSystem,
+  range: CharRange,
+  file: Filename
+) {
   const addHighlight = () => {
-    postToExtension({
+    messageSystem.postData({
       type: "FROM_WEBVIEW",
       file,
       command: "add-highlight",
@@ -44,7 +48,7 @@ export function makeHighlightPosters(range: CharRange, file: Filename) {
   };
 
   const removeHighlight = () => {
-    postToExtension({
+    messageSystem.postData({
       type: "FROM_WEBVIEW",
       file,
       command: "remove-highlight",

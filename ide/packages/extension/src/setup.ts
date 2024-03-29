@@ -1,4 +1,9 @@
-import { ArgusArgs, CallArgus, Result } from "@argus/common/lib";
+import {
+  ArgusArgs,
+  ArgusCliOptions,
+  CallArgus,
+  Result,
+} from "@argus/common/lib";
 import cp from "child_process";
 import _ from "lodash";
 import open from "open";
@@ -268,7 +273,10 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
   }
 
   const argusOpts = await getArgusOpts(workspaceRoot);
-  return async <T>(args: ArgusArgs, noOutput: boolean = false) => {
+  return async <T extends ArgusCliOptions>(
+    args: ArgusArgs<T>,
+    noOutput: boolean = false
+  ) => {
     log("Calling backend with args", args);
 
     let output;
