@@ -1,7 +1,7 @@
-import { ObligationsInBody } from "@argus/common/bindings";
 import {
   ErrorJumpTargetInfo,
-  Filename,
+  PanoptesConfig,
+  SystemSpec,
   SystemToPanoptesCmds,
   SystemToPanoptesMsg,
   isSysMsgOpenError,
@@ -13,8 +13,12 @@ import { observer } from "mobx-react";
 import React, { useEffect, useState } from "react";
 
 import Workspace from "./Workspace";
-import { MessageSystem, MessageSystemContext } from "./communication";
+import {
+  createClosedMessageSystem,
+  vscodeMessageSystem,
+} from "./communication";
 import { highlightedObligation } from "./signals";
+import { AppContext } from "./utilities/context";
 import { bringToFront } from "./utilities/func";
 
 function blingObserver(info: ErrorJumpTargetInfo) {
@@ -23,66 +27,69 @@ function blingObserver(info: ErrorJumpTargetInfo) {
   return setTimeout(() => highlightedObligation.reset(), 1500);
 }
 
-const App = observer(
-  ({
-    data,
-    target,
-    messageSystem,
-  }: {
-    data: [Filename, ObligationsInBody[]][];
-    messageSystem: MessageSystem;
-    target?: ErrorJumpTargetInfo;
-  }) => {
-    const [openFiles, setOpenFiles] =
-      useState<[Filename, ObligationsInBody[]][]>(data);
+const webSysSpec: SystemSpec = {
+  osPlatform: "web-bundle",
+  osRelease: "web-bundle",
+  vscodeVersion: "unknown",
+};
 
-    // NOTE: this listener should only listen for posted messages, not
-    // for things that could be an expected response from a webview request.
-    const listener = (e: MessageEvent) => {
-      const {
-        payload,
-      }: {
-        payload: SystemToPanoptesMsg<SystemToPanoptesCmds>;
-      } = e.data;
+const App = observer(({ config }: { config: PanoptesConfig }) => {
+  const [openFiles, setOpenFiles] = useState(config.data);
+  const messageSystem =
+    config.type === "WEB_BUNDLE"
+      ? createClosedMessageSystem(config.closedSystem)
+      : vscodeMessageSystem;
+  const systemSpec =
+    config.type === "VSCODE_BACKING" ? config.spec : webSysSpec;
 
-      console.debug("Received message from system", payload);
+  // NOTE: this listener should only listen for posted messages, not
+  // for things that could be an expected response from a webview request.
+  const listener = (e: MessageEvent) => {
+    const {
+      payload,
+    }: {
+      payload: SystemToPanoptesMsg<SystemToPanoptesCmds>;
+    } = e.data;
 
-      if (isSysMsgOpenError(payload)) {
-        return blingObserver(payload);
-      } else if (isSysMsgOpenFile(payload)) {
-        return setOpenFiles(currFiles => {
-          const idx = _.findIndex(
-            currFiles,
-            ([filename, _]) => filename === payload.file
-          );
-          if (idx === -1) {
-            return [[payload.file, payload.data], ...currFiles];
-          }
-          return bringToFront(currFiles, idx);
-        });
-      } else if (isSysMsgReset(payload)) {
-        return setOpenFiles(payload.data);
-      }
-    };
+    console.debug("Received message from system", payload);
 
-    useEffect(() => {
-      window.addEventListener("message", listener);
-      if (target !== undefined) {
-        blingObserver(target);
-      }
-      return () => window.removeEventListener("message", listener);
-    }, []);
+    if (isSysMsgOpenError(payload)) {
+      return blingObserver(payload);
+    } else if (isSysMsgOpenFile(payload)) {
+      return setOpenFiles(currFiles => {
+        const idx = _.findIndex(
+          currFiles,
+          ([filename, _]) => filename === payload.file
+        );
+        if (idx === -1) {
+          return [[payload.file, payload.data], ...currFiles];
+        }
+        return bringToFront(currFiles, idx);
+      });
+    } else if (isSysMsgReset(payload)) {
+      return setOpenFiles(payload.data);
+    }
+  };
 
-    const resetState = () => {
-      return setOpenFiles(currFiles => currFiles);
-    };
+  useEffect(() => {
+    window.addEventListener("message", listener);
+    if (config.target !== undefined) {
+      blingObserver(config.target);
+    }
+    return () => window.removeEventListener("message", listener);
+  }, []);
 
-    return (
-      <MessageSystemContext.Provider value={messageSystem}>
+  const resetState = () => {
+    return setOpenFiles(currFiles => currFiles);
+  };
+
+  return (
+    <AppContext.SystemSpecContext.Provider value={systemSpec}>
+      <AppContext.MessageSystemContext.Provider value={messageSystem}>
         <Workspace files={openFiles} reset={resetState} />
-      </MessageSystemContext.Provider>
-    );
-  }
-);
+      </AppContext.MessageSystemContext.Provider>
+    </AppContext.SystemSpecContext.Provider>
+  );
+});
 
 export default App;

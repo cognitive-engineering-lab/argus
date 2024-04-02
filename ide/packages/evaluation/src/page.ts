@@ -1,5 +1,11 @@
-import { BodyBundle, ObligationsInBody } from "@argus/common/bindings";
-import { ErrorJumpTargetInfo, Filename } from "@argus/common/lib";
+import { BodyBundle } from "@argus/common/bindings";
+import {
+  ConfigConsts,
+  ErrorJumpTargetInfo,
+  Filename,
+  PanoptesConfig,
+  configToString,
+} from "@argus/common/lib";
 import _ from "lodash";
 import path from "path";
 
@@ -700,10 +706,12 @@ export function webHtml(
   filename: Filename,
   bundles: BodyBundle[]
 ) {
-  const target = findErrorTargetInBundles(bundles);
-  const initialData: [Filename, ObligationsInBody[]][] = [
-    [filename, bundles.map(b => b.body)],
-  ];
+  const config: PanoptesConfig = {
+    type: "WEB_BUNDLE",
+    target: findErrorTargetInBundles(bundles),
+    data: [[filename, bundles.map(b => b.body)]],
+    closedSystem: bundles,
+  };
 
   const panoptesDir = path.resolve(__dirname, "..", "..", "panoptes");
   const scriptUri = path.resolve(panoptesDir, "dist", "panoptes.iife.js");
@@ -720,6 +728,7 @@ export function webHtml(
   const styleUrl = url(styleUri);
   const codiconsUrl = url(codiconsUri);
   const scriptUrl = url(scriptUri);
+  const configString = configToString(config);
 
   return `
       <!DOCTYPE html>
@@ -730,16 +739,9 @@ export function webHtml(
           <title>${title}</title>
           <link rel="stylesheet" type="text/css" href="${styleUrl}">
           <link rel="stylesheet" type="text/css" href="${codiconsUrl}">
-          <script>
-            (function () {
-              window.data = ${JSON.stringify(initialData)};
-              window.target = ${JSON.stringify(target)};
-              window.createClosedSystem = ${JSON.stringify(bundles)}
-            })()
-          </script>
       </head>
       <body>
-          <div id="root" style="width: 100%; height: 100%;"></div>
+          <div id="root" class=${ConfigConsts.EMBED_NAME} style="width: 100%; height: 100%;" data-config=${configString}></div>
           <script src="${scriptUrl}"></script>
       </body>
       </html>

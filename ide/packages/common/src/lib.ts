@@ -1,4 +1,8 @@
+import newGithubIssueUrl from "new-github-issue-url";
+import { unescape } from "querystring";
+
 import {
+  BodyBundle,
   BodyHash,
   CharRange,
   ExprIdx,
@@ -13,6 +17,41 @@ export interface ErrorJumpTargetInfo {
   bodyIdx: BodyHash;
   exprIdx: ExprIdx;
   hash: ObligationHash;
+}
+
+export const ConfigConsts = {
+  PANOPTES_NAME: "panoptes",
+  EMBED_NAME: "argus-embed",
+};
+
+// ----------------------------------------------------
+// Panoptes initial configuration for a single webview
+
+export type PanoptesInitialData = {
+  data: [Filename, ObligationsInBody[]][];
+  target?: ErrorJumpTargetInfo;
+};
+
+export type SystemSpec = Omit<IssueOptions, "logText">;
+
+export type PanoptesConfig = PanoptesInitialData &
+  (
+    | {
+        type: "VSCODE_BACKING";
+        spec: SystemSpec;
+      }
+    | {
+        type: "WEB_BUNDLE";
+        closedSystem: BodyBundle[];
+      }
+  );
+
+export function configToString(config: PanoptesConfig) {
+  return encodeURI(JSON.stringify(config));
+}
+
+export function maybeStringToConfig(str?: string): PanoptesConfig | undefined {
+  return str ? JSON.parse(decodeURI(str)) : undefined;
 }
 
 // ----------------------------------------------------
@@ -179,4 +218,34 @@ export function isPanoMsgRemoveHighlight(
   msg: PanoptesToSystemMsg<PanoptesToSystemCmds>
 ): msg is PanoptesToSystemMsg<"remove-highlight"> {
   return msg.command === "remove-highlight";
+}
+
+export interface IssueOptions {
+  osPlatform: string;
+  osRelease: string;
+  vscodeVersion: string;
+  logText: string;
+}
+
+export function getArgusIssueUrl(err: string, opts: IssueOptions) {
+  const bts = "```";
+  const url = newGithubIssueUrl({
+    user: "cognitive-engineering-lab",
+    repo: "argus",
+    body: `# Problem
+<!-- Please describe the problem and how you encountered it. -->
+
+# Logs
+<!-- You don't need to add or change anything below this point. -->
+
+**OS:** ${opts.osPlatform} (${opts.osRelease})
+**VSCode:** ${opts.vscodeVersion}
+**Error message**
+${bts}
+${err}
+${bts}
+${opts.logText}`,
+  });
+
+  return url;
 }

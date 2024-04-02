@@ -7,12 +7,15 @@ import {
   ObligationsInBody,
 } from "@argus/common/bindings";
 import {
+  ConfigConsts,
   ErrorJumpTargetInfo,
   Filename,
+  PanoptesConfig,
   PanoptesToSystemCmds,
   PanoptesToSystemMsg,
   SystemToPanoptesCmds,
   SystemToPanoptesMsg,
+  configToString,
   isPanoMsgAddHighlight,
   isPanoMsgObligations,
   isPanoMsgRemoveHighlight,
@@ -20,6 +23,7 @@ import {
 } from "@argus/common/lib";
 import { MessageHandlerData } from "@estruyf/vscode";
 import _ from "lodash";
+import os from "os";
 import vscode from "vscode";
 
 import { globals } from "./main";
@@ -224,6 +228,18 @@ export class View {
       )
     );
 
+    const config: PanoptesConfig = {
+      type: "VSCODE_BACKING",
+      data: initialData,
+      target,
+      spec: {
+        osPlatform: os.platform(),
+        osRelease: os.release(),
+        vscodeVersion: vscode.version,
+      },
+    };
+    const configStr = configToString(config);
+
     return `
       <!DOCTYPE html>
       <html lang="en">
@@ -233,16 +249,9 @@ export class View {
           <title>Argus Inspector</title>
           <link rel="stylesheet" type="text/css" href=${styleUri}>
           <link rel="stylesheet" type="text/css" href=${codiconsUri}>
-
-          <script>
-            (function () {
-              window.data = ${JSON.stringify(initialData)};
-              window.target = ${JSON.stringify(target)};
-            })()
-          </script>
       </head>
       <body>
-          <div id="root"></div>
+          <div class=${ConfigConsts.EMBED_NAME} data-config=${configStr}></div>
           <script src="${scriptUri}"></script>
       </body>
       </html>

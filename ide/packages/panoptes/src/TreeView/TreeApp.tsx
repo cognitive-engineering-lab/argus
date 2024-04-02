@@ -7,8 +7,8 @@ import {
 import _ from "lodash";
 import React from "react";
 
+import { TreeAppContext } from "../utilities/context";
 import BottomUp from "./BottomUp";
-import { TreeContext } from "./Context";
 import TopDown from "./TopDown";
 import "./TreeApp.css";
 import TreeCycle from "./TreeCycle";
@@ -52,7 +52,7 @@ const TreeApp = ({
   }
 
   return (
-    <TreeContext.Provider value={treeInfo}>
+    <TreeAppContext.TreeContext.Provider value={treeInfo}>
       <div className="App">
         <VSCodePanels>
           {_.map(tabs, ([name, _], idx) => (
@@ -67,7 +67,7 @@ const TreeApp = ({
           ))}
         </VSCodePanels>
       </div>
-    </TreeContext.Provider>
+    </TreeAppContext.TreeContext.Provider>
   );
 };
 

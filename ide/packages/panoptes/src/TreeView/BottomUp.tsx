@@ -2,9 +2,13 @@ import { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
 import _ from "lodash";
 import React, { useContext } from "react";
 
+import { TreeAppContext } from "../utilities/context";
 import { mean, mode, searchObject, stdDev } from "../utilities/func";
-import { TreeContext } from "./Context";
-import { CollapsibleElement, DirRecursive } from "./Directory";
+import {
+  CollapsibleElement,
+  DirRecursive,
+  TreeRenderParams,
+} from "./Directory";
 import { TreeInfo, TreeView } from "./TreeInfo";
 
 type TreeViewWithRoot = TreeView & { root: ProofNodeIdx };
@@ -106,7 +110,7 @@ function invertViewWithRoots(
 }
 
 const BottomUp = () => {
-  const tree = useContext(TreeContext)!;
+  const tree = useContext(TreeAppContext.TreeContext)!;
   const mkGetChildren = (view: TreeView) => (idx: ProofNodeIdx) =>
     view.topology.children[idx] ?? [];
 
@@ -248,11 +252,22 @@ const BottomUp = () => {
       />
     );
 
+  const renderParams: TreeRenderParams = {
+    Wrapper: ({
+      n: _n,
+      Child,
+    }: {
+      n: ProofNodeIdx;
+      Child: React.ReactElement;
+    }) => Child,
+    styleEdges: false,
+  };
+
   return (
-    <>
+    <TreeAppContext.TreeRenderContext.Provider value={renderParams}>
       {recommended}
       {fallbacks}
-    </>
+    </TreeAppContext.TreeRenderContext.Provider>
   );
 };
 

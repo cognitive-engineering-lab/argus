@@ -9,7 +9,7 @@ import React, { useContext } from "react";
 import { HoverInfo } from "../HoverInfo";
 import { IcoAmbiguous, IcoCheck, IcoError, IcoLoop } from "../Icons";
 import { PrintGoal, PrintImplHeader } from "../print/print";
-import { TreeContext } from "./Context";
+import { TreeAppContext } from "../utilities/context";
 
 export const ResultRaw = ({ result }: { result: EvaluationResult }) => {
   return result === "yes" ? (
@@ -40,13 +40,13 @@ export const ResultRaw = ({ result }: { result: EvaluationResult }) => {
 };
 
 export const Result = ({ idx }: { idx: ResultIdx }) => {
-  const tree = useContext(TreeContext)!;
+  const tree = useContext(TreeAppContext.TreeContext)!;
   const result = tree.result(idx);
   return <ResultRaw result={result} />;
 };
 
 export const Candidate = ({ idx }: { idx: CandidateIdx }) => {
-  const tree = useContext(TreeContext)!;
+  const tree = useContext(TreeAppContext.TreeContext)!;
   const candidate = tree.candidate(idx);
   if ("Any" in candidate) {
     return candidate.Any;
@@ -60,7 +60,7 @@ export const Candidate = ({ idx }: { idx: CandidateIdx }) => {
 };
 
 export const Node = ({ node }: { node: NodeTy }) => {
-  const treeInfo = useContext(TreeContext)!;
+  const treeInfo = useContext(TreeAppContext.TreeContext)!;
   if ("Result" in node) {
     return (
       <>

@@ -47,6 +47,9 @@ importers:
       jsdom:
         specifier: ^22.1.0
         version: 22.1.0
+      new-github-issue-url:
+        specifier: ^1.0.0
+        version: 1.0.0
 
   packages/evaluation:
     devDependencies:

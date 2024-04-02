@@ -11,7 +11,7 @@ import React, {
 // @ts-ignore
 import Tree, { Orientation, TreeLinkDatum, TreeNodeDatum } from "react-d3-tree";
 
-import { TreeContext } from "./Context";
+import { TreeAppContext } from "../utilities/context";
 import "./Graph.css";
 import { Node, Result } from "./Node";
 import { TreeInfo } from "./TreeInfo";
@@ -49,7 +49,7 @@ const TreeNode = ({
   toggleNode: MouseEventHandler<SVGRectElement>;
   hoverNode: MouseEventHandler<SVGRectElement>;
 }) => {
-  const treeInfo = useContext(TreeContext)!;
+  const treeInfo = useContext(TreeAppContext.TreeContext)!;
   const ref = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const padding = 10;
@@ -129,7 +129,7 @@ const topologyToTreeData = (
 };
 
 const Graph = ({ root }: { root: ProofNodeIdx }) => {
-  const treeInfo = useContext(TreeContext)!;
+  const treeInfo = useContext(TreeAppContext.TreeContext)!;
   const [translate, containerRef] = useCenteredTree();
 
   const topology = treeInfo.topology;

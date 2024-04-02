@@ -64,7 +64,7 @@ async function argusScreenshots(
     fs.writeSync(tmpobj.fd, html);
     const page = await context.newPage();
     await page.goto(`file://${tmpobj.name}`);
-    await sleep(3000);
+    await sleep(6000);
     await page.screenshot({ path: out, fullPage: false });
   };
 
@@ -108,12 +108,12 @@ function ensureDir(dir: fs.PathLike) {
 // When chumsky is working just read the directory contents
 const testCases = [
   "axum",
-  // "bevy",
-  // "diesel",
-  // "easy_ml",
-  // "entrait",
-  // "nalgebra",
-  // "uom",
+  "bevy",
+  "diesel",
+  "easy_ml",
+  "entrait",
+  "nalgebra",
+  "uom",
 ] as const;
 
 async function outputInDir(resultsDir: string) {

@@ -10,7 +10,7 @@ import {
   IcoTriangleDown,
   IcoTriangleRight,
 } from "../Icons";
-import { TreeContext } from "./Context";
+import { TreeAppContext } from "../utilities/context";
 import "./Directory.css";
 import { Node } from "./Node";
 
@@ -81,7 +81,6 @@ export interface TreeRenderParams {
   Wrapper?: InfoWrapper;
   styleEdges?: boolean;
 }
-export let TreeRenderContext = React.createContext<TreeRenderParams>({});
 
 export const DirNode = ({
   idx,
@@ -90,8 +89,8 @@ export const DirNode = ({
   idx: number;
   Children: React.FC | null;
 }) => {
-  const tree = useContext(TreeContext)!;
-  const { Wrapper } = useContext(TreeRenderContext);
+  const tree = useContext(TreeAppContext.TreeContext)!;
+  const { Wrapper } = useContext(TreeAppContext.TreeRenderContext);
   const node = tree.node(idx);
 
   const arrows: ElementPair = [<IcoTriangleDown />, <IcoTriangleRight />];
@@ -117,8 +116,8 @@ export const DirRecursive = ({
   level: ProofNodeIdx[];
   getNext: (idx: ProofNodeIdx) => ProofNodeIdx[];
 }) => {
-  const tree = useContext(TreeContext)!;
-  const { styleEdges } = useContext(TreeRenderContext);
+  const tree = useContext(TreeAppContext.TreeContext)!;
+  const { styleEdges } = useContext(TreeAppContext.TreeRenderContext);
   const node = tree.node(level[0]);
   const className = classNames("DirRecursive", {
     "is-candidate": styleEdges && "Candidate" in node,

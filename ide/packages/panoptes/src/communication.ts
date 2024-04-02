@@ -6,14 +6,9 @@ import {
   isPanoMsgTree,
 } from "@argus/common/lib";
 import { messageHandler } from "@estruyf/vscode/dist/client";
-import _, { range } from "lodash";
-import { createContext } from "react";
+import _ from "lodash";
 
 import { rangeContains } from "./utilities/func";
-
-export const MessageSystemContext = createContext<MessageSystem | undefined>(
-  undefined
-);
 
 export interface MessageSystem {
   postData<T extends PanoptesToSystemCmds>(body: PanoptesToSystemMsg<T>): void;

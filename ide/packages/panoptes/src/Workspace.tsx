@@ -1,5 +1,5 @@
 import { ObligationsInBody } from "@argus/common/bindings";
-import { Filename } from "@argus/common/lib";
+import { Filename, SystemSpec } from "@argus/common/lib";
 import {
   VSCodeCheckbox,
   VSCodePanelTab,
@@ -11,6 +11,7 @@ import React, { useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import File from "./File";
+import ReportBugUrl from "./ReportBugUrl";
 import "./Workspace.css";
 
 // TODO: the workspace should manage a set of files. Currently the App is doing
@@ -21,15 +22,10 @@ function basename(path: string) {
 }
 
 const FatalErrorPanel = ({ error, resetErrorBoundary }: any) => (
-  <div>
-    <p>
-      Whoops! This is not a drill, a fatal error occurred. Please{" "}
-      <a href="https://github.com/cognitive-engineering-lab/argus/issues/new">
-        report this error
-      </a>{" "}
-      to the Argus team, and include the following information:
-    </p>
-    <pre>{error.message}</pre>
+  <div className="ErrorPanel">
+    Whoops! This is not a drill, a fatal error occurred. Please{" "}
+    <ReportBugUrl displayText="click here" error={error.message} />
+    to report this error to the Argus team.
     <button onClick={resetErrorBoundary}>Reset Argus</button>
   </div>
 );
@@ -44,7 +40,7 @@ const Workspace = ({
   const [showHidden, setShowHidden] = useState(false);
   const toggleHidden = () => setShowHidden(!showHidden);
 
-  const _checkbox = (
+  const checkbox = (
     <div style={{ position: "fixed", top: "0", right: "0" }}>
       <VSCodeCheckbox onChange={toggleHidden} checked={showHidden}>
         Show hidden information
@@ -76,7 +72,7 @@ const Workspace = ({
 
   return (
     <>
-      {/*checkbox*/}
+      <div>{checkbox}</div>
       <VSCodePanels>
         {tabs}
         {fileComponents}

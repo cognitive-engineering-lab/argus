@@ -23,12 +23,13 @@ import React, {
 } from "react";
 
 import BodyInfo from "./BodyInfo";
+import ErrorDiv from "./ErrorDiv";
 import "./File.css";
+import ReportBugUrl from "./ReportBugUrl";
 import { CollapsibleElement } from "./TreeView/Directory";
 import { ResultRaw } from "./TreeView/Node";
 import TreeApp from "./TreeView/TreeApp";
 import { WaitingOn } from "./WaitingOn";
-import { MessageSystemContext } from "./communication";
 import {
   PrintBodyName,
   PrintExtensionCandidate,
@@ -36,23 +37,38 @@ import {
   PrintTy,
 } from "./print/print";
 import { highlightedObligation } from "./signals";
+import { AppContext } from "./utilities/context";
 import {
   isObject,
   makeHighlightPosters,
   obligationCardId,
 } from "./utilities/func";
 
+// Only available locally, not to be exported.
 const FileContext = createContext<Filename | undefined>(undefined);
 const BodyInfoContext = createContext<BodyInfo | undefined>(undefined);
 
 const NoTreeFound = ({ obligation }: { obligation: Obligation }) => {
+  const bodyInfo = useContext(BodyInfoContext)!;
+  const filename = useContext(FileContext)!;
   return (
-    <div>
+    <ErrorDiv>
       <h3>Couldn't find a proof tree for this obligation</h3>
       <PrintObligation obligation={obligation} />
 
-      <p>This is a bug, please report it!</p>
-    </div>
+      <p>
+        This is a bug,{" "}
+        <ReportBugUrl
+          error="failed to generate proof tree"
+          displayText="click here to report it."
+          logText={JSON.stringify({
+            filename,
+            bodyName: bodyInfo.name,
+            obligation,
+          })}
+        />
+      </p>
+    </ErrorDiv>
   );
 };
 
@@ -68,7 +84,7 @@ const ObligationTreeWrapper = ({
     "loading"
   );
   const file = useContext(FileContext)!;
-  const messageSystem = useContext(MessageSystemContext)!;
+  const messageSystem = useContext(AppContext.MessageSystemContext)!;
 
   useEffect(() => {
     const getData = async () => {
@@ -101,7 +117,7 @@ const ObligationCard = observer(
     const file = useContext(FileContext)!;
     const id = obligationCardId(file, obligation.hash);
     const ref = useRef<HTMLDivElement>(null);
-    const messageSystem = useContext(MessageSystemContext)!;
+    const messageSystem = useContext(AppContext.MessageSystemContext)!;
 
     const [addHighlight, removeHighlight] = makeHighlightPosters(
       messageSystem,
@@ -233,7 +249,7 @@ const Expr = observer(({ idx }: { idx: ExprIdx }) => {
   const bodyInfo = useContext(BodyInfoContext)!;
   const file = useContext(FileContext)!;
   const expr = bodyInfo.getExpr(idx);
-  const messageSystem = useContext(MessageSystemContext)!;
+  const messageSystem = useContext(AppContext.MessageSystemContext)!;
   const [addHighlight, removeHighlight] = makeHighlightPosters(
     messageSystem,
     expr.range,
@@ -334,14 +350,29 @@ const File = ({
     bi.hasVisibleExprs()
   );
 
+  const bodies = _.map(bodiesWithVisibleExprs, (bodyInfo, idx) => (
+    <Fragment key={idx}>
+      {idx > 0 ? <VSCodeDivider /> : null}
+      <ObligationBody bodyInfo={bodyInfo} />
+    </Fragment>
+  ));
+
+  const noBodiesFound = (
+    <ErrorDiv>
+      <p>
+        Argus didn't find any 'interesting' obligations in this file. If you
+        think there should be, please click below to report this as a bug!
+      </p>
+      <ReportBugUrl
+        error={`No informative obligations found in file: ${file}`}
+        logText={JSON.stringify({ file, osibs })}
+      />
+    </ErrorDiv>
+  );
+
   return (
     <FileContext.Provider value={file}>
-      {_.map(bodiesWithVisibleExprs, (bodyInfo, idx) => (
-        <Fragment key={idx}>
-          {idx > 0 ? <VSCodeDivider /> : null}
-          <ObligationBody bodyInfo={bodyInfo} />
-        </Fragment>
-      ))}
+      {bodies.length > 0 ? bodies : noBodiesFound}
     </FileContext.Provider>
   );
 };

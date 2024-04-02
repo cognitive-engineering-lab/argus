@@ -2,11 +2,11 @@ import { ProofCycle } from "@argus/common/bindings";
 import _ from "lodash";
 import React, { useContext } from "react";
 
-import { TreeContext } from "./Context";
-import { DirRecursive, TreeRenderContext } from "./Directory";
+import { TreeAppContext } from "../utilities/context";
+import { DirRecursive } from "./Directory";
 
 const TreeCycle = ({ path }: { path: ProofCycle }) => {
-  const tree = useContext(TreeContext)!;
+  const tree = useContext(TreeAppContext.TreeContext)!;
 
   const getChildren = (idx: number) => {
     const found = _.indexOf(path, idx);
@@ -18,9 +18,9 @@ const TreeCycle = ({ path }: { path: ProofCycle }) => {
   };
 
   return (
-    <TreeRenderContext.Provider value={{ styleEdges: true }}>
+    <TreeAppContext.TreeRenderContext.Provider value={{ styleEdges: true }}>
       <DirRecursive level={[tree.root]} getNext={getChildren} />
-    </TreeRenderContext.Provider>
+    </TreeAppContext.TreeRenderContext.Provider>
   );
 };
 

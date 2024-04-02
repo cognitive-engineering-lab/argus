@@ -21,6 +21,7 @@
     "entryPoint": "./src/lib.ts"
   },
   "devDependencies": {
-    "jsdom": "^22.1.0"
+    "jsdom": "^22.1.0",
+    "new-github-issue-url": "^1.0.0"
   }
 }

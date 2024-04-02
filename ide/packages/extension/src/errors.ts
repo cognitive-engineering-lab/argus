@@ -1,6 +1,5 @@
-import { ArgusError } from "@argus/common/lib";
+import { ArgusError, getArgusIssueUrl } from "@argus/common/lib";
 import cp from "child_process";
-import newGithubIssueUrl from "new-github-issue-url";
 import open from "open";
 import os from "os";
 import vscode from "vscode";
@@ -24,24 +23,11 @@ export const showErrorDialog = async (err: string) => {
       log("Failed to call to paste.rs: ", e.toString());
     }
 
-    const bts = "```";
-    const logText = logUrl !== null ? `\n**Full log:** ${logUrl}` : ``;
-    const url = newGithubIssueUrl({
-      user: "gavinleroy",
-      repo: "argus",
-      body: `# Problem
-<!-- Please describe the problem and how you encountered it. -->
-
-# Logs
-<!-- You don't need to add or change anything below this point. -->
-
-**OS:** ${os.platform()} (${os.release()})
-**VSCode:** ${vscode.version}
-**Error message**
-${bts}
-${err}
-${bts}
-${logText}`,
+    const url = getArgusIssueUrl(err, {
+      osPlatform: os.platform(),
+      osRelease: os.release(),
+      vscodeVersion: vscode.version,
+      logText: logUrl !== null ? `\n**Full log:** ${logUrl}` : ``,
     });
 
     open(url);

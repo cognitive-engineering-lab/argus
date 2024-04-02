@@ -6,8 +6,9 @@ import {
 import _ from "lodash";
 import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import ReactJson from "react-json-view";
 
+import ErrorDiv from "../ErrorDiv";
+import ReportBugUrl from "../ReportBugUrl";
 import "./print.css";
 import { PrintImplHeader as UnsafePrintImplHeader } from "./private/argus";
 import { PrintDefPath as UnsafePrintDefPath } from "./private/path";
@@ -38,11 +39,15 @@ export const PrintWithFallback = ({
   }) => {
     // NOTE: Call resetErrorBoundary() to reset the error boundary and retry the render.
     return (
-      <div className="PrintError">
-        <p>Whoops! Something went wrong while printing:</p>
-        <ReactJson src={object ?? "null"} collapsed={true} />
-        <pre>`{error.message}`</pre>
-      </div>
+      <ErrorDiv>
+        Whoops! Something went wrong while printing. This is a bug, please{" "}
+        <ReportBugUrl
+          error={error.message}
+          displayText="click here"
+          logText={JSON.stringify(object)}
+        />{" "}
+        to report it.
+      </ErrorDiv>
     );
   };
 

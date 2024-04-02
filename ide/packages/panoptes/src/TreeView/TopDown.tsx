@@ -10,12 +10,12 @@ import {
   useInteractions,
 } from "@floating-ui/react";
 import classNames from "classnames";
-import _, { sortBy } from "lodash";
+import _ from "lodash";
 import React, { useContext, useState } from "react";
 
 import { IcoTreeDown } from "../Icons";
-import { TreeContext } from "./Context";
-import { DirRecursive, TreeRenderContext, TreeRenderParams } from "./Directory";
+import { TreeAppContext } from "../utilities/context";
+import { DirRecursive, TreeRenderParams } from "./Directory";
 import Graph from "./Graph";
 import "./TopDown.css";
 
@@ -76,7 +76,7 @@ export const WrapTreeIco = ({
 };
 
 const TopDown = () => {
-  const tree = useContext(TreeContext)!;
+  const tree = useContext(TreeAppContext.TreeContext)!;
 
   // Sort the candidates by the #infer vars / height of the tree
   const getGoalChildren = (kids: ProofNodeIdx[]) =>
@@ -122,9 +122,9 @@ const TopDown = () => {
   };
 
   return (
-    <TreeRenderContext.Provider value={renderParams}>
+    <TreeAppContext.TreeRenderContext.Provider value={renderParams}>
       <DirRecursive level={[tree.root]} getNext={getChildren} />
-    </TreeRenderContext.Provider>
+    </TreeAppContext.TreeRenderContext.Provider>
   );
 };
 
