@@ -62,8 +62,9 @@
   "devDependencies": {
     "@argus/common": "workspace:*",
     "@argus/panoptes": "workspace:*",
+    "@argus/system": "workspace:*",
     "@estruyf/vscode": "^1.1.0",
-    "@types/lodash": "^4.14.195",
+    "@types/lodash": "^4.17.0",
     "@types/node": "20.2.5",
     "@types/react": "^18.2.14",
     "@types/react-dom": "^18.2.6",

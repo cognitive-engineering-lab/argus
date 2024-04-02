@@ -1,12 +1,20 @@
 import vscode from "vscode";
 
-export type StatusBarState =
-  | "active"
-  | "unsaved"
-  | "idle"
-  | "error"
-  | "loading"
-  | "notfound";
+const statusBarStates = [
+  "active",
+  "unsaved",
+  "idle",
+  "error",
+  "loading",
+  "notfound",
+] as const;
+
+export type StatusBarState = (typeof statusBarStates)[number];
+
+export function isStatusBarState(s: unknown): s is StatusBarState {
+  const arrayAny = statusBarStates as any;
+  return typeof s === "string" && arrayAny.includes(s);
+}
 
 interface StatusBarConfig {
   foreground: string;

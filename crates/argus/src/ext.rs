@@ -16,6 +16,7 @@ use rustc_middle::ty::{
   TypeckResults,
 };
 use rustc_query_system::ich::StableHashingContext;
+use rustc_span::FileName;
 use rustc_trait_selection::traits::solve::Certainty;
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
@@ -117,6 +118,8 @@ pub trait TyExt<'tcx> {
 }
 
 pub trait TyCtxtExt<'tcx> {
+  fn body_filename(&self, body_id: BodyId) -> FileName;
+
   fn inspect_typeck(
     self,
     body_id: BodyId,
@@ -290,6 +293,12 @@ pub fn group_predicates_by_ty<'tcx>(
 }
 
 impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
+  fn body_filename(&self, body_id: BodyId) -> FileName {
+    let def_id = body_id.hir_id.owner.to_def_id();
+    let span = self.def_span(def_id);
+    self.sess.source_map().span_to_filename(span)
+  }
+
   fn inspect_typeck(
     self,
     body_id: BodyId,

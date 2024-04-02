@@ -1,6 +1,5 @@
 import {
   CharRange,
-  Obligation,
   ObligationHash,
   Predicate,
   Ty,
@@ -143,4 +142,11 @@ export function mode(arr: number[]) {
 
 export function stdDev(arr: number[], avg: number) {
   return Math.sqrt(_.sum(_.map(arr, n => Math.pow(n - avg, 2))) / arr.length);
+}
+
+// FIXME: take into account the column ...
+export function rangeContains(outer: CharRange, inner: CharRange) {
+  return (
+    outer.start.line <= inner.start.line && inner.end.line <= outer.end.line
+  );
 }

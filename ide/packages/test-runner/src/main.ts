@@ -1,5 +1,4 @@
 import { runTests } from "@vscode/test-electron";
-import fs from "fs";
 import path from "path";
 
 import { TEST_WORKSPACES } from "./constants";
@@ -7,7 +6,12 @@ import { TEST_WORKSPACES } from "./constants";
 async function runOnWorkspace(workspace: string) {
   // The folder containing the Extension Manifest package.json
   // Passed to `--extensionDevelopmentPath`
-  const extensionDevelopmentPath = path.resolve(__dirname, "../../extension");
+  const extensionDevelopmentPath = path.resolve(
+    __dirname,
+    "..",
+    "node_modules",
+    "argus"
+  );
 
   // The path to the extension test runner script
   // Passed to --extensionTestsPath
@@ -17,12 +21,12 @@ async function runOnWorkspace(workspace: string) {
     "node_modules",
     "@argus/itests",
     "dist",
-    "lib.js"
+    "itests.cjs"
   );
 
   // Get all .rs files in ${workspace}/src/**.rs
   // const workspaceFiles = path.resolve(workspace, "src/**/*.rs");
-  const launchArgs = ["--disable-extensions", workspace];
+  const _launchArgs = ["--disable-extensions", workspace];
 
   // Download VS Code, unzip it and run the integration test
   await runTests({

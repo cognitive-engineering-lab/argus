@@ -1,3 +1,4 @@
-import { expect, test } from "vitest";
+import { expect } from "chai";
+import { test } from "mocha";
 
-test("add", () => expect(2 + 2).toBe(4));
+test("Add", () => expect(1 + 1).to.equal(2));

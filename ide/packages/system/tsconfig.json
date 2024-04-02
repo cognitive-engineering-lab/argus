@@ -4,7 +4,6 @@
     "src"
   ],
   "compilerOptions": {
-    "allowImportingTsExtensions": true,
-    "noEmit": true,
+    "outDir": "dist"
   }
 }

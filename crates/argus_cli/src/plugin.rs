@@ -9,6 +9,7 @@ use std::{
 use argus_lib::{
   analysis,
   emitter::SilentEmitter,
+  ext::TyCtxtExt as ArgusTyCtxtExt,
   find_bodies::{find_bodies, find_enclosing_bodies},
   types::{ObligationHash, ToTarget},
 };
@@ -42,6 +43,7 @@ pub struct ArgusPluginArgs {
 enum ArgusCommand {
   Preload,
   RustcVersion,
+  Bundle,
   Obligations {
     file: Option<String>,
   },
@@ -140,6 +142,7 @@ impl RustcPlugin for ArgusPlugin {
     let file = match &args.command {
       Tree { file, .. } => Some(file),
       Obligations { file } => file.as_ref(),
+      Bundle => None,
       _ => unreachable!(),
     };
 
@@ -203,6 +206,11 @@ impl RustcPlugin for ArgusPlugin {
           nothing,
           &compiler_args,
         );
+        postprocess(v)
+      }
+      Bundle => {
+        let nothing = || None::<(ObligationHash, CharRange)>;
+        let v = run(analysis::bundle, None, nothing, &compiler_args);
         postprocess(v)
       }
       _ => unreachable!(),
@@ -297,7 +305,7 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
 
       let mut inner = |(_, body)| {
         if let FileName::Real(RealFileName::LocalPath(p)) =
-          get_file_of_body(tcx, body)
+          tcx.body_filename(body)
         {
           if target_file.map(|f| f.ends_with(&p)).unwrap_or(true) {
             log::info!("analyzing {:?}", body);
@@ -336,11 +344,4 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
 
     rustc_driver::Compilation::Stop
   }
-}
-
-fn get_file_of_body(tcx: TyCtxt<'_>, body_id: rustc_hir::BodyId) -> FileName {
-  let hir = tcx.hir();
-  let body_span = hir.body(body_id).value.span;
-  let source_map = tcx.sess.source_map();
-  source_map.span_to_filename(body_span)
 }

@@ -4,16 +4,21 @@ import {
   CallArgus,
   Result,
 } from "@argus/common/lib";
-import cp from "child_process";
+import {
+  RustcToolchain,
+  execNotify as _execNotify,
+  cargoCommand,
+  getCargoOpts,
+} from "@argus/system";
 import _ from "lodash";
 import open from "open";
-import os from "os";
 import path from "path";
 import vscode from "vscode";
 
 import { Ctx } from "./ctx";
 import { log } from "./logging";
 import { globals } from "./main";
+import { isStatusBarState } from "./statusbar";
 
 declare const VERSION: string;
 declare const TOOLCHAIN: {
@@ -21,118 +26,12 @@ declare const TOOLCHAIN: {
   components: string[];
 };
 
-const LIBRARY_PATHS: Partial<Record<NodeJS.Platform, string>> = {
-  darwin: "DYLD_LIBRARY_PATH",
-  win32: "LIB",
-};
-
-export const getArgusOpts = async (cwd: string) => {
-  log("Getting Argus options");
-
-  const rustcPath = await execNotify(
-    "rustup",
-    ["which", "--toolchain", TOOLCHAIN.channel, "rustc"],
-    "Waiting for rustc..."
-  );
-
-  log("Rustc path:", rustcPath);
-
-  const targetInfo = await execNotify(
-    rustcPath,
-    ["--print", "target-libdir", "--print", "sysroot"],
-    "Waiting for rustc..."
-  );
-
-  const [targetLibdir, sysroot] = targetInfo.split("\n");
-
-  log("Target libdir:", targetLibdir);
-  log("Sysroot: ", sysroot);
-
-  const libraryPath = LIBRARY_PATHS[process.platform] || "LD_LIBRARY_PATH";
-
-  const PATH = cargoBin() + ";" + process.env.PATH;
-
-  // For each element in libraryPath, we need to add the targetLibdir as its value.
-  // This should then get added to the opts object.
-  const opts = {
-    cwd,
-    env: {
-      [libraryPath]: targetLibdir,
-      LD_LIBRARY_PATH: targetLibdir,
-      SYSROOT: sysroot,
-      RUST_LOG: "info",
-      RUST_BACKTRACE: "1",
-      PATH,
-      ...process.env,
-    },
+function getCurrentToolchain(): RustcToolchain {
+  return {
+    version: VERSION,
+    ...TOOLCHAIN,
   };
-
-  log("Argus options:", opts);
-
-  return opts;
-};
-
-const execNotifyBinary = async (
-  cmd: string,
-  args: string[],
-  title: string,
-  opts?: any
-): Promise<Buffer> => {
-  log("Running command: ", cmd, args, opts);
-
-  const proc = cp.spawn(cmd, args, opts);
-
-  const stdoutChunks: Buffer[] = [];
-  proc.stdout.on("data", data => {
-    stdoutChunks.push(data);
-  });
-
-  const stderrChunks: string[] = [];
-  proc.stderr.setEncoding("utf8");
-  proc.stderr.on("data", data => {
-    log(data);
-    stderrChunks.push(data);
-  });
-
-  globals.statusBar.setState("loading", title);
-  return new Promise<Buffer>((resolve, reject) => {
-    proc.addListener("close", _ => {
-      globals.statusBar.setState("idle");
-      if (proc.exitCode !== 0) {
-        reject(stderrChunks.join(""));
-      } else {
-        resolve(Buffer.concat(stdoutChunks));
-      }
-    });
-
-    proc.addListener("error", e => {
-      reject(e.toString());
-    });
-  });
-};
-
-export const execNotify = async (
-  cmd: string,
-  args: string[],
-  title: string,
-  opts?: any
-): Promise<string> => {
-  const buffer = await execNotifyBinary(cmd, args, title, opts);
-  const text = buffer.toString("utf8");
-  return text.trimEnd();
-};
-
-export const cargoBin = () => {
-  const cargo_home =
-    process.env.CARGO_HOME || path.join(os.homedir(), ".cargo");
-  return path.join(cargo_home, "bin");
-};
-
-export const cargoCommand = (): [string, string[]] => {
-  const cargo = "cargo";
-  const toolchain = `+${TOOLCHAIN.channel}`;
-  return [cargo, [toolchain]];
-};
+}
 
 const findWorkspaceRoot = async (): Promise<string | null> => {
   const folders = vscode.workspace.workspaceFolders;
@@ -179,7 +78,27 @@ const findWorkspaceRoot = async (): Promise<string | null> => {
   return folderSubdirTil(entry.idx);
 };
 
+const execNotify = async (
+  cmd: string,
+  args: string[],
+  title: string,
+  opts?: any
+) => {
+  return await _execNotify(
+    cmd,
+    args,
+    {
+      title,
+      ...opts,
+    },
+    (...args) => log("Argus output", ...args),
+    state =>
+      isStatusBarState(state) ? globals.statusBar.setState(state, title) : {}
+  );
+};
+
 const checkVersionAndInstall = async (
+  config: RustcToolchain,
   workspaceRoot: string,
   cargo: string,
   cargoArgs: string[]
@@ -196,18 +115,18 @@ const checkVersionAndInstall = async (
     version = "";
   }
 
-  if (version !== VERSION) {
+  if (version !== config.version) {
     log(
       `Argus binary version ${version} does not match expected IDE version ${VERSION}`
     );
-    const components = TOOLCHAIN.components.map(c => ["-c", c]).flat();
+    const components = config.components.map(c => ["-c", c]).flat();
     try {
       await execNotify(
         "rustup",
         [
           "toolchain",
           "install",
-          TOOLCHAIN.channel,
+          config.channel,
           "--profile",
           "minimal",
           ...components,
@@ -236,7 +155,14 @@ const checkVersionAndInstall = async (
 
     await execNotify(
       cargo,
-      [...cargoArgs, "install", "argus-cli", "--version", VERSION, "--force"],
+      [
+        ...cargoArgs,
+        "install",
+        "argus-cli",
+        "--version",
+        config.version,
+        "--force",
+      ],
       "Installing Argus from source... (this may take a minute)"
     );
 
@@ -260,8 +186,10 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
 
   log("Workspace root", workspaceRoot);
 
-  const [cargo, cargoArgs] = cargoCommand();
+  const config = getCurrentToolchain();
+  const [cargo, cargoArgs] = cargoCommand(config);
   const isArgusInstalled = await checkVersionAndInstall(
+    config,
     workspaceRoot,
     cargo,
     cargoArgs
@@ -272,7 +200,11 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
     return null;
   }
 
-  const argusOpts = await getArgusOpts(workspaceRoot);
+  const argusOpts = await getCargoOpts(config, workspaceRoot, {
+    RUST_LOG: "info",
+    RUST_BACKTRACE: "1",
+  });
+
   return async <T extends ArgusCliOptions>(
     args: ArgusArgs<T>,
     noOutput: boolean = false

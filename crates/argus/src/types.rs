@@ -1,4 +1,4 @@
-use std::{hash::Hash, ops::Deref, str::FromStr};
+use std::{collections::HashMap, hash::Hash, ops::Deref, str::FromStr};
 
 use anyhow::Result;
 use index_vec::IndexVec;
@@ -21,6 +21,7 @@ use ts_rs::TS;
 use self::intermediate::EvaluationResult;
 use crate::{
   analysis::{FullObligationData, SynIdx, UODIdx},
+  proof_tree::SerializedTree,
   serialize::{
     safe::{PathDefNoArgs, TraitRefPrintOnlyTraitPathDef},
     serialize_to_value,
@@ -37,6 +38,16 @@ crate::define_idx! { usize,
   ExprIdx,
   MethodLookupIdx,
   ObligationIdx
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+pub struct BodyBundle {
+  pub filename: String,
+  pub body: ObligationsInBody,
+  pub trees: HashMap<ObligationHash, SerializedTree>,
 }
 
 #[derive(Serialize)]

@@ -10,11 +10,13 @@
   },
   "dependencies": {
     "@argus/itests": "workspace:*",
+    "argus": "workspace:*",
     "mocha": "^10.4.0"
   },
   "devDependencies": {
     "@vscode/test-cli": "^0.0.6",
     "@vscode/test-electron": "^2.3.9",
+    "mocha": "^10.4.0",
     "vite": "^4.4.9"
   }
 }

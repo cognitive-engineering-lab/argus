@@ -17,3 +17,11 @@ script = """
 cargo test -p argus-lib --lib export_bindings --locked
 ./scripts/ts-rs.scm
 """
+
+[tasks.evaluation]
+script = """
+cd ide && depot build && cd ..
+node ide/packages/evaluation/dist/evaluation.cjs ./data
+python3 -m webbrowser http://localhost:8080/eval
+./scripts/evaluation.scm
+"""

@@ -17,10 +17,6 @@ table! {
 
 allow_tables_to_appear_in_same_query!(users, posts,);
 
-fn bad_select(conn: &mut PgConnection) {
-  users::table.select(posts::id).load::<i32>(conn);
-}
-
 // Select all users who have a post with the same id as their user id.
 // Return the user's id, name, and the post's name.
 fn get_user(conn: &mut PgConnection) {

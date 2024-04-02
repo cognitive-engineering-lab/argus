@@ -9,6 +9,7 @@
     "packages/extension",
     "packages/common",
     "packages/panoptes",
-    "packages/itests"
+    "packages/itests",
+    "packages/system"
   ]
 }

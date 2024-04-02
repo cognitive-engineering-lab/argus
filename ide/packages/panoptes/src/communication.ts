@@ -1,21 +1,15 @@
+import { BodyBundle } from "@argus/common/bindings";
 import {
-  BodyHash,
-  CharRange,
-  ObligationHash,
-  SerializedTree,
-} from "@argus/common/bindings";
-import {
-  Filename,
   PanoptesToSystemCmds,
   PanoptesToSystemMsg,
   SystemReturn,
-  SystemToPanoptesCmds,
-  SystemToPanoptesMsg,
   isPanoMsgTree,
 } from "@argus/common/lib";
 import { messageHandler } from "@estruyf/vscode/dist/client";
-import _ from "lodash";
+import _, { range } from "lodash";
 import { createContext } from "react";
+
+import { rangeContains } from "./utilities/func";
 
 export const MessageSystemContext = createContext<MessageSystem | undefined>(
   undefined
@@ -24,7 +18,6 @@ export const MessageSystemContext = createContext<MessageSystem | undefined>(
 export interface MessageSystem {
   postData<T extends PanoptesToSystemCmds>(body: PanoptesToSystemMsg<T>): void;
 
-  // TODO: how can we force T === body.command?
   requestData<T extends PanoptesToSystemCmds>(
     body: PanoptesToSystemMsg<T>
   ): Promise<SystemReturn<T>>;
@@ -40,14 +33,8 @@ export const vscodeMessageSystem: MessageSystem = {
   },
 };
 
-export type SystemPartialMap = Map<
-  Filename,
-  [CharRange, Map<ObligationHash, SerializedTree>]
->;
-
-export function createClosedMessageSystem(
-  systemMap: SystemPartialMap
-): MessageSystem {
+export function createClosedMessageSystem(bodies: BodyBundle[]): MessageSystem {
+  const systemMap = _.groupBy(bodies, bundle => bundle.filename);
   return {
     postData<T extends PanoptesToSystemCmds>(_body: PanoptesToSystemMsg<T>) {
       // Intentionally blank, no system to post to.
@@ -56,37 +43,32 @@ export function createClosedMessageSystem(
     requestData<T extends PanoptesToSystemCmds>(body: PanoptesToSystemMsg<T>) {
       return new Promise<SystemReturn<T>>((resolve, reject) => {
         if (!isPanoMsgTree(body)) {
-          return reject();
+          return reject(new Error(`"Invalid message type" ${body.command}`));
         }
 
-        const rangesInFile = systemMap.get(body.file) as
-          | [CharRange, Map<ObligationHash, SerializedTree>][]
-          | undefined;
+        const rangesInFile = systemMap[body.file];
         if (rangesInFile === undefined) {
-          return reject();
+          return reject(
+            new Error(`file messages not found for '${body.file}'`)
+          );
         }
 
-        const targetRange = body.range;
-        const found = _.find(rangesInFile, ([range, _oblMap]) => {
-          const linesOutOfBounds =
-            range.end.line < targetRange.start.line ||
-            range.start.line > targetRange.end.line;
-          const linesEq =
-            range.start.line === targetRange.start.line &&
-            range.end.line === targetRange.end.line;
-          const colsOutOfBounds =
-            range.end.column < targetRange.start.column ||
-            range.start.column > targetRange.end.column;
-          return !(linesOutOfBounds || (linesEq && colsOutOfBounds));
-        });
-        if (found === undefined) {
-          return reject();
+        const obligationRange = body.range;
+        const foundBodies = _.filter(rangesInFile, bundle =>
+          rangeContains(bundle.body.range, obligationRange)
+        );
+        if (foundBodies.length == 0) {
+          return reject(new Error(`body in range ${body.range} not found`));
         }
 
-        const [_range, oblMap] = found;
-        const tree = oblMap.get(body.predicate.hash);
+        const tree = _.head(
+          _.compact(
+            _.map(foundBodies, found => found.trees[body.predicate.hash])
+          )
+        );
         if (tree === undefined) {
-          return reject();
+          console.error("Body", foundBodies, "hash", body.predicate.hash);
+          return reject(new Error(`Obligation hash not found in maps`));
         }
 
         const treeReturn = { tree } as SystemReturn<"tree">;

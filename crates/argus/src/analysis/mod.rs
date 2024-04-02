@@ -3,6 +3,8 @@ mod hir;
 mod tls;
 mod transform;
 
+use std::collections::HashMap;
+
 use anyhow::Result;
 use fluid_let::fluid_let;
 use rustc_hir::BodyId;
@@ -12,12 +14,13 @@ pub(crate) use tls::{FullObligationData, SynIdx, UODIdx};
 pub(crate) use crate::types::intermediate::{
   EvaluationResult, FulfillmentData,
 };
-#[cfg(feature = "testing")]
-use crate::types::intermediate::{Forgettable, FullData};
 use crate::{
   ext::TyCtxtExt,
   proof_tree::SerializedTree,
-  types::{ObligationsInBody, Target},
+  types::{
+    intermediate::{Forgettable, FullData},
+    BodyBundle, ObligationNecessity, ObligationsInBody, Target,
+  },
 };
 
 fluid_let! {
@@ -25,6 +28,7 @@ fluid_let! {
   pub static INCLUDE_SUCCESSES: bool;
 }
 
+/// Generate the set of evaluated obligations within a single body.
 pub fn obligations<'tcx>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
@@ -39,8 +43,8 @@ pub fn obligations<'tcx>(
   }}
 }
 
-// NOTE: tree is only invoked for *a single* tree, it must be found
-// within the `body_id` and the appropriate `OBLIGATION_TARGET` (i.e., stable hash).
+/// Generate a *single* proof-tree for a target obligation within a body. See
+/// `OBLIGATION_TARGET` for target data.
 pub fn tree<'tcx>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
@@ -53,7 +57,38 @@ pub fn tree<'tcx>(
   }}
 }
 
-#[cfg(feature = "testing")]
+/// Analyze all bodies and pre-generate the necessary proof trees for self-contained output.
+///
+/// NOTE: this requires quite a bit of memory as everything is generated eagerly, favor
+/// using a combination of `obligation` and `tree` analyses for a reduced memory footprint.
+pub fn bundle<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<BodyBundle> {
+  let (full_data, obligations_in_body) = body_data(tcx, body_id)?;
+  let t = (&*full_data, &obligations_in_body);
+  let thunk = || t;
+
+  let mut trees = HashMap::new();
+  for obl in t.1.obligations.iter() {
+    if obl.necessity == ObligationNecessity::Yes
+      || (obl.necessity == ObligationNecessity::OnError && obl.result.is_err())
+    {
+      if let Ok(stree) = entry::pick_tree(obl.hash, true, thunk) {
+        trees.insert(obl.hash, stree);
+      }
+    }
+  }
+
+  let filename = tcx
+    .body_filename(body_id)
+    .prefer_local()
+    .to_string_lossy()
+    .to_string();
+  Ok(BodyBundle {
+    filename,
+    body: obligations_in_body,
+    trees,
+  })
+}
+
 pub(crate) fn body_data<'tcx>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,

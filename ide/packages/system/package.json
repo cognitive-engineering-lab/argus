@@ -1,0 +1,23 @@
+{
+  "name": "@argus/system",
+  "version": "0.1.0",
+  "files": [
+    "dist"
+  ],
+  "main": "dist/lib.js",
+  "exports": {
+    ".": {
+      "default": "./dist/lib.js"
+    },
+    "./*": {
+      "default": "./dist/*.js"
+    }
+  },
+  "type": "module",
+  "depot": {
+    "platform": "node"
+  },
+  "typedoc": {
+    "entryPoint": "./src/lib.ts"
+  }
+}
