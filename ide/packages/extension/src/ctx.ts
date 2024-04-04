@@ -138,8 +138,9 @@ export class Ctx {
       showErrorDialog("Failed to setup Argus");
       return;
     }
-    // TODO: add some sort of "status loading" indicator.
-    // Compile the workspace with the Argus version of rustc.
+    vscode.window.showInformationMessage(
+      "Loading Argus, this may take several minutes."
+    );
     await b(["preload"], true);
     this.cache = new BackendCache(b);
 

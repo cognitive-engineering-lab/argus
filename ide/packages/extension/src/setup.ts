@@ -26,6 +26,9 @@ declare const TOOLCHAIN: {
   components: string[];
 };
 
+// TODO: all of the calls to `showInformationMessage` should be replaced
+// with some automatic message on the statusBar indicator.
+
 function getCurrentToolchain(): RustcToolchain {
   return {
     version: VERSION,
@@ -121,6 +124,9 @@ const checkVersionAndInstall = async (
     );
     const components = config.components.map(c => ["-c", c]).flat();
     try {
+      vscode.window.showInformationMessage(
+        "Installing nightly Rust (this may take a minute)"
+      );
       await execNotify(
         "rustup",
         [
@@ -153,6 +159,9 @@ const checkVersionAndInstall = async (
       }
     }
 
+    vscode.window.showInformationMessage(
+      "Installing Argus from source (this may take a minute)"
+    );
     await execNotify(
       cargo,
       [
