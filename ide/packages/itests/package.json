@@ -1,12 +1,10 @@
 {
   "name": "@argus/itests",
   "version": "0.1.0",
-  "bin": {
-    "itests": "dist/itests.cjs"
-  },
   "type": "module",
   "depot": {
-    "platform": "node"
+    "platform": "node",
+    "target": "script"
   },
   "dependencies": {
     "mocha": "^10.4.0"
@@ -15,8 +13,9 @@
     "@types/chai": "^4.3.14",
     "@types/glob": "^8.1.0",
     "@types/mocha": "^10.0.6",
-    "chai": "^5.1.0",
-    "glob": "^8.1.0",
-    "mocha": "^10.4.0"
+    "@vscode/test-cli": "^0.0.6",
+    "@vscode/test-electron": "^2.3.9",
+    "chai": "^5.1.0",    
+    "glob": "^8.1.0"    
   }
 }
