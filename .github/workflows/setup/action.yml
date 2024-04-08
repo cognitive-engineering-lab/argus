@@ -13,7 +13,7 @@ runs:
       shell: bash
 
     - name: Install Depot
-      run: curl https://raw.githubusercontent.com/cognitive-engineering-lab/depot/main/scripts/install.sh | sh
+      run: curl https://raw.githubusercontent.com/cognitive-engineering-lab/depot/main/scripts/install.sh | sh -s e92a63edcb17cf156e399587b79192369911560e
       shell: bash
 
     - name: Install Test Libraries

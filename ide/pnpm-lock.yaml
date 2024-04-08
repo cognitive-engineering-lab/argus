@@ -159,6 +159,12 @@ importers:
       '@types/mocha':
         specifier: ^10.0.6
         version: 10.0.6
+      '@vscode/test-cli':
+        specifier: ^0.0.6
+        version: 0.0.6
+      '@vscode/test-electron':
+        specifier: ^2.3.9
+        version: 2.3.9
       chai:
         specifier: ^5.1.0
         version: 5.1.0
@@ -245,28 +251,6 @@ importers:
         version: 4.4.9(@types/node@20.2.5)
 
   packages/system: {}
-
-  packages/test-runner:
-    dependencies:
-      '@argus/itests':
-        specifier: workspace:*
-        version: link:../itests
-      argus:
-        specifier: workspace:*
-        version: link:../extension
-      mocha:
-        specifier: ^10.4.0
-        version: 10.4.0
-    devDependencies:
-      '@vscode/test-cli':
-        specifier: ^0.0.6
-        version: 0.0.6
-      '@vscode/test-electron':
-        specifier: ^2.3.9
-        version: 2.3.9
-      vite:
-        specifier: ^4.4.9
-        version: 4.4.9(@types/node@20.2.5)
 
 packages:
 
@@ -1775,7 +1759,7 @@ packages:
     dev: true
 
   /concat-map@0.0.1:
-    resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
+    resolution: {integrity: sha1-2Klr13/Wjfd5OnMDajug1UBdR3s=}
     dev: true
 
   /convert-source-map@2.0.0:
