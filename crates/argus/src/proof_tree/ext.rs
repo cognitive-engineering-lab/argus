@@ -32,7 +32,7 @@ impl EvaluationResultExt for EvaluationResult {
   fn pretty(&self) -> String {
     let str = match self {
       Ok(Certainty::Yes) => "Yes",
-      Ok(Certainty::Maybe(MaybeCause::Overflow)) => "No: Overflow",
+      Ok(Certainty::Maybe(MaybeCause::Overflow { .. })) => "No: Overflow",
       Ok(Certainty::Maybe(MaybeCause::Ambiguity)) => "No: Ambiguity",
       Err(NoSolution) => "No",
     };
@@ -48,8 +48,10 @@ impl CandidateExt for InspectCandidate<'_, '_> {
       ProbeKind::NormalizedSelfTyAssembly => {
         "normalized-self-ty-asm".to_string()
       }
+      ProbeKind::TryNormalizeNonRigid { .. } => {
+        "try-normalize-non-rigid".to_string()
+      }
       ProbeKind::UnsizeAssembly => "unsize-asm".to_string(),
-      ProbeKind::CommitIfOk => "commit-if-ok".to_string(),
       ProbeKind::UpcastProjectionCompatibility => {
         "upcase-proj-compat".to_string()
       }

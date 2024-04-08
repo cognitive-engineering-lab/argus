@@ -24,7 +24,7 @@ import {
   PrintAliasTy,
   PrintBinder,
   PrintGenericArg,
-  PrintImplPolarity,
+  PrintPolarity,
   PrintRegion,
   PrintTy,
 } from "./ty";
@@ -199,7 +199,7 @@ export const PrintTraitPredicate = ({ o }: { o: TraitPredicate }) => {
   return (
     <>
       <PrintTy o={o.self_ty} />: <PrintBoundConstness o={o.constness} />
-      <PrintImplPolarity o={o.polarity} />
+      <PrintPolarity o={o.polarity} />
       <PrintDefPath o={o.trait_ref} />
     </>
   );

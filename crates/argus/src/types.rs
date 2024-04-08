@@ -26,7 +26,7 @@ use crate::{
     safe::{PathDefNoArgs, TraitRefPrintOnlyTraitPathDef},
     serialize_to_value,
     ty::{
-      ImplPolarityDef, RegionDef, Slice__ClauseDef, Slice__GenericArgDef,
+      Polarity, RegionDef, Slice__ClauseDef, Slice__GenericArgDef,
       Slice__TyDef, TyDef,
     },
   },
@@ -310,9 +310,7 @@ pub struct ClauseWithBounds<'tcx> {
 #[cfg_attr(feature = "testing", ts(export))]
 pub enum ClauseBound<'tcx> {
   Trait(
-    #[serde(with = "ImplPolarityDef")]
-    #[cfg_attr(feature = "testing", ts(type = "ImplPolarity"))]
-    ty::ImplPolarity,
+    Polarity,
     #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
     TraitRefPrintOnlyTraitPathDef<'tcx>,
   ),
@@ -564,7 +562,7 @@ pub(super) mod intermediate {
     ) -> Result<S::Ok, S::Error> {
       let string = match value {
         Ok(Certainty::Yes) => "yes",
-        Ok(Certainty::Maybe(MaybeCause::Overflow)) => "maybe-overflow",
+        Ok(Certainty::Maybe(MaybeCause::Overflow { .. })) => "maybe-overflow",
         Ok(Certainty::Maybe(MaybeCause::Ambiguity)) => "maybe-ambiguity",
         Err(..) => "no",
       };

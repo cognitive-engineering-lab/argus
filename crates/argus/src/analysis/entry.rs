@@ -29,6 +29,7 @@ use crate::{
 
 fluid_let! {
   pub static INSPECTING: bool;
+  pub static BODY_ID: BodyId;
 }
 
 macro_rules! guard_inspection {
@@ -55,8 +56,7 @@ pub fn process_obligation<'tcx>(
 ) {
   guard_inspection! {}
 
-  let Some(_ldef_id) = infcx.body_id() else {
-    log::warn!("Skipping obligation unassociated with local body {obl:?}");
+  let Some(body_id) = BODY_ID.copied() else {
     return;
   };
 
@@ -89,7 +89,8 @@ pub fn process_obligation<'tcx>(
     None
   };
 
-  let obligation = transform::compute_provenance(infcx, obl, result, dataid);
+  let obligation =
+    transform::compute_provenance(body_id, infcx, obl, result, dataid);
 
   tls::store_obligation(obligation);
 
@@ -195,11 +196,13 @@ fn generate_tree<'tcx>(
     predicate: obligation.predicate,
     param_env: obligation.param_env,
   };
-  let item_def_id = infcx
-    .body_id()
-    .ok_or(anyhow!("body not local"))?
-    .to_def_id();
-  serialize_proof_tree(goal, infcx, item_def_id)
+
+  let Some(body_id) = BODY_ID.copied() else {
+    bail!("missing body id");
+  };
+
+  let body_owner = infcx.tcx.hir().body_owner_def_id(body_id).to_def_id();
+  serialize_proof_tree(goal, infcx, body_owner)
 }
 
 pub(in crate::analysis) fn build_obligations_in_body<'tcx>(

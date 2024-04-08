@@ -40,21 +40,17 @@ macro_rules! property_is_ok {
 }
 
 pub fn compute_provenance<'tcx>(
+  body_id: BodyId,
   infcx: &InferCtxt<'tcx>,
   obligation: &PredicateObligation<'tcx>,
   result: EvaluationResult,
   dataid: Option<UODIdx>,
 ) -> Provenance<Obligation> {
-  let Some(ldef_id) = infcx.body_id() else {
-    unreachable!("argus analysis should only happen on local bodies");
-  };
-
   let hir = infcx.tcx.hir();
   let fdata = infcx.bless_fulfilled(obligation, result, false);
 
   // If the span is coming from a macro, point to the callsite.
   let callsite_cause_span = fdata.obligation.cause.span.source_callsite();
-  let body_id = hir.body_owned_by(ldef_id);
   let hir_id = hier_hir::find_most_enclosing_node(
     &infcx.tcx,
     body_id,
@@ -220,16 +216,15 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           BinKind::Call => Call,
           BinKind::MethodReceiver => MethodReceiver,
           BinKind::MethodCall => {
-            let Some(hir::Node::Expr(
+            let hir::Node::Expr(
               call_expr @ hir::Expr {
                 kind: hir::ExprKind::MethodCall(segment, recvr, args, call_span),
                 ..
               },
-            )) = hir.find(hir_id)
+            ) = hir.hir_node(hir_id)
             else {
               unreachable!(
-                "Bin kind `MethodCall` for non `ExprKind::MethodCall` {:?}",
-                hir.node_to_string(hir_id)
+                "bin kind is method call, but node is not method call"
               );
             };
 
@@ -517,19 +512,11 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
 
     let ty_id = |ty: Ty<'tcx>| ty;
 
-    let ty_with_ref = move |ty: Ty<'tcx>| {
-      Ty::new_ref(tcx, region, ty::TypeAndMut {
-        ty,
-        mutbl: hir::Mutability::Not,
-      })
-    };
+    let ty_with_ref =
+      move |ty: Ty<'tcx>| Ty::new_ref(tcx, region, ty, hir::Mutability::Not);
 
-    let ty_with_mut_ref = move |ty: Ty<'tcx>| {
-      Ty::new_ref(tcx, region, ty::TypeAndMut {
-        ty,
-        mutbl: hir::Mutability::Mut,
-      })
-    };
+    let ty_with_mut_ref =
+      move |ty: Ty<'tcx>| Ty::new_ref(tcx, region, ty, hir::Mutability::Mut);
 
     // TODO: rustc also considers raw pointers, ignoring for now ...
     let ty_mutators: Vec<&dyn Fn(Ty<'tcx>) -> Ty<'tcx>> =
@@ -580,8 +567,13 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
             infcx.probe(|_| {
               let res = infcx.evaluate_obligation(&obligation);
 
-              let mut with_provenance =
-                compute_provenance(&infcx, &obligation, res, None);
+              let mut with_provenance = compute_provenance(
+                self.body_id,
+                &infcx,
+                &obligation,
+                res,
+                None,
+              );
 
               let syn_id = self.synthetic_data.add(SyntheticData {
                 full_data: full_query_idx,
@@ -743,12 +735,9 @@ mod tree_search {
   }
 
   impl<'tcx> ProofTreeVisitor<'tcx> for BranchlessSearch {
-    type BreakTy = ();
+    type Result = ControlFlow<()>;
 
-    fn visit_goal(
-      &mut self,
-      goal: &InspectGoal<'_, 'tcx>,
-    ) -> ControlFlow<Self::BreakTy> {
+    fn visit_goal(&mut self, goal: &InspectGoal<'_, 'tcx>) -> Self::Result {
       let infcx = goal.infcx();
       let predicate = &goal.goal().predicate;
       let hash = infcx.predicate_hash(predicate).into();

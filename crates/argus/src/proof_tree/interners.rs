@@ -116,8 +116,10 @@ impl Interners {
       ProbeKind::NormalizedSelfTyAssembly => {
         self.intern_can_string("normalized-self-ty-asm")
       }
+      ProbeKind::TryNormalizeNonRigid { .. } => {
+        self.intern_can_string("try-normalize-non-rigid")
+      }
       ProbeKind::UnsizeAssembly => self.intern_can_string("unsize-asm"),
-      ProbeKind::CommitIfOk => self.intern_can_string("commit-if-ok"),
       ProbeKind::UpcastProjectionCompatibility => {
         self.intern_can_string("upcase-proj-compat")
       }

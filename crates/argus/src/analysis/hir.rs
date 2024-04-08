@@ -193,14 +193,13 @@ macro_rules! simple_visitors {
 impl HirVisitor<'_> for FindNodeBySpan {
   simple_visitors! {
     [visit_param, walk_param, hir::Param],
-    [visit_local, walk_local, hir::Local],
+    [visit_local, walk_local, hir::LetStmt],
     [visit_block, walk_block, hir::Block],
     [visit_stmt, walk_stmt, hir::Stmt],
     [visit_arm, walk_arm, hir::Arm],
     [visit_pat, walk_pat, hir::Pat],
     [visit_pat_field, walk_pat_field, hir::PatField],
     [visit_expr, walk_expr, hir::Expr],
-    [visit_let_expr, walk_let_expr, hir::Let],
     [visit_expr_field, walk_expr_field, hir::ExprField],
     [visit_ty, walk_ty, hir::Ty],
     [visit_generic_param, walk_generic_param, hir::GenericParam],

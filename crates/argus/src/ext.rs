@@ -2,10 +2,7 @@ use rustc_data_structures::{
   fx::FxIndexMap,
   stable_hasher::{Hash64, HashStable, StableHasher},
 };
-use rustc_hir::{
-  def_id::{DefId, LocalDefId},
-  BodyId, HirId,
-};
+use rustc_hir::{def_id::DefId, BodyId, HirId};
 use rustc_hir_typeck::inspect_typeck;
 use rustc_infer::{
   infer::InferCtxt,
@@ -201,8 +198,6 @@ pub trait InferCtxtExt<'tcx> {
     obligation: &PredicateObligation<'tcx>,
   ) -> ObligationNecessity;
 
-  fn body_id(&self) -> Option<LocalDefId>;
-
   fn predicate_hash(&self, p: &Predicate<'tcx>) -> Hash64;
 
   fn evaluate_obligation(
@@ -270,7 +265,7 @@ pub fn group_predicates_by_ty<'tcx>(
       let trait_ref =
         poly_trait_pred.map_bound(|tr| tr.trait_ref).skip_binder();
       let bound = ClauseBound::Trait(
-        poly_trait_pred.polarity(),
+        poly_trait_pred.polarity().into(),
         TraitRefPrintOnlyTraitPathDef(trait_ref),
       );
       grouped.entry(ty).or_default().push(bound);
@@ -314,7 +309,7 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
     let tcx = *self;
     let impl_def_id = def_id;
 
-    // From [`rustc_trait_selection::traits::specialize`]
+    // From [`rustc_trait_selection::traits::specialize::to_pretty_impl_header`]
     log::debug!(
       "Serializing this impl header\n{}",
       rustc::to_pretty_impl_header(tcx, impl_def_id)
@@ -347,7 +342,10 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
       if let Some(poly_trait_ref) = p.as_trait_clause() {
         if Some(poly_trait_ref.def_id()) == sized_trait {
           types_without_default_bounds
-            .remove(&poly_trait_ref.self_ty().skip_binder());
+            // NOTE: we don't rely on the ordering of the types without bounds here,
+            // so `swap_remove` is preferred because it's O(1) instead of `shift_remove`
+            // which is O(n).
+            .swap_remove(&poly_trait_ref.self_ty().skip_binder());
           continue;
         }
       }
@@ -484,16 +482,6 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     }
   }
 
-  // TODO there has to be a better way to do this, right?
-  fn body_id(&self) -> Option<LocalDefId> {
-    use rustc_infer::traits::DefiningAnchor::*;
-    if let Bind(ldef_id) = self.defining_use_anchor {
-      Some(ldef_id)
-    } else {
-      None
-    }
-  }
-
   fn predicate_hash(&self, p: &Predicate<'tcx>) -> Hash64 {
     let mut freshener = rustc_infer::infer::TypeFreshener::new(self);
     let p = p.fold_with(&mut freshener);
@@ -556,7 +544,7 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
       .evaluate_root_goal(obligation.clone().into(), GenerateProofTree::Never)
       .0
     {
-      Ok((_, c, _)) => Ok(c),
+      Ok((_, c)) => Ok(c),
       _ => Err(NoSolution),
     }
   }

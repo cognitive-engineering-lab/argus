@@ -275,18 +275,12 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
   rustc_driver::Callbacks for ArgusCallbacks<A, T, F>
 {
   fn config(&mut self, config: &mut rustc_interface::Config) {
-    config.parse_sess_created = Some(Box::new(|sess| {
-      // // Create a new emitter writer which consumes *silently* all
-      // // errors. There most certainly is a *better* way to do this,
-      // // if you, the reader, know what that is, please open an issue :)
-      // let fallback_bundle = rustc_errors::fallback_fluent_bundle(
-      //   rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
-      //   false,
-      // );
-      // let emitter = HumanEmitter::new(Box::new(io::sink()), fallback_bundle);
-      // sess.dcx = DiagCtxt::with_emitter(Box::new(emitter));
-
-      sess.dcx = DiagCtxt::with_emitter(SilentEmitter::boxed());
+    config.psess_created = Some(Box::new(|sess| {
+      let fallback_bundle = rustc_errors::fallback_fluent_bundle(
+        rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
+        false,
+      );
+      sess.dcx.make_silent(fallback_bundle, None, false);
     }));
   }
 

@@ -243,8 +243,12 @@ where
   Cb: FnOnce(TyCtxt<'_>),
 {
   fn config(&mut self, config: &mut rustc_interface::Config) {
-    config.parse_sess_created = Some(Box::new(|sess| {
-      sess.dcx = DiagCtxt::with_emitter(SilentEmitter::boxed());
+    config.psess_created = Some(Box::new(|sess| {
+      let fallback_bundle = rustc_errors::fallback_fluent_bundle(
+        rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
+        false,
+      );
+      sess.dcx.make_silent(fallback_bundle, None, false);
     }));
   }
 

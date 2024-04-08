@@ -34,7 +34,7 @@ pub fn obligations<'tcx>(
   body_id: BodyId,
 ) -> Result<ObligationsInBody> {
   rustc_middle::ty::print::with_no_trimmed_paths! {{
-    log::info!("Typeck'ing body {body_id:?}");
+    fluid_let::fluid_set!(entry::BODY_ID, body_id);
 
     let typeck_results = tcx.inspect_typeck(body_id, entry::process_obligation);
 
@@ -50,6 +50,8 @@ pub fn tree<'tcx>(
   body_id: BodyId,
 ) -> Result<SerializedTree> {
   rustc_middle::ty::print::with_no_trimmed_paths! {{
+    fluid_let::fluid_set!(entry::BODY_ID, body_id);
+
     let typeck_results =
       tcx.inspect_typeck(body_id, entry::process_obligation_for_tree);
 
@@ -62,6 +64,8 @@ pub fn tree<'tcx>(
 /// NOTE: this requires quite a bit of memory as everything is generated eagerly, favor
 /// using a combination of `obligation` and `tree` analyses for a reduced memory footprint.
 pub fn bundle<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<BodyBundle> {
+  fluid_let::fluid_set!(entry::BODY_ID, body_id);
+
   let (full_data, obligations_in_body) = body_data(tcx, body_id)?;
   let t = (&*full_data, &obligations_in_body);
   let thunk = || t;
@@ -82,6 +86,7 @@ pub fn bundle<'tcx>(tcx: TyCtxt<'tcx>, body_id: BodyId) -> Result<BodyBundle> {
     .prefer_local()
     .to_string_lossy()
     .to_string();
+
   Ok(BodyBundle {
     filename,
     body: obligations_in_body,

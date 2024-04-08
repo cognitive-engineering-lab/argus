@@ -119,12 +119,9 @@ impl SerializedTreeVisitor {
 }
 
 impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
-  type BreakTy = !;
+  type Result = ();
 
-  fn visit_goal(
-    &mut self,
-    goal: &InspectGoal<'_, 'tcx>,
-  ) -> ControlFlow<Self::BreakTy> {
+  fn visit_goal(&mut self, goal: &InspectGoal<'_, 'tcx>) -> Self::Result {
     let here_node = self.interners.mk_goal_node(goal);
     let here_idx = self.nodes.push(here_node.clone());
 
@@ -161,14 +158,12 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
       let candidate_idx = self.nodes.push(here_candidate);
       self.topology.add(here_idx, candidate_idx);
       self.previous = Some(candidate_idx);
-      c.visit_nested(self)?;
+      c.visit_nested(self);
       add_result_if_empty(self, candidate_idx);
     }
 
     add_result_if_empty(self, here_idx);
     self.previous = here_parent;
-
-    ControlFlow::Continue(())
   }
 }
 

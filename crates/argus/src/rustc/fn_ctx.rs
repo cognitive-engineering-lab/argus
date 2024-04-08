@@ -250,7 +250,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
         hir_id: call_hir_id,
         span: call_span,
         ..
-      }) = hir.get_parent(hir_id)
+      }) = self.tcx.parent_hir_node(hir_id)
         && callee.hir_id == hir_id
       {
         if self.closure_span_overlaps_error(error, *call_span) {
@@ -498,22 +498,19 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
       DefId,
     );
     impl<'tcx> TypeVisitor<TyCtxt<'tcx>> for FindAmbiguousParameter<'_, 'tcx> {
-      type BreakTy = ty::GenericArg<'tcx>;
-      fn visit_ty(
-        &mut self,
-        ty: Ty<'tcx>,
-      ) -> std::ops::ControlFlow<Self::BreakTy> {
+      type Result = ControlFlow<ty::GenericArg<'tcx>>;
+      fn visit_ty(&mut self, ty: Ty<'tcx>) -> Self::Result {
         if let Some(origin) = self.0.type_var_origin(ty)
           && let TypeVariableOriginKind::TypeParameterDefinition(_, def_id) =
             origin.kind
           && let generics = self.0.tcx.generics_of(self.1)
           && let Some(index) =
             generics.param_def_id_to_index(self.0.tcx, def_id)
-          && let Some(subst) =
+          && let Some(arg) =
             ty::GenericArgs::identity_for_item(self.0.tcx, self.1)
               .get(index as usize)
         {
-          ControlFlow::Break(*subst)
+          ControlFlow::Break(*arg)
         } else {
           ty.super_visit_with(self)
         }

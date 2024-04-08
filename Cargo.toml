@@ -5,3 +5,7 @@ resolver = "2"
 
 [profile.dev.package.similar]
 opt-level = 3
+
+[patch.crates-io]
+rustc_utils = { path = "../rustc-plugin/crates/rustc_utils" }
+rustc_plugin = { path = "../rustc-plugin/crates/rustc_plugin" }

@@ -5,6 +5,7 @@ import {
   AssocItem,
   BoundTy,
   BoundVariable,
+  CoroutineClosureTyKind,
   CoroutineTyKind,
   CoroutineWitnessTyKind,
   DynamicTyKind,
@@ -13,12 +14,12 @@ import {
   FnSig,
   FnTrait,
   GenericArg,
-  ImplPolarity,
   InferTy,
   IntTy,
   OpaqueImpl,
   ParamTy,
   PlaceholderBoundTy,
+  Polarity,
   PolyExistentialPredicates,
   PolyFnSig,
   Region,
@@ -130,6 +131,8 @@ export const PrintTyKind = ({ o }: { o: TyKind }) => {
     return <PrintDefPath o={o.Foreign} />;
   } else if ("Closure" in o) {
     return <PrintDefPath o={o.Closure} />;
+  } else if ("CoroutineClosure" in o) {
+    return <PrintCoroutineClosureTy o={o.CoroutineClosure} />;
   } else if ("Param" in o) {
     return <PrintParamTy o={o.Param} />;
   } else if ("Bound" in o) {
@@ -161,6 +164,15 @@ export const PrintCoroutineTy = ({ o }: { o: CoroutineTyKind }) => {
       {pathDef} upvar_tys={upvars} witness={witness}
     </DBraced>
   );
+};
+
+export const PrintCoroutineClosureTy = ({
+  o,
+}: {
+  o: CoroutineClosureTyKind;
+}) => {
+  // TODO: we can print other things known to the closure, like kind, signature, upvars, etc.
+  return <PrintDefPath o={o.path} />;
 };
 
 export const PrintCoroutineWitnessTy = ({
@@ -439,8 +451,8 @@ export const PrintBoundVariable = ({ o }: { o: BoundVariable }) => {
   }
 };
 
-export const PrintImplPolarity = ({ o }: { o: ImplPolarity }) => {
-  return o === "Negative" ? "!" : null;
+export const PrintPolarity = ({ o }: { o: Polarity }) => {
+  return o === "Negative" ? "!" : o === "Maybe" ? "?" : null;
 };
 
 export const PrintOpaqueImplType = ({ o }: { o: OpaqueImpl }) => {
@@ -477,7 +489,7 @@ export const PrintOpaqueImplType = ({ o }: { o: OpaqueImpl }) => {
 
   const PrintTrait = ({ o }: { o: Trait }) => {
     console.debug("Printing Trait", o);
-    const prefix = <PrintImplPolarity o={o.polarity} />;
+    const prefix = <PrintPolarity o={o.polarity} />;
     const name = <PrintDefPath o={o.traitName} />;
     const ownArgs = _.map(o.ownArgs, arg => () => <PrintGenericArg o={arg} />);
     const assocArgs = _.map(o.assocArgs, arg => () => (

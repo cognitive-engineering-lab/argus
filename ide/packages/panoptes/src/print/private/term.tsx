@@ -36,7 +36,15 @@ export const PrintTerm = ({ o }: { o: Term }) => {
 export const PrintExpr = ({ o }: { o: ExprDef }) => {
   if ("Binop" in o) {
     const [op, lhs, rhs] = o.Binop;
-    return (
+    return op === "Cmp" ? (
+      <>
+        <PrintConst o={lhs} />
+        .cmp
+        <Parenthesized>
+          <PrintConst o={rhs} />
+        </Parenthesized>
+      </>
+    ) : (
       <>
         <PrintConst o={lhs} />
         <PrintBinOp o={op} />
@@ -71,7 +79,9 @@ export const PrintExpr = ({ o }: { o: ExprDef }) => {
   }
 };
 
-const PrintBinOp = ({ o }: { o: BinOp }) => {
+// NOTE: this is the mir BinOp enum so not all operators are "source representable."
+// Exluding "Cmp" as it rearranges the operands and doesn't follow the pattern.
+const PrintBinOp = ({ o }: { o: Exclude<BinOp, "Cmp"> }) => {
   if (o === "Add") {
     return "+";
   } else if (o === "AddUnchecked") {
