@@ -30,9 +30,11 @@ export const ConfigConsts = {
 export type PanoptesInitialData = {
   data: [Filename, ObligationsInBody[]][];
   target?: ErrorJumpTargetInfo;
+  evalMode?: EvaluationMode;
 };
 
 export type SystemSpec = Omit<IssueOptions, "logText">;
+export type EvaluationMode = "release" | "rank" | "random";
 
 export type PanoptesConfig = PanoptesInitialData &
   (

@@ -10,7 +10,7 @@ import {
   IcoTriangleDown,
   IcoTriangleRight,
 } from "../Icons";
-import { TreeAppContext } from "../utilities/context";
+import { AppContext, TreeAppContext } from "../utilities/context";
 import "./Directory.css";
 import { Node } from "./Node";
 
@@ -34,7 +34,10 @@ export const CollapsibleElement = ({
   startOpen?: boolean;
   Children: React.FC | null;
 }) => {
-  const [isOpen, setIsOpen] = useState(startOpen);
+  const config = useContext(AppContext.ConfigurationContext)!;
+  const openByDefault = startOpen || config.evalMode !== "release";
+
+  const [isOpen, setIsOpen] = useState(openByDefault);
   const [openIco, closedIco] = icons;
   let [children, setChildren] = useState<React.ReactElement | undefined>(
     undefined

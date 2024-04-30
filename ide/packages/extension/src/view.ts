@@ -66,6 +66,7 @@ export class View {
     this.panel = vscode.window.createWebviewPanel("argus", "Argus", column, {
       enableScripts: true,
       retainContextWhenHidden: true,
+      enableFindWidget: true,
       localResourceRoots: [this.extensionUri],
     });
     this.isPanelDisposed = false;

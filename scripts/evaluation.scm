@@ -54,7 +54,7 @@
                            (result-diagnostics result))))
       `(div (@ (style "padding: 0.5em; border: 1px dashed black;"))
         (h2 ,fn)
-        (div (@ (style "max-height: 25em;overflow: hidden;"))
+        (div (@ (style "max-height: 25em;overflow-y: scroll;"))
              (img (@ (src ,(local-file screenshotfn)))))
         "Principal message: "
         (pre (code ,(string-join rustc-msgs "\n")))

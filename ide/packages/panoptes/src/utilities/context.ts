@@ -1,4 +1,4 @@
-import { SystemSpec } from "@argus/common/lib";
+import { EvaluationMode, PanoptesConfig, SystemSpec } from "@argus/common/lib";
 import { createContext } from "react";
 
 import { TreeRenderParams } from "../TreeView/Directory";
@@ -7,6 +7,9 @@ import { MessageSystem } from "../communication";
 
 export const AppContext = {
   MessageSystemContext: createContext<MessageSystem | undefined>(undefined),
+  ConfigurationContext: createContext<
+    (PanoptesConfig & { evalMode: EvaluationMode }) | undefined
+  >(undefined),
   SystemSpecContext: createContext<SystemSpec | undefined>(undefined),
 };
 

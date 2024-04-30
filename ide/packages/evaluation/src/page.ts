@@ -2,6 +2,7 @@ import { BodyBundle } from "@argus/common/bindings";
 import {
   ConfigConsts,
   ErrorJumpTargetInfo,
+  EvaluationMode,
   Filename,
   PanoptesConfig,
   configToString,
@@ -13,6 +14,41 @@ import { PORT } from "./serve";
 
 // Default VSCode Light styles
 export const defaultStyles = `
+--background: #ffffff;
+--contrast-active-border: transparent;
+--focus-border: #0090f1;
+--font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+--font-weight: normal;
+--foreground: #616161;
+--scrollbar-slider-background: rgba(100, 100, 100, 0.4);
+--scrollbar-slider-hover-background: rgba(100, 100, 100, 0.7);
+--scrollbar-slider-active-background: rgba(0, 0, 0, 0.6);
+--badge-background: #c4c4c4;
+--badge-foreground: #333333;
+--button-primary-background: #007acc;
+--button-primary-hover-background: #0062a3;
+--button-secondary-background: #5f6a79;
+--button-secondary-hover-background: #4c5561;
+--checkbox-background: #ffffff;
+--checkbox-border: #919191;
+--checkbox-foreground: #616161;
+--list-active-selection-background: #0060c0;
+--list-hover-background: #e8e8e8;
+--divider-background: #c8c8c8;
+--dropdown-background: #ffffff;
+--dropdown-border: #cecece;
+--dropdown-foreground: #616161;
+--input-background: #ffffff;
+--input-foreground: #616161;
+--input-placeholder-foreground: #767676;
+--link-active-foreground: #006ab1;
+--link-foreground: #006ab1;
+--panel-tab-active-border: #424242;
+--panel-tab-active-foreground: #424242;
+--panel-tab-foreground: rgba(66, 66, 66, 0.75);
+--panel-view-background: #ffffff;
+--panel-view-border: rgba(128, 128, 128, 0.35);
+
 --vscode-foreground: #616161;
 --vscode-disabledForeground: rgba(97, 97, 97, 0.5);
 --vscode-errorForeground: #a1260d;
@@ -704,13 +740,15 @@ function findErrorTargetInBundles(bundles: BodyBundle[]) {
 export function webHtml(
   title: string,
   filename: Filename,
-  bundles: BodyBundle[]
+  bundles: BodyBundle[],
+  evalMode: EvaluationMode = "rank"
 ) {
   const config: PanoptesConfig = {
     type: "WEB_BUNDLE",
     target: findErrorTargetInBundles(bundles),
     data: [[filename, bundles.map(b => b.body)]],
     closedSystem: bundles,
+    evalMode,
   };
 
   const panoptesDir = path.resolve(__dirname, "..", "..", "panoptes");

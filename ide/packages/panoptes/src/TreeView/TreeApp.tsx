@@ -5,9 +5,9 @@ import {
   VSCodePanels,
 } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
-import React from "react";
+import React, { useContext } from "react";
 
-import { TreeAppContext } from "../utilities/context";
+import { AppContext, TreeAppContext } from "../utilities/context";
 import BottomUp from "./BottomUp";
 import TopDown from "./TopDown";
 import "./TreeApp.css";
@@ -21,6 +21,7 @@ const TreeApp = ({
   tree: SerializedTree | undefined;
   showHidden?: boolean;
 }) => {
+  const evalMode = useContext(AppContext.ConfigurationContext)!.evalMode;
   // FIXME: this shouldn't ever happen, if a properly hashed
   // value is sent and returned. I need to think more about how to handle
   // when we want to display "non-traditional" obligations.
@@ -46,7 +47,8 @@ const TreeApp = ({
     tabs.unshift(["Bottom Up", BottomUp]);
   }
 
-  if (tree.cycle !== undefined) {
+  // HACK: we shouldn't test for eval mode here but Playwright is off on the button click.
+  if (tree.cycle !== undefined && evalMode === "release") {
     // FIXME: why do I need the '!' here? - - - - - --------  VVVVVVVV
     tabs.unshift(["Cycle Detected", () => <TreeCycle path={tree.cycle!} />]);
   }

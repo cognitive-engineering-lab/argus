@@ -1,5 +1,6 @@
 import {
   ErrorJumpTargetInfo,
+  EvaluationMode,
   PanoptesConfig,
   SystemSpec,
   SystemToPanoptesCmds,
@@ -41,6 +42,10 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
       : vscodeMessageSystem;
   const systemSpec =
     config.type === "VSCODE_BACKING" ? config.spec : webSysSpec;
+
+  config.evalMode = config.evalMode ?? "release";
+  const configNoUndef: PanoptesConfig & { evalMode: EvaluationMode } =
+    config as any;
 
   // NOTE: this listener should only listen for posted messages, not
   // for things that could be an expected response from a webview request.
@@ -84,11 +89,13 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
   };
 
   return (
-    <AppContext.SystemSpecContext.Provider value={systemSpec}>
-      <AppContext.MessageSystemContext.Provider value={messageSystem}>
-        <Workspace files={openFiles} reset={resetState} />
-      </AppContext.MessageSystemContext.Provider>
-    </AppContext.SystemSpecContext.Provider>
+    <AppContext.ConfigurationContext.Provider value={configNoUndef}>
+      <AppContext.SystemSpecContext.Provider value={systemSpec}>
+        <AppContext.MessageSystemContext.Provider value={messageSystem}>
+          <Workspace files={openFiles} reset={resetState} />
+        </AppContext.MessageSystemContext.Provider>
+      </AppContext.SystemSpecContext.Provider>
+    </AppContext.ConfigurationContext.Provider>
   );
 });
 

@@ -1,15 +1,19 @@
 import { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
 import _ from "lodash";
 import React, { useContext } from "react";
+import { flushSync } from "react-dom";
+import { createRoot } from "react-dom/client";
 
-import { TreeAppContext } from "../utilities/context";
-import { mean, mode, searchObject, stdDev } from "../utilities/func";
+import { PrintGoal } from "../print/print";
+import { AppContext, TreeAppContext } from "../utilities/context";
+import "./BottomUp.css";
 import {
   CollapsibleElement,
   DirRecursive,
   TreeRenderParams,
 } from "./Directory";
 import { TreeInfo, TreeView } from "./TreeInfo";
+import { treeHeuristic } from "./heuristic";
 
 type TreeViewWithRoot = TreeView & { root: ProofNodeIdx };
 
@@ -79,7 +83,7 @@ class TopologyBuilder {
 function invertViewWithRoots(
   leaves: ProofNodeIdx[],
   tree: TreeInfo
-): Array<TreeViewWithRoot> {
+): TreeViewWithRoot[] {
   const groups: ProofNodeIdx[][] = _.values(
     _.groupBy(leaves, leaf => {
       const node = tree.node(leaf);
@@ -109,146 +113,79 @@ function invertViewWithRoots(
   });
 }
 
-const BottomUp = () => {
+const RenderEvaluationViews = ({
+  recommended,
+  others,
+  mode,
+}: {
+  recommended: TreeViewWithRoot[];
+  others: TreeViewWithRoot[];
+  mode: "rank" | "random";
+}) => {
+  const nodeToString = (node: React.ReactNode) => {
+    const div = document.createElement("div");
+    const root = createRoot(div);
+    flushSync(() => root.render(node));
+    return div.innerText;
+  };
+
   const tree = useContext(TreeAppContext.TreeContext)!;
+  let together = _.concat(recommended, others);
+
+  if (mode === "random") {
+    together = _.shuffle(together);
+  }
+
+  const [goals, setGoals] = React.useState<string[]>([]);
+  const nodeList: React.ReactNode[] = _.compact(
+    _.map(together, (leaf, i) => {
+      const node = tree.node(leaf.root);
+      return "Goal" in node ? (
+        <PrintGoal key={i} o={tree.goal(node.Goal)} />
+      ) : null;
+    })
+  );
+
+  React.useEffect(() => {
+    // run outside of react lifecycle
+    window.setTimeout(() => setGoals(_.map(nodeList, nodeToString)));
+  }, []);
+
+  return (
+    <div className="BottomUpArea">
+      {_.map(goals, (s, i) => (
+        <div key={i} className="EvalGoal" data-rank={i} data-goal={s}>
+          {s}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/**
+ * The actual entry point for rendering the bottom up view. All others are used in testing or evaluation.
+ */
+const RenderBottomUpViews = ({
+  recommended,
+  others,
+}: {
+  recommended: TreeViewWithRoot[];
+  others: TreeViewWithRoot[];
+}) => {
   const mkGetChildren = (view: TreeView) => (idx: ProofNodeIdx) =>
     view.topology.children[idx] ?? [];
 
-  const liftTo = (idx: ProofNodeIdx, target: "Goal" | "Candidate") => {
-    let curr: ProofNodeIdx | undefined = idx;
-    while (curr !== undefined && !(target in tree.node(curr))) {
-      curr = tree.parent(curr);
-    }
-    return curr;
-  };
+  const mkTopLevel = (views: TreeViewWithRoot[]) =>
+    _.map(views, (leaf, i) => (
+      <DirRecursive key={i} level={[leaf.root]} getNext={mkGetChildren(leaf)} />
+    ));
 
-  const leaves = _.uniq(
-    _.compact(_.map(tree.errorLeaves(), n => liftTo(n, "Goal")))
-  );
-  const failedGroups = _.groupBy(leaves, leaf => tree.parent(leaf));
-
-  // Operations on groups of errors
-  const numMainUninferred = (group: ProofNodeIdx[]) =>
-    _.reduce(
-      group,
-      (acc, leaf) =>
-        acc +
-        (() => {
-          const node = tree.node(leaf);
-          if ("Goal" in node) {
-            const goal = tree.goal(node.Goal);
-            return goal.isMainTv ? 1 : 0;
-          } else {
-            return 0;
-          }
-        })(),
-      0
-    );
-
-  const getNumPrincipaled = (group: ProofNodeIdx[]) =>
-    group.length - numMainUninferred(group);
-
-  const sortByNPT = (group: ProofNodeIdx[]) => -getNumPrincipaled(group);
-
-  const sortByNPTRatio = (group: ProofNodeIdx[]) =>
-    group.length / getNumPrincipaled(group);
-
-  const sortByDepth = (group: ProofNodeIdx[]) =>
-    -_.max(_.map(group, leaf => tree.depth(leaf)))!;
-
-  const takeN = (n: number) => (groups: ProofNodeIdx[][]) =>
-    [_.take(groups, n), _.tail(groups)] as [ProofNodeIdx[][], ProofNodeIdx[][]];
-
-  const takeAll = (groups: ProofNodeIdx[][]) =>
-    [groups, []] as [ProofNodeIdx[][], ProofNodeIdx[][]];
-
-  // HACK: this crappy heuristic needs to be replaced with a proper analysis.
-  const [sortStrategy, firstFilter] = (() => {
-    const npts = _.map(failedGroups, getNumPrincipaled);
-    const meanNPT = mean(npts);
-    const stdDevNPT = stdDev(npts, meanNPT);
-    const onlyHigh = _.filter(npts, npt => npt > meanNPT + stdDevNPT);
-    if (onlyHigh.length > 0) {
-      return [sortByNPT, takeN(onlyHigh.length)];
-    }
-
-    const nptRatioEq = _.filter(
-      failedGroups,
-      group => group.length === getNumPrincipaled(group)
-    );
-    if (nptRatioEq.length > 0) {
-      return [sortByNPTRatio, takeN(nptRatioEq.length)];
-    }
-
-    return [sortByDepth, takeAll];
-  })();
-
-  const sortedGroups = _.sortBy(_.values(failedGroups), [
-    // Getting the right group is important but it's not precise.
-    // We currently use the following metrics.
-    //
-    // 1. The number of obligations whose "principle types" are known (NPT).
-    //    What this entails is that in an obligation such as `TYPE: TRAIT`,
-    //    neither TYPE nor TRAIT is an unresolved type variable `_`.
-    //
-    //    We use this number, NPT, to find groups whose NPT is more than
-    //    one standard deviation from the mean. This is useful when trait impls are
-    //    macro generated for varying arities, larger arities have a high number of
-    //    unresolved type variables.
-    //
-    //    The above is useful, until it isn't. Then, we can use tha ratio
-    //    of group size vs the NPT. This favors smaller groups with more
-    //    concrete types.
-    //
-    // 2. Depth of the group. Generally, deep obligations are "more interesting."
-    sortStrategy,
-  ]);
-
-  const [importantGroups, rest] = firstFilter(sortedGroups);
-
-  // The "Argus recommended" errors are shown expanded, and the
-  // "others" are collapsed. Argus recommended errors are the ones
-  // that failed or are ambiguous with a concrete type on the LHS.
-  const [argusRecommendedLeaves, others] = _.partition(
-    _.flatten(importantGroups),
-    leaf => {
-      const node = tree.node(leaf);
-      if ("Goal" in node) {
-        const goal = tree.goal(node.Goal);
-        const result = tree.result(goal.result);
-        return (
-          !goal.isMainTv && (result === "no" || result === "maybe-overflow")
-        );
-      } else {
-        // Leaves should only be goals...
-        throw new Error(`Leaves should only be goals ${node}`);
-      }
-    }
-  );
-
-  const hiddenLeaves = _.concat(_.flatten(rest), others);
-  const argusViews = invertViewWithRoots(argusRecommendedLeaves, tree);
-  const otherViews = invertViewWithRoots(hiddenLeaves, tree);
-
-  const LeafElement = ({ leaf }: { leaf: TreeViewWithRoot }) => (
-    <DirRecursive level={[leaf.root]} getNext={mkGetChildren(leaf)} />
-  );
-
-  const recommendedSortedViews = tree.sortByRecommendedOrder(
-    _.flatten(argusViews),
-    v => v.root
-  );
-  const recommended = _.map(recommendedSortedViews, (leaf, i) => (
-    <LeafElement key={i} leaf={leaf} />
-  ));
-
+  const argusViews = mkTopLevel(recommended);
   const fallbacks =
     others.length === 0 ? null : (
       <CollapsibleElement
-        info={<span>Other failures ...</span>}
-        Children={() =>
-          _.map(otherViews, (leaf, i) => <LeafElement key={i} leaf={leaf} />)
-        }
+        info={<span id="hidden-failure-list">Other failures ...</span>}
+        Children={() => mkTopLevel(others)}
       />
     );
 
@@ -265,9 +202,48 @@ const BottomUp = () => {
 
   return (
     <TreeAppContext.TreeRenderContext.Provider value={renderParams}>
-      {recommended}
+      <div id="recommended-failure-list">{argusViews}</div>
       {fallbacks}
     </TreeAppContext.TreeRenderContext.Provider>
+  );
+};
+
+const BottomUp = () => {
+  const tree = useContext(TreeAppContext.TreeContext)!;
+  const evaluationMode =
+    useContext(AppContext.ConfigurationContext)?.evalMode ?? "release";
+
+  const liftTo = (idx: ProofNodeIdx, target: "Goal" | "Candidate") => {
+    let curr: ProofNodeIdx | undefined = idx;
+    while (curr !== undefined && !(target in tree.node(curr))) {
+      curr = tree.parent(curr);
+    }
+    return curr;
+  };
+
+  const H = treeHeuristic(tree);
+
+  const leaves = _.uniq(
+    _.compact(_.map(tree.errorLeaves(), n => liftTo(n, "Goal")))
+  );
+
+  const failedGroups = _.groupBy(leaves, leaf => tree.parent(leaf));
+  const [argusRecommendedLeaves, hiddenLeaves] = H.partition(failedGroups);
+  const sortViews = (views: TreeViewWithRoot[]) => H.rank(views, v => v.root);
+  const argusViews = sortViews(
+    invertViewWithRoots(argusRecommendedLeaves, tree)
+  );
+  const otherViews = sortViews(invertViewWithRoots(hiddenLeaves, tree));
+
+  // A bit of a hack to allow the evaluation script to render the bottom up view differently.
+  return evaluationMode === "release" ? (
+    <RenderBottomUpViews recommended={argusViews} others={otherViews} />
+  ) : (
+    <RenderEvaluationViews
+      recommended={argusViews}
+      others={otherViews}
+      mode={evaluationMode}
+    />
   );
 };
 

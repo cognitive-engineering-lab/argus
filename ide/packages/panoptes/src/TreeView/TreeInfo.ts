@@ -232,56 +232,6 @@ export class TreeInfo {
     return errorLeaves;
   }
 
-  public sortByRecommendedOrder<T>(data: T[], f: (t: T) => ProofNodeIdx): T[] {
-    const sortErrorsFirst = (t: T) => {
-      const leaf = f(t);
-      switch (this.nodeResult(leaf)) {
-        case "no":
-          return 0;
-        case "maybe-overflow":
-        case "maybe-ambiguity":
-          return 1;
-        case "yes":
-          return 2;
-      }
-    };
-
-    const sortWeightPaths = (t: T) => {
-      const leaf = f(t);
-      const pathToRoot = this.pathToRoot(leaf);
-      const len = pathToRoot.path.length;
-      const numVars = _.reduce(
-        pathToRoot.path,
-        (sum, k) => sum + this.inferVars(k),
-        0
-      );
-
-      return numVars / len;
-    };
-
-    const bubbleTraitClauses = (t: T) => {
-      const leaf = f(t);
-      const n = this.node(leaf);
-      if ("Goal" in n && isTraitClause(this.goal(n.Goal).value.predicate)) {
-        return 0;
-      }
-      return 1;
-    };
-
-    const recommendedOrder = _.sortBy(data, [
-      bubbleTraitClauses,
-      sortErrorsFirst,
-      sortWeightPaths,
-    ]);
-
-    return recommendedOrder;
-  }
-
-  public errorLeavesRecommendedOrder(): ProofNodeIdx[] {
-    const viewLeaves = this.errorLeaves();
-    return this.sortByRecommendedOrder(viewLeaves, _.identity);
-  }
-
   public inferVars(n: ProofNodeIdx): number {
     const current = this.numInferVars.get(n);
     if (current !== undefined) {

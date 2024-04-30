@@ -21,7 +21,7 @@ cargo test -p argus-lib --lib export_bindings --locked
 [tasks.evaluation]
 script = """
 cd ide && depot build && cd ..
-node ide/packages/evaluation/dist/evaluation.cjs ./data
+node ide/packages/evaluation/dist/evaluation.cjs -s ./data
 python3 -m webbrowser http://localhost:8080/eval
 ./scripts/evaluation.scm
 """
