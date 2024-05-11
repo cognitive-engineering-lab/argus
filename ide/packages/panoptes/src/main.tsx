@@ -1,8 +1,4 @@
-import {
-  ConfigConsts,
-  PanoptesConfig,
-  maybeStringToConfig,
-} from "@argus/common/lib";
+import { ConfigConsts, maybeStringToConfig } from "@argus/common/lib";
 import * as React from "react";
 import * as ReactDOM from "react-dom/client";
 
@@ -29,6 +25,6 @@ window.initializeArgusBlocks = (root: HTMLElement) => {
 
 window.addEventListener(
   "load",
-  () => initializeArgusBlocks(document.body),
+  () => window.initializeArgusBlocks(document.body),
   false
 );

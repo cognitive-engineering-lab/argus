@@ -180,6 +180,12 @@ export type CallArgus = <T extends ArgusCliOptions>(
 
 // Type predicates (these shouldn't really exist ...)
 
+export function isSysMsg(
+  obj: any
+): obj is SystemToPanoptesMsg<SystemToPanoptesCmds> {
+  return typeof obj === "object" && "command" in obj;
+}
+
 export function isSysMsgOpenError(
   msg: SystemToPanoptesMsg<SystemToPanoptesCmds>
 ): msg is SystemToPanoptesMsg<"open-error"> {

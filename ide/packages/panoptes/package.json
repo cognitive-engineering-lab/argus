@@ -1,6 +1,7 @@
 {
   "name": "@argus/panoptes",
   "version": "0.0.1",
+  "main": "dist/panoptes.iife.js",
   "depot": {
     "platform": "browser"
   },

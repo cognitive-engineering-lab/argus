@@ -10,8 +10,6 @@ import {
 } from "@argus/common/bindings";
 import _ from "lodash";
 
-import { isHiddenObl, isTraitClause } from "../utilities/func";
-
 type MultiRecord<K extends number, T> = Record<K, T[]>;
 
 type Direction = "to-root" | "from-root";

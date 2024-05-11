@@ -38,7 +38,6 @@ import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
 import {
   Angled,
-  CBraced,
   CommaSeparated,
   DBraced,
   Parenthesized,
