@@ -3,7 +3,6 @@ import {
   EvaluationMode,
   PanoptesConfig,
   SystemSpec,
-  isSysMsg,
   isSysMsgOpenError,
   isSysMsgOpenFile,
   isSysMsgReset,
@@ -55,7 +54,6 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
       payload: any;
     } = e.data;
 
-    if (!isSysMsg(payload)) return;
     console.debug("Received message from system", payload);
 
     if (isSysMsgOpenError(payload)) {
