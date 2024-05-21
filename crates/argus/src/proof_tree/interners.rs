@@ -123,8 +123,10 @@ impl Interners {
       ProbeKind::UpcastProjectionCompatibility => {
         self.intern_can_string("upcase-proj-compat")
       }
-      ProbeKind::MiscCandidate { .. } => self.intern_can_string("misc"),
       ProbeKind::TraitCandidate { source, .. } => match source {
+        CandidateSource::CoherenceUnknowable => {
+          self.intern_can_string("coherence-unknowable")
+        }
         CandidateSource::BuiltinImpl(_built_impl) => {
           self.intern_can_string("builtin")
         }
@@ -133,9 +135,15 @@ impl Interners {
         CandidateSource::ParamEnv(idx) => self.intern_can_param_env(idx),
 
         CandidateSource::Impl(def_id) => {
-          self.intern_impl(candidate.infcx(), def_id)
+          self.intern_impl(candidate.goal().infcx(), def_id)
         }
       },
+      ProbeKind::ShadowedEnvProbing => {
+        self.intern_can_string("shadowed-env-probing")
+      }
+      ProbeKind::OpaqueTypeStorageLookup { .. } => {
+        self.intern_can_string("opaque-type-storage-lookup")
+      }
     };
 
     Node::Candidate(can_idx)

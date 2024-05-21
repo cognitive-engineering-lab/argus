@@ -9,8 +9,7 @@ use rustc_infer::{
   traits::{ObligationInspector, PredicateObligation},
 };
 use rustc_middle::ty::{
-  self, Predicate, Ty, TyCtxt, TypeFoldable, TypeFolder, TypeSuperFoldable,
-  TypeckResults,
+  self, Predicate, Ty, TyCtxt, TypeFoldable, TypeckResults,
 };
 use rustc_query_system::ich::StableHashingContext;
 use rustc_span::FileName;
@@ -20,7 +19,6 @@ use serde::Serialize;
 
 use crate::{
   analysis::{EvaluationResult, FulfillmentData},
-  rustc,
   serialize::{
     safe::TraitRefPrintOnlyTraitPathDef, serialize_to_value,
     ty::PredicateObligationDef,
@@ -309,13 +307,6 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
     let tcx = *self;
     let impl_def_id = def_id;
 
-    // From [`rustc_trait_selection::traits::specialize::to_pretty_impl_header`]
-    log::debug!(
-      "Serializing this impl header\n{}",
-      rustc::to_pretty_impl_header(tcx, impl_def_id)
-        .unwrap_or(String::from("{failed to get header}"))
-    );
-
     let trait_ref = tcx.impl_trait_ref(impl_def_id)?.instantiate_identity();
     let args = ty::GenericArgs::identity_for_item(tcx, impl_def_id);
 
@@ -446,16 +437,14 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     &self,
     obligation: &PredicateObligation<'tcx>,
   ) -> ObligationNecessity {
-    use rustc_infer::traits::ObligationCauseCode::*;
-    use ObligationNecessity::*;
+    use rustc_infer::traits::ObligationCauseCode;
+    use ObligationNecessity as ON;
 
     let p = &obligation.predicate;
     let code = obligation.cause.code();
 
-    if matches!(code, SizedReturnType) && p.is_lhs_unit() {
-      No
-    } else if matches!(code, MiscObligation) {
-      No
+    if matches!(code, ObligationCauseCode::SizedReturnType) && p.is_lhs_unit() {
+      ON::No
     } else {
       self.guess_predicate_necessity(p)
     }
@@ -546,64 +535,6 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     {
       Ok((_, c)) => Ok(c),
       _ => Err(NoSolution),
-    }
-  }
-}
-
-mod ty_eraser {
-  use super::*;
-
-  pub(super) struct TyVarEraserVisitor<'a, 'tcx: 'a> {
-    pub infcx: &'a InferCtxt<'tcx>,
-  }
-
-  // FIXME: these placeholders are a huge hack, there's definitely
-  // something better we could do here.
-  macro_rules! gen_placeholders {
-    ($( [$f:ident $n:literal],)*) => {$(
-      fn $f(&self) -> Ty<'tcx> {
-        Ty::new_placeholder(self.infcx.tcx, ty::PlaceholderType {
-          universe: self.infcx.universe(),
-          bound: ty::BoundTy {
-            var: ty::BoundVar::from_u32(ty::BoundVar::MAX_AS_U32 - $n),
-            kind: ty::BoundTyKind::Anon,
-          },
-        })
-      })*
-    }
-  }
-
-  impl<'a, 'tcx: 'a> TyVarEraserVisitor<'a, 'tcx> {
-    gen_placeholders! {
-      [ty_placeholder    0],
-      [int_placeholder   1],
-      [float_placeholder 2],
-    }
-  }
-
-  impl<'tcx> TypeFolder<TyCtxt<'tcx>> for TyVarEraserVisitor<'_, 'tcx> {
-    fn interner(&self) -> TyCtxt<'tcx> {
-      self.infcx.tcx
-    }
-
-    fn fold_ty(&mut self, ty: Ty<'tcx>) -> Ty<'tcx> {
-      // HACK: I'm not sure if replacing type variables with
-      // an anonymous placeholder is the best idea. It is *an*
-      // idea, certainly. But this should only happen before hashing.
-      match ty.kind() {
-        ty::Infer(ty::TyVar(_)) => self.ty_placeholder(),
-        ty::Infer(ty::IntVar(_)) => self.int_placeholder(),
-        ty::Infer(ty::FloatVar(_)) => self.float_placeholder(),
-        _ => ty.super_fold_with(self),
-      }
-    }
-
-    fn fold_binder<T>(&mut self, t: ty::Binder<'tcx, T>) -> ty::Binder<'tcx, T>
-    where
-      T: TypeFoldable<TyCtxt<'tcx>>,
-    {
-      let u = self.infcx.tcx.anonymize_bound_vars(t);
-      u.super_fold_with(self)
     }
   }
 }

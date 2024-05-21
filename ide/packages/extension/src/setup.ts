@@ -112,7 +112,9 @@ const checkVersionAndInstall = async (
       cargo,
       [...cargoArgs, "argus", "-V"],
       "Waiting for Argus...",
-      { cwd: workspaceRoot }
+      {
+        cwd: workspaceRoot,
+      }
     );
   } catch (e) {
     version = "";

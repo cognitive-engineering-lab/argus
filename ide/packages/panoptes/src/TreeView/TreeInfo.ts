@@ -10,6 +10,8 @@ import {
 } from "@argus/common/bindings";
 import _ from "lodash";
 
+import { isHiddenObl } from "../utilities/func";
+
 type MultiRecord<K extends number, T> = Record<K, T[]>;
 
 type Direction = "to-root" | "from-root";
@@ -45,6 +47,7 @@ function makeTreeView(
     let newPrev = prev;
     switch (cf(curr)) {
       case "keep": {
+        console.debug("keep", curr);
         if (prev !== undefined) {
           addChildRel(prev, curr);
         }
@@ -52,14 +55,17 @@ function makeTreeView(
         break;
       }
       case "remove-node":
+        console.debug("remove-node", curr);
         break;
       case "remove-tree":
+        console.debug("remove-tree", curr);
         return;
     }
     _.forEach(kids, kid => iterate(kid, newPrev));
   };
 
   iterate(root);
+  console.debug(`CF for root ${root} ${cf(root)}`);
 
   if (children[root] !== undefined) {
     return {
@@ -90,9 +96,9 @@ export class TreeInfo {
 
       const node = tree.nodes[n];
       if ("Goal" in node) {
-        return "keep";
-        // const goalData = tree.goals[node.Goal];
+        const goalData = tree.goals[node.Goal];
         // const result = tree.results[goalData.result];
+        return "keep";
         // return isHiddenObl({ necessity: goalData.necessity, result })
         //   ? "remove-tree"
         //   : "keep";

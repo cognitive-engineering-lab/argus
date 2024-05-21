@@ -1,14 +1,14 @@
 export interface RootCause {
   workspace: string;
-  causes: [
-    {
-      file: string;
-      message: string;
-    }
-  ];
+  causes: FileCause[];
 }
 
-export const rootCauses = [
+interface FileCause {
+  file: string;
+  message: string;
+}
+
+export const rootCauses: RootCause[] = [
   {
     workspace: "diesel",
     causes: [

@@ -1,4 +1,4 @@
-use std::{fmt::Write, io::Write as IoWrite};
+use std::fmt::Write;
 
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::ty::Predicate;
@@ -21,7 +21,7 @@ pub fn dump_proof_tree<'tcx>(
     Ok(())
   };
 
-    log::debug!("TREE DUMP\nFor {:?}\n{:?}", goal, Formatter(&do_format));
+  log::debug!("TREE DUMP\nFor {:?}\n{:?}", goal, Formatter(&do_format));
 }
 
 struct Formatter<'a>(

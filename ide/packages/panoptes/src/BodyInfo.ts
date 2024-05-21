@@ -17,7 +17,7 @@ class BodyInfo {
   constructor(
     private readonly oib: ObligationsInBody,
     readonly idx: number,
-    readonly viewHiddenObligations: boolean = false
+    readonly viewHiddenObligations: boolean = true
   ) {}
 
   get hash(): BodyHash {

@@ -1,7 +1,6 @@
 use std::{env, fs, io, panic, path::Path, process::Command, sync::Arc};
 
 use anyhow::{Context, Result};
-use rustc_errors::DiagCtxt;
 use rustc_hir::BodyId;
 use rustc_middle::ty::TyCtxt;
 use rustc_span::source_map::FileLoader;
@@ -13,7 +12,6 @@ use rustc_utils::source_map::{
 
 use crate::{
   analysis,
-  emitter::SilentEmitter,
   proof_tree::SerializedTree,
   types::{
     intermediate::{Forgettable, FullData},

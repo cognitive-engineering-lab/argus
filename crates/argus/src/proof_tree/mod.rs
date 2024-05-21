@@ -1,6 +1,6 @@
 //! Proof tree types sent to the Argus frontend.
 
-pub mod ext;
+pub(self) mod format;
 pub(self) mod interners;
 pub(super) mod serialize;
 pub mod topology;

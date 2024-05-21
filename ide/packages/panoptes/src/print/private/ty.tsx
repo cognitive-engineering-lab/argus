@@ -1,5 +1,6 @@
 import {
   Abi,
+  AliasTerm,
   AliasTy,
   AliasTyKind,
   AssocItem,
@@ -79,6 +80,9 @@ export const PrintTyKind = ({ o }: { o: TyKind }) => {
     return <PrintUintTy o={o.Uint} />;
   } else if ("Float" in o) {
     return <PrintFloatTy o={o.Float} />;
+  } else if ("Pat" in o) {
+    const [ty] = o.Pat;
+    return <PrintTy o={ty} />;
   } else if ("Adt" in o) {
     return <PrintDefPath o={o.Adt} />;
   } else if ("Array" in o) {
@@ -230,6 +234,10 @@ export const PrintAliasTyKind = ({ o }: { o: AliasTyKind }) => {
   }
 };
 
+export const PrintAliasTerm = ({ o }: { o: AliasTerm }) => {
+  return <PrintDefPath o={o} />;
+};
+
 export const PrintAliasTy = ({ o }: { o: AliasTy }) => {
   switch (o.type) {
     case "PathDef":
@@ -304,7 +312,7 @@ export const PrintPolyFnSig = ({ o }: { o: PolyFnSig }) => {
   };
 
   const inner = (o: FnSig) => {
-    const unsafetyStr = o.unsafety === "Unsafe" ? "unsafe " : null;
+    const unsafetyStr = o.safety === "Unsafe" ? "unsafe " : null;
     const abi = <PrintAbi abi={o.abi} />;
     const [inputs, output] = fnInputsAndOutput(o.inputs_and_output);
     return (
@@ -372,8 +380,6 @@ export const PrintInferTy = ({ o }: { o: InferTy }) => {
       ? () => <DBraced>float</DBraced>
       : o === "Unresolved"
       ? () => "_"
-      : "Named" in o
-      ? () => <PrintDefPath o={o.Named[1]} />
       : "Unnamed" in o
       ? () => <PrintDefPath o={o.Unnamed} />
       : "SourceInfo" in o

@@ -410,6 +410,12 @@ impl From<Hash64> for ObligationHash {
   }
 }
 
+impl From<&ObligationHash> for ObligationHash {
+  fn from(value: &Self) -> Self {
+    *value
+  }
+}
+
 impl<U: Into<ObligationHash>, T: ToSpan> ToTarget for (U, T) {
   fn to_target(self, tcx: TyCtxt) -> Result<Target> {
     self.1.to_span(tcx).map(|span| Target {
@@ -540,6 +546,7 @@ pub(super) mod intermediate {
     }
   }
 
+  #[allow(dead_code)]
   pub trait ForgetProvenance {
     type Target;
     fn forget(self) -> Self::Target;
@@ -588,6 +595,7 @@ pub(super) mod intermediate {
     }
   }
 
+  #[allow(dead_code)]
   pub struct ErrorAssemblyCtx<'a, 'tcx: 'a> {
     pub tcx: TyCtxt<'tcx>,
     pub body_id: BodyId,

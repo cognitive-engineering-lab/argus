@@ -26,6 +26,7 @@ extern crate rustc_infer;
 extern crate rustc_interface;
 extern crate rustc_macros;
 extern crate rustc_middle;
+extern crate rustc_next_trait_solver;
 extern crate rustc_query_system;
 extern crate rustc_serialize;
 extern crate rustc_session;

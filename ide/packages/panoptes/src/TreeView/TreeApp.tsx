@@ -33,11 +33,13 @@ const TreeApp = ({
   );
 
   if (tree === undefined) {
+    console.error("Returned tree `undefined`");
     return <ErrorMessage />;
   }
 
   const treeInfo = TreeInfo.new(tree, showHidden);
   if (treeInfo === undefined) {
+    console.error("Failed to create tree view");
     return <ErrorMessage />;
   }
 

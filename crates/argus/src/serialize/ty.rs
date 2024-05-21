@@ -1,5 +1,5 @@
 use rustc_data_structures::fx::FxIndexMap;
-use rustc_hir::{self as hir, def::DefKind, def_id::DefId, LangItem, Unsafety};
+use rustc_hir::{self as hir, def::DefKind, def_id::DefId, LangItem, Safety};
 use rustc_infer::traits::{ObligationCause, PredicateObligation};
 use rustc_middle::{traits::util::supertraits_for_pretty_printing, ty};
 use rustc_span::symbol::{kw, Symbol};
@@ -81,6 +81,12 @@ pub enum TyKindDef<'tcx> {
     #[cfg_attr(feature = "testing", ts(type = "FloatTy"))]
     ty::FloatTy,
   ),
+  Pat(
+    #[serde(with = "TyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+    ty::Ty<'tcx>,
+    #[serde(skip)] ty::Pattern<'tcx>,
+  ),
   Adt(path::PathDefWithArgs<'tcx>),
   Str,
   Array(
@@ -159,6 +165,7 @@ impl<'tcx> From<&ty::TyKind<'tcx>> for TyKindDef<'tcx> {
       ty::TyKind::Uint(v) => Self::Uint(*v),
       ty::TyKind::Float(v) => Self::Float(*v),
       ty::TyKind::Str => Self::Str,
+      ty::TyKind::Pat(ty, pat) => Self::Pat(*ty, *pat),
       ty::TyKind::Adt(def, args) => {
         Self::Adt(path::PathDefWithArgs::new(def.did(), args))
       }
@@ -232,13 +239,13 @@ pub enum AliasTyKindDef<'tcx> {
 }
 
 impl<'tcx> AliasTyKindDef<'tcx> {
-  pub fn new(kind: ty::AliasKind, ty: ty::AliasTy<'tcx>) -> Self {
+  pub fn new(kind: ty::AliasTyKind, ty: ty::AliasTy<'tcx>) -> Self {
     let infcx = get_dynamic_ctx();
     match (kind, ty) {
       (
-        ty::AliasKind::Projection
-        | ty::AliasKind::Inherent
-        | ty::AliasKind::Weak,
+        ty::AliasTyKind::Projection
+        | ty::AliasTyKind::Inherent
+        | ty::AliasTyKind::Weak,
         ref data,
       ) => {
         if !(infcx.should_print_verbose() || with_no_queries())
@@ -253,7 +260,7 @@ impl<'tcx> AliasTyKindDef<'tcx> {
           Self::AliasTy { data: *data }
         }
       }
-      (ty::AliasKind::Opaque, ty::AliasTy { def_id, args, .. }) => {
+      (ty::AliasTyKind::Opaque, ty::AliasTy { def_id, args, .. }) => {
         // We use verbose printing in 'NO_QUERIES' mode, to
         // avoid needing to call `predicates_of`. This should
         // only affect certain debug messages (e.g. messages printed
@@ -605,9 +612,9 @@ pub struct FnSigDef<'tcx> {
   pub inputs_and_output: &'tcx ty::List<ty::Ty<'tcx>>,
   pub c_variadic: bool,
 
-  #[serde(with = "UnsafetyDef")]
-  #[cfg_attr(feature = "testing", ts(type = "Unsafety"))]
-  pub unsafety: Unsafety,
+  #[serde(with = "SafetyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Safety"))]
+  pub safety: Safety,
 
   #[serde(with = "AbiDef")]
   #[cfg_attr(feature = "testing", ts(type = "Abi"))]
@@ -615,12 +622,12 @@ pub struct FnSigDef<'tcx> {
 }
 
 #[derive(Serialize)]
-#[serde(remote = "Unsafety")]
+#[serde(remote = "Safety")]
 #[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export, rename = "Unsafety"))]
-pub enum UnsafetyDef {
+#[cfg_attr(feature = "testing", ts(export, rename = "Safety"))]
+pub enum SafetyDef {
   Unsafe,
-  Normal,
+  Safe,
 }
 
 #[derive(Serialize)]
@@ -671,6 +678,27 @@ pub enum DynKindDef {
 pub enum MovabilityDef {
   Static,
   Movable,
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "AliasTerm"))]
+pub struct AliasTermDef<'tcx>(path::PathDefWithArgs<'tcx>);
+
+impl<'tcx> AliasTermDef<'tcx> {
+  pub fn new(value: &ty::AliasTerm<'tcx>) -> Self {
+    Self(path::PathDefWithArgs::new(value.def_id, value.args))
+  }
+
+  pub fn serialize<S>(
+    value: &ty::AliasTerm<'tcx>,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    Self::new(value).serialize(s)
+  }
 }
 
 #[derive(Serialize)]
@@ -1003,19 +1031,14 @@ pub enum GenericArgKindDef<'tcx> {
   ),
 }
 
-// TODO: gavinleroy
+// TODO: gavinleroy we used to have a Named inference types (coming from binders) but that
+// isn't the case anymore. Can we do any better or is the "Unnamed" variant sufficient for now?
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "InferTy"))]
 pub enum InferTyDef<'tcx> {
   IntVar,
   FloatVar,
-  Named(
-    #[serde(with = "SymbolDef")]
-    #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
-    Symbol,
-    path::PathDefNoArgs<'tcx>,
-  ),
   Unnamed(path::PathDefNoArgs<'tcx>),
   SourceInfo(String),
   Unresolved,
@@ -1023,10 +1046,6 @@ pub enum InferTyDef<'tcx> {
 
 impl<'tcx> InferTyDef<'tcx> {
   pub fn new(value: &ty::InferTy) -> Self {
-    use rustc_infer::infer::type_variable::{
-      TypeVariableOrigin, TypeVariableOriginKind::*,
-    };
-
     // See: `ty_getter` in `printer.ty_infer_name_resolver = Some(Box::new(ty_getter))`
     // from: `rustc_infer::infer::error_reporting::need_type_info.rs`
 
@@ -1041,28 +1060,27 @@ impl<'tcx> InferTyDef<'tcx> {
 
     let ty = ty::Ty::new_infer(tcx, root_value);
 
-    match infcx.type_var_origin(ty) {
-      Some(TypeVariableOrigin {
-        kind: TypeParameterDefinition(name, def_id),
-        ..
-      }) => Self::Named(name, path::PathDefNoArgs::new(def_id)),
-
-      Some(TypeVariableOrigin { span, .. }) if !span.is_dummy() => {
-        let span = span.source_callsite();
-        if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(span) {
-          Self::SourceInfo(snippet)
-        } else {
-          Self::Unresolved
-        }
+    if let Some(origin) = infcx.type_var_origin(ty)
+      && let Some(def_id) = origin.param_def_id
+    {
+      Self::Unnamed(path::PathDefNoArgs::new(def_id))
+    } else if let Some(origin) = infcx.type_var_origin(ty)
+      && !origin.span.is_dummy()
+    {
+      let span = origin.span.source_callsite();
+      if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(span) {
+        Self::SourceInfo(snippet)
+      } else {
+        Self::Unresolved
       }
-
-      _ => match value {
+    } else {
+      match value {
         ty::InferTy::IntVar(_) | ty::InferTy::FreshIntTy(_) => Self::IntVar,
         ty::InferTy::FloatVar(_) | ty::InferTy::FreshFloatTy(_) => {
           Self::FloatVar
         }
         ty::InferTy::TyVar(_) | ty::InferTy::FreshTy(_) => Self::Unresolved,
-      },
+      }
     }
   }
 
@@ -1285,9 +1303,9 @@ pub enum PredicateKindDef<'tcx> {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "NormalizesTo"))]
 pub struct NormalizesToDef<'tcx> {
-  #[serde(with = "AliasTyDef")]
-  #[cfg_attr(feature = "testing", ts(type = "AliasTy"))]
-  pub alias: ty::AliasTy<'tcx>,
+  #[serde(with = "AliasTermDef")]
+  #[cfg_attr(feature = "testing", ts(type = "AliasTerm"))]
+  pub alias: ty::AliasTerm<'tcx>,
 
   #[serde(with = "TermDef")]
   #[cfg_attr(feature = "testing", ts(type = "Term"))]
@@ -1644,9 +1662,9 @@ impl<'tcx> TyOutlivesRegionDef<'tcx> {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "ProjectionPredicate"))]
 pub struct ProjectionPredicateDef<'tcx> {
-  #[serde(with = "AliasTyDef")]
-  #[cfg_attr(feature = "testing", ts(type = "AliasTy"))]
-  pub projection_ty: ty::AliasTy<'tcx>,
+  #[serde(with = "AliasTermDef")]
+  #[cfg_attr(feature = "testing", ts(type = "AliasTerm"))]
+  pub projection_term: ty::AliasTerm<'tcx>,
 
   #[serde(with = "TermDef")]
   #[cfg_attr(feature = "testing", ts(type = "Term"))]

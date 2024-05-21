@@ -5,11 +5,9 @@ use rustc_data_structures::fx::{FxHashMap as HashMap, FxIndexMap};
 use rustc_hir::{self as hir, intravisit::Map, BodyId, HirId};
 use rustc_infer::{
   infer::{canonical::OriginalQueryValues, InferCtxt, InferOk},
-  traits::{self, ObligationCauseCode, PredicateObligation},
+  traits::{self, PredicateObligation},
 };
-use rustc_middle::ty::{
-  self, ParamEnvAnd, ToPredicate, Ty, TyCtxt, TypeckResults,
-};
+use rustc_middle::ty::{self, ParamEnvAnd, Ty, TyCtxt, TypeckResults, Upcast};
 use rustc_span::Span;
 use rustc_utils::source_map::range::CharRange;
 
@@ -19,10 +17,7 @@ use super::{
   EvaluationResult,
 };
 use crate::{
-  ext::{
-    EvaluationResultExt, InferCtxtExt, PredicateExt, TyCtxtExt,
-    TypeckResultsExt,
-  },
+  ext::{InferCtxtExt, PredicateExt, TyCtxtExt, TypeckResultsExt},
   types::{intermediate::*, *},
 };
 
@@ -441,16 +436,8 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           );
         }
 
-        let is_necessary =
         // Bounds for extension method calls are always trait predicates.
-          fdata.obligation.predicate.is_trait_predicate() &&
-          // FIXME: Obligations for method calls are registered under 'misc,'
-          // this of course could change. There should be a stronger way
-          // to gather the attempted traits.
-          matches!(
-            fdata.obligation.cause.code(),
-            ObligationCauseCode::MiscObligation
-          );
+        let is_necessary = fdata.obligation.predicate.is_trait_predicate();
 
         is_necessary.then(|| {
           (idx, expect_trait_ref(&fdata.obligation.predicate).def_id())
@@ -555,8 +542,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           for trait_ref in trait_candidates.iter() {
             let trait_ref = trait_ref.with_self_ty(tcx, self_ty);
 
-            let predicate: ty::Predicate<'tcx> =
-              ty::Binder::dummy(trait_ref).to_predicate(self.tcx);
+            let predicate: ty::Predicate<'tcx> = trait_ref.upcast(self.tcx);
             let obligation = traits::Obligation::new(
               tcx,
               o.cause.clone(),
@@ -662,7 +648,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         anyhow::ensure!(exists, "synthetic data not found for {:?}", obl)
       } else if matches!(obl.necessity, ObligationNecessity::Yes)
         || (matches!(obl.necessity, ObligationNecessity::OnError)
-          && obl.result.is_no())
+          && obl.result.is_err())
       {
         let exists = self.full_data.iter().any(|fdata| fdata.hash == obl.hash);
 
@@ -737,6 +723,10 @@ mod tree_search {
   impl<'tcx> ProofTreeVisitor<'tcx> for BranchlessSearch {
     type Result = ControlFlow<()>;
 
+    fn span(&self) -> Span {
+      rustc_span::DUMMY_SP
+    }
+
     fn visit_goal(&mut self, goal: &InspectGoal<'_, 'tcx>) -> Self::Result {
       let infcx = goal.infcx();
       let predicate = &goal.goal().predicate;
@@ -748,9 +738,9 @@ mod tree_search {
 
       let candidates = goal.candidates();
       if 1 == candidates.len() {
-        ControlFlow::Break(())
+        candidates[0].visit_nested_in_probe(self)
       } else {
-        candidates[0].visit_nested(self)
+        ControlFlow::Break(())
       }
     }
   }

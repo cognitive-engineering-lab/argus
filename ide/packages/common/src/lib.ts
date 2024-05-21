@@ -180,52 +180,50 @@ export type CallArgus = <T extends ArgusCliOptions>(
 
 // Type predicates (these shouldn't really exist ...)
 
-export function isSysMsg(
-  obj: any
-): obj is SystemToPanoptesMsg<SystemToPanoptesCmds> {
-  return typeof obj === "object" && "command" in obj;
+function objWCmd(m: any): m is { command: string } {
+  return typeof m === "object" && "command" in m;
 }
 
 export function isSysMsgOpenError(
-  msg: SystemToPanoptesMsg<SystemToPanoptesCmds>
+  msg: unknown
 ): msg is SystemToPanoptesMsg<"open-error"> {
-  return msg.command === "open-error";
+  return objWCmd(msg) && msg.command === "open-error";
 }
 
 export function isSysMsgOpenFile(
-  msg: SystemToPanoptesMsg<SystemToPanoptesCmds>
+  msg: unknown
 ): msg is SystemToPanoptesMsg<"open-file"> {
-  return msg.command === "open-file";
+  return objWCmd(msg) && msg.command === "open-file";
 }
 
 export function isSysMsgReset(
-  msg: SystemToPanoptesMsg<SystemToPanoptesCmds>
+  msg: unknown
 ): msg is SystemToPanoptesMsg<"reset"> {
-  return msg.command === "reset";
+  return objWCmd(msg) && msg.command === "reset";
 }
 
 export function isPanoMsgTree(
-  msg: PanoptesToSystemMsg<PanoptesToSystemCmds>
+  msg: unknown
 ): msg is PanoptesToSystemMsg<"tree"> {
-  return msg.command === "tree";
+  return objWCmd(msg) && msg.command === "tree";
 }
 
 export function isPanoMsgObligations(
-  msg: PanoptesToSystemMsg<PanoptesToSystemCmds>
+  msg: unknown
 ): msg is PanoptesToSystemMsg<"obligations"> {
-  return msg.command === "obligations";
+  return objWCmd(msg) && msg.command === "obligations";
 }
 
 export function isPanoMsgAddHighlight(
-  msg: PanoptesToSystemMsg<PanoptesToSystemCmds>
+  msg: unknown
 ): msg is PanoptesToSystemMsg<"add-highlight"> {
-  return msg.command === "add-highlight";
+  return objWCmd(msg) && msg.command === "add-highlight";
 }
 
 export function isPanoMsgRemoveHighlight(
-  msg: PanoptesToSystemMsg<PanoptesToSystemCmds>
+  msg: unknown
 ): msg is PanoptesToSystemMsg<"remove-highlight"> {
-  return msg.command === "remove-highlight";
+  return objWCmd(msg) && msg.command === "remove-highlight";
 }
 
 export interface IssueOptions {
