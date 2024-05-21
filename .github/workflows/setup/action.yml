@@ -13,7 +13,7 @@ runs:
       shell: bash
 
     - name: Install Depot
-      run: cargo install --git https://github.com/cognitive-engineering-lab/depot.git depot-js
+      run: cargo install --git https://github.com/cognitive-engineering-lab/depot.git depot-js && depot setup
       shell: bash
 
     - name: Install Test Libraries
