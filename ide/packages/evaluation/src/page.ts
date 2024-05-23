@@ -746,7 +746,6 @@ export function webHtml(
   const config: PanoptesConfig = {
     type: "WEB_BUNDLE",
     target: findErrorTargetInBundles(bundles),
-    data: [[filename, bundles.map(b => b.body)]],
     closedSystem: bundles,
     evalMode,
   };

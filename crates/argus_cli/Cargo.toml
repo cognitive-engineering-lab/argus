@@ -11,8 +11,8 @@ license = "MIT"
 
 [dependencies]
 argus-lib = { version = "0.1.6", path = "../argus" }
-rustc_plugin = "=0.9.0-nightly-2024-01-24"
-rustc_utils = { version = "=0.9.0-nightly-2024-01-24", features = ["serde"] }
+rustc_plugin = "=0.10.0-nightly-2024-05-20"
+rustc_utils = { version = "=0.10.0-nightly-2024-05-20", features = ["serde"] }
 
 # For binaries
 log = "0.4"

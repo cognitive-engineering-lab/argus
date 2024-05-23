@@ -8,14 +8,12 @@ use std::{
 
 use argus_lib::{
   analysis,
-  emitter::SilentEmitter,
   ext::TyCtxtExt as ArgusTyCtxtExt,
   find_bodies::{find_bodies, find_enclosing_bodies},
   types::{ObligationHash, ToTarget},
 };
 use clap::{Parser, Subcommand};
 use fluid_let::fluid_set;
-use rustc_errors::DiagCtxt;
 use rustc_hir::BodyId;
 use rustc_interface::interface::Result as RustcResult;
 use rustc_middle::ty::TyCtxt;
@@ -37,6 +35,9 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub struct ArgusPluginArgs {
   #[clap(subcommand)]
   command: ArgusCommand,
+
+  #[clap(long)]
+  show_stderr: bool,
 }
 
 #[derive(Subcommand, Serialize, Deserialize)]
@@ -84,6 +85,7 @@ where
 }
 
 struct ArgusCallbacks<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>> {
+  show_stderr: bool,
   file: Option<PathBuf>,
   analysis: Option<A>,
   compute_target: Option<F>,
@@ -159,7 +161,7 @@ impl RustcPlugin for ArgusPlugin {
     plugin_args: ArgusPluginArgs,
   ) -> RustcResult<()> {
     use ArgusCommand::*;
-    match plugin_args.command {
+    match &plugin_args.command {
       Tree {
         file,
         id,
@@ -167,8 +169,6 @@ impl RustcPlugin for ArgusPlugin {
         start_column,
         end_line,
         end_column,
-
-        // TODO: we dono't yet handle synthetic queries in Argus.
         is_synthetic,
       } => {
         let is_synthetic = is_synthetic.unwrap_or(false);
@@ -177,12 +177,12 @@ impl RustcPlugin for ArgusPlugin {
             id,
             CharRange {
               start: CharPos {
-                line: start_line,
-                column: start_column,
+                line: *start_line,
+                column: *start_column,
               },
               end: CharPos {
-                line: end_line,
-                column: end_column,
+                line: *end_line,
+                column: *end_column,
               },
               filename: Filename::intern(&file),
             },
@@ -194,6 +194,7 @@ impl RustcPlugin for ArgusPlugin {
           analysis::tree,
           Some(PathBuf::from(&file)),
           compute_target,
+          &plugin_args,
           &compiler_args,
         );
         postprocess(v)
@@ -202,15 +203,22 @@ impl RustcPlugin for ArgusPlugin {
         let nothing = || None::<(ObligationHash, CharRange)>;
         let v = run(
           analysis::obligations,
-          file.map(PathBuf::from),
+          file.as_ref().map(PathBuf::from),
           nothing,
+          &plugin_args,
           &compiler_args,
         );
         postprocess(v)
       }
       Bundle => {
         let nothing = || None::<(ObligationHash, CharRange)>;
-        let v = run(analysis::bundle, None, nothing, &compiler_args);
+        let v = run(
+          analysis::bundle,
+          None,
+          nothing,
+          &plugin_args,
+          &compiler_args,
+        );
         postprocess(v)
       }
       _ => unreachable!(),
@@ -222,10 +230,12 @@ fn run<A: ArgusAnalysis, T: ToTarget>(
   analysis: A,
   file: Option<PathBuf>,
   compute_target: impl FnOnce() -> Option<T> + Send,
+  plugin_args: &ArgusPluginArgs,
   args: &[String],
 ) -> ArgusResult<Vec<A::Output>> {
   let mut callbacks = ArgusCallbacks {
     file,
+    show_stderr: plugin_args.show_stderr,
     analysis: Some(analysis),
     compute_target: Some(compute_target),
     result: Vec::default(),
@@ -275,18 +285,17 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
   rustc_driver::Callbacks for ArgusCallbacks<A, T, F>
 {
   fn config(&mut self, config: &mut rustc_interface::Config) {
-    config.parse_sess_created = Some(Box::new(|sess| {
-      // // Create a new emitter writer which consumes *silently* all
-      // // errors. There most certainly is a *better* way to do this,
-      // // if you, the reader, know what that is, please open an issue :)
-      // let fallback_bundle = rustc_errors::fallback_fluent_bundle(
-      //   rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
-      //   false,
-      // );
-      // let emitter = HumanEmitter::new(Box::new(io::sink()), fallback_bundle);
-      // sess.dcx = DiagCtxt::with_emitter(Box::new(emitter));
+    if self.show_stderr {
+      return;
+    }
 
-      sess.dcx = DiagCtxt::with_emitter(SilentEmitter::boxed());
+    config.psess_created = Some(Box::new(|sess| {
+      let fallback_bundle = rustc_errors::fallback_fluent_bundle(
+        rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
+        false,
+      );
+
+      sess.dcx.make_silent(fallback_bundle, None, false);
     }));
   }
 

@@ -1,11 +1,11 @@
-use std::{collections::HashSet, ops::ControlFlow};
+use std::collections::HashSet;
 
 use anyhow::{bail, Result};
-use ext::CandidateExt;
 use index_vec::IndexVec;
 use rustc_hir::def_id::DefId;
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::ty::Predicate;
+use rustc_span::Span;
 use rustc_trait_selection::{
   solve::inspect::{InspectGoal, ProofTreeInferCtxtExt, ProofTreeVisitor},
   traits::solve,
@@ -14,7 +14,6 @@ use rustc_trait_selection::{
 use super::{interners::Interners, *};
 
 pub struct SerializedTreeVisitor {
-  pub def_id: DefId,
   pub root: Option<ProofNodeIdx>,
   pub previous: Option<ProofNodeIdx>,
   pub nodes: IndexVec<ProofNodeIdx, Node>,
@@ -25,9 +24,8 @@ pub struct SerializedTreeVisitor {
 }
 
 impl SerializedTreeVisitor {
-  pub fn new(def_id: DefId) -> Self {
+  pub fn new() -> Self {
     SerializedTreeVisitor {
-      def_id,
       root: None,
       previous: None,
       nodes: IndexVec::default(),
@@ -119,12 +117,13 @@ impl SerializedTreeVisitor {
 }
 
 impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
-  type BreakTy = !;
+  type Result = ();
 
-  fn visit_goal(
-    &mut self,
-    goal: &InspectGoal<'_, 'tcx>,
-  ) -> ControlFlow<Self::BreakTy> {
+  fn span(&self) -> Span {
+    rustc_span::DUMMY_SP
+  }
+
+  fn visit_goal(&mut self, goal: &InspectGoal<'_, 'tcx>) -> Self::Result {
     let here_node = self.interners.mk_goal_node(goal);
     let here_idx = self.nodes.push(here_node.clone());
 
@@ -153,32 +152,29 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
     };
 
     for c in goal.candidates() {
-      if !c.is_informative_probe() {
-        continue;
-      }
-
       let here_candidate = self.interners.mk_candidate_node(&c);
       let candidate_idx = self.nodes.push(here_candidate);
       self.topology.add(here_idx, candidate_idx);
       self.previous = Some(candidate_idx);
-      c.visit_nested(self)?;
+      c.visit_nested_in_probe(self);
       add_result_if_empty(self, candidate_idx);
     }
 
     add_result_if_empty(self, here_idx);
     self.previous = here_parent;
-
-    ControlFlow::Continue(())
   }
 }
 
 pub fn serialize_proof_tree<'tcx>(
   goal: solve::Goal<'tcx, Predicate<'tcx>>,
+  span: Span,
   infcx: &InferCtxt<'tcx>,
-  def_id: DefId,
+  _def_id: DefId,
 ) -> Result<SerializedTree> {
+  super::format::dump_proof_tree(goal, span, infcx);
+
   infcx.probe(|_| {
-    let mut visitor = SerializedTreeVisitor::new(def_id);
+    let mut visitor = SerializedTreeVisitor::new();
     infcx.visit_proof_tree(goal, &mut visitor);
     visitor.into_tree()
   })

@@ -26,7 +26,7 @@ use crate::{
     safe::{PathDefNoArgs, TraitRefPrintOnlyTraitPathDef},
     serialize_to_value,
     ty::{
-      ImplPolarityDef, RegionDef, Slice__ClauseDef, Slice__GenericArgDef,
+      Polarity, RegionDef, Slice__ClauseDef, Slice__GenericArgDef,
       Slice__TyDef, TyDef,
     },
   },
@@ -310,9 +310,7 @@ pub struct ClauseWithBounds<'tcx> {
 #[cfg_attr(feature = "testing", ts(export))]
 pub enum ClauseBound<'tcx> {
   Trait(
-    #[serde(with = "ImplPolarityDef")]
-    #[cfg_attr(feature = "testing", ts(type = "ImplPolarity"))]
-    ty::ImplPolarity,
+    Polarity,
     #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
     TraitRefPrintOnlyTraitPathDef<'tcx>,
   ),
@@ -409,6 +407,12 @@ impl From<u64> for ObligationHash {
 impl From<Hash64> for ObligationHash {
   fn from(value: Hash64) -> Self {
     value.as_u64().into()
+  }
+}
+
+impl From<&ObligationHash> for ObligationHash {
+  fn from(value: &Self) -> Self {
+    *value
   }
 }
 
@@ -542,6 +546,7 @@ pub(super) mod intermediate {
     }
   }
 
+  #[allow(dead_code)]
   pub trait ForgetProvenance {
     type Target;
     fn forget(self) -> Self::Target;
@@ -564,7 +569,7 @@ pub(super) mod intermediate {
     ) -> Result<S::Ok, S::Error> {
       let string = match value {
         Ok(Certainty::Yes) => "yes",
-        Ok(Certainty::Maybe(MaybeCause::Overflow)) => "maybe-overflow",
+        Ok(Certainty::Maybe(MaybeCause::Overflow { .. })) => "maybe-overflow",
         Ok(Certainty::Maybe(MaybeCause::Ambiguity)) => "maybe-ambiguity",
         Err(..) => "no",
       };
@@ -590,6 +595,7 @@ pub(super) mod intermediate {
     }
   }
 
+  #[allow(dead_code)]
   pub struct ErrorAssemblyCtx<'a, 'tcx: 'a> {
     pub tcx: TyCtxt<'tcx>,
     pub body_id: BodyId,

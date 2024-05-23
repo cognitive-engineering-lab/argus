@@ -287,6 +287,7 @@ pub enum ExprDef<'tcx> {
 pub enum BinOpDef {
   Add,
   AddUnchecked,
+  Cmp,
   Sub,
   SubUnchecked,
   Mul,

@@ -17,7 +17,6 @@ import {
   SystemToPanoptesMsg,
   configToString,
   isPanoMsgAddHighlight,
-  isPanoMsgObligations,
   isPanoMsgRemoveHighlight,
   isPanoMsgTree,
 } from "@argus/common/lib";
@@ -109,11 +108,10 @@ export class View {
 
   // Public API, using static methods >:(
 
-  public async reset(newData: [Filename, ObligationsInBody[]][]) {
-    this.messageWebview("reset", {
+  public async havoc() {
+    this.messageWebview("havoc", {
       type: "FROM_EXTENSION",
-      command: "reset",
-      data: newData,
+      command: "havoc",
     });
   }
 
@@ -133,22 +131,24 @@ export class View {
     });
   }
 
-  public async openEditor(editor: RustEditor, data: ObligationsInBody[]) {
+  public async openEditor(
+    editor: RustEditor,
+    signature: string,
+    data: ObligationsInBody[]
+  ) {
     console.debug("Sending open file message", editor.document.fileName);
     this.messageWebview("open-file", {
       type: "FROM_EXTENSION",
       command: "open-file",
       file: editor.document.fileName,
+      signature,
       data,
     });
   }
 
   private async handleMessage(message: BlessedMessage<PanoptesToSystemCmds>) {
     const { requestId, payload } = message;
-
-    if (isPanoMsgObligations(payload)) {
-      return this.getObligations(requestId, payload.file);
-    } else if (isPanoMsgTree(payload)) {
+    if (isPanoMsgTree(payload)) {
       return this.getTree(
         requestId,
         payload.file,
@@ -159,18 +159,6 @@ export class View {
       return globals.ctx.addHighlightRange(payload.file, payload.range);
     } else if (isPanoMsgRemoveHighlight(payload)) {
       return globals.ctx.removeHighlightRange(payload.file, payload.range);
-    }
-  }
-
-  private async getObligations(requestId: string, host: Filename) {
-    const obligations = await globals.ctx.getObligations(host);
-    if (obligations !== undefined) {
-      this.messageWebview(requestId, {
-        type: "FROM_EXTENSION",
-        file: host,
-        command: "obligations",
-        obligations: obligations,
-      });
     }
   }
 

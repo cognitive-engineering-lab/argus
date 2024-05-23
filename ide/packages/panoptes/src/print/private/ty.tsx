@@ -1,10 +1,12 @@
 import {
   Abi,
+  AliasTerm,
   AliasTy,
   AliasTyKind,
   AssocItem,
   BoundTy,
   BoundVariable,
+  CoroutineClosureTyKind,
   CoroutineTyKind,
   CoroutineWitnessTyKind,
   DynamicTyKind,
@@ -13,12 +15,12 @@ import {
   FnSig,
   FnTrait,
   GenericArg,
-  ImplPolarity,
   InferTy,
   IntTy,
   OpaqueImpl,
   ParamTy,
   PlaceholderBoundTy,
+  Polarity,
   PolyExistentialPredicates,
   PolyFnSig,
   Region,
@@ -78,6 +80,9 @@ export const PrintTyKind = ({ o }: { o: TyKind }) => {
     return <PrintUintTy o={o.Uint} />;
   } else if ("Float" in o) {
     return <PrintFloatTy o={o.Float} />;
+  } else if ("Pat" in o) {
+    const [ty] = o.Pat;
+    return <PrintTy o={ty} />;
   } else if ("Adt" in o) {
     return <PrintDefPath o={o.Adt} />;
   } else if ("Array" in o) {
@@ -130,6 +135,8 @@ export const PrintTyKind = ({ o }: { o: TyKind }) => {
     return <PrintDefPath o={o.Foreign} />;
   } else if ("Closure" in o) {
     return <PrintDefPath o={o.Closure} />;
+  } else if ("CoroutineClosure" in o) {
+    return <PrintCoroutineClosureTy o={o.CoroutineClosure} />;
   } else if ("Param" in o) {
     return <PrintParamTy o={o.Param} />;
   } else if ("Bound" in o) {
@@ -161,6 +168,15 @@ export const PrintCoroutineTy = ({ o }: { o: CoroutineTyKind }) => {
       {pathDef} upvar_tys={upvars} witness={witness}
     </DBraced>
   );
+};
+
+export const PrintCoroutineClosureTy = ({
+  o,
+}: {
+  o: CoroutineClosureTyKind;
+}) => {
+  // TODO: we can print other things known to the closure, like kind, signature, upvars, etc.
+  return <PrintDefPath o={o.path} />;
 };
 
 export const PrintCoroutineWitnessTy = ({
@@ -216,6 +232,10 @@ export const PrintAliasTyKind = ({ o }: { o: AliasTyKind }) => {
       throw new Error("Unknown alias ty kind", o);
     }
   }
+};
+
+export const PrintAliasTerm = ({ o }: { o: AliasTerm }) => {
+  return <PrintDefPath o={o} />;
 };
 
 export const PrintAliasTy = ({ o }: { o: AliasTy }) => {
@@ -292,7 +312,7 @@ export const PrintPolyFnSig = ({ o }: { o: PolyFnSig }) => {
   };
 
   const inner = (o: FnSig) => {
-    const unsafetyStr = o.unsafety === "Unsafe" ? "unsafe " : null;
+    const unsafetyStr = o.safety === "Unsafe" ? "unsafe " : null;
     const abi = <PrintAbi abi={o.abi} />;
     const [inputs, output] = fnInputsAndOutput(o.inputs_and_output);
     return (
@@ -360,8 +380,6 @@ export const PrintInferTy = ({ o }: { o: InferTy }) => {
       ? () => <DBraced>float</DBraced>
       : o === "Unresolved"
       ? () => "_"
-      : "Named" in o
-      ? () => <PrintDefPath o={o.Named[1]} />
       : "Unnamed" in o
       ? () => <PrintDefPath o={o.Unnamed} />
       : "SourceInfo" in o
@@ -439,8 +457,8 @@ export const PrintBoundVariable = ({ o }: { o: BoundVariable }) => {
   }
 };
 
-export const PrintImplPolarity = ({ o }: { o: ImplPolarity }) => {
-  return o === "Negative" ? "!" : null;
+export const PrintPolarity = ({ o }: { o: Polarity }) => {
+  return o === "Negative" ? "!" : o === "Maybe" ? "?" : null;
 };
 
 export const PrintOpaqueImplType = ({ o }: { o: OpaqueImpl }) => {
@@ -477,7 +495,7 @@ export const PrintOpaqueImplType = ({ o }: { o: OpaqueImpl }) => {
 
   const PrintTrait = ({ o }: { o: Trait }) => {
     console.debug("Printing Trait", o);
-    const prefix = <PrintImplPolarity o={o.polarity} />;
+    const prefix = <PrintPolarity o={o.polarity} />;
     const name = <PrintDefPath o={o.traitName} />;
     const ownArgs = _.map(o.ownArgs, arg => () => <PrintGenericArg o={arg} />);
     const assocArgs = _.map(o.assocArgs, arg => () => (

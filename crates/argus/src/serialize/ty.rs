@@ -1,5 +1,5 @@
 use rustc_data_structures::fx::FxIndexMap;
-use rustc_hir::{self as hir, def::DefKind, def_id::DefId, LangItem, Unsafety};
+use rustc_hir::{self as hir, def::DefKind, def_id::DefId, LangItem, Safety};
 use rustc_infer::traits::{ObligationCause, PredicateObligation};
 use rustc_middle::{traits::util::supertraits_for_pretty_printing, ty};
 use rustc_span::symbol::{kw, Symbol};
@@ -81,6 +81,12 @@ pub enum TyKindDef<'tcx> {
     #[cfg_attr(feature = "testing", ts(type = "FloatTy"))]
     ty::FloatTy,
   ),
+  Pat(
+    #[serde(with = "TyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+    ty::Ty<'tcx>,
+    #[serde(skip)] ty::Pattern<'tcx>,
+  ),
   Adt(path::PathDefWithArgs<'tcx>),
   Str,
   Array(
@@ -146,6 +152,7 @@ pub enum TyKindDef<'tcx> {
   Alias(AliasTyKindDef<'tcx>),
   Dynamic(DynamicTyKindDef<'tcx>),
   Coroutine(CoroutineTyKindDef<'tcx>),
+  CoroutineClosure(CoroutineClosureTyKindDef<'tcx>),
   CoroutineWitness(CoroutineWitnessTyKindDef<'tcx>),
 }
 
@@ -158,6 +165,7 @@ impl<'tcx> From<&ty::TyKind<'tcx>> for TyKindDef<'tcx> {
       ty::TyKind::Uint(v) => Self::Uint(*v),
       ty::TyKind::Float(v) => Self::Float(*v),
       ty::TyKind::Str => Self::Str,
+      ty::TyKind::Pat(ty, pat) => Self::Pat(*ty, *pat),
       ty::TyKind::Adt(def, args) => {
         Self::Adt(path::PathDefWithArgs::new(def.did(), args))
       }
@@ -170,7 +178,10 @@ impl<'tcx> From<&ty::TyKind<'tcx>> for TyKindDef<'tcx> {
       ty::TyKind::Placeholder(v) => Self::Placeholder(*v),
       ty::TyKind::Error(_) => Self::Error,
       ty::TyKind::Infer(v) => Self::Infer(*v),
-      ty::TyKind::RawPtr(tam) => Self::RawPtr(*tam),
+      ty::TyKind::RawPtr(ty, mutbl) => Self::RawPtr(ty::TypeAndMut {
+        ty: *ty,
+        mutbl: *mutbl,
+      }),
       ty::TyKind::Foreign(d) => Self::Foreign(path::PathDefNoArgs::new(*d)),
       ty::TyKind::Closure(def_id, args) => {
         Self::Closure(path::PathDefWithArgs::new(*def_id, args))
@@ -186,6 +197,9 @@ impl<'tcx> From<&ty::TyKind<'tcx>> for TyKindDef<'tcx> {
       }
       ty::TyKind::Coroutine(def_id, args) => {
         Self::Coroutine(CoroutineTyKindDef::new(*def_id, args))
+      }
+      ty::TyKind::CoroutineClosure(def_id, args) => {
+        Self::CoroutineClosure(CoroutineClosureTyKindDef::new(*def_id, args))
       }
       ty::TyKind::CoroutineWitness(def_id, args) => {
         Self::CoroutineWitness(CoroutineWitnessTyKindDef::new(*def_id, args))
@@ -225,13 +239,15 @@ pub enum AliasTyKindDef<'tcx> {
 }
 
 impl<'tcx> AliasTyKindDef<'tcx> {
-  pub fn new(kind: ty::AliasKind, ty: ty::AliasTy<'tcx>) -> Self {
+  pub fn new(kind: ty::AliasTyKind, ty: ty::AliasTy<'tcx>) -> Self {
     let infcx = get_dynamic_ctx();
+    log::debug!("Serializing type Alias {:?} {:?}", kind, ty);
+
     match (kind, ty) {
       (
-        ty::AliasKind::Projection
-        | ty::AliasKind::Inherent
-        | ty::AliasKind::Weak,
+        ty::AliasTyKind::Projection
+        | ty::AliasTyKind::Inherent
+        | ty::AliasTyKind::Weak,
         ref data,
       ) => {
         if !(infcx.should_print_verbose() || with_no_queries())
@@ -246,7 +262,7 @@ impl<'tcx> AliasTyKindDef<'tcx> {
           Self::AliasTy { data: *data }
         }
       }
-      (ty::AliasKind::Opaque, ty::AliasTy { def_id, args, .. }) => {
+      (ty::AliasTyKind::Opaque, ty::AliasTy { def_id, args, .. }) => {
         // We use verbose printing in 'NO_QUERIES' mode, to
         // avoid needing to call `predicates_of`. This should
         // only affect certain debug messages (e.g. messages printed
@@ -427,6 +443,57 @@ impl<'tcx> CoroutineTyKindDef<'tcx> {
   }
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "CoroutineClosureTyKind"))]
+pub struct CoroutineClosureTyKindDef<'tcx> {
+  path: path::PathDefWithArgs<'tcx>,
+
+  #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+  closure_kind: ty::Ty<'tcx>,
+
+  #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+  signature_parts: ty::Ty<'tcx>,
+
+  #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+  upvar_tys: ty::Ty<'tcx>,
+
+  #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+  captures_by_ref: ty::Ty<'tcx>,
+
+  #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+  witness: ty::Ty<'tcx>,
+}
+
+impl<'tcx> CoroutineClosureTyKindDef<'tcx> {
+  pub fn new(
+    def_id: DefId,
+    args: &'tcx ty::List<ty::GenericArg<'tcx>>,
+  ) -> Self {
+    let closure_kind = args.as_coroutine_closure().kind_ty();
+    let signature_parts = args.as_coroutine_closure().signature_parts_ty();
+    let upvar_tys = args.as_coroutine_closure().tupled_upvars_ty();
+    let captures_by_ref =
+      args.as_coroutine_closure().coroutine_captures_by_ref_ty();
+    let witness = args.as_coroutine_closure().coroutine_witness_ty();
+
+    Self {
+      path: path::PathDefWithArgs::new(def_id, &*args),
+      closure_kind,
+      signature_parts,
+      upvar_tys,
+      captures_by_ref,
+      witness,
+    }
+  }
+}
+
 // -----------------------------------
 // Coroutine witness definitions
 
@@ -547,9 +614,9 @@ pub struct FnSigDef<'tcx> {
   pub inputs_and_output: &'tcx ty::List<ty::Ty<'tcx>>,
   pub c_variadic: bool,
 
-  #[serde(with = "UnsafetyDef")]
-  #[cfg_attr(feature = "testing", ts(type = "Unsafety"))]
-  pub unsafety: Unsafety,
+  #[serde(with = "SafetyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Safety"))]
+  pub safety: Safety,
 
   #[serde(with = "AbiDef")]
   #[cfg_attr(feature = "testing", ts(type = "Abi"))]
@@ -557,12 +624,12 @@ pub struct FnSigDef<'tcx> {
 }
 
 #[derive(Serialize)]
-#[serde(remote = "Unsafety")]
+#[serde(remote = "Safety")]
 #[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export, rename = "Unsafety"))]
-pub enum UnsafetyDef {
+#[cfg_attr(feature = "testing", ts(export, rename = "Safety"))]
+pub enum SafetyDef {
   Unsafe,
-  Normal,
+  Safe,
 }
 
 #[derive(Serialize)]
@@ -583,7 +650,6 @@ pub enum AbiDef {
   PtxKernel,
   Msp430Interrupt,
   X86Interrupt,
-  AmdGpuKernel,
   EfiApi,
   AvrInterrupt,
   AvrNonBlockingInterrupt,
@@ -592,7 +658,6 @@ pub enum AbiDef {
   System { unwind: bool },
   RustIntrinsic,
   RustCall,
-  PlatformIntrinsic,
   Unadjusted,
   RustCold,
   RiscvInterruptM,
@@ -615,6 +680,27 @@ pub enum DynKindDef {
 pub enum MovabilityDef {
   Static,
   Movable,
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "AliasTerm"))]
+pub struct AliasTermDef<'tcx>(path::PathDefWithArgs<'tcx>);
+
+impl<'tcx> AliasTermDef<'tcx> {
+  pub fn new(value: &ty::AliasTerm<'tcx>) -> Self {
+    Self(path::PathDefWithArgs::new(value.def_id, value.args))
+  }
+
+  pub fn serialize<S>(
+    value: &ty::AliasTerm<'tcx>,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    Self::new(value).serialize(s)
+  }
 }
 
 #[derive(Serialize)]
@@ -779,8 +865,10 @@ pub enum UintTyDef {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "FloatTy"))]
 pub enum FloatTyDef {
+  F16,
   F32,
   F64,
+  F128,
 }
 
 #[derive(Serialize)]
@@ -945,19 +1033,14 @@ pub enum GenericArgKindDef<'tcx> {
   ),
 }
 
-// TODO: gavinleroy
+// TODO: gavinleroy we used to have a Named inference types (coming from binders) but that
+// isn't the case anymore. Can we do any better or is the "Unnamed" variant sufficient for now?
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "InferTy"))]
 pub enum InferTyDef<'tcx> {
   IntVar,
   FloatVar,
-  Named(
-    #[serde(with = "SymbolDef")]
-    #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
-    Symbol,
-    path::PathDefNoArgs<'tcx>,
-  ),
   Unnamed(path::PathDefNoArgs<'tcx>),
   SourceInfo(String),
   Unresolved,
@@ -965,9 +1048,8 @@ pub enum InferTyDef<'tcx> {
 
 impl<'tcx> InferTyDef<'tcx> {
   pub fn new(value: &ty::InferTy) -> Self {
-    use rustc_infer::infer::type_variable::{
-      TypeVariableOrigin, TypeVariableOriginKind::*,
-    };
+    // See: `ty_getter` in `printer.ty_infer_name_resolver = Some(Box::new(ty_getter))`
+    // from: `rustc_infer::infer::error_reporting::need_type_info.rs`
 
     let infcx = get_dynamic_ctx();
     let tcx = infcx.tcx;
@@ -980,33 +1062,27 @@ impl<'tcx> InferTyDef<'tcx> {
 
     let ty = ty::Ty::new_infer(tcx, root_value);
 
-    match infcx.type_var_origin(ty) {
-      Some(TypeVariableOrigin {
-        kind: TypeParameterDefinition(name, def_id),
-        ..
-      }) => Self::Named(name, path::PathDefNoArgs::new(def_id)),
-
-      Some(TypeVariableOrigin {
-        kind: OpaqueTypeInference(def_id),
-        ..
-      }) => Self::Unnamed(path::PathDefNoArgs::new(def_id)),
-
-      Some(TypeVariableOrigin { span, .. }) if !span.is_dummy() => {
-        let span = span.source_callsite();
-        if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(span) {
-          Self::SourceInfo(snippet)
-        } else {
-          Self::Unresolved
-        }
+    if let Some(origin) = infcx.type_var_origin(ty)
+      && let Some(def_id) = origin.param_def_id
+    {
+      Self::Unnamed(path::PathDefNoArgs::new(def_id))
+    } else if let Some(origin) = infcx.type_var_origin(ty)
+      && !origin.span.is_dummy()
+    {
+      let span = origin.span.source_callsite();
+      if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(span) {
+        Self::SourceInfo(snippet)
+      } else {
+        Self::Unresolved
       }
-
-      _ => match value {
+    } else {
+      match value {
         ty::InferTy::IntVar(_) | ty::InferTy::FreshIntTy(_) => Self::IntVar,
         ty::InferTy::FloatVar(_) | ty::InferTy::FreshFloatTy(_) => {
           Self::FloatVar
         }
         ty::InferTy::TyVar(_) | ty::InferTy::FreshTy(_) => Self::Unresolved,
-      },
+      }
     }
   }
 
@@ -1229,9 +1305,9 @@ pub enum PredicateKindDef<'tcx> {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "NormalizesTo"))]
 pub struct NormalizesToDef<'tcx> {
-  #[serde(with = "AliasTyDef")]
-  #[cfg_attr(feature = "testing", ts(type = "AliasTy"))]
-  pub alias: ty::AliasTy<'tcx>,
+  #[serde(with = "AliasTermDef")]
+  #[cfg_attr(feature = "testing", ts(type = "AliasTerm"))]
+  pub alias: ty::AliasTerm<'tcx>,
 
   #[serde(with = "TermDef")]
   #[cfg_attr(feature = "testing", ts(type = "Term"))]
@@ -1385,9 +1461,9 @@ pub struct TraitPredicateDef<'tcx> {
 
   pub trait_ref: TraitRefPrintSugaredDef<'tcx>,
 
-  #[serde(with = "ImplPolarityDef")]
-  #[cfg_attr(feature = "testing", ts(type = "ImplPolarity"))]
-  pub polarity: ty::ImplPolarity,
+  #[serde(with = "Polarity")]
+  #[cfg_attr(feature = "testing", ts(type = "Polarity"))]
+  pub polarity: ty::PredicatePolarity,
 }
 
 impl<'tcx> TraitPredicateDef<'tcx> {
@@ -1465,12 +1541,74 @@ impl<'tcx> TraitRefPrintOnlyTraitPathDef<'tcx> {
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export, rename = "ImplPolarity"))]
-#[serde(remote = "ty::ImplPolarity")]
-pub enum ImplPolarityDef {
+#[cfg_attr(feature = "testing", ts(export))]
+pub enum Polarity {
   Positive,
   Negative,
-  Reservation,
+  Maybe,
+}
+
+trait PolarityRepresentation {
+  fn is_positive(&self) -> bool;
+  fn is_negative(&self) -> bool;
+}
+
+impl<T: PolarityRepresentation> From<T> for Polarity {
+  fn from(value: T) -> Self {
+    if value.is_positive() {
+      Self::Positive
+    } else if value.is_negative() {
+      Self::Negative
+    } else {
+      Self::Maybe
+    }
+  }
+}
+
+macro_rules! impl_polarity_repr {
+  ([$p:ident, $n:ident], $( $t:path ),*) => {$(
+    impl PolarityRepresentation for $t {
+      fn is_positive(&self) -> bool {
+        matches!(self, <$t>::$p)
+      }
+      fn is_negative(&self) -> bool {
+        matches!(self, <$t>::$n)
+      }
+    }
+
+    impl PolarityRepresentation for &$t {
+      fn is_positive(&self) -> bool {
+        matches!(self, <$t>::$p)
+      }
+      fn is_negative(&self) -> bool {
+        matches!(self, <$t>::$n)
+      }
+    }
+  )*}
+}
+
+impl_polarity_repr! {
+  [Positive, Negative],
+  ty::ImplPolarity,
+  ty::PredicatePolarity
+}
+
+impl Polarity {
+  fn serialize<S>(
+    value: impl PolarityRepresentation,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    if value.is_positive() {
+      Self::Positive.serialize(s)
+    } else if value.is_negative() {
+      Self::Negative.serialize(s)
+    } else {
+      Self::Maybe.serialize(s)
+    }
+  }
 }
 
 #[derive(Serialize)]
@@ -1526,9 +1664,9 @@ impl<'tcx> TyOutlivesRegionDef<'tcx> {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "ProjectionPredicate"))]
 pub struct ProjectionPredicateDef<'tcx> {
-  #[serde(with = "AliasTyDef")]
-  #[cfg_attr(feature = "testing", ts(type = "AliasTy"))]
-  pub projection_ty: ty::AliasTy<'tcx>,
+  #[serde(with = "AliasTermDef")]
+  #[cfg_attr(feature = "testing", ts(type = "AliasTerm"))]
+  pub projection_term: ty::AliasTerm<'tcx>,
 
   #[serde(with = "TermDef")]
   #[cfg_attr(feature = "testing", ts(type = "Term"))]
@@ -1661,9 +1799,9 @@ pub struct FnTrait<'tcx> {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct Trait<'tcx> {
-  #[serde(with = "ImplPolarityDef")]
-  #[cfg_attr(feature = "testing", ts(type = "ImplPolarity"))]
-  polarity: ty::ImplPolarity,
+  #[serde(with = "Polarity")]
+  #[cfg_attr(feature = "testing", ts(type = "Polarity"))]
+  polarity: ty::PredicatePolarity,
   #[cfg_attr(feature = "testing", ts(type = "DefinedPath"))]
   trait_name: TraitRefPrintOnlyTraitPathDef<'tcx>,
   #[serde(with = "Slice__GenericArgDef")]
@@ -1688,10 +1826,10 @@ impl<'tcx> OpaqueImpl<'tcx> {
   fn insert_trait_and_projection(
     tcx: ty::TyCtxt<'tcx>,
     trait_ref: ty::PolyTraitRef<'tcx>,
-    polarity: ty::ImplPolarity,
+    polarity: ty::PredicatePolarity,
     proj_ty: Option<(DefId, ty::Binder<'tcx, ty::Term<'tcx>>)>,
     traits: &mut FxIndexMap<
-      (ty::PolyTraitRef<'tcx>, ty::ImplPolarity),
+      (ty::PolyTraitRef<'tcx>, ty::PredicatePolarity),
       FxIndexMap<DefId, ty::Binder<'tcx, ty::Term<'tcx>>>,
     >,
     fn_traits: &mut FxIndexMap<ty::PolyTraitRef<'tcx>, OpaqueFnEntry<'tcx>>,
@@ -1701,7 +1839,7 @@ impl<'tcx> OpaqueImpl<'tcx> {
     // If our trait_ref is FnOnce or any of its children, project it onto the parent FnOnce
     // super-trait ref and record it there.
     // We skip negative Fn* bounds since they can't use parenthetical notation anyway.
-    if polarity == ty::ImplPolarity::Positive
+    if polarity == ty::PredicatePolarity::Positive
       && let Some(fn_once_trait) = tcx.lang_items().fn_once_trait()
     {
       // If we have a FnOnce, then insert it into
@@ -1771,7 +1909,7 @@ impl<'tcx> OpaqueImpl<'tcx> {
     // by looking up the projections associated with the def_id.
     let bounds = tcx.explicit_item_bounds(def_id);
 
-    log::debug!("Explicit item bounds {:?}", bounds);
+    log::trace!("Explicit item bounds {:?}", bounds);
 
     let mut traits = FxIndexMap::default();
     let mut fn_traits = FxIndexMap::default();
@@ -1789,11 +1927,13 @@ impl<'tcx> OpaqueImpl<'tcx> {
           // Don't print `+ Sized`, but rather `+ ?Sized` if absent.
           if Some(trait_ref.def_id()) == tcx.lang_items().sized_trait() {
             match pred.polarity {
-              ty::ImplPolarity::Positive | ty::ImplPolarity::Reservation => {
+              ty::PredicatePolarity::Positive => {
                 has_sized_bound = true;
                 continue;
               }
-              ty::ImplPolarity::Negative => has_negative_sized_bound = true,
+              ty::PredicatePolarity::Negative => {
+                has_negative_sized_bound = true
+              }
             }
           }
 
@@ -1816,7 +1956,7 @@ impl<'tcx> OpaqueImpl<'tcx> {
           Self::insert_trait_and_projection(
             tcx,
             trait_ref,
-            ty::ImplPolarity::Positive,
+            ty::PredicatePolarity::Positive,
             Some(proj_ty),
             &mut traits,
             &mut fn_traits,
@@ -1868,7 +2008,7 @@ impl<'tcx> OpaqueImpl<'tcx> {
           _ => {
             if entry.has_fn_once {
               traits
-                .entry((fn_once_trait_ref, ty::ImplPolarity::Positive))
+                .entry((fn_once_trait_ref, ty::PredicatePolarity::Positive))
                 .or_default()
                 .extend(
                   // Group the return ty with its def id, if we had one.
@@ -1879,12 +2019,12 @@ impl<'tcx> OpaqueImpl<'tcx> {
             }
             if let Some(trait_ref) = entry.fn_mut_trait_ref {
               traits
-                .entry((trait_ref, ty::ImplPolarity::Positive))
+                .entry((trait_ref, ty::PredicatePolarity::Positive))
                 .or_default();
             }
             if let Some(trait_ref) = entry.fn_trait_ref {
               traits
-                .entry((trait_ref, ty::ImplPolarity::Positive))
+                .entry((trait_ref, ty::PredicatePolarity::Positive))
                 .or_default();
             }
           }

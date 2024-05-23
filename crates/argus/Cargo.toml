@@ -14,7 +14,7 @@ testing = ["lazy_static", "ts-rs"]
 doctest = false
 
 [dependencies]
-rustc_utils = { version = "=0.9.0-nightly-2024-01-24", features = ["serde"] }
+rustc_utils = { version = "=0.10.0-nightly-2024-05-20", features = ["serde"] }
 
 log = "0.4"
 index_vec = { version = "0.1.3", features = ["serde"] }
@@ -33,7 +33,7 @@ ts-rs = { version = "7.1.1", features = ["indexmap-impl"], optional = true }
 
 [dev-dependencies]
 argus-lib = { path = ".", features = ["testing"] }
-rustc_utils = { version = "=0.9.0-nightly-2024-01-24", features = ["serde", "ts-rs"] }
+rustc_utils = { version = "=0.10.0-nightly-2024-05-20", features = ["serde", "ts-rs"] }
 test-log = "0.2.11"
 env_logger = "0.9.3"
 text-diff = "0.4"

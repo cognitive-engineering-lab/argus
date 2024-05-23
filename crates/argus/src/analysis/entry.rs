@@ -5,9 +5,8 @@ use anyhow::{anyhow, bail, Result};
 use fluid_let::fluid_let;
 use rustc_hir::BodyId;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
-use rustc_middle::ty::{Predicate, TyCtxt, TypeckResults};
+use rustc_middle::ty::{TyCtxt, TypeckResults};
 use rustc_trait_selection::traits::solve::Goal;
-use serde::Serialize;
 
 use crate::{
   analysis::{
@@ -17,7 +16,6 @@ use crate::{
   },
   ext::{EvaluationResultExt, InferCtxtExt},
   proof_tree::{serialize::serialize_proof_tree, SerializedTree},
-  serialize::ty::PredicateDef,
   types::{
     intermediate::{
       ErrorAssemblyCtx, Forgettable, FullData, ObligationQueriesInBody,
@@ -29,6 +27,7 @@ use crate::{
 
 fluid_let! {
   pub static INSPECTING: bool;
+  pub static BODY_ID: BodyId;
 }
 
 macro_rules! guard_inspection {
@@ -43,11 +42,6 @@ macro_rules! guard_inspection {
 // --------------------------------
 // Rustc inspection points
 
-#[derive(Serialize)]
-struct PredWrapper<'a, 'tcx: 'a>(
-  #[serde(with = "PredicateDef")] &'a Predicate<'tcx>,
-);
-
 pub fn process_obligation<'tcx>(
   infcx: &InferCtxt<'tcx>,
   obl: &PredicateObligation<'tcx>,
@@ -55,10 +49,11 @@ pub fn process_obligation<'tcx>(
 ) {
   guard_inspection! {}
 
-  let Some(_ldef_id) = infcx.body_id() else {
-    log::warn!("Skipping obligation unassociated with local body {obl:?}");
+  let Some(body_id) = BODY_ID.copied() else {
     return;
   };
+
+  log::trace!("RECV OBLIGATION {result:?} {obl:?}");
 
   // Use this to get rid of any resolved inference variables,
   // these could have been resolved while trying to solve the obligation
@@ -78,8 +73,6 @@ pub fn process_obligation<'tcx>(
     return;
   }
 
-  log::debug!("Processing obligation {obl:?}");
-
   let necessity = infcx.obligation_necessity(obl);
   let dataid = if matches!(necessity, ObligationNecessity::Yes)
     || (matches!(necessity, ObligationNecessity::OnError) && result.is_no())
@@ -89,7 +82,8 @@ pub fn process_obligation<'tcx>(
     None
   };
 
-  let obligation = transform::compute_provenance(infcx, obl, result, dataid);
+  let obligation =
+    transform::compute_provenance(body_id, infcx, obl, result, dataid);
 
   tls::store_obligation(obligation);
 
@@ -195,11 +189,13 @@ fn generate_tree<'tcx>(
     predicate: obligation.predicate,
     param_env: obligation.param_env,
   };
-  let item_def_id = infcx
-    .body_id()
-    .ok_or(anyhow!("body not local"))?
-    .to_def_id();
-  serialize_proof_tree(goal, infcx, item_def_id)
+
+  let Some(body_id) = BODY_ID.copied() else {
+    bail!("missing body id");
+  };
+
+  let body_owner = infcx.tcx.hir().body_owner_def_id(body_id).to_def_id();
+  serialize_proof_tree(goal, obligation.cause.span, infcx, body_owner)
 }
 
 pub(in crate::analysis) fn build_obligations_in_body<'tcx>(

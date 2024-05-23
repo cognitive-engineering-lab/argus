@@ -119,7 +119,7 @@ pub fn replace_reported_errors(infcx: &InferCtxt) {
       .reported_trait_errors
       .borrow()
       .iter()
-      .map(|(span, predicates)| {
+      .map(|(span, (predicates, _))| {
         (
           *span,
           predicates

@@ -13,7 +13,7 @@ import { anyElems } from "../../utilities/func";
 import { PrintDefPath } from "./path";
 import { PrintClause } from "./predicate";
 import { Angled, CommaSeparated, Kw, PlusSeparated } from "./syntax";
-import { PrintGenericArg, PrintImplPolarity, PrintRegion, PrintTy } from "./ty";
+import { PrintGenericArg, PrintPolarity, PrintRegion, PrintTy } from "./ty";
 
 export const PrintImplHeader = ({ o }: { o: ImplHeader }) => {
   console.debug("Printing ImplHeader", o);
@@ -117,7 +117,7 @@ const PrintClauseBound = ({ o }: { o: ClauseBound }) => {
     const [polarity, path] = o.Trait;
     return (
       <>
-        <PrintImplPolarity o={polarity} />
+        <PrintPolarity o={polarity} />
         <PrintDefPath o={path} />
       </>
     );

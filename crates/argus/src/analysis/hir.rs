@@ -94,6 +94,12 @@ impl BinCreator<'_, '_> {
       .collect::<Vec<_>>();
 
     if !obligations.is_empty() {
+      log::debug!(
+        "Associating obligations with {kind:?} {:?}\n{:#?}",
+        self.ctx.tcx.hir().node_to_string(target),
+        obligations
+      );
+
       self.bins.push(Bin {
         hir_id: target,
         obligations,
@@ -104,23 +110,29 @@ impl BinCreator<'_, '_> {
 }
 
 impl<'a, 'tcx: 'a> HirVisitor<'_> for BinCreator<'a, 'tcx> {
+  // FIXME: after updating to nightly-2024-05-20 this binning logic broke slightly.
+  // Obligations associated with parameters are now being assigned to the overall call,
+  // this makes more things use a method call table than necessary.
   fn visit_expr(&mut self, ex: &hir::Expr) {
+    // Drain nested obligations first to match the most specific node possible.
     hir::intravisit::walk_expr(self, ex);
 
     match ex.kind {
       hir::ExprKind::Call(callable, args) => {
-        self.drain_nested(callable.hir_id, BinKind::CallableExpr);
         for arg in args {
           self.drain_nested(arg.hir_id, BinKind::CallArg);
         }
+        self.drain_nested(callable.hir_id, BinKind::CallableExpr);
         self.drain_nested(ex.hir_id, BinKind::Call);
       }
       hir::ExprKind::MethodCall(_, func, args, _) => {
-        self.drain_nested(func.hir_id, BinKind::MethodReceiver);
         for arg in args {
           self.drain_nested(arg.hir_id, BinKind::CallArg);
         }
-        self.drain_nested(ex.hir_id, BinKind::MethodCall);
+        self.drain_nested(func.hir_id, BinKind::MethodReceiver);
+        // [ ] TODO (see above `FIXME`):
+        // self.drain_nested(ex.hir_id, BinKind::MethodCall);
+        self.drain_nested(ex.hir_id, BinKind::Misc);
       }
       _ => {}
     }
@@ -193,14 +205,13 @@ macro_rules! simple_visitors {
 impl HirVisitor<'_> for FindNodeBySpan {
   simple_visitors! {
     [visit_param, walk_param, hir::Param],
-    [visit_local, walk_local, hir::Local],
+    [visit_local, walk_local, hir::LetStmt],
     [visit_block, walk_block, hir::Block],
     [visit_stmt, walk_stmt, hir::Stmt],
     [visit_arm, walk_arm, hir::Arm],
     [visit_pat, walk_pat, hir::Pat],
     [visit_pat_field, walk_pat_field, hir::PatField],
     [visit_expr, walk_expr, hir::Expr],
-    [visit_let_expr, walk_let_expr, hir::Let],
     [visit_expr_field, walk_expr_field, hir::ExprField],
     [visit_ty, walk_ty, hir::Ty],
     [visit_generic_param, walk_generic_param, hir::GenericParam],

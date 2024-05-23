@@ -1,6 +1,5 @@
 //! Default implementaitons from rustc_middle::ty::print
 
-use log::debug;
 use rustc_data_structures::sso::SsoHashSet;
 use rustc_hir::{def_id::DefId, definitions::DefPathData};
 use rustc_middle::ty::{self, *};
@@ -38,7 +37,7 @@ impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
     args: &'tcx [GenericArg<'tcx>],
   ) {
     let key = self.tcx().def_key(def_id);
-    debug!("{:?}", key);
+    log::trace!("default_print_def_path {:?}", key);
 
     match key.disambiguated_data.data {
       DefPathData::CrateRoot => {
@@ -87,7 +86,9 @@ impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
             // If we have any generic arguments to print, we do that
             // on top of the same path, but without its own generics.
             _ => {
-              if !generics.params.is_empty() && args.len() >= generics.count() {
+              if !generics.own_params.is_empty()
+                && args.len() >= generics.count()
+              {
                 let args = generics.own_args_no_defaults(self.tcx(), args);
                 return self.path_generic_args(
                   |cx| cx.print_def_path(def_id, parent_args),
@@ -122,7 +123,6 @@ impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
         )
       }
     };
-    debug!("Returning from default_print_def_path");
   }
 
   fn print_impl_path(
@@ -142,7 +142,7 @@ impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
     self_ty: Ty<'tcx>,
     impl_trait_ref: Option<ty::TraitRef<'tcx>>,
   ) {
-    debug!(
+    log::trace!(
         "default_print_impl_path: impl_def_id={:?}, self_ty={}, impl_trait_ref={:?}",
         impl_def_id, self_ty, impl_trait_ref
     );
@@ -203,11 +203,11 @@ fn characteristic_def_id_of_type_cached<'a>(
 
     ty::Dynamic(data, ..) => data.principal_def_id(),
 
-    ty::Array(subty, _) | ty::Slice(subty) => {
+    ty::Pat(subty, _) | ty::Array(subty, _) | ty::Slice(subty) => {
       characteristic_def_id_of_type_cached(subty, visited)
     }
 
-    ty::RawPtr(mt) => characteristic_def_id_of_type_cached(mt.ty, visited),
+    ty::RawPtr(ty, _) => characteristic_def_id_of_type_cached(ty, visited),
 
     ty::Ref(_, ty, _) => characteristic_def_id_of_type_cached(ty, visited),
 
@@ -220,6 +220,7 @@ fn characteristic_def_id_of_type_cached<'a>(
 
     ty::FnDef(def_id, _)
     | ty::Closure(def_id, _)
+    | ty::CoroutineClosure(def_id, _)
     | ty::Coroutine(def_id, _)
     | ty::CoroutineWitness(def_id, _)
     | ty::Foreign(def_id) => Some(def_id),

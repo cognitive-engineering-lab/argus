@@ -46,7 +46,7 @@ If rustup fails, especially with an error like "could not rename the downloaded 
 To solve the issue, go to the command line and run:
 
 ```
-rustup toolchain install nightly-2024-01-24 -c rust-src -c rustc-dev -c llvm-tools-preview
+rustup toolchain install nightly-2024-05-20 -c rust-src -c rustc-dev -c llvm-tools-preview
 ```
 
 Then go back to VSCode and click "Continue" to let Argus continue installing.

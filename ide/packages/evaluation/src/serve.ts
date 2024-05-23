@@ -4,7 +4,21 @@ import url from "url";
 
 export const PORT = 8080;
 
-export function fileServer() {
+export async function withServerOnPort<T>(
+  port: number,
+  callback: () => Promise<T>
+) {
+  const serve = fileServer();
+  try {
+    serve.listen(port);
+    return await callback();
+  } finally {
+    serve.closeAllConnections();
+    serve.close();
+  }
+}
+
+function fileServer() {
   return http.createServer((request, response) => {
     response.setHeader("Access-Control-Allow-Origin", "*");
     response.setHeader("Access-Control-Request-Method", "*");

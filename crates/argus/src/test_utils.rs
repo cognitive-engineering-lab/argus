@@ -1,7 +1,6 @@
 use std::{env, fs, io, panic, path::Path, process::Command, sync::Arc};
 
 use anyhow::{Context, Result};
-use rustc_errors::DiagCtxt;
 use rustc_hir::BodyId;
 use rustc_middle::ty::TyCtxt;
 use rustc_span::source_map::FileLoader;
@@ -13,7 +12,6 @@ use rustc_utils::source_map::{
 
 use crate::{
   analysis,
-  emitter::SilentEmitter,
   proof_tree::SerializedTree,
   types::{
     intermediate::{Forgettable, FullData},
@@ -243,8 +241,12 @@ where
   Cb: FnOnce(TyCtxt<'_>),
 {
   fn config(&mut self, config: &mut rustc_interface::Config) {
-    config.parse_sess_created = Some(Box::new(|sess| {
-      sess.dcx = DiagCtxt::with_emitter(SilentEmitter::boxed());
+    config.psess_created = Some(Box::new(|sess| {
+      let fallback_bundle = rustc_errors::fallback_fluent_bundle(
+        rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
+        false,
+      );
+      sess.dcx.make_silent(fallback_bundle, None, false);
     }));
   }
 

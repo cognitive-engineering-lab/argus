@@ -21,10 +21,10 @@ import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
 import { PrintTerm } from "./term";
 import {
-  PrintAliasTy,
+  PrintAliasTerm,
   PrintBinder,
   PrintGenericArg,
-  PrintImplPolarity,
+  PrintPolarity,
   PrintRegion,
   PrintTy,
 } from "./ty";
@@ -111,7 +111,7 @@ export const PrintPredicateKind = ({ o }: { o: PredicateKind }) => {
   } else if ("NormalizesTo" in o) {
     return (
       <>
-        <PrintAliasTy o={o.NormalizesTo.alias} /> normalizes to{" "}
+        <PrintAliasTerm o={o.NormalizesTo.alias} /> normalizes to{" "}
         <PrintTerm o={o.NormalizesTo.term} />
       </>
     );
@@ -160,7 +160,8 @@ export const PrintClauseKind = ({ o }: { o: ClauseKind }) => {
     const proj = o.Projection;
     return (
       <span>
-        <PrintAliasTy o={proj.projection_ty} /> == <PrintTerm o={proj.term} />
+        <PrintAliasTerm o={proj.projection_term} /> =={" "}
+        <PrintTerm o={proj.term} />
       </span>
     );
   } else if ("ConstArgHasType" in o) {
@@ -199,7 +200,7 @@ export const PrintTraitPredicate = ({ o }: { o: TraitPredicate }) => {
   return (
     <>
       <PrintTy o={o.self_ty} />: <PrintBoundConstness o={o.constness} />
-      <PrintImplPolarity o={o.polarity} />
+      <PrintPolarity o={o.polarity} />
       <PrintDefPath o={o.trait_ref} />
     </>
   );

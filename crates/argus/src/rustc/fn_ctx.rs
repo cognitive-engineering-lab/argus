@@ -1,5 +1,7 @@
 //! We don't have access to a `FnCtxt`, but many of these methods
 //! *don't require* the function context, just the `TyCtxt` or `InferCtxt`.
+//!
+//! See [https://github.com/rust-lang/rust/blob/master/compiler/rustc_hir_typeck/src/fn_ctxt/adjust_fulfillment_errors.rs]
 
 use std::ops::ControlFlow;
 
@@ -8,10 +10,7 @@ use rustc_hir::{
   def::{DefKind, Res},
   def_id::DefId,
 };
-use rustc_infer::{
-  infer::{type_variable::TypeVariableOriginKind, InferCtxt},
-  traits::ObligationCauseCode,
-};
+use rustc_infer::{infer::InferCtxt, traits::ObligationCauseCode};
 use rustc_middle::ty::{
   self, Ty, TyCtxt, TypeSuperVisitable, TypeVisitable, TypeVisitor,
 };
@@ -109,7 +108,7 @@ pub trait FnCtxtExt<'tcx> {
 
   fn blame_specific_expr_if_possible_for_derived_predicate_obligation(
     &self,
-    obligation: &traits::ImplDerivedObligationCause<'tcx>,
+    obligation: &traits::ImplDerivedCause<'tcx>,
     expr: &'tcx hir::Expr<'tcx>,
   ) -> Result<&'tcx hir::Expr<'tcx>, &'tcx hir::Expr<'tcx>>;
 
@@ -126,14 +125,13 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
     &self,
     error: &mut traits::FulfillmentError<'tcx>,
   ) -> bool {
-    let (traits::ExprItemObligation(def_id, hir_id, idx)
-    | traits::ExprBindingObligation(def_id, _, hir_id, idx)) =
+    let ObligationCauseCode::WhereClauseInExpr(def_id, _, hir_id, idx) =
       *error.obligation.cause.code().peel_derives()
     else {
       return false;
     };
 
-    let Some(unsubstituted_pred) = self
+    let Some(uninstantiated_pred) = self
       .tcx
       .predicates_of(def_id)
       .instantiate_identity(self.tcx)
@@ -146,12 +144,12 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
 
     let generics = self.tcx.generics_of(def_id);
     let (predicate_args, predicate_self_type_to_point_at) =
-      match unsubstituted_pred.kind().skip_binder() {
+      match uninstantiated_pred.kind().skip_binder() {
         ty::ClauseKind::Trait(pred) => {
           (pred.trait_ref.args.to_vec(), Some(pred.self_ty().into()))
         }
         ty::ClauseKind::Projection(pred) => {
-          (pred.projection_ty.args.to_vec(), None)
+          (pred.projection_term.args.to_vec(), None)
         }
         ty::ClauseKind::ConstArgHasType(arg, ty) => {
           (vec![ty.into(), arg.into()], None)
@@ -215,7 +213,6 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
         .find_ambiguous_parameter_in(def_id, error.root_obligation.predicate);
     }
 
-    let hir = self.tcx.hir();
     let (expr, qpath) = match self.tcx.hir_node(hir_id) {
       hir::Node::Expr(expr) => {
         if self.closure_span_overlaps_error(error, expr.span) {
@@ -250,7 +247,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
         hir_id: call_hir_id,
         span: call_span,
         ..
-      }) = hir.get_parent(hir_id)
+      }) = self.tcx.parent_hir_node(hir_id)
         && callee.hir_id == hir_id
       {
         if self.closure_span_overlaps_error(error, *call_span) {
@@ -304,7 +301,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
           // the method's turbofish segments but still use `FunctionArgumentObligation`
           // elsewhere. Hopefully this doesn't break something.
           error.obligation.cause.map_code(|parent_code| {
-            ObligationCauseCode::FunctionArgumentObligation {
+            ObligationCauseCode::FunctionArg {
               arg_hir_id: receiver.hir_id,
               call_hir_id: hir_id,
               parent_code,
@@ -355,10 +352,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
       }
       Some(hir::ExprKind::Struct(qpath, fields, ..)) => {
         if let Res::Def(DefKind::Struct | DefKind::Variant, variant_def_id) =
-          self
-            .typeck_results
-            // .borrow()
-            .qpath_res(qpath, hir_id)
+          self.typeck_results.qpath_res(qpath, hir_id)
         {
           for param in [
             param_to_point_at,
@@ -498,22 +492,18 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
       DefId,
     );
     impl<'tcx> TypeVisitor<TyCtxt<'tcx>> for FindAmbiguousParameter<'_, 'tcx> {
-      type BreakTy = ty::GenericArg<'tcx>;
-      fn visit_ty(
-        &mut self,
-        ty: Ty<'tcx>,
-      ) -> std::ops::ControlFlow<Self::BreakTy> {
+      type Result = ControlFlow<ty::GenericArg<'tcx>>;
+      fn visit_ty(&mut self, ty: Ty<'tcx>) -> Self::Result {
         if let Some(origin) = self.0.type_var_origin(ty)
-          && let TypeVariableOriginKind::TypeParameterDefinition(_, def_id) =
-            origin.kind
+          && let Some(def_id) = origin.param_def_id
           && let generics = self.0.tcx.generics_of(self.1)
           && let Some(index) =
             generics.param_def_id_to_index(self.0.tcx, def_id)
-          && let Some(subst) =
+          && let Some(arg) =
             ty::GenericArgs::identity_for_item(self.0.tcx, self.1)
               .get(index as usize)
         {
-          ControlFlow::Break(*subst)
+          ControlFlow::Break(*arg)
         } else {
           ty.super_visit_with(self)
         }
@@ -528,7 +518,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
     error: &traits::FulfillmentError<'tcx>,
     span: Span,
   ) -> bool {
-    if let traits::FulfillmentErrorCode::SelectionError(
+    if let traits::FulfillmentErrorCode::Select(
       traits::SelectionError::SignatureMismatch(
         box traits::SignatureMismatchData {
           expected_trait_ref, ..
@@ -536,7 +526,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
       ),
     ) = error.code
       && let ty::Closure(def_id, _) | ty::Coroutine(def_id, ..) =
-        expected_trait_ref.skip_binder().self_ty().kind()
+        expected_trait_ref.self_ty().kind()
       && span.overlaps(self.tcx.def_span(*def_id))
     {
       true
@@ -634,7 +624,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
       }
 
       error.obligation.cause.map_code(|parent_code| {
-        ObligationCauseCode::FunctionArgumentObligation {
+        ObligationCauseCode::FunctionArg {
           arg_hir_id: arg.hir_id,
           call_hir_id,
           parent_code,
@@ -692,12 +682,12 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
     expr: &'tcx hir::Expr<'tcx>,
   ) -> Result<&'tcx hir::Expr<'tcx>, &'tcx hir::Expr<'tcx>> {
     match obligation_cause_code {
-      traits::ObligationCauseCode::ExprBindingObligation(_, _, _, _) => {
+      traits::ObligationCauseCode::WhereClauseInExpr(_, _, _, _) => {
         // This is the "root"; we assume that the `expr` is already pointing here.
         // Therefore, we return `Ok` so that this `expr` can be refined further.
         Ok(expr)
       }
-      traits::ObligationCauseCode::ImplDerivedObligation(impl_derived) => self
+      traits::ObligationCauseCode::ImplDerived(impl_derived) => self
         .blame_specific_expr_if_possible_for_derived_predicate_obligation(
           impl_derived,
           expr,
@@ -735,7 +725,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
   /// only a partial success - but it cannot be refined even further.
   fn blame_specific_expr_if_possible_for_derived_predicate_obligation(
     &self,
-    obligation: &traits::ImplDerivedObligationCause<'tcx>,
+    obligation: &traits::ImplDerivedCause<'tcx>,
     expr: &'tcx hir::Expr<'tcx>,
   ) -> Result<&'tcx hir::Expr<'tcx>, &'tcx hir::Expr<'tcx>> {
     // First, we attempt to refine the `expr` for our span using the parent obligation.
@@ -880,10 +870,8 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
     {
       // First, confirm that this struct is the same one as in the types, and if so,
       // find the right variant.
-      let Res::Def(expr_struct_def_kind, expr_struct_def_id) = self
-        .typeck_results
-        // .borrow()
-        .qpath_res(expr_struct_path, expr.hir_id)
+      let Res::Def(expr_struct_def_kind, expr_struct_def_id) =
+        self.typeck_results.qpath_res(expr_struct_path, expr.hir_id)
       else {
         return Err(expr);
       };
@@ -923,7 +911,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
 
       let struct_generic_parameters: &ty::Generics =
         self.tcx.generics_of(in_ty_adt.did());
-      if drill_generic_index >= struct_generic_parameters.params.len() {
+      if drill_generic_index >= struct_generic_parameters.own_params.len() {
         return Err(expr);
       }
 
@@ -996,7 +984,6 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
 
       let Res::Def(expr_struct_def_kind, expr_ctor_def_id) = self
         .typeck_results
-        // .borrow()
         .qpath_res(expr_callee_path, expr_callee.hir_id)
       else {
         return Err(expr);
@@ -1053,7 +1040,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
 
       let struct_generic_parameters: &ty::Generics =
         self.tcx.generics_of(in_ty_adt.did());
-      if drill_generic_index >= struct_generic_parameters.params.len() {
+      if drill_generic_index >= struct_generic_parameters.own_params.len() {
         return Err(expr);
       }
 
