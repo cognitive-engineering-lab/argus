@@ -280,7 +280,7 @@ impl<'a, 'tcx: 'a> PathBuilder<'a, 'tcx> {
   ) {
     print_prefix(self);
 
-    log::debug!("pretty_path_append_impl {:?} {:?}", self_ty, trait_ref);
+    log::trace!("pretty_path_append_impl {:?} {:?}", self_ty, trait_ref);
 
     self.generic_delimiters(|cx| {
       // CHANGE: define_scoped_cx!(cx);

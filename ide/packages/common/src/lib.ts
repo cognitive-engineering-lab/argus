@@ -27,8 +27,7 @@ export const ConfigConsts = {
 // ----------------------------------------------------
 // Panoptes initial configuration for a single webview
 
-export type PanoptesInitialData = {
-  data: [Filename, ObligationsInBody[]][];
+export type PanoptesOptionalData = {
   target?: ErrorJumpTargetInfo;
   evalMode?: EvaluationMode;
 };
@@ -36,11 +35,12 @@ export type PanoptesInitialData = {
 export type SystemSpec = Omit<IssueOptions, "logText">;
 export type EvaluationMode = "release" | "rank" | "random";
 
-export type PanoptesConfig = PanoptesInitialData &
+export type PanoptesConfig = PanoptesOptionalData &
   (
     | {
         type: "VSCODE_BACKING";
         spec: SystemSpec;
+        data: [Filename, ObligationsInBody[]][];
       }
     | {
         type: "WEB_BUNDLE";
@@ -92,28 +92,25 @@ export type PayloadTypes = {
 };
 
 export type SystemToPanoptesCmds =
-  | "reset"
+  | "havoc"
   | "open-file"
   | "open-error"
-  | "obligations"
   | "tree";
 
 export type SystemToPanoptesMsg<T extends SystemToPanoptesCmds> = {
   command: T;
   type: FROM_EXT;
-} & (T extends "reset"
-  ? { data: [Filename, ObligationsInBody[]][] }
+} & (T extends "havoc"
+  ? {}
   : CommonData &
       (T extends "open-file"
-        ? { data: ObligationsInBody[] }
+        ? { data: ObligationsInBody[]; signature: string }
         : T extends "open-error"
         ? {
             bodyIdx: BodyHash;
             exprIdx: ExprIdx;
             hash: ObligationHash;
           }
-        : T extends "obligations"
-        ? { obligations: ObligationsInBody[] }
         : T extends "tree"
         ? { tree?: SerializedTree }
         : never));
@@ -196,22 +193,24 @@ export function isSysMsgOpenFile(
   return objWCmd(msg) && msg.command === "open-file";
 }
 
-export function isSysMsgReset(
+export function isSysMsgHavoc(
   msg: unknown
-): msg is SystemToPanoptesMsg<"reset"> {
-  return objWCmd(msg) && msg.command === "reset";
+): msg is SystemToPanoptesMsg<"havoc"> {
+  return objWCmd(msg) && msg.command === "havoc";
+}
+
+// ------------------------------------------------------
+
+export function isPanoMsgObligations(
+  msg: unknown
+): msg is PanoptesToSystemMsg<"obligations"> {
+  return objWCmd(msg) && msg.command === "obligations";
 }
 
 export function isPanoMsgTree(
   msg: unknown
 ): msg is PanoptesToSystemMsg<"tree"> {
   return objWCmd(msg) && msg.command === "tree";
-}
-
-export function isPanoMsgObligations(
-  msg: unknown
-): msg is PanoptesToSystemMsg<"obligations"> {
-  return objWCmd(msg) && msg.command === "obligations";
 }
 
 export function isPanoMsgAddHighlight(

@@ -1,11 +1,13 @@
+import { ObligationsInBody } from "@argus/common/bindings";
 import {
   ErrorJumpTargetInfo,
   EvaluationMode,
+  Filename,
   PanoptesConfig,
   SystemSpec,
+  isSysMsgHavoc,
   isSysMsgOpenError,
   isSysMsgOpenFile,
-  isSysMsgReset,
 } from "@argus/common/lib";
 import _ from "lodash";
 import { observer } from "mobx-react";
@@ -32,8 +34,19 @@ const webSysSpec: SystemSpec = {
   vscodeVersion: "unknown",
 };
 
+function buildInitialData(
+  config: PanoptesConfig
+): [Filename, ObligationsInBody[]][] {
+  if (config.type === "VSCODE_BACKING") {
+    return config.data;
+  }
+
+  const byName = _.groupBy(config.closedSystem, body => body.filename);
+  return _.map(byName, (bodies, fn) => [fn, _.map(bodies, b => b.body)]);
+}
+
 const App = observer(({ config }: { config: PanoptesConfig }) => {
-  const [openFiles, setOpenFiles] = useState(config.data);
+  const [openFiles, setOpenFiles] = useState(buildInitialData(config));
   const messageSystem =
     config.type === "WEB_BUNDLE"
       ? createClosedMessageSystem(config.closedSystem)
@@ -60,17 +73,14 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
       return blingObserver(payload);
     } else if (isSysMsgOpenFile(payload)) {
       return setOpenFiles(currFiles => {
-        const idx = _.findIndex(
+        const files = _.filter(
           currFiles,
-          ([filename, _]) => filename === payload.file
+          ([filename, _]) => filename !== payload.file
         );
-        if (idx === -1) {
-          return [[payload.file, payload.data], ...currFiles];
-        }
-        return bringToFront(currFiles, idx);
+        return [[payload.file, payload.data], ...files];
       });
-    } else if (isSysMsgReset(payload)) {
-      return setOpenFiles(payload.data);
+    } else if (isSysMsgHavoc(payload)) {
+      return setOpenFiles([]);
     }
   };
 

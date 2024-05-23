@@ -241,6 +241,8 @@ pub enum AliasTyKindDef<'tcx> {
 impl<'tcx> AliasTyKindDef<'tcx> {
   pub fn new(kind: ty::AliasTyKind, ty: ty::AliasTy<'tcx>) -> Self {
     let infcx = get_dynamic_ctx();
+    log::debug!("Serializing type Alias {:?} {:?}", kind, ty);
+
     match (kind, ty) {
       (
         ty::AliasTyKind::Projection
@@ -1907,7 +1909,7 @@ impl<'tcx> OpaqueImpl<'tcx> {
     // by looking up the projections associated with the def_id.
     let bounds = tcx.explicit_item_bounds(def_id);
 
-    log::debug!("Explicit item bounds {:?}", bounds);
+    log::trace!("Explicit item bounds {:?}", bounds);
 
     let mut traits = FxIndexMap::default();
     let mut fn_traits = FxIndexMap::default();

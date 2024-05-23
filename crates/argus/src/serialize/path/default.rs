@@ -1,6 +1,5 @@
 //! Default implementaitons from rustc_middle::ty::print
 
-use log::debug;
 use rustc_data_structures::sso::SsoHashSet;
 use rustc_hir::{def_id::DefId, definitions::DefPathData};
 use rustc_middle::ty::{self, *};
@@ -38,7 +37,7 @@ impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
     args: &'tcx [GenericArg<'tcx>],
   ) {
     let key = self.tcx().def_key(def_id);
-    debug!("{:?}", key);
+    log::trace!("default_print_def_path {:?}", key);
 
     match key.disambiguated_data.data {
       DefPathData::CrateRoot => {
@@ -124,7 +123,6 @@ impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
         )
       }
     };
-    debug!("Returning from default_print_def_path");
   }
 
   fn print_impl_path(
@@ -144,7 +142,7 @@ impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
     self_ty: Ty<'tcx>,
     impl_trait_ref: Option<ty::TraitRef<'tcx>>,
   ) {
-    debug!(
+    log::trace!(
         "default_print_impl_path: impl_def_id={:?}, self_ty={}, impl_trait_ref={:?}",
         impl_def_id, self_ty, impl_trait_ref
     );

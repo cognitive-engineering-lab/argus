@@ -257,8 +257,9 @@ const Expr = observer(({ idx }: { idx: ExprIdx }) => {
   );
 
   if (
-    !bodyInfo.isErrorMethodCall(expr) &&
-    bodyInfo.visibleObligations(idx).length === 0
+    (expr.isBody && !bodyInfo.showHidden) ||
+    (!bodyInfo.isErrorMethodCall(expr) &&
+      bodyInfo.visibleObligations(idx).length === 0)
   ) {
     return null;
   }
@@ -360,7 +361,7 @@ const File = ({
   const noBodiesFound = (
     <ErrorDiv>
       <p>
-        Argus didn't find any 'interesting' obligations in this file. If you
+        Argus didn’t find any “interesting” obligations in this file. If you
         think there should be, please click below to report this as a bug!
       </p>
       <ReportBugUrl

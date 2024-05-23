@@ -12,6 +12,7 @@ import ReportBugUrl from "../ReportBugUrl";
 import "./print.css";
 import { PrintImplHeader as UnsafePrintImplHeader } from "./private/argus";
 import { PrintDefPath as UnsafePrintDefPath } from "./private/path";
+import { ToggleGenericDelimiterContext } from "./private/path";
 import {
   PrintGoalPredicate as UnsafePrintGoalPredicate,
   PrintPredicateObligation as UnsafePrintPredicateObligation,
@@ -71,17 +72,21 @@ export const PrintTy = ({ ty }: { ty: any }) => {
 
 export const PrintObligation = ({ obligation }: { obligation: Obligation }) => {
   const InnerContent = () => (
-    <UnsafePrintPredicateObligation o={obligation.obligation} />
+    <ToggleGenericDelimiterContext.Provider value={true}>
+      <UnsafePrintPredicateObligation o={obligation.obligation} />
+    </ToggleGenericDelimiterContext.Provider>
   );
   return <PrintWithFallback object={obligation} Content={InnerContent} />;
 };
 
 export const PrintImplHeader = ({ impl }: { impl: any }) => {
   return (
-    <PrintWithFallback
-      object={impl}
-      Content={() => <UnsafePrintImplHeader o={impl} />}
-    />
+    <ToggleGenericDelimiterContext.Provider value={true}>
+      <PrintWithFallback
+        object={impl}
+        Content={() => <UnsafePrintImplHeader o={impl} />}
+      />
+    </ToggleGenericDelimiterContext.Provider>
   );
 };
 
@@ -91,10 +96,10 @@ export const PrintGoal = ({ o }: { o: GoalData }) => {
       <div style={{ opacity: 0.5 }}>{o.debugComparison}</div>
     );
   const Content = () => (
-    <>
+    <ToggleGenericDelimiterContext.Provider value={true}>
       <UnsafePrintGoalPredicate o={o.value} />
       {debugString}
-    </>
+    </ToggleGenericDelimiterContext.Provider>
   );
   return <PrintWithFallback object={o} Content={Content} />;
 };

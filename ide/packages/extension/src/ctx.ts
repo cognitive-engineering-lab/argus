@@ -20,12 +20,15 @@ import {
   isDocumentInWorkspace,
   isRustDocument,
   isRustEditor,
+  makeid,
   rustRangeToVscodeRange,
 } from "./utils";
 import { View } from "./view";
 
 // NOTE: much of this file was inspired (or taken) from the rust-analyzer extension.
 // See: https://github.com/rust-lang/rust-analyzer/blob/master/editors/code/src/ctx.ts#L1
+
+// TODO: opening obligations / trees need to be cancellable.
 
 export type Workspace =
   | { kind: "empty" }
@@ -138,15 +141,20 @@ export class Ctx {
       showErrorDialog("Failed to setup Argus");
       return;
     }
+
     vscode.window.showInformationMessage(
       "Loading Argus, this may take several minutes."
     );
+
     await b(["preload"], true);
     this.cache = new BackendCache(b);
 
-    await Promise.all(
-      _.map(this.visibleEditors, editor => this.openEditor(editor))
-    );
+    let openingEditor = new Promise<void[]>(() => []);
+    if (this.activeRustEditor) {
+      openingEditor = Promise.all(
+        _.map(this.visibleEditors, e => this.openEditor(e))
+      );
+    }
 
     // Register the commands with VSCode after the backend is setup.
     this.updateCommands();
@@ -191,9 +199,14 @@ export class Ctx {
         isDocumentInWorkspace(editor.document)
       ) {
         this.cache.havoc();
-        this.view!.reset(await this.getFreshWebViewData());
+        this.view!.havoc();
+        if (this.activeRustEditor) {
+          this.openEditor(this.activeRustEditor);
+        }
       }
     });
+
+    await openingEditor;
   }
 
   get visibleEditors(): RustEditor[] {
@@ -202,12 +215,12 @@ export class Ctx {
 
   private async openEditor(editor: RustEditor) {
     // Load the obligations in the file, while we have the editor.
-    const obl = await this.loadObligations(editor);
+    const [obl, sig] = await this.loadObligations(editor);
     if (obl) {
       if (this.view === undefined) {
         console.debug("View not initialized, skipping editor open.");
       }
-      return this.view?.openEditor(editor, obl);
+      return this.view?.openEditor(editor, sig, obl);
     }
   }
 
@@ -218,16 +231,19 @@ export class Ctx {
   // Here we load the obligations for a file, and cache the results,
   // there's a distinction between having an editor and not because
   // we only have definitive access to the editor when it's visible.
-  private async loadObligations(editor: RustEditor) {
-    const obligations = await this.cache.getObligationsInBody(
+  private async loadObligations(
+    editor: RustEditor
+  ): Promise<[ObligationsInBody[] | undefined, string]> {
+    const [obligationsP, sig] = this.cache.getObligationsInBody(
       editor.document.fileName
     );
+    const obligations = await obligationsP;
     if (obligations === undefined) {
-      return;
+      return [undefined, sig];
     }
 
     this.refreshDiagnostics(editor, obligations);
-    return obligations;
+    return [obligations, sig];
   }
 
   async getObligations(filename: Filename) {
@@ -260,8 +276,8 @@ export class Ctx {
       type: "trait" | "ambig";
     }
 
-    const info =
-      (await this.cache.getObligationsInBody(document.fileName)) ?? [];
+    const [infoP, _sig] = this.cache.getObligationsInBody(document.fileName);
+    const info = (await infoP) ?? [];
 
     const traitRecs: Rec[] = _.flatMap(info, ob =>
       _.map(ob.traitErrors, e => ({
@@ -390,17 +406,15 @@ export class Ctx {
     );
   }
 
-  private async getFreshWebViewData(): Promise<
-    [Filename, ObligationsInBody[]][]
-  > {
+  private async getFreshWebViewData() {
     const initialData = await Promise.all(
       _.map(this.visibleEditors, async e => [
         e.document.fileName,
-        await this.cache.getObligationsInBody(e.document.fileName),
+        await this.cache.getObligationsInBody(e.document.fileName)[0],
       ])
     );
-    // FIXME: how to make TS figure this out?
-    return _.filter(initialData, ([_, obl]) => obl !== undefined) as any;
+    const f = _.filter(initialData, ([_, obl]) => obl !== undefined);
+    return f as [Filename, ObligationsInBody[]][];
   }
 
   private updateCommands() {
@@ -416,10 +430,11 @@ export class Ctx {
   }
 }
 
+// TODO: all running operations on the system need to be cancellable.
 class BackendCache {
   private obligationCache: Record<
     Filename,
-    Promise<ObligationsInBody[] | undefined>
+    [Promise<ObligationsInBody[] | undefined>, string]
   >;
   private treeCache: Record<
     Filename,
@@ -438,7 +453,7 @@ class BackendCache {
     this.treeCache = {};
   }
 
-  async getObligationsInBody(filename: Filename) {
+  getObligationsInBody(filename: Filename) {
     if (this.obligationCache[filename] !== undefined) {
       return this.obligationCache[filename];
     }
@@ -454,18 +469,17 @@ class BackendCache {
       return res.value;
     };
 
-    this.obligationCache[filename] = thunk();
-    return await this.obligationCache[filename];
+    this.obligationCache[filename] = [thunk(), makeid(8)] as [
+      Promise<ObligationsInBody[] | undefined>,
+      string
+    ];
+    return this.obligationCache[filename];
   }
 
-  async getTreeForObligation(
-    filename: Filename,
-    obl: Obligation,
-    range: CharRange
-  ) {
+  getTreeForObligation(filename: Filename, obl: Obligation, range: CharRange) {
     if (this.treeCache[filename] !== undefined) {
       if (this.treeCache[filename][obl.hash] !== undefined) {
-        return await this.treeCache[filename][obl.hash];
+        return this.treeCache[filename][obl.hash];
       }
     } else {
       this.treeCache[filename] = {};
@@ -506,6 +520,6 @@ class BackendCache {
     };
 
     this.treeCache[filename][obl.hash] = thunk();
-    return await this.treeCache[filename][obl.hash];
+    return this.treeCache[filename][obl.hash];
   }
 }
