@@ -9,6 +9,7 @@ import React, { useContext } from "react";
 
 import { AppContext, TreeAppContext } from "../utilities/context";
 import BottomUp from "./BottomUp";
+import FailedSubsets from "./Subsets";
 import TopDown from "./TopDown";
 import "./TreeApp.css";
 import TreeCycle from "./TreeCycle";
@@ -45,8 +46,12 @@ const TreeApp = ({
 
   const tabs: [string, React.FC][] = [["Top Down", TopDown]];
 
-  if (treeInfo.errorLeaves().length > 0) {
-    tabs.unshift(["Bottom Up", BottomUp]);
+  // if (treeInfo.errorLeaves().length > 0) {
+  //   tabs.unshift(["Bottom Up", BottomUp]);
+  // }
+
+  if (true) {
+    tabs.unshift(["Bottom Up", FailedSubsets]);
   }
 
   // HACK: we shouldn't test for eval mode here but Playwright is off on the button click.

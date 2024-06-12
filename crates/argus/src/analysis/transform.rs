@@ -9,7 +9,7 @@ use rustc_infer::{
 };
 use rustc_middle::ty::{self, ParamEnvAnd, Ty, TyCtxt, TypeckResults, Upcast};
 use rustc_span::Span;
-use rustc_utils::source_map::range::CharRange;
+use rustc_utils::source_map::{range::CharRange, span::SpanExt};
 
 use super::{
   hir::{self as hier_hir, Bin, BinKind},
@@ -43,15 +43,12 @@ pub fn compute_provenance<'tcx>(
 ) -> Provenance<Obligation> {
   let hir = infcx.tcx.hir();
   let fdata = infcx.bless_fulfilled(obligation, result, false);
-
   // If the span is coming from a macro, point to the callsite.
-  let callsite_cause_span = fdata.obligation.cause.span.source_callsite();
-  let hir_id = hier_hir::find_most_enclosing_node(
-    &infcx.tcx,
-    body_id,
-    callsite_cause_span,
-  )
-  .unwrap_or_else(|| hir.body_owner(body_id));
+  let callsite_cause_span =
+    infcx.tcx.to_local(body_id, fdata.obligation.cause.span);
+  let hir_id =
+    hier_hir::find_most_enclosing_node(infcx.tcx, body_id, callsite_cause_span)
+      .unwrap_or_else(|| hir.body_owner(body_id));
 
   Provenance {
     hir_id,
@@ -61,17 +58,22 @@ pub fn compute_provenance<'tcx>(
   }
 }
 
-fn expect_trait_ref<'tcx>(
-  p: &ty::Predicate<'tcx>,
-) -> ty::Binder<'tcx, ty::TraitPredicate<'tcx>> {
-  p.kind().map_bound(|f| {
-    let ty::PredicateKind::Clause(ty::ClauseKind::Trait(tr)) = f else {
-      unreachable!();
-    };
-    tr
-  })
-}
-
+/// Transform a set of obligations into categorized trait errors.
+///
+/// `bins` coarsely associates obligations with HIR *expressions*. In
+/// the future we should be even more precise and associate them with
+/// arbitrary nodes. This is important because predicates like `WellFormed`
+/// associate with signature types.
+///
+/// 1. Take the map of 'HIR ids -> obligations' and sort these into
+///    expressions. This leaves us with a map of 'expressions -> hirids'.
+/// 2. Look at the rustc reported trait errors and find the obligations in
+///    out stack. This can be tricky because we have root goals but rustc
+///    reports the lowest non-branching obligations. See `tree_search` for a
+///    dirty way of estimating this.
+/// 3. Relate "ambiguous" method calls. These don't get reported in the set of
+///    rustc trait errors (not sure why) but we need to represent them as
+///    trait errors.
 pub fn transform<'a, 'tcx: 'a>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
@@ -84,8 +86,8 @@ pub fn transform<'a, 'tcx: 'a>(
 ) -> ObligationsInBody {
   #[cfg(debug_assertions)]
   {
-    assert!(synthetic_data.is_empty(), "synthetic data not empty");
-    assert!(
+    debug_assert!(synthetic_data.is_empty(), "synthetic data not empty");
+    debug_assert!(
       obligations.iter().all(|p| !p.is_synthetic),
       "synthetic obligations exist before method call table construction"
     );
@@ -102,10 +104,17 @@ pub fn transform<'a, 'tcx: 'a>(
     })
     .collect::<Vec<_>>();
 
+  let hir = tcx.hir();
+  let source_map = tcx.sess.source_map();
+  let body_span = hir.body(body_id).value.span;
+  let body_range = CharRange::from_span(body_span, source_map)
+    .expect("Couldn't get body range");
+
   let mut builder = ObligationsBuilder {
     tcx,
     body_id,
     typeck_results,
+    body_span,
 
     raw_obligations: obligations_idx,
     obligations: &obligations_with_idx,
@@ -113,11 +122,11 @@ pub fn transform<'a, 'tcx: 'a>(
     synthetic_data,
     reported_trait_errors,
 
-    exprs_to_hir_id: Default::default(),
-    ambiguity_errors: Default::default(),
-    trait_errors: Default::default(),
-    exprs: Default::default(),
-    method_lookups: Default::default(),
+    exprs_to_hir_id: HashMap::default(),
+    ambiguity_errors: IndexSet::default(),
+    trait_errors: Vec::default(),
+    exprs: IndexVec::default(),
+    method_lookups: IndexVec::default(),
   };
 
   builder.sort_bins(bins);
@@ -136,12 +145,6 @@ pub fn transform<'a, 'tcx: 'a>(
     builder.relate_unreported_errors();
     property_is_ok!(builder.is_valid(), "builder is invalid");
   }
-
-  let hir = tcx.hir();
-  let source_map = tcx.sess.source_map();
-  let body_range =
-    CharRange::from_span(hir.body(body_id).value.span, source_map)
-      .expect("Couldn't get body range");
 
   let name = obligation_data.iter().next().map(|fdata| {
     (
@@ -164,6 +167,7 @@ pub fn transform<'a, 'tcx: 'a>(
 struct ObligationsBuilder<'a, 'tcx: 'a> {
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
+  body_span: Span,
   full_data: &'a ObligationQueriesInBody<'tcx>,
   typeck_results: &'tcx TypeckResults<'tcx>,
   reported_trait_errors: &'a FxIndexMap<Span, Vec<ObligationHash>>,
@@ -182,102 +186,110 @@ struct ObligationsBuilder<'a, 'tcx: 'a> {
 }
 
 impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
-  pub(self) fn sort_bins(&mut self, bins: Vec<Bin>) {
-    use ExprKind::*;
+  fn to_local(&self, span: Span) -> Span {
+    span.as_local(self.body_span).unwrap_or(span)
+  }
+
+  fn local_snip(&self, span: Span) -> String {
+    let source_map = self.tcx.sess.source_map();
+    source_map
+      .span_to_snippet(span)
+      .unwrap_or_else(|_| String::from("{unknown snippet}"))
+  }
+
+  fn sort_bins(&mut self, bins: Vec<Bin>) {
+    use ExprKind as EK;
 
     let hir = self.tcx.hir();
     let source_map = self.tcx.sess.source_map();
-
-    for Bin {
-      hir_id,
-      obligations,
-      kind,
-    } in bins
-    {
-      let span = hir.span_with_body(hir_id).source_callsite();
-      if let Some((range, snippet)) =
-        CharRange::from_span(span, source_map).ok().and_then(|r| {
-          let snip = source_map
-            .span_to_snippet(span)
-            .unwrap_or_else(|_| String::from("{unknown snippet}"));
-          Some((r, snip))
-        })
-      {
-        let mut ambiguous_call = None;
-        let kind = match kind {
-          BinKind::Misc => Misc,
-          BinKind::CallableExpr => CallableExpr,
-          BinKind::CallArg => CallArg,
-          BinKind::Call => Call,
-          BinKind::MethodReceiver => MethodReceiver,
-          BinKind::MethodCall => {
-            let hir::Node::Expr(
-              call_expr @ hir::Expr {
-                kind: hir::ExprKind::MethodCall(segment, recvr, args, call_span),
-                ..
-              },
-            ) = hir.hir_node(hir_id)
-            else {
-              unreachable!(
-                "bin kind is method call, but node is not method call"
-              );
-            };
-
-            if let Some((idx, error_recvr, error_call)) = self
-              .relate_method_call(
-                call_expr,
-                segment,
-                recvr,
-                args,
-                *call_span,
-                &obligations,
-              )
-            {
-              if error_recvr || error_call {
-                ambiguous_call = Some(call_span);
-              }
-
-              MethodCall {
-                data: idx,
-                error_recvr,
-              }
-            } else {
-              log::warn!(
-                "failed to build method call table for {}",
-                self.tcx.hir().node_to_string(call_expr.hir_id)
-              );
-              Misc
-            }
-          }
-        };
-
-        let obligations = obligations
-          .into_iter()
-          .map(|idx| *self.obligations[idx])
-          .collect::<Vec<_>>();
-
-        let is_body = hir_id == self.tcx.hir().body_owner(self.body_id);
-        let expr_idx = self.exprs.push(Expr {
-          range,
-          snippet,
-          obligations,
-          kind,
-          is_body,
-        });
-        self.exprs_to_hir_id.insert(expr_idx, hir_id);
-        if let Some(call_span) = ambiguous_call {
-          let range = CharRange::from_span(*call_span, source_map)
-            .expect("failed to get range for ambiguous call");
-          self.ambiguity_errors.insert(AmbiguityError {
-            idx: expr_idx,
-            range,
-          });
-        }
-      } else {
+    for bin in bins {
+      let Bin {
+        hir_id,
+        obligations,
+        kind,
+      } = bin;
+      let span = self.to_local(hir.span_with_body(hir_id));
+      let snippet = self.local_snip(span);
+      let Ok(range) = CharRange::from_span(span, source_map) else {
         log::error!(
           "failed to get range for HIR: {}",
           hir.node_to_string(hir_id)
         );
+        continue;
+      };
+
+      log::debug!(
+          "Sorting at\nrange:{range:?}\nhir_span: {:?}\nfrom_expansion: {}\nspan: {span:?}",
+          hir.span_with_body(hir_id),
+          hir.span_with_body(hir_id).from_expansion()
+        );
+      let mut ambiguous_call = None;
+      let kind = match kind {
+        BinKind::Misc => EK::Misc,
+        BinKind::CallableExpr => EK::CallableExpr,
+        BinKind::CallArg => EK::CallArg,
+        BinKind::Call => EK::Call,
+        BinKind::MethodReceiver => EK::MethodReceiver,
+        BinKind::MethodCall => {
+          let hir::Node::Expr(
+            call_expr @ hir::Expr {
+              kind: hir::ExprKind::MethodCall(segment, recvr, args, call_span),
+              ..
+            },
+          ) = hir.hir_node(hir_id)
+          else {
+            unreachable!(
+              "bin kind is method call, but node is not method call"
+            );
+          };
+
+          if let Some((idx, error_recvr, error_call)) = self.relate_method_call(
+            call_expr,
+            segment,
+            recvr,
+            args,
+            *call_span,
+            &obligations,
+          ) {
+            if error_recvr || error_call {
+              ambiguous_call = Some(call_span);
+            }
+
+            EK::MethodCall {
+              data: idx,
+              error_recvr,
+            }
+          } else {
+            log::warn!(
+              "failed to build method call table for {}",
+              self.tcx.hir().node_to_string(call_expr.hir_id)
+            );
+            EK::Misc
+          }
+        }
+      };
+
+      let obligations = obligations
+        .into_iter()
+        .map(|idx| *self.obligations[idx])
+        .collect::<Vec<_>>();
+
+      let is_body = hir_id == self.tcx.hir().body_owner(self.body_id);
+      let expr_idx = self.exprs.push(Expr {
+        range,
+        snippet,
+        obligations,
+        kind,
+        is_body,
+      });
+      self.exprs_to_hir_id.insert(expr_idx, hir_id);
+      if let Some(call_span) = ambiguous_call {
+        let range = CharRange::from_span(*call_span, source_map)
+          .expect("failed to get range for ambiguous call");
+        self.ambiguity_errors.insert(AmbiguityError {
+          idx: expr_idx,
+          range,
+        });
       }
     }
   }
@@ -289,7 +301,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     self
       .raw_obligations
       .iter_enumerated()
-      .find_map(|(obl_id, obl)| (obl.hash == needle).then(|| obl_id))
+      .find_map(|(obl_id, obl)| (obl.hash == needle).then_some(obl_id))
   }
 
   fn shallow_tree_predicate_search(
@@ -306,14 +318,19 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         &full_data.obligation,
         needle,
       )
-      .then(|| prov.it)
+      .then_some(prov.it)
     })
   }
 
   fn relate_trait_bounds(&mut self) {
-    for (span, predicates) in self.reported_trait_errors.iter() {
-      let range = CharRange::from_span(*span, self.tcx.sess.source_map())
+    for (&span, predicates) in self.reported_trait_errors {
+      let span = self.to_local(span);
+      let range = CharRange::from_span(span, self.tcx.sess.source_map())
         .expect("failed to get range for reported trait error");
+
+      log::debug!(
+        "Relating trait bounds:\nrange {range:?}\nspan: {span:?}\n{predicates:#?}"
+      );
 
       // Search for the obligation hash in our set of computed obligations.
       let predicates = predicates
@@ -329,7 +346,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       // Associate these with an expression, first comes first served.
       let mut root_expr = None;
       'outer: for (expr_id, expr) in self.exprs.iter_enumerated() {
-        for (p, _) in predicates.iter() {
+        for (p, _) in &predicates {
           if expr.obligations.contains(p) {
             root_expr = Some(expr_id);
             break 'outer;
@@ -356,7 +373,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       // A predicate did not match exactly, now we're scrambling
       // to find an expression by span, and pick an obligation.
       let Some(err_hir_id) =
-        hier_hir::find_most_enclosing_node(&self.tcx, self.body_id, *span)
+        hier_hir::find_most_enclosing_node(self.tcx, self.body_id, span)
       else {
         log::error!("reported error doesn't have an associated span ...");
         continue;
@@ -410,6 +427,8 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     // FIXME: type the `usize` here,
     obligations: &[usize],
   ) -> Option<(MethodLookupIdx, bool, bool)> {
+    panic!("We shouldn't be computing synthetic goals rn");
+
     // Given that the receiver is of type error, we can tell users
     // to annotate the receiver type if they want to get "better"
     // error messages (potentially).
@@ -437,11 +456,8 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         }
 
         // Bounds for extension method calls are always trait predicates.
-        let is_necessary = fdata.obligation.predicate.is_trait_predicate();
-
-        is_necessary.then(|| {
-          (idx, expect_trait_ref(&fdata.obligation.predicate).def_id())
-        })
+        let tp = fdata.obligation.predicate.as_trait_predicate()?;
+        Some((idx, tp.def_id()))
       })
       .unzip();
 
@@ -481,7 +497,12 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
 
     let infcx = &query.infcx;
     let o = &query.obligation;
-    let self_ty = expect_trait_ref(&o.predicate).self_ty().skip_binder();
+    let self_ty = o
+      .predicate
+      .as_trait_predicate()
+      .expect("trait predicate")
+      .self_ty()
+      .skip_binder();
     let param_env = o.param_env;
 
     let mut original_values = OriginalQueryValues::default();
@@ -520,9 +541,9 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     let mut table = Vec::default();
 
     infcx.probe(|_| {
-      for ty_adjust in ty_mutators.into_iter() {
+      for ty_adjust in ty_mutators {
         let mut method_steps = Vec::default();
-        for step in steps.steps.iter() {
+        for step in steps.steps {
           let InferOk {
             value: self_ty,
             obligations: _,
@@ -539,7 +560,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           let step = ReceiverAdjStep::new(infcx, self_ty);
 
           let mut trait_predicates = Vec::default();
-          for trait_ref in trait_candidates.iter() {
+          for trait_ref in &trait_candidates {
             let trait_ref = trait_ref.with_self_ty(tcx, self_ty);
 
             let predicate: ty::Predicate<'tcx> = trait_ref.upcast(self.tcx);
@@ -553,13 +574,8 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
             infcx.probe(|_| {
               let res = infcx.evaluate_obligation(&obligation);
 
-              let mut with_provenance = compute_provenance(
-                self.body_id,
-                &infcx,
-                &obligation,
-                res,
-                None,
-              );
+              let mut with_provenance =
+                compute_provenance(self.body_id, infcx, &obligation, res, None);
 
               let syn_id = self.synthetic_data.add(SyntheticData {
                 full_data: full_query_idx,
@@ -571,7 +587,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
               with_provenance.mark_as_synthetic(syn_id);
 
               trait_predicates
-                .push(self.raw_obligations.push(with_provenance.forget()))
+                .push(self.raw_obligations.push(with_provenance.forget()));
             });
 
             property_is_ok!(
@@ -583,7 +599,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           method_steps.push(MethodStep {
             recvr_ty: step,
             trait_predicates,
-          })
+          });
         }
 
         table.extend(method_steps);
@@ -637,7 +653,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
 
   #[cfg(any(feature = "testing", debug_assertions))]
   fn is_valid(&self) -> anyhow::Result<()> {
-    for obl in self.raw_obligations.iter() {
+    for obl in &self.raw_obligations {
       if obl.is_synthetic {
         // assert that synthetic obligation exists
         let exists = self
@@ -645,14 +661,14 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           .iter()
           .any(|sdata| obl.hash == sdata.hash);
 
-        anyhow::ensure!(exists, "synthetic data not found for {:?}", obl)
+        anyhow::ensure!(exists, "synthetic data not found for {:?}", obl);
       } else if matches!(obl.necessity, ObligationNecessity::Yes)
         || (matches!(obl.necessity, ObligationNecessity::OnError)
           && obl.result.is_err())
       {
         let exists = self.full_data.iter().any(|fdata| fdata.hash == obl.hash);
 
-        anyhow::ensure!(exists, "full data not found for {:?}", obl)
+        anyhow::ensure!(exists, "full data not found for {:?}", obl);
       }
     }
 

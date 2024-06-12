@@ -53,6 +53,10 @@ impl<N: Idx, Marker> Path<N, Marker> {
   pub fn iter_exclusive(&self) -> impl Iterator<Item = &N> {
     self.path.iter().skip(1)
   }
+
+  pub fn len(&self) -> usize {
+    self.path.len()
+  }
 }
 
 impl<N: Idx> Path<N, ToRoot> {
@@ -67,9 +71,9 @@ impl<N: Idx> Path<N, ToRoot> {
   }
 }
 
-impl Into<super::ProofCycle> for Path<ProofNodeIdx, ToRoot> {
-  fn into(self) -> super::ProofCycle {
-    let from_root = self.reverse();
+impl From<Path<ProofNodeIdx, ToRoot>> for super::ProofCycle {
+  fn from(val: Path<ProofNodeIdx, ToRoot>) -> super::ProofCycle {
+    let from_root = val.reverse();
     super::ProofCycle(from_root.path)
   }
 }
@@ -99,6 +103,10 @@ impl TreeTopology {
     self.parent.insert(to, from);
   }
 
+  pub fn is_parent(&self, parent: ProofNodeIdx, child: ProofNodeIdx) -> bool {
+    self.parent.get(&child).map_or(false, |p| *p == parent)
+  }
+
   pub fn is_leaf(&self, node: ProofNodeIdx) -> bool {
     match self.children.get(&node) {
       None => true,
@@ -108,6 +116,28 @@ impl TreeTopology {
 
   pub fn parent(&self, to: ProofNodeIdx) -> Option<ProofNodeIdx> {
     self.parent.get(&to).copied()
+  }
+
+  pub fn children(
+    &self,
+    from: ProofNodeIdx,
+  ) -> impl Iterator<Item = ProofNodeIdx> + '_ {
+    self
+      .children
+      .get(&from)
+      .into_iter()
+      .flat_map(|c| c.iter().copied())
+  }
+
+  pub fn iter(&self) -> impl Iterator<Item = ProofNodeIdx> + '_ {
+    use itertools::Itertools;
+    // TODO: just take the parents and chain the root
+    self
+      .parent
+      .keys()
+      .copied()
+      .chain(self.children.keys().copied())
+      .unique()
   }
 
   pub fn path_to_root(&self, node: ProofNodeIdx) -> Path<ProofNodeIdx, ToRoot> {
@@ -131,5 +161,14 @@ impl TreeTopology {
       path,
       _marker: PhantomData,
     }
+  }
+
+  pub fn depth(&self, mut idx: ProofNodeIdx) -> usize {
+    let mut d = 0;
+    while let Some(p) = self.parent(idx) {
+      d += 1;
+      idx = p;
+    }
+    d
   }
 }

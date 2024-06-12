@@ -31,10 +31,7 @@ impl<'tcx> TyDef<'tcx> {
 
 pub struct Slice__TyDef;
 impl Slice__TyDef {
-  pub fn serialize<'tcx, S>(
-    value: &[ty::Ty<'tcx>],
-    s: S,
-  ) -> Result<S::Ok, S::Error>
+  pub fn serialize<S>(value: &[ty::Ty], s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -46,10 +43,7 @@ impl Slice__TyDef {
 
 pub struct Option__TyDef;
 impl Option__TyDef {
-  pub fn serialize<'tcx, S>(
-    value: &Option<ty::Ty<'tcx>>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
+  pub fn serialize<S>(value: &Option<ty::Ty>, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -186,8 +180,8 @@ impl<'tcx> From<&ty::TyKind<'tcx>> for TyKindDef<'tcx> {
       ty::TyKind::Closure(def_id, args) => {
         Self::Closure(path::PathDefWithArgs::new(*def_id, args))
       }
-      ty::TyKind::FnPtr(v) => Self::FnPtr(v.clone()),
-      ty::TyKind::Param(param_ty) => Self::Param(param_ty.clone()),
+      ty::TyKind::FnPtr(v) => Self::FnPtr(*v),
+      ty::TyKind::Param(param_ty) => Self::Param(*param_ty),
       ty::TyKind::Bound(dji, bound_ty) => {
         Self::Bound(BoundTyDef::new(*dji, *bound_ty))
       }
@@ -241,8 +235,6 @@ pub enum AliasTyKindDef<'tcx> {
 impl<'tcx> AliasTyKindDef<'tcx> {
   pub fn new(kind: ty::AliasTyKind, ty: ty::AliasTy<'tcx>) -> Self {
     let infcx = get_dynamic_ctx();
-    log::debug!("Serializing type Alias {:?} {:?}", kind, ty);
-
     match (kind, ty) {
       (
         ty::AliasTyKind::Projection
@@ -387,7 +379,7 @@ impl<'tcx> PolyExistentialPredicatesDef<'tcx> {
     });
     let auto_traits: Vec<_> = predicates
       .auto_traits()
-      .map(|def_id| path::PathDefNoArgs::new(def_id))
+      .map(path::PathDefNoArgs::new)
       .collect::<Vec<_>>();
 
     Self { data, auto_traits }
@@ -431,7 +423,7 @@ impl<'tcx> CoroutineTyKindDef<'tcx> {
     let movability = coroutine_kind.movability();
 
     Self {
-      path: path::PathDefWithArgs::new(def_id, &*args),
+      path: path::PathDefWithArgs::new(def_id, args),
       movability,
       upvar_tys,
       witness,
@@ -484,7 +476,7 @@ impl<'tcx> CoroutineClosureTyKindDef<'tcx> {
     let witness = args.as_coroutine_closure().coroutine_witness_ty();
 
     Self {
-      path: path::PathDefWithArgs::new(def_id, &*args),
+      path: path::PathDefWithArgs::new(def_id, args),
       closure_kind,
       signature_parts,
       upvar_tys,
@@ -551,7 +543,7 @@ pub enum PlaceholderTyDef {
 }
 
 impl PlaceholderTyDef {
-  pub fn serialize<'tcx, S>(
+  pub fn serialize<S>(
     value: &ty::Placeholder<ty::BoundTy>,
     s: S,
   ) -> Result<S::Ok, S::Error>
@@ -939,16 +931,14 @@ impl<'tcx> RegionDef {
       // XXX: the catch all case is for those from above with guards, in the
       // future if we expand the capabilities of the region printing this will
       // need to change.
-      ty::ReVar(_) | ty::ReErased | ty::ReError(_) | _ => Self::Anonymous,
+      ty::ReVar(_) | ty::ReErased | ty::ReError(_) => Self::Anonymous,
+      _ => Self::Anonymous,
     }
   }
 }
 
 impl RegionDef {
-  pub fn serialize<'tcx, S>(
-    value: &ty::Region<'tcx>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
+  pub fn serialize<S>(value: &ty::Region, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -958,10 +948,7 @@ impl RegionDef {
 
 pub struct Slice__RegionDef;
 impl Slice__RegionDef {
-  pub fn serialize<'tcx, S>(
-    value: &[ty::Region<'tcx>],
-    s: S,
-  ) -> Result<S::Ok, S::Error>
+  pub fn serialize<S>(value: &[ty::Region], s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -996,10 +983,7 @@ impl<'tcx> GenericArgDef<'tcx> {
 
 pub struct Slice__GenericArgDef;
 impl Slice__GenericArgDef {
-  pub fn serialize<'tcx, S>(
-    value: &[ty::GenericArg<'tcx>],
-    s: S,
-  ) -> Result<S::Ok, S::Error>
+  pub fn serialize<S>(value: &[ty::GenericArg], s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -1212,7 +1196,7 @@ impl<'tcx> Binder__PredicateKind<'tcx> {
   {
     Binder__PredicateKind {
       bound_vars: value.bound_vars().to_vec(),
-      value: value.skip_binder().clone(),
+      value: value.skip_binder(),
     }
     .serialize(s)
   }
@@ -1344,10 +1328,7 @@ impl<'tcx> ClauseDef<'tcx> {
 
 pub struct Slice__ClauseDef;
 impl Slice__ClauseDef {
-  pub fn serialize<'tcx, S>(
-    value: &[ty::Clause<'tcx>],
-    s: S,
-  ) -> Result<S::Ok, S::Error>
+  pub fn serialize<S>(value: &[ty::Clause], s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -1407,19 +1388,19 @@ impl<'tcx> ClauseKindDef<'tcx> {
 impl<'tcx> From<&ty::ClauseKind<'tcx>> for ClauseKindDef<'tcx> {
   fn from(value: &ty::ClauseKind<'tcx>) -> Self {
     match value {
-      ty::ClauseKind::Trait(v) => Self::Trait(v.clone()),
+      ty::ClauseKind::Trait(v) => Self::Trait(*v),
       ty::ClauseKind::RegionOutlives(v) => {
         Self::RegionOutlives(RegionOutlivesRegionDef::new(v))
       }
       ty::ClauseKind::TypeOutlives(v) => {
         Self::TypeOutlives(TyOutlivesRegionDef::new(v))
       }
-      ty::ClauseKind::Projection(v) => Self::Projection(v.clone()),
+      ty::ClauseKind::Projection(v) => Self::Projection(*v),
       ty::ClauseKind::ConstArgHasType(v1, v2) => {
-        Self::ConstArgHasType(v1.clone(), v2.clone())
+        Self::ConstArgHasType(*v1, *v2)
       }
-      ty::ClauseKind::WellFormed(v) => Self::WellFormed(v.clone()),
-      ty::ClauseKind::ConstEvaluatable(v) => Self::ConstEvaluatable(v.clone()),
+      ty::ClauseKind::WellFormed(v) => Self::WellFormed(*v),
+      ty::ClauseKind::ConstEvaluatable(v) => Self::ConstEvaluatable(*v),
     }
   }
 }
@@ -1595,7 +1576,7 @@ impl_polarity_repr! {
 
 impl Polarity {
   fn serialize<S>(
-    value: impl PolarityRepresentation,
+    value: &impl PolarityRepresentation,
     s: S,
   ) -> Result<S::Ok, S::Error>
   where
@@ -1629,8 +1610,8 @@ impl<'tcx> RegionOutlivesRegionDef<'tcx> {
     value: &ty::OutlivesPredicate<ty::Region<'tcx>, ty::Region<'tcx>>,
   ) -> Self {
     Self {
-      a: value.0.clone(),
-      b: value.1.clone(),
+      a: value.0,
+      b: value.1,
     }
   }
 }
@@ -1653,8 +1634,8 @@ impl<'tcx> TyOutlivesRegionDef<'tcx> {
     value: &ty::OutlivesPredicate<ty::Ty<'tcx>, ty::Region<'tcx>>,
   ) -> Self {
     Self {
-      a: value.0.clone(),
-      b: value.1.clone(),
+      a: value.0,
+      b: value.1,
     }
   }
 }
@@ -1705,7 +1686,7 @@ pub struct ParamTyDef {
 pub struct SymbolDef<'a>(&'a str);
 
 impl<'a> SymbolDef<'a> {
-  pub fn serialize<'tcx, S>(value: &'a Symbol, s: S) -> Result<S::Ok, S::Error>
+  pub fn serialize<S>(value: &'a Symbol, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -1715,7 +1696,7 @@ impl<'a> SymbolDef<'a> {
 
 pub struct Slice__SymbolDef;
 impl Slice__SymbolDef {
-  pub fn serialize<'tcx, S>(value: &[Symbol], s: S) -> Result<S::Ok, S::Error>
+  pub fn serialize<S>(value: &[Symbol], s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -1880,6 +1861,7 @@ impl<'tcx> OpaqueImpl<'tcx> {
   }
 
   // TODO: what the hell should we do with binders ...
+  #[allow(clippy::let_and_return)]
   pub fn wrap_binder<T, O, C: FnOnce(&T) -> O>(
     value: &ty::Binder<'tcx, T>,
     f: C,
@@ -1898,6 +1880,7 @@ impl<'tcx> OpaqueImpl<'tcx> {
 }
 
 impl<'tcx> OpaqueImpl<'tcx> {
+  #[allow(clippy::too_many_lines)]
   pub fn new(
     def_id: DefId,
     args: &'tcx ty::List<ty::GenericArg<'tcx>>,
@@ -1932,7 +1915,7 @@ impl<'tcx> OpaqueImpl<'tcx> {
                 continue;
               }
               ty::PredicatePolarity::Negative => {
-                has_negative_sized_bound = true
+                has_negative_sized_bound = true;
               }
             }
           }
@@ -2029,7 +2012,7 @@ impl<'tcx> OpaqueImpl<'tcx> {
             }
           }
         }
-      })
+      });
     }
 
     // Print the rest of the trait types (that aren't Fn* family of traits)
@@ -2052,11 +2035,10 @@ impl<'tcx> OpaqueImpl<'tcx> {
           {
             if let ty::Coroutine(_, args) = args.type_at(0).kind() {
               let return_ty = args.as_coroutine().return_ty();
-              if !return_ty.is_ty_var() {
-                return_ty.into()
-              } else {
+              if return_ty.is_ty_var() {
                 continue;
               }
+              return_ty.into()
             } else {
               continue;
             }

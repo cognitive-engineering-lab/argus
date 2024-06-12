@@ -109,7 +109,7 @@ impl<'a, 'b, 'tcx> ProofTreeFormatter<'a, 'b> {
 
   fn format_candidate(
     &mut self,
-    candidate: InspectCandidate<'_, 'tcx>,
+    candidate: InspectCandidate,
   ) -> std::fmt::Result {
     write!(self.f, "{:?}", candidate.kind())?;
     self.nested(|this| {
@@ -127,6 +127,6 @@ impl<'a, 'b, 'tcx> ProofTreeVisitor<'tcx> for ProofTreeFormatter<'a, 'b> {
   }
 
   fn visit_goal(&mut self, goal: &InspectGoal<'_, 'tcx>) -> Self::Result {
-    self.format_goal(goal).unwrap()
+    self.format_goal(goal).unwrap();
   }
 }

@@ -133,14 +133,14 @@ pub enum ImplKind {
 impl PathSegment<'_> {
   pub fn unambiguous_name(name: Symbol) -> Self {
     PathSegment::DefPathDataName {
-      name: name.clone(),
+      name,
       disambiguator: None,
     }
   }
 
   pub fn ambiguous_name(name: Symbol, disambiguator: u32) -> Self {
     PathSegment::DefPathDataName {
-      name: name.clone(),
+      name,
       disambiguator: Some(disambiguator),
     }
   }

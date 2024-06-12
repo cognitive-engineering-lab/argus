@@ -6,21 +6,28 @@ use rustc_hir::{def_id::DefId, BodyId, HirId};
 use rustc_hir_typeck::inspect_typeck;
 use rustc_infer::{
   infer::InferCtxt,
-  traits::{ObligationInspector, PredicateObligation},
+  traits::{solve::CandidateSource, ObligationInspector, PredicateObligation},
 };
 use rustc_middle::ty::{
-  self, Predicate, Ty, TyCtxt, TypeFoldable, TypeckResults,
+  self, Predicate, Ty, TyCtxt, TypeFoldable, TypeSuperVisitable, TypeVisitable,
+  TypeVisitor, TypeckResults,
 };
 use rustc_query_system::ich::StableHashingContext;
-use rustc_span::FileName;
-use rustc_trait_selection::traits::solve::Certainty;
+use rustc_span::{symbol::sym, FileName, Span};
+use rustc_trait_selection::{
+  solve::inspect::{InspectCandidate, ProbeKind},
+  traits::{
+    query::NoSolution,
+    solve::{Certainty, MaybeCause},
+  },
+};
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 
 use crate::{
   analysis::{EvaluationResult, FulfillmentData},
   serialize::{
-    safe::TraitRefPrintOnlyTraitPathDef, serialize_to_value,
+    self as ser, safe::TraitRefPrintOnlyTraitPathDef,
     ty::PredicateObligationDef,
   },
   types::{
@@ -34,7 +41,52 @@ pub trait CharRangeExt: Copy + Sized {
   fn overlaps(self, other: Self) -> bool;
 }
 
-pub trait PredicateExt {
+pub trait VarCounterExt<'tcx>: TypeVisitable<TyCtxt<'tcx>> {
+  fn count_vars(self, tcx: TyCtxt<'tcx>) -> usize;
+}
+
+impl<'tcx, T: TypeVisitable<TyCtxt<'tcx>>> VarCounterExt<'tcx> for T {
+  fn count_vars(self, tcx: TyCtxt<'tcx>) -> usize {
+    struct TyVarCounterVisitor {
+      pub count: usize,
+    }
+
+    impl<'tcx> TypeVisitor<TyCtxt<'tcx>> for TyVarCounterVisitor {
+      fn visit_ty(&mut self, ty: ty::Ty<'tcx>) {
+        if matches!(
+          ty.kind(),
+          ty::Infer(ty::TyVar(_) | ty::IntVar(_) | ty::FloatVar(_))
+        ) {
+          self.count += 1;
+        }
+
+        ty.super_visit_with(self);
+      }
+
+      fn visit_const(&mut self, c: ty::Const<'tcx>) {
+        if matches!(c.kind(), ty::ConstKind::Infer(_)) {
+          self.count += 1;
+        }
+
+        c.super_visit_with(self);
+      }
+
+      fn visit_region(&mut self, r: ty::Region<'tcx>) {
+        if matches!(r.kind(), ty::RegionKind::ReVar(_)) {
+          self.count += 1;
+        }
+      }
+    }
+
+    let mut folder = TyVarCounterVisitor { count: 0 };
+    self.visit_with(&mut folder);
+    folder.count
+  }
+}
+
+pub trait PredicateExt<'tcx> {
+  fn as_trait_predicate(&self) -> Option<ty::PolyTraitPredicate<'tcx>>;
+
   fn is_trait_predicate(&self) -> bool;
 
   fn is_lhs_unit(&self) -> bool;
@@ -45,15 +97,22 @@ pub trait PredicateExt {
 
   fn is_main_ty_var(&self) -> bool;
 
-  fn is_projection_ty_var(&self) -> bool;
+  fn is_refined_by(&self, other: &Self) -> bool;
 }
 
-impl PredicateExt for Predicate<'_> {
+impl<'tcx> PredicateExt<'tcx> for Predicate<'tcx> {
+  fn as_trait_predicate(&self) -> Option<ty::PolyTraitPredicate<'tcx>> {
+    if let ty::PredicateKind::Clause(ty::ClauseKind::Trait(tp)) =
+      self.kind().skip_binder()
+    {
+      Some(self.kind().rebind(tp))
+    } else {
+      None
+    }
+  }
+
   fn is_trait_predicate(&self) -> bool {
-    matches!(
-      self.kind().skip_binder(),
-      ty::PredicateKind::Clause(ty::ClauseKind::Trait(..))
-    )
+    self.as_trait_predicate().is_some()
   }
 
   fn is_lhs_unit(&self) -> bool {
@@ -87,14 +146,41 @@ impl PredicateExt for Predicate<'_> {
       )) => ty.is_ty_var(),
       ty::PredicateKind::Clause(ty::ClauseKind::Projection(proj)) => {
         proj.self_ty().is_ty_var()
-          || proj.term.ty().map(|t| t.is_ty_var()).unwrap_or(false)
+          || proj.term.ty().map_or(false, ty::Ty::is_ty_var)
       }
       _ => false,
     }
   }
 
-  fn is_projection_ty_var(&self) -> bool {
-    todo!()
+  // FIXME: I don't think this is fully correct...but it's been sufficient
+  #[allow(clippy::similar_names)]
+  fn is_refined_by(&self, other: &Self) -> bool {
+    let (Some(refinee), Some(refiner)) =
+      (self.as_trait_predicate(), other.as_trait_predicate())
+    else {
+      return false;
+    };
+
+    let refinee = refinee.skip_binder();
+    let refiner = refiner.skip_binder();
+
+    // The trait bound must be equal
+    if refinee.def_id() != refiner.def_id()
+      // The RHS self ty cannot be an inference variable
+      || refiner.self_ty().is_ty_var()
+      // The impl polarity must be equal
+      || refinee.polarity != refiner.polarity
+    {
+      return false;
+    }
+
+    // LHS is _ and RHS is TY with same generic args
+    // The LHS self ty must be an inference variable
+    (refinee.self_ty().is_ty_var()
+      // The generic args must also be the same(...?)
+      && refinee.trait_ref.args == refiner.trait_ref.args)
+    // LHS TY == RHS TY and generic args were updated...(does this happen?)
+    || refinee.self_ty() == refiner.self_ty()
   }
 }
 
@@ -115,6 +201,8 @@ pub trait TyExt<'tcx> {
 pub trait TyCtxtExt<'tcx> {
   fn body_filename(&self, body_id: BodyId) -> FileName;
 
+  fn to_local(&self, body_id: BodyId, span: Span) -> Span;
+
   fn inspect_typeck(
     self,
     body_id: BodyId,
@@ -127,6 +215,17 @@ pub trait TyCtxtExt<'tcx> {
   fn is_parent_of(&self, a: HirId, b: HirId) -> bool;
 
   fn predicate_hash(&self, p: &Predicate<'tcx>) -> Hash64;
+
+  fn is_annotated_do_not_recommend(
+    &self,
+    candidate: &InspectCandidate<'_, 'tcx>,
+  ) -> bool;
+
+  fn does_trait_ref_occur_in(
+    &self,
+    needle: ty::TraitRef<'tcx>,
+    haystack: ty::Predicate<'tcx>,
+  ) -> bool;
 }
 
 pub trait TypeckResultsExt<'tcx> {
@@ -137,6 +236,10 @@ pub trait EvaluationResultExt {
   fn is_yes(&self) -> bool;
   fn is_maybe(&self) -> bool;
   fn is_no(&self) -> bool;
+  fn is_better_than(&self, other: &EvaluationResult) -> bool;
+  fn yes() -> Self;
+  fn no() -> Self;
+  fn maybe() -> Self;
 }
 
 pub trait PredicateObligationExt {
@@ -153,13 +256,14 @@ impl PredicateObligationExt for PredicateObligation<'_> {
 
     // Backup span of the DefId
 
-    let original_span = self.cause.span.source_callsite();
+    let original_span = self.cause.span;
     let span = if original_span.is_dummy() {
       body_span
     } else {
       original_span
     };
 
+    let span = tcx.to_local(body_id, span);
     CharRange::from_span(span, source_map)
       .expect("failed to get range from span")
   }
@@ -224,6 +328,26 @@ impl EvaluationResultExt for EvaluationResult {
 
   fn is_no(&self) -> bool {
     matches!(self, EvaluationResult::Err(..))
+  }
+
+  fn is_better_than(&self, other: &EvaluationResult) -> bool {
+    matches!(
+      (self, other),
+      (Ok(Certainty::Yes), Ok(Certainty::Maybe(..)))
+        | (Ok(Certainty::Maybe(..)), Err(..))
+    )
+  }
+
+  fn yes() -> Self {
+    Ok(Certainty::Yes)
+  }
+
+  fn maybe() -> Self {
+    Ok(Certainty::Maybe(MaybeCause::Ambiguity))
+  }
+
+  fn no() -> Self {
+    Err(NoSolution)
   }
 }
 
@@ -292,6 +416,14 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
     self.sess.source_map().span_to_filename(span)
   }
 
+  fn to_local(&self, body_id: BodyId, span: Span) -> Span {
+    use rustc_utils::source_map::span::SpanExt;
+    let hir = self.hir();
+    let body_owner = hir.body_owner(body_id);
+    let body_span = hir.body(body_id).value.span;
+    span.as_local(body_span).unwrap_or(span)
+  }
+
   fn inspect_typeck(
     self,
     body_id: BodyId,
@@ -340,7 +472,7 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
           continue;
         }
       }
-      pretty_predicates.push(p.clone());
+      pretty_predicates.push(*p);
     }
 
     log::debug!("pretty predicates for impl header {:#?}", pretty_predicates);
@@ -362,11 +494,99 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
   }
 
   fn is_parent_of(&self, a: HirId, b: HirId) -> bool {
-    a == b || self.hir().parent_iter(b).find(|&(id, _)| id == a).is_some()
+    a == b || self.hir().parent_iter(b).any(|(id, _)| id == a)
   }
 
   fn predicate_hash(&self, p: &Predicate<'tcx>) -> Hash64 {
     self.with_stable_hashing_context(|mut hcx| p.stable_hash(self, &mut hcx))
+  }
+
+  fn is_annotated_do_not_recommend(
+    &self,
+    candidate: &InspectCandidate<'_, 'tcx>,
+  ) -> bool {
+    // FIXME: after updating use the function
+    // `tcx.has_attrs_with_path` instead of `get_attrs_by_path`
+    matches!(candidate.kind(), ProbeKind::TraitCandidate {
+            source: CandidateSource::Impl(impl_def_id),
+            ..
+        } if self.get_attrs_by_path(impl_def_id, &[sym::diagnostic, sym::do_not_recommend]).next().is_some())
+  }
+
+  fn does_trait_ref_occur_in(
+    &self,
+    needle: ty::TraitRef<'tcx>,
+    haystack: ty::Predicate<'tcx>,
+  ) -> bool {
+    struct TraitRefVisitor<'tcx> {
+      tr: ty::TraitRef<'tcx>,
+      tcx: TyCtxt<'tcx>,
+      found: bool,
+    }
+
+    impl<'tcx> TraitRefVisitor<'tcx> {
+      fn occurs_in_projection(
+        &self,
+        args: &ty::GenericArgs<'tcx>,
+        def_id: DefId,
+      ) -> bool {
+        let my_ty = self.tr.self_ty();
+        let my_id = self.tr.def_id;
+
+        if args.is_empty() {
+          return false;
+        }
+
+        // FIXME: is it always the first type in the args list?
+        let proj_ty = args.type_at(0);
+        proj_ty == my_ty && self.tcx.is_descendant_of(def_id, my_id)
+      }
+    }
+
+    impl<'tcx> TypeVisitor<TyCtxt<'tcx>> for TraitRefVisitor<'tcx> {
+      fn visit_ty(&mut self, ty: ty::Ty<'tcx>) {
+        log::debug!("*  [{ty:?}]");
+        if let ty::TyKind::Alias(ty::AliasTyKind::Projection, alias_ty) =
+          ty.kind()
+        {
+          self.found |=
+            self.occurs_in_projection(alias_ty.args, alias_ty.def_id);
+        }
+
+        ty.super_visit_with(self);
+      }
+
+      fn visit_predicate(&mut self, predicate: ty::Predicate<'tcx>) {
+        log::debug!("*  [{predicate:#?}]");
+
+        if let ty::PredicateKind::Clause(ty::ClauseKind::Projection(
+          ty::ProjectionPredicate {
+            projection_term, ..
+          },
+        )) = predicate.kind().skip_binder()
+        {
+          self.found |= self
+            .occurs_in_projection(projection_term.args, projection_term.def_id);
+        }
+
+        predicate.super_visit_with(self);
+      }
+    }
+
+    let visitor = &mut TraitRefVisitor {
+      tr: needle,
+      tcx: *self,
+      found: false,
+    };
+
+    haystack.visit_with(visitor);
+
+    log::debug!(
+      "Checked occurrences {}:\n{needle:#?} ==> {haystack:#?}",
+      visitor.found
+    );
+
+    visitor.found
   }
 }
 
@@ -394,7 +614,7 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     &self,
     p: &Predicate<'tcx>,
   ) -> ObligationNecessity {
-    use ObligationNecessity::*;
+    use ObligationNecessity as ON;
 
     let is_rhs_lang_item = || {
       self
@@ -405,30 +625,33 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     };
 
     let is_writeable = || {
-      use rustc_type_ir::ClauseKind::*;
+      use rustc_type_ir::ClauseKind as CK;
       matches!(
         p.kind().skip_binder(),
         ty::PredicateKind::Clause(
-          Trait(..) | RegionOutlives(..) | TypeOutlives(..) | Projection(..)
+          CK::Trait(..)
+            | CK::RegionOutlives(..)
+            | CK::TypeOutlives(..)
+            | CK::Projection(..)
         )
       )
     };
 
     if !is_writeable() || p.is_lhs_unit() {
-      No
+      ON::No
     } else if (p.is_trait_predicate() && is_rhs_lang_item())
       || !p.is_trait_predicate()
     {
-      OnError
+      ON::OnError
     } else {
-      Yes
+      ON::Yes
     }
   }
 
   /// Determine what level of "necessity" an obligation has.
   ///
   /// For example, obligations with a cause `SizedReturnType`,
-  /// with a self_ty `()` (unit), is *unecessary*. Obligations whose
+  /// with a `self_ty` `()` (unit), is *unecessary*. Obligations whose
   /// kind is not a Trait Clause, are generally deemed `ForProfessionals`
   /// (that is, you can get them when interested), and others are shown
   /// `OnError`. Necessary obligations are trait predicates where the
@@ -443,7 +666,9 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     let p = &obligation.predicate;
     let code = obligation.cause.code();
 
-    if matches!(code, ObligationCauseCode::SizedReturnType) && p.is_lhs_unit() {
+    if matches!(code, ObligationCauseCode::SizedReturnType) && p.is_lhs_unit()
+      || matches!(p.as_trait_predicate(), Some(p) if p.self_ty().skip_binder().is_ty_var())
+    {
       ON::No
     } else {
       self.guess_predicate_necessity(p)
@@ -496,22 +721,20 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     body_id: BodyId,
     fdata: FulfillmentData<'_, 'tcx>,
   ) -> Obligation {
-    let obl = &fdata.obligation;
-    let range = obl.range(&self.tcx, body_id);
-    let necessity = self.obligation_necessity(&obl);
-
     #[derive(Serialize)]
     #[serde(rename_all = "camelCase")]
     struct Wrapper<'a, 'tcx: 'a>(
       #[serde(with = "PredicateObligationDef")] &'a PredicateObligation<'tcx>,
     );
 
-    let obligation = serialize_to_value(self, &Wrapper(obl))
-      .expect("could not serialize predicate");
+    let obl = &fdata.obligation;
+    let range = obl.range(&self.tcx, body_id);
+    let necessity = self.obligation_necessity(obl);
+    let obligation = ser::to_value_expect(self, &Wrapper(obl));
 
     Obligation {
       obligation,
-      hash: fdata.hash.into(),
+      hash: fdata.hash,
       range,
       kind: fdata.kind(),
       necessity,
@@ -528,7 +751,6 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
       solve::{GenerateProofTree, InferCtxtEvalExt},
       traits::query::NoSolution,
     };
-
     match self
       .evaluate_root_goal(obligation.clone().into(), GenerateProofTree::Never)
       .0

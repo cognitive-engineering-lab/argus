@@ -36,7 +36,10 @@ async function createWorkspaceRunner() {
         | { file: string; message: string }
         | undefined;
 
-      if (!cause) return;
+      if (!cause) {
+        console.debug(`MISSING: cause ${workspace}/${filename}`);
+        return;
+      }
       const page = await openPage(context, filename, bundles, "rank");
 
       await sleep(5000);

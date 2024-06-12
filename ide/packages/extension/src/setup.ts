@@ -1,6 +1,9 @@
 import {
   ArgusArgs,
   ArgusCliOptions,
+  ArgusError,
+  ArgusResult,
+  ArgusReturn,
   CallArgus,
   Result,
 } from "@argus/common/lib";
@@ -10,6 +13,7 @@ import {
   cargoCommand,
   getCargoOpts,
 } from "@argus/system";
+import { CancelablePromise as CPromise } from "cancelable-promise";
 import _ from "lodash";
 import open from "open";
 import path from "path";
@@ -81,13 +85,8 @@ const findWorkspaceRoot = async (): Promise<string | null> => {
   return folderSubdirTil(entry.idx);
 };
 
-const execNotify = async (
-  cmd: string,
-  args: string[],
-  title: string,
-  opts?: any
-) => {
-  return await _execNotify(
+const execNotify = (cmd: string, args: string[], title: string, opts?: any) => {
+  return _execNotify(
     cmd,
     args,
     {
@@ -185,7 +184,7 @@ const checkVersionAndInstall = async (
   return true;
 };
 
-export async function setup(context: Ctx): Promise<CallArgus | null> {
+export async function setup(_context: Ctx): Promise<CallArgus | null> {
   log("Getting workspace root");
 
   const workspaceRoot = await findWorkspaceRoot();
@@ -216,62 +215,50 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
     RUST_BACKTRACE: "1",
   });
 
-  return async <T extends ArgusCliOptions>(
+  return <T extends ArgusCliOptions>(
     args: ArgusArgs<T>,
     noOutput: boolean = false
-  ) => {
+  ): CPromise<ArgusResult<T>> => {
     log("Calling backend with args", args);
+    const editor = vscode.window.activeTextEditor;
+    const strArgs = _.map(args, arg => arg.toString());
+    globals.statusBar.setState("loading", "Waiting for Argus...");
 
-    let output;
-    try {
-      const editor = vscode.window.activeTextEditor;
+    // cancelable( new Promise(() => (editor ? editor.document.save() : undefined)))
+    return execNotify(
+      cargo,
+      [...cargoArgs, "argus", ...strArgs],
+      "Waiting for Argus...",
+      argusOpts
+    )
+      .then(output => {
+        log("Received output from Argus");
+        if (noOutput) {
+          globals.statusBar.setState("idle", "Argus is ready");
+          return {
+            type: "output",
+            value: undefined as any,
+          } as ArgusResult<T>;
+        }
 
-      if (editor) {
-        await editor.document.save();
-      }
-      const strArgs = _.map(args, arg => arg.toString());
-      output = await execNotify(
-        cargo,
-        [...cargoArgs, "argus", ...strArgs],
-        "Waiting for Argus...",
-        argusOpts
-      );
-    } catch (e: any) {
-      context.extCtx.workspaceState.update("err_log", e);
-      return {
-        type: "build-error",
-        error: e,
-      };
-    }
-    if (noOutput) {
-      return {
-        type: "output",
-        value: undefined as any,
-      };
-    }
+        const outputTyped: Result<ArgusReturn<T>> = JSON.parse(output);
+        if ("Err" in outputTyped) {
+          globals.statusBar.setState("error", "Analysis failed");
+          return outputTyped.Err;
+        }
 
-    let outputTyped: Result<T>;
-    try {
-      log("output", output);
-      outputTyped = JSON.parse(output);
-    } catch (e: any) {
-      context.extCtx.workspaceState.update("err_log", e);
-      return {
-        type: "analysis-error",
-        error: e.toString(),
-      };
-    }
-
-    if ("Err" in outputTyped) {
-      return {
-        type: "analysis-error",
-        error: outputTyped.Err,
-      };
-    }
-
-    return {
-      type: "output",
-      value: outputTyped.Ok,
-    };
+        globals.statusBar.setState("idle", "Argus is ready");
+        return {
+          type: "output",
+          value: outputTyped.Ok,
+        } as ArgusResult<T>;
+      })
+      .catch(e => {
+        globals.statusBar.setState("error", "Build failure");
+        return {
+          type: "build-error",
+          error: e.toString(),
+        } as ArgusResult<T>;
+      });
   };
 }

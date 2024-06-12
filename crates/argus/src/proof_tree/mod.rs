@@ -1,11 +1,9 @@
 //! Proof tree types sent to the Argus frontend.
 
-pub(self) mod format;
-pub(self) mod interners;
+mod format;
+mod interners;
 pub(super) mod serialize;
 pub mod topology;
-
-use std::collections::HashSet;
 
 use index_vec::IndexVec;
 use rustc_infer::infer::InferCtxt;
@@ -16,8 +14,9 @@ pub use topology::*;
 use ts_rs::TS;
 
 use crate::{
+  aadebug,
   ext::{InferCtxtExt, PredicateExt},
-  serialize::{safe::GoalPredicateDef, serialize_to_value},
+  serialize::{self as ser, safe::GoalPredicateDef},
   types::{
     intermediate::{EvaluationResult, EvaluationResultDef},
     ImplHeader, ObligationNecessity,
@@ -25,7 +24,7 @@ use crate::{
 };
 
 crate::define_idx! {
-  usize,
+  u32,
   ProofNodeIdx,
   GoalIdx,
   CandidateIdx,
@@ -66,9 +65,11 @@ pub struct GoalData {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub enum CandidateData {
-  Impl(
-    #[cfg_attr(feature = "testing", ts(type = "ImplHeader"))] serde_json::Value,
-  ),
+  Impl {
+    #[cfg_attr(feature = "testing", ts(type = "ImplHeader"))]
+    hd: serde_json::Value,
+    is_user_visible: bool,
+  },
   ParamEnv(usize),
   // TODO remove variant once everything is structured
   Any(String),
@@ -103,9 +104,9 @@ pub struct SerializedTree {
   pub results: IndexVec<ResultIdx, ResultData>,
 
   pub topology: TreeTopology,
-  pub unnecessary_roots: HashSet<ProofNodeIdx>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub cycle: Option<ProofCycle>,
+  pub analysis: aadebug::AnalysisResults,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -120,10 +121,13 @@ impl CandidateData {
   fn new_impl_header<'tcx>(
     infcx: &InferCtxt<'tcx>,
     impl_: &ImplHeader<'tcx>,
+    is_user_visible: bool,
   ) -> Self {
-    let impl_ =
-      serialize_to_value(infcx, impl_).expect("couldn't serialize impl header");
-    Self::Impl(impl_)
+    let impl_ = ser::to_value_expect(infcx, impl_);
+    Self::Impl {
+      hd: impl_,
+      is_user_visible,
+    }
   }
 }
 

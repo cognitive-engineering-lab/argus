@@ -28,6 +28,10 @@ export const rootCauses: RootCause[] = [
         file: "invalid_query.rs",
         message: "Count == Once",
       },
+      {
+        file: "bad_insertable_field.rs",
+        message: "Text: Expression",
+      },
     ],
   },
   {
@@ -56,6 +60,35 @@ export const rootCauses: RootCause[] = [
       {
         file: "request_not_last.rs",
         message: "Request<Body>: FromRequestParts",
+      },
+      {
+        file: "not_send.rs",
+        message: "Rc<()>: Send",
+      },
+      {
+        file: "not_async.rs",
+        message: "(): Future",
+      },
+      {
+        file: "too_many_extractors.rs",
+        message: ": FnOnce<(_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _)>",
+      },
+      {
+        file: "wrong_return_type.rs",
+        message: "bool: IntoResponse",
+      },
+      {
+        file: "not_a_function.rs",
+        message: "A: IntoResponse",
+      },
+    ],
+  },
+  {
+    workspace: "entrait",
+    causes: [
+      {
+        file: "missing_impl_deep.rs",
+        message: "Impl<()>: T4",
       },
     ],
   },

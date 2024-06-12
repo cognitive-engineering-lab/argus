@@ -1,4 +1,4 @@
-//! Implementations from rustc_middle::ty::print::pretty
+//! Implementations from `rustc_middle::ty::print::pretty`
 //
 //! This code was modified in the following ways, ideally,
 //! there could be a solution upstreamed into rustc, but that
@@ -153,11 +153,8 @@ impl<'a, 'tcx: 'a> PathBuilder<'a, 'tcx> {
         struct Wrapper<'a, 'tcx: 'a>(
           #[serde(with = "GenericArgDef")] &'a GenericArg<'tcx>,
         );
-        cx.comma_sep(
-          args.into_iter().map(Wrapper),
-          CommaSeparatedKind::GenericArg,
-        )
-      })
+        cx.comma_sep(args.iter().map(Wrapper), CommaSeparatedKind::GenericArg);
+      });
     }
   }
 
@@ -206,8 +203,8 @@ impl<'a, 'tcx: 'a> PathBuilder<'a, 'tcx> {
         path: trait_ref.map(|t| TraitRefPrintOnlyTraitPathDef::new(&t)),
         ty: self_ty,
         kind: ImplKind::As,
-      })
-    })
+      });
+    });
   }
 
   fn generic_delimiters(&mut self, f: impl FnOnce(&mut Self)) {
@@ -219,7 +216,7 @@ impl<'a, 'tcx: 'a> PathBuilder<'a, 'tcx> {
     self.in_value = was_in_value;
     self
       .segments
-      .push(PathSegment::GenericDelimiters { inner: after })
+      .push(PathSegment::GenericDelimiters { inner: after });
     // CHANGE: write!(self, ">")?;
   }
 
@@ -293,7 +290,7 @@ impl<'a, 'tcx: 'a> PathBuilder<'a, 'tcx> {
         ty: self_ty,
         path: trait_ref.map(|t| TraitRefPrintOnlyTraitPathDef::new(&t)),
         kind: ImplKind::For,
-      })
+      });
     })
   }
 
@@ -307,9 +304,9 @@ impl<'a, 'tcx: 'a> PathBuilder<'a, 'tcx> {
         cx.path_append(
           |cx| cx.path_qualified(alias_ty.self_ty(), None),
           &def_key.disambiguated_data,
-        )
+        );
       },
       &alias_ty.args[1 ..],
-    )
+    );
   }
 }

@@ -143,7 +143,7 @@ impl<'a, 'tcx: 'a> HirVisitor<'_> for BinCreator<'a, 'tcx> {
 
 /// Find the HirId of the node that is the "most enclosing" of the span.
 pub fn find_most_enclosing_node<'tcx>(
-  tcx: &TyCtxt<'tcx>,
+  tcx: TyCtxt<'tcx>,
   body_id: BodyId,
   span: Span,
 ) -> Option<HirId> {

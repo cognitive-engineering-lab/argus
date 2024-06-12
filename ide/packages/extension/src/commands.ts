@@ -10,6 +10,12 @@ export function inspect(ctx: Ctx): Cmd {
   };
 }
 
+export function cancelTasks(ctx: Ctx): Cmd {
+  return async () => {
+    ctx.cancelRunningTasks();
+  };
+}
+
 export function openError(ctx: Ctx): Cmd {
   return async (
     file: Filename,

@@ -75,9 +75,9 @@ where
   O: Serialize + Send + Sync,
 {
   type Output = O;
-  fn analyze<'tcx>(
+  fn analyze(
     &mut self,
-    tcx: TyCtxt<'tcx>,
+    tcx: TyCtxt,
     id: BodyId,
   ) -> anyhow::Result<Self::Output> {
     (self)(tcx, id)
@@ -211,6 +211,7 @@ impl RustcPlugin for ArgusPlugin {
         postprocess(v)
       }
       Bundle => {
+        log::warn!("Bundling takes an enormous amount of time.");
         let nothing = || None::<(ObligationHash, CharRange)>;
         let v = run(
           analysis::bundle,
@@ -337,7 +338,7 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
       self.result = match (self.compute_target.take().unwrap())() {
         Some(target) => {
           let target = target.to_target(tcx).expect("Couldn't compute target");
-          let body_span = target.span.clone();
+          let body_span = target.span;
           fluid_set!(analysis::OBLIGATION_TARGET, target);
 
           find_enclosing_bodies(tcx, body_span)

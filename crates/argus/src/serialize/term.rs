@@ -12,7 +12,7 @@ use super::{r#const::*, ty::*, *};
 
 pub struct TermDef;
 impl TermDef {
-  pub fn serialize<'tcx, S>(value: &Term<'tcx>, s: S) -> Result<S::Ok, S::Error>
+  pub fn serialize<S>(value: &Term, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {

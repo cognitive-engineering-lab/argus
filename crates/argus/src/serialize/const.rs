@@ -20,10 +20,7 @@ use super::{
 // the `Ty` after the constant syntactic definition.
 pub struct ConstDef;
 impl ConstDef {
-  pub fn serialize<'tcx, S>(
-    value: &Const<'tcx>,
-    s: S,
-  ) -> Result<S::Ok, S::Error>
+  pub fn serialize<S>(value: &Const, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -33,10 +30,7 @@ impl ConstDef {
 
 pub struct Slice__ConstDef;
 impl Slice__ConstDef {
-  pub fn serialize<'tcx, S>(
-    value: &[Const<'tcx>],
-    s: S,
-  ) -> Result<S::Ok, S::Error>
+  pub fn serialize<S>(value: &[Const], s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -131,7 +125,7 @@ impl InferConstDef {
     }
   }
 
-  pub fn serialize<'tcx, S>(value: &InferConst, s: S) -> Result<S::Ok, S::Error>
+  pub fn serialize<S>(value: &InferConst, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -149,7 +143,7 @@ pub struct ParamConstDef(
 );
 
 impl ParamConstDef {
-  pub fn serialize<'tcx, S>(value: &ParamConst, s: S) -> Result<S::Ok, S::Error>
+  pub fn serialize<S>(value: &ParamConst, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
@@ -203,7 +197,7 @@ impl<'tcx> UnevaluatedConstDef<'tcx> {
           }
         }
       }
-      defkind => panic!("unexpected defkind {:?} {:?}", defkind, value),
+      defkind => panic!("unexpected defkind {defkind:?} {value:?}"),
     }
   }
 
@@ -270,7 +264,7 @@ impl<'tcx> ConstScalarIntDef {
           ty.is_ptr_sized_integral(),
         );
         Self::Int {
-          data: format!("{:?}", int),
+          data: format!("{int:?}"),
         }
       }
       Char if char::try_from(int).is_ok() => Self::Char {
@@ -289,7 +283,7 @@ impl<'tcx> ConstScalarIntDef {
           }
         } else {
           Self::Misc {
-            data: format!("transmute(0x{:x})", int),
+            data: format!("transmute(0x{int:x})"),
           }
         }
       }

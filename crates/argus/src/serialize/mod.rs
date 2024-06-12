@@ -24,9 +24,8 @@
 //! If you need to serialize an optional type then prefix it with `Option__`, and
 //! lists of elements are serialized with a prefixed `Slice__`.
 #![allow(non_camel_case_types, non_snake_case)]
-
 pub mod r#const;
-pub(self) mod path;
+mod path;
 pub mod term;
 pub mod ty;
 
@@ -37,12 +36,24 @@ use rustc_middle::ty::{self as rustc_ty};
 use rustc_trait_selection::traits::solve::Goal;
 use serde::Serialize;
 
+/// # Panics
+///
+/// This function expects that serialization succeeded. This usually
+/// happens because the *wrong* `InferCtxt` has been passed. Double-check
+/// that and then report an issue.
+pub fn to_value_expect<'a, 'tcx: 'a, T: Serialize + 'a>(
+  infcx: &InferCtxt<'tcx>,
+  value: &T,
+) -> serde_json::Value {
+  to_value(infcx, value).expect("failed to serialize value")
+}
+
 /// Entry function to serialize anything from rustc.
-pub fn serialize_to_value<'a, 'tcx: 'a, T: Serialize + 'a>(
+pub fn to_value<'a, 'tcx: 'a, T: Serialize + 'a>(
   infcx: &InferCtxt<'tcx>,
   value: &T,
 ) -> Result<serde_json::Value, serde_json::Error> {
-  in_dynamic_ctx(infcx, || serde_json::to_value(&value))
+  in_dynamic_ctx(infcx, || serde_json::to_value(value))
 }
 
 // NOTE: setting the dynamic TCX should *only* happen
@@ -50,10 +61,7 @@ pub fn serialize_to_value<'a, 'tcx: 'a, T: Serialize + 'a>(
 // that the 'tcx lifetime is the same as that of the serialized item.
 fluid_let::fluid_let! {static INFCX: &'static InferCtxt<'static>}
 
-fn in_dynamic_ctx<'tcx, T>(
-  infcx: &InferCtxt<'tcx>,
-  f: impl FnOnce() -> T,
-) -> T {
+fn in_dynamic_ctx<T>(infcx: &InferCtxt, f: impl FnOnce() -> T) -> T {
   let infcx: &'static InferCtxt<'static> =
     unsafe { std::mem::transmute(infcx) };
   INFCX.set(infcx, f)

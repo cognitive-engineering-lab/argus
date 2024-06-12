@@ -1,5 +1,5 @@
+import { CancelablePromise as CPromise } from "cancelable-promise";
 import newGithubIssueUrl from "new-github-issue-url";
-import { unescape } from "querystring";
 
 import {
   BodyBundle,
@@ -173,7 +173,7 @@ export type ArgusResult<T extends ArgusCliOptions> =
 export type CallArgus = <T extends ArgusCliOptions>(
   _args: ArgusArgs<T>,
   _no_output?: boolean
-) => Promise<ArgusResult<T>>;
+) => CPromise<ArgusResult<T>>;
 
 // Type predicates (these shouldn't really exist ...)
 

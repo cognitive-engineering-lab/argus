@@ -8,11 +8,13 @@ import {
   SerializedTree,
 } from "@argus/common/bindings";
 import { CallArgus, ErrorJumpTargetInfo, Filename } from "@argus/common/lib";
+import { CancelablePromise as CPromise } from "cancelable-promise";
 import _ from "lodash";
 import * as vscode from "vscode";
 
 import { rangeHighlight } from "./decorate";
 import { showErrorDialog } from "./errors";
+import { log } from "./logging";
 import { globals } from "./main";
 import { setup } from "./setup";
 import {
@@ -27,8 +29,6 @@ import { View } from "./view";
 
 // NOTE: much of this file was inspired (or taken) from the rust-analyzer extension.
 // See: https://github.com/rust-lang/rust-analyzer/blob/master/editors/code/src/ctx.ts#L1
-
-// TODO: opening obligations / trees need to be cancellable.
 
 export type Workspace =
   | { kind: "empty" }
@@ -98,18 +98,24 @@ export class Ctx {
     this.diagnosticCollection =
       vscode.languages.createDiagnosticCollection("rust");
 
-    this.cache = new BackendCache(async () => {
-      showErrorDialog(`
-        Argus backend left uninitialized.
-      `);
-      return {
-        type: "analysis-error",
-        error: "Argus uninitialized.",
-      };
-    });
+    this.cache = new BackendCache(
+      () =>
+        new CPromise(() => {
+          showErrorDialog(`
+            Argus backend left uninitialized.
+          `);
+
+          return {
+            type: "analysis-error",
+            error: "Argus uninitialized.",
+          };
+        })
+    );
   }
 
   dispose() {
+    this.cache.havoc();
+
     _.forEach(this.commandDisposables, d => d.dispose());
     this.commandDisposables = [];
 
@@ -122,7 +128,9 @@ export class Ctx {
       this.view.getPanel().reveal();
     } else {
       const initialData = await this.getFreshWebViewData();
-      this.view = new View(this.extCtx.extensionUri, initialData, target);
+      this.view = new View(this.extCtx.extensionUri, initialData, target, () =>
+        this.cache.cancelAll()
+      );
     }
   }
 
@@ -136,6 +144,7 @@ export class Ctx {
   }
 
   async setupBackend() {
+    log("setting up Argus backend");
     const b = await setup(this);
     if (b == null) {
       showErrorDialog("Failed to setup Argus");
@@ -148,6 +157,8 @@ export class Ctx {
 
     await b(["preload"], true);
     this.cache = new BackendCache(b);
+
+    log("Argus backend preloaded");
 
     let openingEditor = new Promise<void[]>(() => []);
     if (this.activeRustEditor) {
@@ -185,7 +196,7 @@ export class Ctx {
         isRustEditor(editor) &&
         isDocumentInWorkspace(editor.document)
       ) {
-        console.debug(`Opening ${editor.document.fileName}`);
+        log(`Opening ${editor.document.fileName}`);
         this.openEditor(editor);
       }
     });
@@ -218,7 +229,7 @@ export class Ctx {
     const [obl, sig] = await this.loadObligations(editor);
     if (obl) {
       if (this.view === undefined) {
-        console.debug("View not initialized, skipping editor open.");
+        log("View not initialized, skipping editor open.");
       }
       return this.view?.openEditor(editor, sig, obl);
     }
@@ -254,6 +265,10 @@ export class Ctx {
     return this.cache.getTreeForObligation(filename, obligation, range);
   }
 
+  cancelRunningTasks() {
+    this.cache.cancelAll();
+  }
+
   // ------------------------------------
   // Diagnostic helpers
 
@@ -263,7 +278,7 @@ export class Ctx {
     _token: vscode.CancellationToken
   ) {
     if (!isRustDocument(document) || !isDocumentInWorkspace(document)) {
-      console.debug("Document not in workspace", document);
+      log("Document not in workspace", document);
       return;
     }
 
@@ -304,7 +319,7 @@ export class Ctx {
       const range = rustRangeToVscodeRange(rec.range);
 
       if (!range.contains(position)) {
-        console.debug("Skipping position outside of range", range, position);
+        log("Skipping position outside of range", range, position);
         return;
       }
 
@@ -430,16 +445,12 @@ export class Ctx {
   }
 }
 
-// TODO: all running operations on the system need to be cancellable.
+// Aliases to keep type coercions shorter.
+type PTuple = [CPromise<ObligationsInBody[] | undefined>, string];
+type TreeRecord = Record<ObligationHash, CPromise<SerializedTree | undefined>>;
 class BackendCache {
-  private obligationCache: Record<
-    Filename,
-    [Promise<ObligationsInBody[] | undefined>, string]
-  >;
-  private treeCache: Record<
-    Filename,
-    Record<ObligationHash, Promise<SerializedTree | undefined>>
-  >;
+  private obligationCache: Record<Filename, PTuple>;
+  private treeCache: Record<Filename, TreeRecord>;
   private backend: CallArgus;
 
   constructor(backend: CallArgus) {
@@ -448,7 +459,13 @@ class BackendCache {
     this.backend = backend;
   }
 
+  cancelAll() {
+    _.forEach(this.obligationCache, ([p, _]) => p.cancel());
+    _.forEach(this.treeCache, t => _.forEach(t, p => p.cancel()));
+  }
+
   havoc() {
+    this.cancelAll();
     this.obligationCache = {};
     this.treeCache = {};
   }
@@ -458,21 +475,18 @@ class BackendCache {
       return this.obligationCache[filename];
     }
 
-    const thunk = async () => {
-      const res = await this.backend<"obligations">(["obligations", filename]);
-
-      if (res.type !== "output") {
-        globals.statusBar.setState("error");
-        showErrorDialog(res.error);
-        return;
+    const thunk = this.backend<"obligations">(["obligations", filename]).then(
+      res => {
+        if (res.type !== "output") {
+          globals.statusBar.setState("error");
+          showErrorDialog(res.error);
+          return;
+        }
+        return res.value;
       }
-      return res.value;
-    };
+    );
 
-    this.obligationCache[filename] = [thunk(), makeid(8)] as [
-      Promise<ObligationsInBody[] | undefined>,
-      string
-    ];
+    this.obligationCache[filename] = [thunk, makeid(8)] as PTuple;
     return this.obligationCache[filename];
   }
 
@@ -485,18 +499,16 @@ class BackendCache {
       this.treeCache[filename] = {};
     }
 
-    const thunk = async () => {
-      const res = await this.backend<"tree">([
-        "tree",
-        filename,
-        obl.hash,
-        range.start.line,
-        range.start.column,
-        range.end.line,
-        range.end.column,
-        obl.isSynthetic,
-      ]);
-
+    const thunk = this.backend<"tree">([
+      "tree",
+      filename,
+      obl.hash,
+      range.start.line,
+      range.start.column,
+      range.end.line,
+      range.end.column,
+      obl.isSynthetic,
+    ]).then(res => {
       if (res.type !== "output") {
         globals.statusBar.setState("error");
         showErrorDialog(res.error);
@@ -517,9 +529,9 @@ class BackendCache {
       }
 
       return tree0;
-    };
+    });
 
-    this.treeCache[filename][obl.hash] = thunk();
+    this.treeCache[filename][obl.hash] = thunk;
     return this.treeCache[filename][obl.hash];
   }
 }

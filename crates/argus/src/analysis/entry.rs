@@ -15,7 +15,7 @@ use crate::{
     transform, EvaluationResult, INCLUDE_SUCCESSES, OBLIGATION_TARGET,
   },
   ext::{EvaluationResultExt, InferCtxtExt},
-  proof_tree::{serialize::serialize_proof_tree, SerializedTree},
+  proof_tree::{serialize::try_serialize, SerializedTree},
   types::{
     intermediate::{
       ErrorAssemblyCtx, Forgettable, FullData, ObligationQueriesInBody,
@@ -31,12 +31,15 @@ fluid_let! {
 }
 
 macro_rules! guard_inspection {
-  () => {{
+  () => {
+    guard_inspection! { return; };
+  };
+  ($($t:tt)+) => {
     if INSPECTING.copied().unwrap_or(false) {
-      return;
+      $($t)+
     }
     fluid_let::fluid_set!(INSPECTING, true);
-  }};
+  };
 }
 
 // --------------------------------
@@ -119,7 +122,7 @@ pub fn process_obligation_for_tree<'tcx>(
       return;
     }
 
-    match generate_tree(infcx, obl) {
+    match generate_tree(infcx, obl, fdata.result) {
       Ok(stree) => tls::store_tree(stree),
       Err(e) => {
         log::error!("matching target tree not generated {e:?}");
@@ -137,6 +140,7 @@ pub fn build_obligations_output<'tcx>(
   body_id: BodyId,
   typeck_results: &'tcx TypeckResults<'tcx>,
 ) -> Result<ObligationsInBody> {
+  log::trace!("build_obligations_output {body_id:?}");
   let (_, oib) = build_obligations_in_body(tcx, body_id, typeck_results);
   Ok(oib)
 }
@@ -146,6 +150,7 @@ pub fn build_tree_output<'tcx>(
   body_id: BodyId,
   typeck_results: &'tcx TypeckResults<'tcx>,
 ) -> Result<SerializedTree> {
+  log::trace!("build_tree_output {body_id:?}");
   OBLIGATION_TARGET.get(|target| {
     let target = target.ok_or(anyhow!("missing target"))?;
     let (data, oib) = build_obligations_in_body(tcx, body_id, typeck_results);
@@ -158,6 +163,12 @@ pub(crate) fn pick_tree<'a, 'tcx: 'a>(
   needs_search: bool,
   thunk: impl FnOnce() -> (&'a FullData<'tcx>, &'a ObligationsInBody),
 ) -> Result<SerializedTree> {
+  log::trace!("pick_tree {hash:?} {needs_search}");
+
+  guard_inspection! {
+    anyhow::bail!("already inspecting tree")
+  }
+
   if !needs_search {
     return tls::take_tree().ok_or(anyhow!(
       "failed to find tree for obligation target {hash:?}"
@@ -168,10 +179,10 @@ pub(crate) fn pick_tree<'a, 'tcx: 'a>(
 
   let res: Result<SerializedTree> = data
     .iter()
-    .find_map(|(obligation, this_hash, infcx)| {
+    .find_map(|(obligation, result, this_hash, infcx)| {
       if this_hash == hash {
-        log::info!("Generating synthetic tree for obligation {:?}", obligation);
-        Some(generate_tree(infcx, &obligation))
+        log::info!("Generating tree for obligation {:?}", obligation);
+        Some(generate_tree(infcx, &obligation, result))
       } else {
         None
       }
@@ -184,7 +195,10 @@ pub(crate) fn pick_tree<'a, 'tcx: 'a>(
 fn generate_tree<'tcx>(
   infcx: &InferCtxt<'tcx>,
   obligation: &PredicateObligation<'tcx>,
+  result: EvaluationResult,
 ) -> Result<SerializedTree> {
+  log::trace!("generate_tree {obligation:?} {result:?}");
+
   let goal = Goal {
     predicate: obligation.predicate,
     param_env: obligation.param_env,
@@ -195,7 +209,7 @@ fn generate_tree<'tcx>(
   };
 
   let body_owner = infcx.tcx.hir().body_owner_def_id(body_id).to_def_id();
-  serialize_proof_tree(goal, obligation.cause.span, infcx, body_owner)
+  try_serialize(goal, result, obligation.cause.span, infcx, body_owner)
 }
 
 pub(in crate::analysis) fn build_obligations_in_body<'tcx>(

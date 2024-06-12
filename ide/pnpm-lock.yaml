@@ -44,6 +44,9 @@ importers:
 
   packages/common:
     devDependencies:
+      cancelable-promise:
+        specifier: ^4.3.1
+        version: 4.3.1
       jsdom:
         specifier: ^22.1.0
         version: 22.1.0
@@ -116,6 +119,9 @@ importers:
       '@types/vscode':
         specifier: ^1.79.0
         version: 1.79.0
+      cancelable-promise:
+        specifier: ^4.3.1
+        version: 4.3.1
       lodash:
         specifier: ^4.17.21
         version: 4.17.21
@@ -250,7 +256,11 @@ importers:
         specifier: ^4.4.9
         version: 4.4.9(@types/node@20.2.5)
 
-  packages/system: {}
+  packages/system:
+    devDependencies:
+      cancelable-promise:
+        specifier: ^4.3.1
+        version: 4.3.1
 
 packages:
 
@@ -1613,6 +1623,10 @@ packages:
   /camelcase@6.3.0:
     resolution: {integrity: sha512-Gmy6FhYlCY7uOElZUSbxo2UCDH8owEk996gkbrpsgGtrJLM3J7jGxl9Ic7Qwwj4ivOE5AWZWRMecDdF7hqGjFA==}
     engines: {node: '>=10'}
+
+  /cancelable-promise@4.3.1:
+    resolution: {integrity: sha512-A/8PwLk/T7IJDfUdQ68NR24QHa8rIlnN/stiJEBo6dmVUkD4K14LswG0w3VwdeK/o7qOwRUR1k2MhK5Rpy2m7A==}
+    dev: true
 
   /caniuse-lite@1.0.30001588:
     resolution: {integrity: sha512-+hVY9jE44uKLkH0SrUTqxjxqNTOWHsbnQDIKjwkZ3lNTzUUVdBLBGXtj/q5Mp5u98r3droaZAewQuEDzjQdZlQ==}

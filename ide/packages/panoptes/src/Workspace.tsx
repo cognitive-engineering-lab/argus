@@ -72,7 +72,7 @@ const Workspace = ({
 
   return (
     <>
-      {/* <div>{checkbox}</div> */}
+      <div>{checkbox}</div>
       <VSCodePanels>
         {tabs}
         {fileComponents}

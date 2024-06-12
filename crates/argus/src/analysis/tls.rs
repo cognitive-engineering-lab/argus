@@ -1,5 +1,5 @@
 //! Thread local storage for storing data processed in rustc.
-use std::{cell::RefCell, panic};
+use std::cell::RefCell;
 
 use index_vec::IndexVec;
 use rustc_data_structures::fx::FxIndexMap;
@@ -11,13 +11,12 @@ pub use unsafe_tls::{
 };
 
 use crate::{
-  ext::{EvaluationResultExt, InferCtxtExt},
+  ext::{EvaluationResultExt, InferCtxtExt, PredicateExt},
   proof_tree::SerializedTree,
-  rustc::InferCtxtExt as RustcInferCtxtExt,
   types::{intermediate::Provenance, Obligation, ObligationHash},
 };
 
-const DRAIN_WINDOW: usize = 50;
+const DRAIN_WINDOW: usize = 100;
 
 // NOTE: we use thread local storage to accumulate obligations
 // accross call to the obligation inspector in `typeck_inspect`.
@@ -25,26 +24,21 @@ const DRAIN_WINDOW: usize = 50;
 //
 // TODO: documentation
 thread_local! {
-  static BODY_DEF_PATH: RefCell<Option<serde_json::Value>> = Default::default();
+  static BODY_DEF_PATH: RefCell<Option<serde_json::Value>> = RefCell::default();
 
-  static OBLIGATIONS: RefCell<Vec<Provenance<Obligation>>> = Default::default();
+  static OBLIGATIONS: RefCell<Vec<Provenance<Obligation>>> = RefCell::default();
 
   static TREE: RefCell<Option<SerializedTree>> = Default::default();
 
-  static REPORTED_ERRORS: RefCell<FxIndexMap<Span, Vec<ObligationHash>>> = Default::default();
+  static REPORTED_ERRORS: RefCell<FxIndexMap<Span, Vec<ObligationHash>>> = RefCell::default();
 }
 
 pub fn store_obligation(obl: Provenance<Obligation>) {
   OBLIGATIONS.with(|obls| {
-    if obls
-      .borrow()
-      .iter()
-      .find(|o| *o.hash == *obl.hash)
-      .is_none()
-    {
+    if !obls.borrow().iter().any(|o| *o.hash == *obl.hash) {
       obls.borrow_mut().push(obl)
     }
-  })
+  });
 }
 
 // TODO: using `infcx` for error implication panics, but using
@@ -54,7 +48,6 @@ pub fn drain_implied_ambiguities<'tcx>(
   _infcx: &InferCtxt<'tcx>,
   obligation: &PredicateObligation<'tcx>,
 ) {
-  use std::panic::AssertUnwindSafe;
   OBLIGATIONS.with(|obls| {
     let mut obls = obls.borrow_mut();
 
@@ -70,27 +63,14 @@ pub fn drain_implied_ambiguities<'tcx>(
       // 1. Ambiguous, and--
       // 2. Implied by the passed obligation
       let should_remove = provenance.result.is_maybe()
-        && provenance
-          .full_data
-          .map(|idx| {
-            unsafe_tls::borrow_in(idx, |fdata| {
-              // NOTE: using the inference context in this was is problematic as
-              // we can't know for sure whether variables won't be leaked. (I.e.,
-              // used in a context they don't live in.) The open snapshot check is
-              // trying to mitigate this happening, but it's not foolproof and we
-              // certainly don't want to crash the program.
-              // Furthermore, this closure is unwind safe because the inference contexts
-              // are forked, and no one outside this thread can access them.
-              panic::catch_unwind(AssertUnwindSafe(|| {
-                fdata.infcx.error_implies(
-                  obligation.predicate.clone(),
-                  fdata.obligation.predicate.clone(),
-                )
-              }))
-              .unwrap_or(false)
-            })
+        && provenance.full_data.map_or(false, |idx| {
+          unsafe_tls::borrow_in(idx, |fdata| {
+            fdata
+              .obligation
+              .predicate
+              .is_refined_by(&obligation.predicate)
           })
-          .unwrap_or(false);
+        });
 
       if should_remove {
         set.push(i);
@@ -98,15 +78,16 @@ pub fn drain_implied_ambiguities<'tcx>(
     }
 
     // TODO: we can make this faster by swapping elements to the end
-    // then truncating the vector.
+    // then truncating the vector. Except that shuffles the order, which
+    // we kind of rely on right now.
     for i in set.into_iter().rev() {
       obls.remove(i);
     }
-  })
+  });
 }
 
 pub fn take_obligations() -> Vec<Provenance<Obligation>> {
-  OBLIGATIONS.with(|obls| obls.take())
+  OBLIGATIONS.with(RefCell::take)
 }
 
 pub fn replace_reported_errors(infcx: &InferCtxt) {
@@ -135,7 +116,7 @@ pub fn replace_reported_errors(infcx: &InferCtxt) {
 }
 
 pub fn take_reported_errors() -> FxIndexMap<Span, Vec<ObligationHash>> {
-  REPORTED_ERRORS.with(|rerrs| rerrs.take())
+  REPORTED_ERRORS.with(RefCell::take)
 }
 
 pub fn store_tree(new_tree: SerializedTree) {
@@ -143,11 +124,11 @@ pub fn store_tree(new_tree: SerializedTree) {
     if tree.borrow().is_none() {
       tree.replace(Some(new_tree));
     }
-  })
+  });
 }
 
 pub fn take_tree() -> Option<SerializedTree> {
-  TREE.with(|tree| tree.take())
+  TREE.with(RefCell::take)
 }
 
 // This is for complex obligations and their inference contexts.
@@ -159,7 +140,7 @@ mod unsafe_tls {
 
   thread_local! {
     static OBLIGATION_DATA: RefCell<IndexVec<UODIdx, Option<FullObligationData<'static>>>> =
-      Default::default();
+      RefCell::default();
   }
 
   crate::define_idx! {

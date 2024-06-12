@@ -29,5 +29,5 @@ runs:
       shell: bash
 
     - name: Install Argus
-      run: cargo install --path crates/argus_cli --debug --locked
+      run: cargo install --path crates/argus-cli --debug --locked
       shell: bash

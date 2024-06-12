@@ -7,7 +7,13 @@ import {
 import React, { useContext } from "react";
 
 import { HoverInfo } from "../HoverInfo";
-import { IcoAmbiguous, IcoCheck, IcoError, IcoLoop } from "../Icons";
+import {
+  IcoAmbiguous,
+  IcoCheck,
+  IcoError,
+  IcoEyeClosed,
+  IcoLoop,
+} from "../Icons";
 import { PrintGoal, PrintImplHeader } from "../print/print";
 import { TreeAppContext } from "../utilities/context";
 
@@ -51,7 +57,18 @@ export const Candidate = ({ idx }: { idx: CandidateIdx }) => {
   if ("Any" in candidate) {
     return candidate.Any;
   } else if ("Impl" in candidate) {
-    return <PrintImplHeader impl={candidate.Impl} />;
+    const ico = candidate.Impl.is_user_visible ? null : (
+      <HoverInfo
+        Content={() => <span>This impl block is private to user code.</span>}
+      >
+        <IcoEyeClosed />
+      </HoverInfo>
+    );
+    return (
+      <>
+        {ico} <PrintImplHeader impl={candidate.Impl.hd} />
+      </>
+    );
   } else if ("ParamEnv" in candidate) {
     throw new Error("paramEnv not implemented");
   } else {

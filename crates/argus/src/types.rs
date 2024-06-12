@@ -18,13 +18,13 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
-use self::intermediate::EvaluationResult;
+pub use self::intermediate::{EvaluationResult, EvaluationResultDef};
 use crate::{
   analysis::{FullObligationData, SynIdx, UODIdx},
   proof_tree::SerializedTree,
   serialize::{
+    self as ser,
     safe::{PathDefNoArgs, TraitRefPrintOnlyTraitPathDef},
-    serialize_to_value,
     ty::{
       Polarity, RegionDef, Slice__ClauseDef, Slice__GenericArgDef,
       Slice__TyDef, TyDef,
@@ -77,8 +77,7 @@ impl ExtensionCandidates {
       .into_iter()
       .map(TraitRefPrintOnlyTraitPathDef)
       .collect::<Vec<_>>();
-    let json = serialize_to_value(infcx, &wrapped)
-      .expect("failed to serialied trait refs for method lookup");
+    let json = ser::to_value_expect(infcx, &wrapped);
     ExtensionCandidates { data: json }
   }
 }
@@ -105,8 +104,7 @@ impl ReceiverAdjStep {
   pub fn new<'tcx>(infcx: &InferCtxt<'tcx>, ty: Ty<'tcx>) -> Self {
     #[derive(Serialize)]
     struct Wrapper<'tcx>(#[serde(with = "TyDef")] Ty<'tcx>);
-    let value =
-      serialize_to_value(infcx, &Wrapper(ty)).expect("failed to serialize ty");
+    let value = ser::to_value_expect(infcx, &Wrapper(ty));
     ReceiverAdjStep { ty: value }
   }
 }
@@ -151,7 +149,7 @@ pub struct AmbiguityError {
 
 impl Hash for AmbiguityError {
   fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-    self.idx.hash(state)
+    self.idx.hash(state);
   }
 }
 
@@ -216,9 +214,8 @@ impl ObligationsInBody {
     exprs: IndexVec<ExprIdx, Expr>,
     method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,
   ) -> Self {
-    let json_name = id.and_then(|(infcx, id)| {
-      serialize_to_value(infcx, &PathDefNoArgs(id)).ok()
-    });
+    let json_name =
+      id.map(|(infcx, id)| ser::to_value_expect(infcx, &PathDefNoArgs(id)));
     ObligationsInBody {
       name: json_name,
       hash: BodyHash::new(),
@@ -256,9 +253,9 @@ pub struct Obligation {
   pub range: CharRange,
   pub kind: ObligationKind,
   pub necessity: ObligationNecessity,
-  #[serde(with = "intermediate::EvaluationResultDef")]
+  #[serde(with = "EvaluationResultDef")]
   #[cfg_attr(feature = "testing", ts(type = "EvaluationResult"))]
-  pub result: intermediate::EvaluationResult,
+  pub result: EvaluationResult,
   pub is_synthetic: bool,
 }
 
@@ -332,10 +329,9 @@ pub enum ObligationNecessity {
 
 impl ObligationNecessity {
   pub fn is_necessary(&self, res: EvaluationResult) -> bool {
-    use ObligationNecessity::*;
     matches!(
       (self, res),
-      (Yes, _) // TODO: | (OnError, Err(..))
+      (ObligationNecessity::Yes, _) // TODO: | (OnError, Err(..))
     )
   }
 }
@@ -542,7 +538,7 @@ pub(super) mod intermediate {
 
   impl<T: Hash> Hash for Provenance<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-      self.it.hash(state)
+      self.it.hash(state);
     }
   }
 
@@ -555,7 +551,7 @@ pub(super) mod intermediate {
   impl<T: Sized> ForgetProvenance for Vec<Provenance<T>> {
     type Target = Vec<T>;
     fn forget(self) -> Self::Target {
-      self.into_iter().map(|f| f.forget()).collect()
+      self.into_iter().map(Provenance::forget).collect()
     }
   }
 
@@ -611,21 +607,34 @@ pub(super) mod intermediate {
   }
 
   impl<'tcx> FullData<'tcx> {
+    fn result(&self, idx: UODIdx) -> EvaluationResult {
+      self.obligations.0[idx].result
+    }
+
     pub fn iter<'me>(
       &'me self,
     ) -> impl Iterator<
-      Item = (&PredicateObligation<'tcx>, ObligationHash, &InferCtxt<'tcx>),
+      Item = (
+        &PredicateObligation<'tcx>,
+        EvaluationResult,
+        ObligationHash,
+        &InferCtxt<'tcx>,
+      ),
     > + 'me {
       self
         .synthetic
         .iter()
-        .map(|sdata| (&sdata.obligation, sdata.hash, &sdata.infcx))
-        .chain(
-          self
-            .obligations
-            .iter()
-            .map(|fdata| (&fdata.obligation, fdata.hash, &fdata.infcx)),
-        )
+        .map(|sdata| {
+          (
+            &sdata.obligation,
+            self.result(sdata.full_data),
+            sdata.hash,
+            &sdata.infcx,
+          )
+        })
+        .chain(self.obligations.iter().map(|fdata| {
+          (&fdata.obligation, fdata.result, fdata.hash, &fdata.infcx)
+        }))
     }
   }
 
@@ -654,7 +663,7 @@ pub(super) mod intermediate {
 
   impl<'tcx> SyntheticQueriesInBody<'tcx> {
     pub fn new() -> Self {
-      SyntheticQueriesInBody(Default::default())
+      SyntheticQueriesInBody(IndexVec::default())
     }
 
     pub fn is_empty(&self) -> bool {

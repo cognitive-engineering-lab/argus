@@ -1,7 +1,10 @@
 import {
+  DefinedPath,
   ExtensionCandidates,
   GoalData,
+  ImplHeader,
   Obligation,
+  Ty,
 } from "@argus/common/bindings";
 import _ from "lodash";
 import React from "react";
@@ -38,6 +41,10 @@ export const PrintWithFallback = ({
     error: any;
     resetErrorBoundary: (...args: any[]) => void;
   }) => {
+    if (object === undefined) {
+      return "(ERR: undef)";
+    }
+
     // NOTE: Call resetErrorBoundary() to reset the error boundary and retry the render.
     return (
       <ErrorDiv>
@@ -64,7 +71,7 @@ export const PrintWithFallback = ({
   );
 };
 
-export const PrintTy = ({ ty }: { ty: any }) => {
+export const PrintTy = ({ ty }: { ty: Ty }) => {
   return (
     <PrintWithFallback object={ty} Content={() => <UnsafePrintTy o={ty} />} />
   );
@@ -79,7 +86,7 @@ export const PrintObligation = ({ obligation }: { obligation: Obligation }) => {
   return <PrintWithFallback object={obligation} Content={InnerContent} />;
 };
 
-export const PrintImplHeader = ({ impl }: { impl: any }) => {
+export const PrintImplHeader = ({ impl }: { impl: ImplHeader }) => {
   return (
     <ToggleGenericDelimiterContext.Provider value={true}>
       <PrintWithFallback
@@ -123,7 +130,7 @@ export const PrintExtensionCandidate = ({
   );
 };
 
-export const PrintBodyName = ({ defPath }: { defPath: any }) => {
+export const PrintBodyName = ({ defPath }: { defPath: DefinedPath }) => {
   return (
     <PrintWithFallback
       object={defPath}

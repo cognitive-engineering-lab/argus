@@ -50,6 +50,7 @@ function createCommands(): Record<string, CommandFactory> {
   return {
     // Public commands that appear in the command palette and thus need to be listed in package.json.
     inspectWorkspace: { enabled: commands.inspect },
+    cancelTasks: { enabled: commands.cancelTasks },
 
     // Private commands used internally, these should not appear in the command palette.
     openError: { enabled: commands.openError },

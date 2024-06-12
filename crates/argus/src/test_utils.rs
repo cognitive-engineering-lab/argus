@@ -85,7 +85,7 @@ pub fn test_obligations_no_crash(
     compile_normal(source, move |tcx| {
       for_each_body(tcx, |body_id, tcx| {
         let (full_data, obligations_in_body) =
-          analysis::body_data(tcx, body_id).expect("failed to get obligations");
+          analysis::body_data(tcx, body_id);
 
         assert_pass(full_data, obligations_in_body);
       })

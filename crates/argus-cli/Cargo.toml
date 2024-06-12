@@ -12,16 +12,15 @@ license = "MIT"
 [dependencies]
 argus-lib = { version = "0.1.6", path = "../argus" }
 rustc_plugin = "=0.10.0-nightly-2024-05-20"
-rustc_utils = { version = "=0.10.0-nightly-2024-05-20", features = ["serde"] }
+rustc_utils.workspace = true
+log.workspace = true
+anyhow.workspace = true
+fluid-let.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
-# For binaries
-log = "0.4"
 env_logger = { version = "0.9", default-features = false }
 clap = { version = "3.1", default-features = false, features = ["std", "derive"] }
-serde = { version = "1.0.192", features = ["derive"] }
-serde_json = "1"
-anyhow = "1.0.75"
-fluid-let = "1.0.0"
 
 [package.metadata.rust-analyzer]
 # This crate uses #[feature(rustc_private)].

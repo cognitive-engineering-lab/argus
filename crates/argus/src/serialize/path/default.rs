@@ -1,4 +1,4 @@
-//! Default implementaitons from rustc_middle::ty::print
+//! Default implementaitons from `rustc_middle::ty::print`
 
 use rustc_data_structures::sso::SsoHashSet;
 use rustc_hir::{def_id::DefId, definitions::DefPathData};
@@ -42,7 +42,7 @@ impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
     match key.disambiguated_data.data {
       DefPathData::CrateRoot => {
         assert!(key.parent.is_none());
-        self.path_crate(def_id.krate)
+        self.path_crate(def_id.krate);
       }
 
       DefPathData::Impl => {
@@ -60,7 +60,7 @@ impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
             impl_trait_ref.map(|i| i.instantiate_identity()),
           )
         };
-        self.print_impl_path(def_id, args, self_ty, impl_trait_ref)
+        self.print_impl_path(def_id, args, self_ty, impl_trait_ref);
       }
 
       _ => {
@@ -114,13 +114,13 @@ impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
                 parent_def_id,
                 parent_args.iter().copied(),
               );
-              cx.path_qualified(trait_ref.self_ty(), Some(trait_ref))
+              cx.path_qualified(trait_ref.self_ty(), Some(trait_ref));
             } else {
-              cx.print_def_path(parent_def_id, parent_args)
+              cx.print_def_path(parent_def_id, parent_args);
             }
           },
           &key.disambiguated_data,
-        )
+        );
       }
     };
   }
@@ -132,7 +132,7 @@ impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
     self_ty: Ty<'tcx>,
     trait_ref: Option<ty::TraitRef<'tcx>>,
   ) {
-    self.default_print_impl_path(impl_def_id, args, self_ty, trait_ref)
+    self.default_print_impl_path(impl_def_id, args, self_ty, trait_ref);
   }
 
   fn default_print_impl_path(
@@ -176,11 +176,11 @@ impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
         &key.disambiguated_data,
         self_ty,
         impl_trait_ref,
-      )
+      );
     } else {
       // Otherwise, try to give a good form that would be valid language
       // syntax. Preferably using associated item notation.
-      self.path_qualified(self_ty, impl_trait_ref)
+      self.path_qualified(self_ty, impl_trait_ref);
     }
   }
 }
@@ -193,7 +193,7 @@ impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
 /// decisions and we may want to adjust it later.
 ///
 /// Visited set is needed to avoid full iteration over
-/// deeply nested tuples that have no DefId.
+/// deeply nested tuples that have no `DefId`.
 fn characteristic_def_id_of_type_cached<'a>(
   ty: Ty<'a>,
   visited: &mut SsoHashSet<Ty<'a>>,
@@ -215,7 +215,7 @@ fn characteristic_def_id_of_type_cached<'a>(
       if visited.insert(ty) {
         return characteristic_def_id_of_type_cached(ty, visited);
       }
-      return None;
+      None
     }),
 
     ty::FnDef(def_id, _)

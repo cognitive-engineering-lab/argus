@@ -47,7 +47,6 @@ function makeTreeView(
     let newPrev = prev;
     switch (cf(curr)) {
       case "keep": {
-        console.debug("keep", curr);
         if (prev !== undefined) {
           addChildRel(prev, curr);
         }
@@ -55,10 +54,8 @@ function makeTreeView(
         break;
       }
       case "remove-node":
-        console.debug("remove-node", curr);
         break;
       case "remove-tree":
-        console.debug("remove-tree", curr);
         return;
     }
     _.forEach(kids, kid => iterate(kid, newPrev));
@@ -260,6 +257,10 @@ export class TreeInfo {
     const height = 1 + (_.max(childHeights) ?? 0);
     this._maxHeight.set(n, height);
     return height;
+  }
+
+  get failedSets() {
+    return this.tree.analysis.problematicSets;
   }
 }
 

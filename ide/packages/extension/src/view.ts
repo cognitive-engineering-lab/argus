@@ -45,6 +45,7 @@ export class View {
     extensionUri: vscode.Uri,
     initialData: [Filename, ObligationsInBody[]][],
     target?: ErrorJumpTargetInfo,
+    readonly cleanup: () => void = () => {},
     column: vscode.ViewColumn = vscode.ViewColumn.Beside
   ) {
     this.extensionUri = extensionUri;
@@ -96,6 +97,7 @@ export class View {
 
   public dispose() {
     // Clean up our resources
+    this.cleanup();
     this.isPanelDisposed = true;
     this.panel.dispose();
     while (this.disposables.length) {

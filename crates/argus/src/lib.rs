@@ -9,9 +9,16 @@
     hash_extract_if,
     box_patterns,
     control_flow_enum,
-    if_let_guard
+    if_let_guard,
+    lazy_cell
 )]
-
+#![warn(clippy::pedantic)]
+// #![allow(
+//   clippy::missing_errors_doc,
+//   clippy::wildcard_imports,
+//   clippy::must_use_candidate,
+//   clippy::module_name_repetitions
+// )]
 extern crate rustc_apfloat;
 extern crate rustc_ast;
 extern crate rustc_data_structures;
@@ -25,6 +32,7 @@ extern crate rustc_infer;
 #[cfg(feature = "testing")]
 extern crate rustc_interface;
 extern crate rustc_macros;
+extern crate rustc_metadata;
 extern crate rustc_middle;
 extern crate rustc_next_trait_solver;
 extern crate rustc_query_system;
@@ -35,29 +43,43 @@ extern crate rustc_target;
 extern crate rustc_trait_selection;
 extern crate rustc_type_ir;
 
+mod aadebug;
 pub mod analysis;
-pub mod emitter;
 pub mod ext;
-// TODO: remove when upstreamed to rustc-plugin
-pub mod find_bodies;
+pub mod find_bodies; // TODO: remove when upstreamed to rustc-plugin
 mod proof_tree;
 mod rustc;
 mod serialize;
-#[cfg(all(feature = "testing"))]
+#[cfg(feature = "testing")]
 pub mod test_utils;
-#[cfg(all(feature = "testing", test))]
+#[cfg(feature = "testing")]
 mod ts;
 pub mod types;
 
 #[macro_export]
+macro_rules! impl_raw_cnv {
+  // FIXME: how can I match the type literally here?
+  // (usize, $($t:tt)*) => {
+  //   index_vec::define_index_type! {
+  //     $($t)*
+  //   }
+  // };
+  ($_ty:ty, $($t:tt)*) => {
+    index_vec::define_index_type! {
+      $($t)*
+      // IMPL_RAW_CONVERSION = true;
+    }
+  };
+}
+
+#[macro_export]
 macro_rules! define_idx {
   ($t:ident, $($ty:tt),*) => {
-      $(
-        index_vec::define_index_type! {
-            pub struct $ty = $t;
-        }
-      )*
-      crate::define_tsrs_alias!($($ty,)* => $t);
+      $($crate::impl_raw_cnv! {
+          $t,
+          pub struct $ty = $t;
+        })*
+      $crate::define_tsrs_alias!($($ty,)* => $t);
   }
 }
 

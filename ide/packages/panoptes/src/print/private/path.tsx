@@ -82,9 +82,12 @@ export const PrintDefPath = ({ o }: { o: DefinedPath }) => {
     return (
       <PrintAsGenericPath
         Prefix={() => (
-          <ToggleGenericDelimiterContext.Provider value={true}>
-            <PrintPathSegment o={o[0]} />
-          </ToggleGenericDelimiterContext.Provider>
+          <Angled>
+            <Toggle
+              summary=".."
+              Children={() => <PrintPathSegment o={o[0]} />}
+            />
+          </Angled>
         )}
         Rest={() => <PrintSegments o={_.slice(o, 1)} />}
       />
@@ -159,7 +162,9 @@ export const PrintPathSegment = ({ o }: { o: PathSegment }) => {
       if (o.inner.length === 0) {
         return null;
       }
-      const useToggle = useContext(ToggleGenericDelimiterContext);
+      // Use a metric of "type size" rather than inner lenght.
+      const useToggle =
+        useContext(ToggleGenericDelimiterContext) && o.inner.length > 3;
       return (
         // TODO: do we want to allow nested toggles?
         <ToggleGenericDelimiterContext.Provider value={false}>
@@ -168,7 +173,7 @@ export const PrintPathSegment = ({ o }: { o: PathSegment }) => {
               <Toggle
                 summary=".."
                 Children={() => <PrintDefPathFull o={o.inner} />}
-              ></Toggle>
+              />
             ) : (
               <PrintDefPathFull o={o.inner} />
             )}
