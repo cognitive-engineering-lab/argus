@@ -1,7 +1,7 @@
 //! We don't have access to a `FnCtxt`, but many of these methods
 //! *don't require* the function context, just the `TyCtxt` or `InferCtxt`.
 //!
-//! See [https://github.com/rust-lang/rust/blob/master/compiler/rustc_hir_typeck/src/fn_ctxt/adjust_fulfillment_errors.rs]
+//! See <https://github.com/rust-lang/rust/blob/master/compiler/rustc_hir_typeck/src/fn_ctxt/adjust_fulfillment_errors.rs>
 
 use std::ops::ControlFlow;
 
@@ -37,7 +37,7 @@ impl<'a, 'tcx: 'a> FnCtxtSimulator<'a, 'tcx> {
 impl<'a, 'tcx: 'a> std::ops::Deref for FnCtxtSimulator<'a, 'tcx> {
   type Target = InferCtxt<'tcx>;
   fn deref(&self) -> &Self::Target {
-    &self.infcx
+    self.infcx
   }
 }
 
@@ -83,6 +83,7 @@ pub trait FnCtxtExt<'tcx> {
     expr_fields: &[hir::ExprField<'tcx>],
   ) -> Option<(&'tcx hir::Expr<'tcx>, Ty<'tcx>)>;
 
+  #[allow(clippy::too_many_arguments)]
   fn blame_specific_arg_if_possible(
     &self,
     error: &mut traits::FulfillmentError<'tcx>,
@@ -121,6 +122,7 @@ pub trait FnCtxtExt<'tcx> {
 }
 
 impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
+  #[allow(clippy::too_many_lines, clippy::match_same_arms)]
   fn adjust_fulfillment_error_for_expr_obligation(
     &self,
     error: &mut traits::FulfillmentError<'tcx>,
@@ -160,19 +162,19 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
 
     let find_param_matching = |matches: &dyn Fn(ty::ParamTerm) -> bool| {
       predicate_args.iter().find_map(|arg| {
-        arg.walk().find_map(|arg| {
+        arg.walk().find(|arg| {
           if let ty::GenericArgKind::Type(ty) = arg.unpack()
             && let ty::Param(param_ty) = *ty.kind()
             && matches(ty::ParamTerm::Ty(param_ty))
           {
-            Some(arg)
+            true
           } else if let ty::GenericArgKind::Const(ct) = arg.unpack()
             && let ty::ConstKind::Param(param_ct) = ct.kind()
             && matches(ty::ParamTerm::Const(param_ct))
           {
-            Some(arg)
+            true
           } else {
-            None
+            false
           }
         })
       })
@@ -448,7 +450,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
           return true;
         }
       }
-      _ => {}
+      hir::QPath::LangItem(..) => {}
     }
 
     false
@@ -582,6 +584,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
   /// `blame_specific_arg_if_possible` will find the most-specific expression anywhere inside
   /// the provided function call expression, and mark it as responsible for the fulfillment
   /// error.
+  #[allow(clippy::too_many_lines)]
   fn blame_specific_arg_if_possible(
     &self,
     error: &mut traits::FulfillmentError<'tcx>,
@@ -620,7 +623,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
 
       if let hir::Node::Expr(arg_expr) = self.tcx.hir_node(arg.hir_id) {
         // This is more specific than pointing at the entire argument.
-        self.blame_specific_expr_if_possible(error, arg_expr)
+        self.blame_specific_expr_if_possible(error, arg_expr);
       }
 
       error.obligation.cause.map_code(|parent_code| {
@@ -631,7 +634,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
         }
       });
       return true;
-    } else if args_referencing_param.len() > 0 {
+    } else if !args_referencing_param.is_empty() {
       // If more than one argument applies, then point to the callee span at least...
       // We have chance to fix this up further in `point_at_generics_if_possible`
       error.obligation.cause.span = callee_span;
@@ -651,6 +654,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
    *
    * This function only updates the error span.
    */
+  #[allow(clippy::match_same_arms)]
   fn blame_specific_expr_if_possible(
     &self,
     error: &mut traits::FulfillmentError<'tcx>,
@@ -732,7 +736,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
     // If this cannot be done, then we are already stuck, so we stop early (hence the use
     // of the `?` try operator here).
     let expr = self.blame_specific_expr_if_possible_for_obligation_cause_code(
-      &*obligation.derived.parent_code,
+      &obligation.derived.parent_code,
       expr,
     )?;
 
@@ -753,7 +757,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
         self
           .tcx
           .impl_trait_ref(obligation.impl_or_alias_def_id)
-          .map(|impl_def| impl_def.skip_binder())
+          .map(ty::EarlyBinder::skip_binder)
           // It is possible that this is absent. In this case, we make no progress.
           .ok_or(expr)?
       };
@@ -794,7 +798,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
   /// For example, given
   /// - expr: `(Some(vec![1, 2, 3]), false)`
   /// - param: `T`
-  /// - in_ty: `(Option<Vec<T>, bool)`
+  /// - `in_ty`: `(Option<Vec<T>, bool)`
   /// we would drill until we arrive at `vec![1, 2, 3]`.
   ///
   /// If successful, we return `Ok(refined_expr)`. If unsuccessful, we return `Err(partially_refined_expr`),
@@ -804,6 +808,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
   /// This means that you can (and should) use the `?` try operator to chain multiple calls to this
   /// function with different types, since you can only continue drilling the second time if you
   /// succeeded the first time.
+  #[allow(clippy::too_many_lines)]
   fn blame_specific_part_of_expr_corresponding_to_generic_param(
     &self,
     param: ty::GenericArg<'tcx>,
@@ -1076,7 +1081,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
           .variant_with_id(variant_def_id)
           .fields
           .iter()
-          .map(|field| field.ty(self.tcx, *in_ty_adt_generic_args))
+          .map(|field| field.ty(self.tcx, in_ty_adt_generic_args))
           .enumerate()
           .filter(|(_index, field_type)| {
             find_param_in_ty((*field_type).into(), param)

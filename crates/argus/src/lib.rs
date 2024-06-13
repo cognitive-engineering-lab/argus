@@ -13,43 +13,33 @@
     lazy_cell
 )]
 #![warn(clippy::pedantic)]
-// #![allow(
-//   clippy::missing_errors_doc,
-//   clippy::wildcard_imports,
-//   clippy::must_use_candidate,
-//   clippy::module_name_repetitions
-// )]
-extern crate rustc_apfloat;
-extern crate rustc_ast;
+#![allow(
+  clippy::missing_errors_doc,
+  clippy::wildcard_imports,
+  clippy::must_use_candidate,
+  clippy::module_name_repetitions
+)]
 extern crate rustc_data_structures;
+#[cfg(feature = "testing")]
 extern crate rustc_driver;
-extern crate rustc_errors;
-extern crate rustc_hash;
 extern crate rustc_hir;
-extern crate rustc_hir_analysis;
 extern crate rustc_hir_typeck;
 extern crate rustc_infer;
+
+#[cfg(feature = "testing")]
+extern crate rustc_errors;
+
 #[cfg(feature = "testing")]
 extern crate rustc_interface;
-extern crate rustc_macros;
-extern crate rustc_metadata;
 extern crate rustc_middle;
-extern crate rustc_next_trait_solver;
-extern crate rustc_query_system;
-extern crate rustc_serialize;
-extern crate rustc_session;
 extern crate rustc_span;
-extern crate rustc_target;
 extern crate rustc_trait_selection;
-extern crate rustc_type_ir;
 
 mod aadebug;
 pub mod analysis;
 pub mod ext;
 pub mod find_bodies; // TODO: remove when upstreamed to rustc-plugin
 mod proof_tree;
-mod rustc;
-mod serialize;
 #[cfg(feature = "testing")]
 pub mod test_utils;
 #[cfg(feature = "testing")]

@@ -5,6 +5,8 @@ mod interners;
 pub(super) mod serialize;
 pub mod topology;
 
+use argus_ext::ty::PredicateExt;
+use argus_ser as ser;
 use index_vec::IndexVec;
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::ty;
@@ -15,11 +17,9 @@ use ts_rs::TS;
 
 use crate::{
   aadebug,
-  ext::{InferCtxtExt, PredicateExt},
-  serialize::{self as ser, safe::GoalPredicateDef},
   types::{
     intermediate::{EvaluationResult, EvaluationResultDef},
-    ImplHeader, ObligationNecessity,
+    ObligationNecessity,
   },
 };
 
@@ -120,7 +120,7 @@ pub struct ProofCycle(Vec<ProofNodeIdx>);
 impl CandidateData {
   fn new_impl_header<'tcx>(
     infcx: &InferCtxt<'tcx>,
-    impl_: &ImplHeader<'tcx>,
+    impl_: &ser::ImplHeader<'tcx>,
     is_user_visible: bool,
   ) -> Self {
     let impl_ = ser::to_value_expect(infcx, impl_);

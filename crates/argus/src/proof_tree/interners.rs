@@ -3,6 +3,8 @@ use std::{
   hash::Hash,
 };
 
+use argus_ext::{infer::InferCtxtExt, ty::VarCounterExt};
+use argus_ser as ser;
 use index_vec::{Idx, IndexVec};
 use rustc_data_structures::{fx::FxHashMap as HashMap, stable_hasher::Hash64};
 use rustc_hir::def_id::DefId;
@@ -17,9 +19,7 @@ use rustc_trait_selection::{
 
 use super::*;
 use crate::{
-  ext::{TyCtxtExt, VarCounterExt},
-  serialize as ser,
-  types::intermediate::EvaluationResult,
+  ext::InferCtxtExt as InferCtxtExt_, types::intermediate::EvaluationResult,
 };
 
 #[derive(Default)]
@@ -91,10 +91,14 @@ impl Interners {
     )
   }
 
+  // NOTE: used in `test_utils`.
+  #[allow(dead_code)]
   pub fn goal(&self, g: GoalIdx) -> &GoalData {
     &self.goals.values[g]
   }
 
+  // NOTE: used in `test_utils`.
+  #[allow(dead_code)]
   pub fn candidate(&self, c: CandidateIdx) -> &CandidateData {
     &self.candidates.values[c]
   }
@@ -174,7 +178,7 @@ impl Interners {
     let necessity = infcx.guess_predicate_necessity(&goal.predicate);
     let num_vars = goal.predicate.count_vars(infcx.tcx);
     let is_main_tv = goal.predicate.is_main_ty_var();
-    let goal_value = ser::to_value_expect(infcx, &GoalPredicateDef(goal));
+    let goal_value = ser::to_value_expect(infcx, &ser::GoalPredicateDef(goal));
 
     self.goals.insert(hash, GoalData {
       value: goal_value,
@@ -212,7 +216,7 @@ impl Interners {
     }
 
     // First, try to get an impl header from the def_id ty
-    if let Some(header) = infcx.tcx.get_impl_header(def_id) {
+    if let Some(header) = ser::get_opt_impl_header(infcx.tcx, def_id) {
       return self.candidates.insert(
         CanKey::Impl(def_id),
         CandidateData::new_impl_header(

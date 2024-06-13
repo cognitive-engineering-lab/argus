@@ -5,6 +5,7 @@ mod util;
 use std::time::Instant;
 
 use anyhow::Result;
+use argus_ext::ty::EvaluationResultExt;
 use index_vec::IndexVec;
 use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_infer::traits::solve::GoalSource;
@@ -14,10 +15,7 @@ use serde::Serialize;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
-use crate::{
-  ext::EvaluationResultExt,
-  proof_tree::{topology::TreeTopology, ProofNodeIdx},
-};
+use crate::proof_tree::{topology::TreeTopology, ProofNodeIdx};
 
 pub struct Storage<'tcx> {
   pub ns: IndexVec<ProofNodeIdx, tree::N<'tcx>>,
@@ -126,7 +124,8 @@ impl<'tcx> Storage<'tcx> {
       sets.entry(h.total).or_default().push(h);
     }
 
-    for (_, group) in sets.iter_mut() {
+    for group in sets.values_mut() {
+      #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
       group.sort_by_key(|g| -(g.max_depth as i32));
     }
 

@@ -23,24 +23,38 @@
 //!
 //! If you need to serialize an optional type then prefix it with `Option__`, and
 //! lists of elements are serialized with a prefixed `Slice__`.
+#![feature(rustc_private, let_chains, if_let_guard, decl_macro)]
 #![allow(non_camel_case_types, non_snake_case)]
+extern crate rustc_apfloat;
+extern crate rustc_data_structures;
+extern crate rustc_hir;
+extern crate rustc_infer;
+extern crate rustc_middle;
+extern crate rustc_span;
+extern crate rustc_target;
+extern crate rustc_trait_selection;
+
+// Make these public to expose the `XXX_Def` wrappers.
 pub mod r#const;
+pub mod custom;
 mod path;
+mod safe;
 pub mod term;
 pub mod ty;
-
 use std::cell::Cell;
 
+pub use custom::*;
 use rustc_infer::infer::InferCtxt;
-use rustc_middle::ty::{self as rustc_ty};
 use rustc_trait_selection::traits::solve::Goal;
+// These types are safe for dependents to use.
+pub use safe::*;
 use serde::Serialize;
 
 /// # Panics
 ///
 /// This function expects that serialization succeeded. This usually
 /// happens because the *wrong* `InferCtxt` has been passed. Double-check
-/// that and then report an issue.
+/// that, then report an issue if it's not the case.
 pub fn to_value_expect<'a, 'tcx: 'a, T: Serialize + 'a>(
   infcx: &InferCtxt<'tcx>,
   value: &T,
@@ -126,6 +140,12 @@ macro_rules! define_helper {
                 }
             }
 
+            impl Default for $helper {
+              fn default() -> Self {
+                Self::new()
+              }
+            }
+
             $(#[$a])*
             pub macro $name($e:expr) {
                 {
@@ -164,45 +184,3 @@ define_helper!(
     /// Adds the `crate::` prefix to paths where appropriate.
     fn with_crate_prefix(CratePrefixGuard, SHOULD_PREFIX_WITH_CRATE);
 );
-
-pub(crate) mod safe {
-  use rustc_hir::def_id::DefId;
-  use rustc_trait_selection::traits::solve;
-  #[cfg(feature = "testing")]
-  use ts_rs::TS;
-
-  use super::*;
-
-  #[derive(Serialize)]
-  #[cfg_attr(feature = "testing", derive(TS))]
-  #[cfg_attr(feature = "testing", ts(export))]
-  #[cfg_attr(feature = "testing", ts(rename = "GoalPredicateDefSafeWrapper"))]
-  pub struct GoalPredicateDef<'tcx>(
-    #[serde(with = "ty::Goal__PredicateDef")]
-    #[cfg_attr(feature = "testing", ts(type = "GoalPredicate"))]
-    pub solve::Goal<'tcx, rustc_ty::Predicate<'tcx>>,
-  );
-
-  #[derive(Serialize)]
-  #[cfg_attr(feature = "testing", derive(TS))]
-  #[cfg_attr(feature = "testing", ts(export))]
-  #[cfg_attr(feature = "testing", ts(rename = "PathDefNoArgsSafeWrapper"))]
-  pub struct PathDefNoArgs(
-    #[serde(with = "path::PathDefNoArgs")]
-    #[cfg_attr(feature = "testing", ts(type = "PathDefNoArgs"))]
-    pub DefId,
-  );
-
-  #[derive(Serialize)]
-  #[cfg_attr(feature = "testing", derive(TS))]
-  #[cfg_attr(feature = "testing", ts(export))]
-  #[cfg_attr(
-    feature = "testing",
-    ts(rename = "TraitRefPrintOnlyTraitPathDefSafeWrapper")
-  )]
-  pub struct TraitRefPrintOnlyTraitPathDef<'tcx>(
-    #[serde(with = "ty::TraitRefPrintOnlyTraitPathDef")]
-    #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
-    pub rustc_ty::TraitRef<'tcx>,
-  );
-}

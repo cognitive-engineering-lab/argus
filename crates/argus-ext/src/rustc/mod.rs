@@ -16,23 +16,21 @@ use rustc_infer::{
 use rustc_middle::ty::{
   self,
   error::{ExpectedFound, TypeError},
-  ToPolyTraitRef,
 };
-use rustc_span::DUMMY_SP;
-use rustc_trait_selection::{infer, traits::elaborate};
 
-use crate::types::intermediate::EvaluationResult;
+use crate::EvaluationResult;
 
 pub mod fn_ctx;
 
-#[derive(Debug)]
-pub struct ImplCandidate<'tcx> {
-  pub trait_ref: ty::TraitRef<'tcx>,
-  pub similarity: CandidateSimilarity,
-  pub impl_def_id: rustc_span::def_id::DefId,
-}
+// #[derive(Debug)]
+// pub struct ImplCandidate<'tcx> {
+//   pub trait_ref: ty::TraitRef<'tcx>,
+//   pub similarity: CandidateSimilarity,
+//   pub impl_def_id: rustc_span::def_id::DefId,
+// }
 
 #[derive(Copy, Clone, Debug)]
+#[allow(dead_code)]
 pub enum CandidateSimilarity {
   Exact { ignoring_lifetimes: bool },
   Fuzzy { ignoring_lifetimes: bool },
@@ -46,11 +44,11 @@ macro_rules! bug {
 }
 
 pub trait InferCtxtExt<'tcx> {
-  fn can_match_projection(
-    &self,
-    goal: ty::ProjectionPredicate<'tcx>,
-    assumption: ty::PolyProjectionPredicate<'tcx>,
-  ) -> bool;
+  // fn can_match_projection(
+  //   &self,
+  //   goal: ty::ProjectionPredicate<'tcx>,
+  //   assumption: ty::PolyProjectionPredicate<'tcx>,
+  // ) -> bool;
 
   fn to_fulfillment_error(
     &self,
@@ -58,22 +56,22 @@ pub trait InferCtxtExt<'tcx> {
     result: EvaluationResult,
   ) -> Option<FulfillmentError<'tcx>>;
 
-  fn can_match_trait(
-    &self,
-    goal: ty::TraitPredicate<'tcx>,
-    assumption: ty::PolyTraitPredicate<'tcx>,
-  ) -> bool;
+  // fn can_match_trait(
+  //   &self,
+  //   goal: ty::TraitPredicate<'tcx>,
+  //   assumption: ty::PolyTraitPredicate<'tcx>,
+  // ) -> bool;
 
-  fn error_implies(
-    &self,
-    cond: ty::Predicate<'tcx>,
-    error: ty::Predicate<'tcx>,
-  ) -> bool;
+  // fn error_implies(
+  //   &self,
+  //   cond: ty::Predicate<'tcx>,
+  //   error: ty::Predicate<'tcx>,
+  // ) -> bool;
 
-  fn find_similar_impl_candidates(
-    &self,
-    trait_pred: ty::PolyTraitPredicate<'tcx>,
-  ) -> Vec<ImplCandidate<'tcx>>;
+  // fn find_similar_impl_candidates(
+  //   &self,
+  //   trait_pred: ty::PolyTraitPredicate<'tcx>,
+  // ) -> Vec<ImplCandidate<'tcx>>;
 
   fn fuzzy_match_tys(
     &self,
@@ -84,33 +82,33 @@ pub trait InferCtxtExt<'tcx> {
 }
 
 impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
-  fn can_match_trait(
-    &self,
-    goal: ty::TraitPredicate<'tcx>,
-    assumption: ty::PolyTraitPredicate<'tcx>,
-  ) -> bool {
-    if goal.polarity != assumption.polarity() {
-      return false;
-    }
+  // fn can_match_trait(
+  //   &self,
+  //   goal: ty::TraitPredicate<'tcx>,
+  //   assumption: ty::PolyTraitPredicate<'tcx>,
+  // ) -> bool {
+  //   if goal.polarity != assumption.polarity() {
+  //     return false;
+  //   }
 
-    let trait_goal = goal.trait_ref;
-    let trait_assumption = self.instantiate_binder_with_fresh_vars(
-      DUMMY_SP,
-      infer::BoundRegionConversionTime::HigherRankedType,
-      assumption.to_poly_trait_ref(),
-    );
+  //   let trait_goal = goal.trait_ref;
+  //   let trait_assumption = self.instantiate_binder_with_fresh_vars(
+  //     DUMMY_SP,
+  //     infer::BoundRegionConversionTime::HigherRankedType,
+  //     assumption.to_poly_trait_ref(),
+  //   );
 
-    self.can_eq(ty::ParamEnv::empty(), trait_goal, trait_assumption)
-  }
+  //   self.can_eq(ty::ParamEnv::empty(), trait_goal, trait_assumption)
+  // }
 
-  // TODO: there is no longer a single `to_error` route so this is outdated.
+  // FIXME: there is no longer a single `to_error` function making this logic outdated.
+  #[allow(clippy::match_same_arms)]
   fn to_fulfillment_error(
     &self,
     obligation: &PredicateObligation<'tcx>,
     result: EvaluationResult,
   ) -> Option<FulfillmentError<'tcx>> {
     let infcx = self;
-    let goal = obligation;
     let obligation = obligation.clone();
 
     match result {
@@ -175,94 +173,94 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     )
   }
 
-  fn can_match_projection(
-    &self,
-    goal: ty::ProjectionPredicate<'tcx>,
-    assumption: ty::PolyProjectionPredicate<'tcx>,
-  ) -> bool {
-    let assumption = self.instantiate_binder_with_fresh_vars(
-      DUMMY_SP,
-      infer::BoundRegionConversionTime::HigherRankedType,
-      assumption,
-    );
+  // fn can_match_projection(
+  //   &self,
+  //   goal: ty::ProjectionPredicate<'tcx>,
+  //   assumption: ty::PolyProjectionPredicate<'tcx>,
+  // ) -> bool {
+  //   let assumption = self.instantiate_binder_with_fresh_vars(
+  //     DUMMY_SP,
+  //     infer::BoundRegionConversionTime::HigherRankedType,
+  //     assumption,
+  //   );
 
-    let param_env = ty::ParamEnv::empty();
-    self.can_eq(param_env, goal.projection_term, assumption.projection_term)
-      && self.can_eq(param_env, goal.term, assumption.term)
-  }
+  //   let param_env = ty::ParamEnv::empty();
+  //   self.can_eq(param_env, goal.projection_term, assumption.projection_term)
+  //     && self.can_eq(param_env, goal.term, assumption.term)
+  // }
 
-  fn error_implies(
-    &self,
-    cond: ty::Predicate<'tcx>,
-    error: ty::Predicate<'tcx>,
-  ) -> bool {
-    if cond == error {
-      return true;
-    }
+  // fn error_implies(
+  //   &self,
+  //   cond: ty::Predicate<'tcx>,
+  //   error: ty::Predicate<'tcx>,
+  // ) -> bool {
+  //   if cond == error {
+  //     return true;
+  //   }
 
-    if let Some(error) = error.as_trait_clause() {
-      self.enter_forall(error, |error| {
-        elaborate(self.tcx, std::iter::once(cond))
-          .filter_map(|implied| implied.as_trait_clause())
-          .any(|implied| self.can_match_trait(error, implied))
-      })
-    } else if let Some(error) = error.as_projection_clause() {
-      self.enter_forall(error, |error| {
-        elaborate(self.tcx, std::iter::once(cond))
-          .filter_map(|implied| implied.as_projection_clause())
-          .any(|implied| self.can_match_projection(error, implied))
-      })
-    } else {
-      false
-    }
-  }
+  //   if let Some(error) = error.as_trait_clause() {
+  //     self.enter_forall(error, |error| {
+  //       elaborate(self.tcx, std::iter::once(cond))
+  //         .filter_map(|implied| implied.as_trait_clause())
+  //         .any(|implied| self.can_match_trait(error, implied))
+  //     })
+  //   } else if let Some(error) = error.as_projection_clause() {
+  //     self.enter_forall(error, |error| {
+  //       elaborate(self.tcx, std::iter::once(cond))
+  //         .filter_map(|implied| implied.as_projection_clause())
+  //         .any(|implied| self.can_match_projection(error, implied))
+  //     })
+  //   } else {
+  //     false
+  //   }
+  // }
 
-  fn find_similar_impl_candidates(
-    &self,
-    trait_pred: ty::PolyTraitPredicate<'tcx>,
-  ) -> Vec<ImplCandidate<'tcx>> {
-    let mut candidates: Vec<_> = self
-      .tcx
-      .all_impls(trait_pred.def_id())
-      .filter_map(|def_id| {
-        let imp = self.tcx.impl_trait_header(def_id).unwrap();
-        if imp.polarity == ty::ImplPolarity::Negative
-          || !self.tcx.is_user_visible_dep(def_id.krate)
-        {
-          return None;
-        }
-        let imp = imp.trait_ref.skip_binder();
+  // fn find_similar_impl_candidates(
+  //   &self,
+  //   trait_pred: ty::PolyTraitPredicate<'tcx>,
+  // ) -> Vec<ImplCandidate<'tcx>> {
+  //   let mut candidates: Vec<_> = self
+  //     .tcx
+  //     .all_impls(trait_pred.def_id())
+  //     .filter_map(|def_id| {
+  //       let imp = self.tcx.impl_trait_header(def_id).unwrap();
+  //       if imp.polarity == ty::ImplPolarity::Negative
+  //         || !self.tcx.is_user_visible_dep(def_id.krate)
+  //       {
+  //         return None;
+  //       }
+  //       let imp = imp.trait_ref.skip_binder();
 
-        self
-          .fuzzy_match_tys(
-            trait_pred.skip_binder().self_ty(),
-            imp.self_ty(),
-            false,
-          )
-          .map(|similarity| ImplCandidate {
-            trait_ref: imp,
-            similarity,
-            impl_def_id: def_id,
-          })
-          .or(Some(ImplCandidate {
-            trait_ref: imp,
-            similarity: CandidateSimilarity::Other,
-            impl_def_id: def_id,
-          }))
-      })
-      .collect();
-    if candidates
-      .iter()
-      .any(|c| matches!(c.similarity, CandidateSimilarity::Exact { .. }))
-    {
-      // If any of the candidates is a perfect match, we don't want to show all of them.
-      // This is particularly relevant for the case of numeric types (as they all have the
-      // same category).
-      candidates
-        .retain(|c| matches!(c.similarity, CandidateSimilarity::Exact { .. }));
-    }
-    candidates
-  }
+  //       self
+  //         .fuzzy_match_tys(
+  //           trait_pred.skip_binder().self_ty(),
+  //           imp.self_ty(),
+  //           false,
+  //         )
+  //         .map(|similarity| ImplCandidate {
+  //           trait_ref: imp,
+  //           similarity,
+  //           impl_def_id: def_id,
+  //         })
+  //         .or(Some(ImplCandidate {
+  //           trait_ref: imp,
+  //           similarity: CandidateSimilarity::Other,
+  //           impl_def_id: def_id,
+  //         }))
+  //     })
+  //     .collect();
+  //   if candidates
+  //     .iter()
+  //     .any(|c| matches!(c.similarity, CandidateSimilarity::Exact { .. }))
+  //   {
+  //     // If any of the candidates is a perfect match, we don't want to show all of them.
+  //     // This is particularly relevant for the case of numeric types (as they all have the
+  //     // same category).
+  //     candidates
+  //       .retain(|c| matches!(c.similarity, CandidateSimilarity::Exact { .. }));
+  //   }
+  //   candidates
+  // }
 
   fn fuzzy_match_tys(
     &self,

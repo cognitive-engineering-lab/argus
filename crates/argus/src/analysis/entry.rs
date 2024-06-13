@@ -2,6 +2,7 @@
 //! rleationships between large structures.
 
 use anyhow::{anyhow, bail, Result};
+use argus_ext::ty::EvaluationResultExt;
 use fluid_let::fluid_let;
 use rustc_hir::BodyId;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
@@ -14,7 +15,7 @@ use crate::{
     tls::{self},
     transform, EvaluationResult, INCLUDE_SUCCESSES, OBLIGATION_TARGET,
   },
-  ext::{EvaluationResultExt, InferCtxtExt},
+  ext::InferCtxtExt,
   proof_tree::{serialize::try_serialize, SerializedTree},
   types::{
     intermediate::{
@@ -68,7 +69,7 @@ pub fn process_obligation<'tcx>(
   // can't (currently) distinguish between a subsequent solving attempt
   // of a previous obligation.
   if result.is_yes() || result.is_no() {
-    tls::drain_implied_ambiguities(infcx, &obl);
+    tls::drain_implied_ambiguities(infcx, obl);
   }
 
   if !INCLUDE_SUCCESSES.copied().unwrap_or(false) && result.is_yes() {
@@ -139,10 +140,10 @@ pub fn build_obligations_output<'tcx>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
   typeck_results: &'tcx TypeckResults<'tcx>,
-) -> Result<ObligationsInBody> {
+) -> ObligationsInBody {
   log::trace!("build_obligations_output {body_id:?}");
   let (_, oib) = build_obligations_in_body(tcx, body_id, typeck_results);
-  Ok(oib)
+  oib
 }
 
 pub fn build_tree_output<'tcx>(
@@ -182,7 +183,7 @@ pub(crate) fn pick_tree<'a, 'tcx: 'a>(
     .find_map(|(obligation, result, this_hash, infcx)| {
       if this_hash == hash {
         log::info!("Generating tree for obligation {:?}", obligation);
-        Some(generate_tree(infcx, &obligation, result))
+        Some(generate_tree(infcx, obligation, result))
       } else {
         None
       }

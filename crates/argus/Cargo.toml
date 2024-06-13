@@ -21,6 +21,8 @@ fluid-let.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
+argus-ext = { version = "0.1.6", path = "../argus-ext" }
+argus-ser = { version = "0.1.6", path = "../argus-ser" }
 index_vec = { version = "0.1.3", features = ["serde"] }
 smallvec = "1.11.2"
 itertools = "0.12.0"
@@ -33,6 +35,7 @@ ts-rs = { version = "7.1.1", features = ["indexmap-impl"], optional = true }
 
 [dev-dependencies]
 argus-lib = { path = ".", features = ["testing"] }
+argus-ser = { version = "0.1.6", path = "../argus-ser", features = ["testing"] }
 rustc_utils = { version = "=0.10.0-nightly-2024-05-20", features = ["serde", "ts-rs"] }
 test-log = "0.2.11"
 env_logger = "0.9.3"

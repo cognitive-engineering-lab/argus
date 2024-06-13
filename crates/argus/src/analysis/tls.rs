@@ -1,6 +1,10 @@
 //! Thread local storage for storing data processed in rustc.
 use std::cell::RefCell;
 
+use argus_ext::{
+  infer::InferCtxtExt,
+  ty::{EvaluationResultExt, PredicateExt},
+};
 use index_vec::IndexVec;
 use rustc_data_structures::fx::FxIndexMap;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
@@ -11,7 +15,6 @@ pub use unsafe_tls::{
 };
 
 use crate::{
-  ext::{EvaluationResultExt, InferCtxtExt, PredicateExt},
   proof_tree::SerializedTree,
   types::{intermediate::Provenance, Obligation, ObligationHash},
 };
@@ -28,7 +31,7 @@ thread_local! {
 
   static OBLIGATIONS: RefCell<Vec<Provenance<Obligation>>> = RefCell::default();
 
-  static TREE: RefCell<Option<SerializedTree>> = Default::default();
+  static TREE: RefCell<Option<SerializedTree>> = RefCell::default();
 
   static REPORTED_ERRORS: RefCell<FxIndexMap<Span, Vec<ObligationHash>>> = RefCell::default();
 }
@@ -36,7 +39,7 @@ thread_local! {
 pub fn store_obligation(obl: Provenance<Obligation>) {
   OBLIGATIONS.with(|obls| {
     if !obls.borrow().iter().any(|o| *o.hash == *obl.hash) {
-      obls.borrow_mut().push(obl)
+      obls.borrow_mut().push(obl);
     }
   });
 }

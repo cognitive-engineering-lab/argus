@@ -11,7 +11,9 @@ license = "MIT"
 
 [dependencies]
 argus-lib = { version = "0.1.6", path = "../argus" }
+argus-ext = { version = "0.1.6", path = "../argus-ext" }
 rustc_plugin = "=0.10.0-nightly-2024-05-20"
+
 rustc_utils.workspace = true
 log.workspace = true
 anyhow.workspace = true

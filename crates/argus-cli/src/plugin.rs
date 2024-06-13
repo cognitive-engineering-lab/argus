@@ -6,9 +6,9 @@ use std::{
   time::Instant,
 };
 
+use argus_ext::ty::TyCtxtExt;
 use argus_lib::{
   analysis,
-  ext::TyCtxtExt as ArgusTyCtxtExt,
   find_bodies::{find_bodies, find_enclosing_bodies},
   types::{ObligationHash, ToTarget},
 };
@@ -115,14 +115,13 @@ impl RustcPlugin for ArgusPlugin {
   }
 
   fn args(&self, target_dir: &Utf8Path) -> RustcPluginArgs<ArgusPluginArgs> {
+    use ArgusCommand as AC;
     let args = ArgusPluginArgs::parse_from(env::args().skip(1));
-
     let cargo_path =
       env::var("CARGO_PATH").unwrap_or_else(|_| "cargo".to_string());
 
-    use ArgusCommand::*;
     match &args.command {
-      Preload => {
+      AC::Preload => {
         let mut cmd = Command::new(cargo_path);
         // Note: this command must share certain parameters with rustc_plugin so Cargo will not recompute
         // dependencies when actually running the driver, e.g. RUSTFLAGS.
@@ -132,7 +131,7 @@ impl RustcPlugin for ArgusPlugin {
         let exit_status = cmd.status().expect("could not run cargo");
         exit(exit_status.code().unwrap_or(-1));
       }
-      RustcVersion => {
+      AC::RustcVersion => {
         let commit_hash =
           rustc_interface::util::rustc_version_str().unwrap_or("unknown");
         println!("{commit_hash}");
@@ -142,17 +141,17 @@ impl RustcPlugin for ArgusPlugin {
     };
 
     let file = match &args.command {
-      Tree { file, .. } => Some(file),
-      Obligations { file } => file.as_ref(),
-      Bundle => None,
+      AC::Tree { file, .. } => Some(file),
+      AC::Obligations { file } => file.as_ref(),
+      AC::Bundle => None,
       _ => unreachable!(),
     };
 
-    let filter = file
-      .map(|file| CrateFilter::CrateContainingFile(PathBuf::from(file)))
-      .unwrap_or(CrateFilter::OnlyWorkspace);
+    let filter = file.map_or(CrateFilter::OnlyWorkspace, |file| {
+      CrateFilter::CrateContainingFile(PathBuf::from(file))
+    });
 
-    RustcPluginArgs { filter, args }
+    RustcPluginArgs { args, filter }
   }
 
   fn run(
@@ -160,9 +159,9 @@ impl RustcPlugin for ArgusPlugin {
     compiler_args: Vec<String>,
     plugin_args: ArgusPluginArgs,
   ) -> RustcResult<()> {
-    use ArgusCommand::*;
+    use ArgusCommand as AC;
     match &plugin_args.command {
-      Tree {
+      AC::Tree {
         file,
         id,
         start_line,
@@ -199,7 +198,7 @@ impl RustcPlugin for ArgusPlugin {
         );
         postprocess(v)
       }
-      Obligations { file, .. } => {
+      AC::Obligations { file, .. } => {
         let nothing = || None::<(ObligationHash, CharRange)>;
         let v = run(
           analysis::obligations,
@@ -210,7 +209,7 @@ impl RustcPlugin for ArgusPlugin {
         );
         postprocess(v)
       }
-      Bundle => {
+      AC::Bundle => {
         log::warn!("Bundling takes an enormous amount of time.");
         let nothing = || None::<(ObligationHash, CharRange)>;
         let v = run(
@@ -227,6 +226,7 @@ impl RustcPlugin for ArgusPlugin {
   }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn run<A: ArgusAnalysis, T: ToTarget>(
   analysis: A,
   file: Option<PathBuf>,
@@ -251,6 +251,7 @@ fn run<A: ArgusAnalysis, T: ToTarget>(
   Ok(callbacks.result)
 }
 
+#[allow(clippy::unnecessary_wraps)]
 pub fn run_with_callbacks(
   args: &[String],
   callbacks: &mut (dyn rustc_driver::Callbacks + Send),
@@ -259,7 +260,7 @@ pub fn run_with_callbacks(
   args.extend(
     "-Z next-solver -Z print-type-sizes=true -A warnings"
       .split(' ')
-      .map(|s| s.to_owned()),
+      .map(ToOwned::to_owned),
   );
 
   log::debug!("Running command with callbacks: {args:?}");
@@ -277,6 +278,7 @@ pub fn run_with_callbacks(
   Ok(())
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn postprocess<T: Serialize>(result: T) -> RustcResult<()> {
   serde_json::to_writer(io::stdout(), &result).unwrap();
   Ok(())
@@ -317,7 +319,7 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
         if let FileName::Real(RealFileName::LocalPath(p)) =
           tcx.body_filename(body)
         {
-          if target_file.map(|f| f.ends_with(&p)).unwrap_or(true) {
+          if target_file.map_or(true, |f| f.ends_with(&p)) {
             log::info!("analyzing {:?}", body);
             match analysis.analyze(tcx, body) {
               Ok(v) => Some(v),

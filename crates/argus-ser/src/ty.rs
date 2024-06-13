@@ -1134,11 +1134,11 @@ impl<'tcx> Goal__PredicateDef<'tcx> {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "ParamEnv"))]
-pub struct ParamEnvDef<'tcx>(crate::types::GroupedClauses<'tcx>);
+pub struct ParamEnvDef<'tcx>(crate::custom::GroupedClauses<'tcx>);
 
 impl<'tcx> ParamEnvDef<'tcx> {
   pub fn new(value: &ty::ParamEnv<'tcx>) -> Self {
-    Self(crate::ext::group_predicates_by_ty(value.caller_bounds()))
+    Self(crate::custom::group_predicates_by_ty(value.caller_bounds()))
   }
 
   pub fn serialize<S>(

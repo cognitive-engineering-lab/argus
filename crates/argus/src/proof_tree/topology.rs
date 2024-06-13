@@ -38,6 +38,7 @@ pub struct ToRoot;
 
 /// The path from or to the root for a given node.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[allow(clippy::struct_field_names)]
 pub struct Path<N: Idx, Marker> {
   pub root: N,
   pub node: N,

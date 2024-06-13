@@ -1,5 +1,6 @@
 use std::time::Instant;
 
+use argus_ext::ty::{EvaluationResultExt, TyCtxtExt, TyExt};
 use index_vec::IndexVec;
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::{
@@ -12,10 +13,9 @@ use serde::Serialize;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
-use super::{ty as myty, util};
+use super::util;
 use crate::{
   analysis::EvaluationResult,
-  ext::{EvaluationResultExt, TyCtxtExt},
   proof_tree::{topology::TreeTopology, ProofNodeIdx},
 };
 
@@ -67,42 +67,43 @@ enum GoalKind {
 
 impl GoalKind {
   fn weight(&self) -> usize {
-    use GoalKind::*;
-    use Location::*;
+    use GoalKind as GK;
+    use Location::{External as E, Local as L};
     match self {
-      Trait {
-        _self: Local,
-        _trait: Local,
+      GK::Trait {
+        _self: L,
+        _trait: L,
       } => 0,
 
-      Trait {
-        _self: Local,
-        _trait: External,
+      GK::Trait {
+        _self: L,
+        _trait: E,
       } => 1,
 
       // NOTE: if the failed predicate is fn(..): Trait then treat the
       // function as an `External` type, because you can't implement traits
       // for functions, that has to be done via blanket impls using Fn traits.
-      Trait {
-        _self: External,
-        _trait: Local,
+      GK::Trait {
+        _self: E,
+        _trait: L,
       }
       // You can't implement a trait for function, they have to be
       // done by the crate exporting the trait.
-      | FnToTrait { _trait: Local } => 2,
+      | GK::FnToTrait { _trait: L } => 2,
 
-      Trait {
-        _self: External,
-        _trait: External,
+      GK::Trait {
+        _self: E,
+        _trait: E,
       } => 3,
-      FnToTrait { _trait: External } => 4,
 
-      TyChange => 4,
-      FnParamDel { d } => 4 * d,
+      GK::FnToTrait { _trait: E }
+      | GK::TyChange => 4,
+      GK::FnParamDel { d } => 4 * d,
+
       // You could implement the unstable Fn traits for a type,
       // we could thens suggest this if there's nothing else better.
-      TyAsCallable { arity } => 10 + arity,
-      Misc => 20,
+      GK::TyAsCallable { arity } => 10 + arity,
+      GK::Misc => 20,
     }
   }
 }
@@ -140,7 +141,7 @@ impl And {
   ///
   /// Changing types. That could either be changing a type to match an
   /// alias-relate, deleting function parameters or tuple elements.
-  pub fn weight<'tcx>(self, tree: &T<'_, 'tcx>) -> SetHeuristic {
+  pub fn weight(self, tree: &T) -> SetHeuristic {
     let goals = self
       .0
       .iter()
@@ -174,6 +175,7 @@ impl Dnf {
     }
   }
 
+  #[allow(clippy::needless_pass_by_value)]
   fn distribute(self, other: Self) -> Self {
     Self::or(
       self
@@ -193,6 +195,7 @@ impl Dnf {
   }
 }
 
+#[allow(clippy::struct_field_names)]
 pub struct Goal<'a, 'tcx> {
   idx: I,
   result: EvaluationResult,
@@ -201,15 +204,15 @@ pub struct Goal<'a, 'tcx> {
   goal: &'a RGoal<'tcx, ty::Predicate<'tcx>>,
 }
 
-impl Into<ProofNodeIdx> for Goal<'_, '_> {
-  fn into(self) -> ProofNodeIdx {
-    self.idx
+impl From<Goal<'_, '_>> for I {
+  fn from(val: Goal) -> Self {
+    val.idx
   }
 }
 
-impl Into<ProofNodeIdx> for &Goal<'_, '_> {
-  fn into(self) -> ProofNodeIdx {
-    self.idx
+impl From<&Goal<'_, '_>> for I {
+  fn from(val: &Goal) -> Self {
+    val.idx
   }
 }
 
@@ -229,7 +232,7 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
   }
 
   pub fn predicate(&self) -> ty::Predicate<'tcx> {
-    self.goal.predicate.clone()
+    self.goal.predicate
   }
 
   pub fn last_ancestor_pre_builtin(&self) -> Self {
@@ -280,9 +283,9 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
       ty::PredicateKind::Clause(ty::ClauseKind::Trait(t))
         if t.polarity == ty::PredicatePolarity::Positive
           && tcx.is_fn_trait(t.def_id())
-          && let Some(fn_arity) = myty::function_arity(tcx, t.self_ty()) =>
+          && let Some(fn_arity) = tcx.function_arity(t.self_ty()) =>
       {
-        let trait_arity = myty::fn_trait_arity(tcx, t).unwrap_or(usize::MAX);
+        let trait_arity = tcx.fn_trait_arity(t).unwrap_or(usize::MAX);
 
         log::debug!("FnSigs\n{:?}\n{:?}", t.self_ty(), t.trait_ref);
         log::debug!("Fn Args {:?}", t.trait_ref.args.into_type_list(tcx));
@@ -302,14 +305,14 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
         if t.polarity == ty::PredicatePolarity::Positive
           && tcx.is_fn_trait(t.def_id()) =>
       {
-        let trait_arity = myty::fn_trait_arity(tcx, t).unwrap_or(usize::MAX);
+        let trait_arity = tcx.fn_trait_arity(t).unwrap_or(usize::MAX);
         GoalKind::TyAsCallable { arity: trait_arity }
       }
 
       // Self type is a function type but the trait isn't
       ty::PredicateKind::Clause(ty::ClauseKind::Trait(t))
         if t.polarity == ty::PredicatePolarity::Positive
-          && let Some(_) = myty::function_arity(tcx, t.self_ty()) =>
+          && let Some(_) = tcx.function_arity(t.self_ty()) =>
       {
         let def_id = t.def_id();
         let location = if def_id.is_local() {
@@ -329,7 +332,7 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
         let def_id = t.def_id();
 
         let def_id_local = def_id.is_local();
-        let ty_local = myty::is_local(ty);
+        let ty_local = ty.is_local();
 
         match (ty_local, def_id_local) {
           (true, true) => GoalKind::Trait {
@@ -360,9 +363,8 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
         GoalKind::TyChange
       }
 
-      ty::PredicateKind::Clause(..) => GoalKind::Misc,
-
-      ty::PredicateKind::NormalizesTo(..)
+      ty::PredicateKind::Clause(..)
+      | ty::PredicateKind::NormalizesTo(..)
       | ty::PredicateKind::AliasRelate(..)
       | ty::PredicateKind::ObjectSafe(..)
       | ty::PredicateKind::Subtype(..)
@@ -471,7 +473,7 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
         infcx,
         goal,
       }),
-      _ => None,
+      N::C { .. } => None,
     }
   }
 
@@ -488,22 +490,21 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
         tree: self,
         kind,
       }),
-      _ => None,
+      N::R { .. } => None,
     }
   }
 
   pub fn dnf(&self) -> Dnf {
-    fn _goal<'tcx>(this: &T, goal: Goal<'_, 'tcx>) -> Option<Dnf> {
-      if !match this.maybe_ambiguous {
-        true => goal.result.is_maybe(),
-        false => goal.result.is_no(),
-      } {
+    fn _goal(this: &T, goal: &Goal) -> Option<Dnf> {
+      if !((this.maybe_ambiguous && goal.result.is_maybe())
+        || goal.result.is_no())
+      {
         return None;
       }
 
       let candidates = goal.interesting_candidates();
       let nested = candidates
-        .filter_map(|c| _candidate(this, c))
+        .filter_map(|c| _candidate(this, &c))
         .collect::<Vec<_>>();
 
       if nested.is_empty() {
@@ -513,16 +514,13 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
       Dnf::or(nested.into_iter())
     }
 
-    fn _candidate<'tcx>(
-      this: &T,
-      candidate: Candidate<'_, 'tcx>,
-    ) -> Option<Dnf> {
+    fn _candidate(this: &T, candidate: &Candidate) -> Option<Dnf> {
       if candidate.result.is_yes() {
         return None;
       }
 
       let goals = candidate.source_subgoals();
-      let nested = goals.filter_map(|g| _goal(this, g)).collect::<Vec<_>>();
+      let nested = goals.filter_map(|g| _goal(this, &g)).collect::<Vec<_>>();
 
       if nested.is_empty() {
         return None;
@@ -532,7 +530,7 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
     }
 
     let root = self.goal(self.root).expect("invalid root");
-    _goal(self, root).unwrap_or_else(|| Dnf(vec![]))
+    _goal(self, &root).unwrap_or_else(|| Dnf(vec![]))
   }
 
   pub fn iter_correction_sets(&self) -> impl Iterator<Item = And> {
@@ -553,12 +551,10 @@ impl std::fmt::Debug for N<'_> {
         kind,
         result,
         retain,
-      } => write!(f, "C {{ {} {:?} {:?} }}", retain, result, kind),
-      N::R { goal, result, .. } => write!(
-        f,
-        "R {{ result: {:?}, goal: {:?} }}",
-        result, goal.predicate
-      ),
+      } => write!(f, "C {{ {retain} {result:?} {kind:?} }}"),
+      N::R { goal, result, .. } => {
+        write!(f, "R {{ result: {result:?}, goal: {:?} }}", goal.predicate)
+      }
     }
   }
 }

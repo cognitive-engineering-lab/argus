@@ -1,6 +1,7 @@
 use std::{collections::HashMap, hash::Hash, ops::Deref, str::FromStr};
 
 use anyhow::Result;
+use argus_ser::{self as ser};
 use index_vec::IndexVec;
 use indexmap::IndexSet;
 use rustc_data_structures::stable_hasher::Hash64;
@@ -22,14 +23,6 @@ pub use self::intermediate::{EvaluationResult, EvaluationResultDef};
 use crate::{
   analysis::{FullObligationData, SynIdx, UODIdx},
   proof_tree::SerializedTree,
-  serialize::{
-    self as ser,
-    safe::{PathDefNoArgs, TraitRefPrintOnlyTraitPathDef},
-    ty::{
-      Polarity, RegionDef, Slice__ClauseDef, Slice__GenericArgDef,
-      Slice__TyDef, TyDef,
-    },
-  },
 };
 
 // -----------------
@@ -75,7 +68,7 @@ impl ExtensionCandidates {
   ) -> Self {
     let wrapped = traits
       .into_iter()
-      .map(TraitRefPrintOnlyTraitPathDef)
+      .map(ser::TraitRefPrintOnlyTraitPathDef)
       .collect::<Vec<_>>();
     let json = ser::to_value_expect(infcx, &wrapped);
     ExtensionCandidates { data: json }
@@ -103,7 +96,7 @@ pub struct ReceiverAdjStep {
 impl ReceiverAdjStep {
   pub fn new<'tcx>(infcx: &InferCtxt<'tcx>, ty: Ty<'tcx>) -> Self {
     #[derive(Serialize)]
-    struct Wrapper<'tcx>(#[serde(with = "TyDef")] Ty<'tcx>);
+    struct Wrapper<'tcx>(#[serde(with = "ser::ty::TyDef")] Ty<'tcx>);
     let value = ser::to_value_expect(infcx, &Wrapper(ty));
     ReceiverAdjStep { ty: value }
   }
@@ -214,8 +207,8 @@ impl ObligationsInBody {
     exprs: IndexVec<ExprIdx, Expr>,
     method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,
   ) -> Self {
-    let json_name =
-      id.map(|(infcx, id)| ser::to_value_expect(infcx, &PathDefNoArgs(id)));
+    let json_name = id
+      .map(|(infcx, id)| ser::to_value_expect(infcx, &ser::PathDefNoArgs(id)));
     ObligationsInBody {
       name: json_name,
       hash: BodyHash::new(),
@@ -257,65 +250,6 @@ pub struct Obligation {
   #[cfg_attr(feature = "testing", ts(type = "EvaluationResult"))]
   pub result: EvaluationResult,
   pub is_synthetic: bool,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub struct ImplHeader<'tcx> {
-  #[serde(with = "Slice__GenericArgDef")]
-  #[cfg_attr(feature = "testing", ts(type = "GenericArg[]"))]
-  pub args: Vec<ty::GenericArg<'tcx>>,
-
-  #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
-  pub name: TraitRefPrintOnlyTraitPathDef<'tcx>,
-
-  #[serde(with = "TyDef")]
-  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
-  pub self_ty: ty::Ty<'tcx>,
-
-  pub predicates: GroupedClauses<'tcx>,
-
-  #[serde(with = "Slice__TyDef")]
-  #[cfg_attr(feature = "testing", ts(type = "Ty[]"))]
-  pub tys_without_default_bounds: Vec<Ty<'tcx>>,
-}
-
-#[derive(Serialize)]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub struct GroupedClauses<'tcx> {
-  pub grouped: Vec<ClauseWithBounds<'tcx>>,
-  #[serde(with = "Slice__ClauseDef")]
-  #[cfg_attr(feature = "testing", ts(type = "Clause[]"))]
-  pub other: Vec<ty::Clause<'tcx>>,
-}
-
-#[derive(Serialize)]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub struct ClauseWithBounds<'tcx> {
-  #[serde(with = "TyDef")]
-  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
-  pub ty: ty::Ty<'tcx>,
-  pub bounds: Vec<ClauseBound<'tcx>>,
-}
-
-#[derive(Serialize)]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub enum ClauseBound<'tcx> {
-  Trait(
-    Polarity,
-    #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
-    TraitRefPrintOnlyTraitPathDef<'tcx>,
-  ),
-  Region(
-    #[serde(with = "RegionDef")]
-    #[cfg_attr(feature = "testing", ts(type = "Region"))]
-    ty::Region<'tcx>,
-  ),
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
@@ -666,6 +600,8 @@ pub(super) mod intermediate {
       SyntheticQueriesInBody(IndexVec::default())
     }
 
+    // NOTE: used in `test_utils`.
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
       self.0.is_empty()
     }

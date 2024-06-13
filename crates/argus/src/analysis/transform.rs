@@ -1,3 +1,7 @@
+use argus_ext::{
+  infer::InferCtxtExt,
+  ty::{PredicateExt, TyCtxtExt, TypeckResultsExt},
+};
 use index_vec::IndexVec;
 use indexmap::IndexSet;
 use itertools::Itertools;
@@ -17,7 +21,7 @@ use super::{
   EvaluationResult,
 };
 use crate::{
-  ext::{InferCtxtExt, PredicateExt, TyCtxtExt, TypeckResultsExt},
+  ext::InferCtxtExt as LocalInferCtxtExt,
   types::{intermediate::*, *},
 };
 
@@ -74,6 +78,7 @@ pub fn compute_provenance<'tcx>(
 /// 3. Relate "ambiguous" method calls. These don't get reported in the set of
 ///    rustc trait errors (not sure why) but we need to represent them as
 ///    trait errors.
+#[allow(clippy::too_many_arguments)]
 pub fn transform<'a, 'tcx: 'a>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
@@ -364,11 +369,9 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           hashes,
         });
         continue;
-      } else {
-        log::error!(
-          "failed to find root expression for {span:?} {predicates:?}"
-        );
       }
+
+      log::error!("failed to find root expression for {span:?} {predicates:?}");
 
       // A predicate did not match exactly, now we're scrambling
       // to find an expression by span, and pick an obligation.
@@ -411,7 +414,14 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     }
   }
 
+  // FIXME: this entire method, can we actually get rid of it???
   // 1. build the method call table (see ambiguous / )
+  #[allow(
+    dead_code,
+    unreachable_code,
+    unused_variables,
+    clippy::too_many_lines
+  )]
   fn relate_method_call<'hir>(
     &mut self,
     // Expr of the entire call expression

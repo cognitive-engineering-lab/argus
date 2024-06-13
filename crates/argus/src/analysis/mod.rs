@@ -6,6 +6,7 @@ mod transform;
 use std::collections::HashMap;
 
 use anyhow::Result;
+use argus_ext::ty::TyCtxtExt;
 use fluid_let::fluid_let;
 use rustc_hir::BodyId;
 use rustc_middle::ty::TyCtxt;
@@ -15,7 +16,6 @@ pub(crate) use crate::types::intermediate::{
   EvaluationResult, FulfillmentData,
 };
 use crate::{
-  ext::TyCtxtExt,
   proof_tree::SerializedTree,
   types::{
     intermediate::{Forgettable, FullData},
@@ -37,7 +37,11 @@ pub fn obligations(tcx: TyCtxt, body_id: BodyId) -> Result<ObligationsInBody> {
   let typeck_results = tcx.inspect_typeck(body_id, entry::process_obligation);
 
   // Construct the output from the stored data.
-  entry::build_obligations_output(tcx, body_id, typeck_results)
+  Ok(entry::build_obligations_output(
+    tcx,
+    body_id,
+    typeck_results,
+  ))
 }
 
 /// Generate a *single* proof-tree for a target obligation within a body. See

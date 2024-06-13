@@ -1,4 +1,5 @@
 use anyhow::{bail, Result};
+use argus_ext::ty::EvaluationResultExt;
 use index_vec::IndexVec;
 use rustc_hir::def_id::DefId;
 use rustc_infer::infer::InferCtxt;
@@ -10,7 +11,7 @@ use rustc_trait_selection::{
 };
 
 use super::{interners::Interners, *};
-use crate::{aadebug, ext::EvaluationResultExt};
+use crate::aadebug;
 
 pub struct SerializedTreeVisitor<'tcx> {
   pub root: Option<ProofNodeIdx>,
@@ -113,6 +114,8 @@ impl SerializedTreeVisitor<'_> {
   // comparing the JSON values is a bad idea in general. (This is what comparing
   // interned keys does essentially). We should wait until the new trait solver
   // has some mechanism for detecting cycles and piggy back off that.
+  // FIXME: this is currently dissabled but we should check for cycles again...
+  #[allow(dead_code)]
   fn check_for_cycle_from(&mut self, from: ProofNodeIdx) {
     if self.cycle.is_some() {
       return;

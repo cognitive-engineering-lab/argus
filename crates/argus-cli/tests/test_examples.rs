@@ -67,6 +67,7 @@ mk_tests_for! {
   entrait,
   nalgebra,
   uom
+  // tauri_project
 }
 
 // TODO: include individual test if we want to see a particular output
