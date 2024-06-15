@@ -1,19 +1,16 @@
+import { TreeInfo, TreeView } from "@argus/common/TreeInfo";
 import { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
+import { TreeRenderParams } from "@argus/common/communication";
+import { AppContext, TreeAppContext } from "@argus/common/context";
 import { EvaluationMode } from "@argus/common/lib";
+import { PrintGoal } from "@argus/print/lib";
 import _ from "lodash";
 import React, { useContext } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import { PrintGoal } from "../print/print";
-import { AppContext, TreeAppContext } from "../utilities/context";
 import "./BottomUp.css";
-import {
-  CollapsibleElement,
-  DirRecursive,
-  TreeRenderParams,
-} from "./Directory";
-import { TreeInfo, TreeView } from "./TreeInfo";
+import { CollapsibleElement, DirRecursive } from "./Directory";
 import { treeHeuristic } from "./heuristic";
 
 type TreeViewWithRoot = TreeView & { root: ProofNodeIdx };

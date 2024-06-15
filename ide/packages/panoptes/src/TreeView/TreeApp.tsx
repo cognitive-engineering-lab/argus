@@ -1,4 +1,6 @@
+import TreeInfo from "@argus/common/TreeInfo";
 import { SerializedTree } from "@argus/common/bindings";
+import { AppContext, TreeAppContext } from "@argus/common/context";
 import {
   VSCodePanelTab,
   VSCodePanelView,
@@ -7,13 +9,11 @@ import {
 import _ from "lodash";
 import React, { useContext } from "react";
 
-import { AppContext, TreeAppContext } from "../utilities/context";
 import BottomUp from "./BottomUp";
 import FailedSubsets from "./Subsets";
 import TopDown from "./TopDown";
 import "./TreeApp.css";
 import TreeCycle from "./TreeCycle";
-import TreeInfo from "./TreeInfo";
 
 const TreeApp = ({
   tree,

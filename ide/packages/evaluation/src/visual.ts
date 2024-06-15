@@ -29,7 +29,7 @@ function ensureDir(dir: fs.PathLike) {
 async function argusScreenshots(
   outDir: fs.PathLike,
   bundles: BodyBundle[],
-  title: string = "Argus Output"
+  _title: string = "Argus Output"
 ) {
   const browser = await chromium.launch({ headless: !global.debugging });
   const context = await browser.newContext();

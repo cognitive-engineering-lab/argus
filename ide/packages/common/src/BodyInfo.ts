@@ -1,3 +1,5 @@
+import _ from "lodash";
+
 import {
   BodyHash,
   Expr,
@@ -8,10 +10,8 @@ import {
   ObligationHash,
   ObligationIdx,
   ObligationsInBody,
-} from "@argus/common/bindings";
-import _ from "lodash";
-
-import { isHiddenObl, isObject } from "./utilities/func";
+} from "./bindings";
+import { isHiddenObl, isObject } from "./func";
 
 class BodyInfo {
   constructor(

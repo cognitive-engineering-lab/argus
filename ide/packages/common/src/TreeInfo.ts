@@ -1,3 +1,5 @@
+import _ from "lodash";
+
 import {
   CandidateData,
   CandidateIdx,
@@ -7,10 +9,7 @@ import {
   ResultIdx,
   SerializedTree,
   TreeTopology,
-} from "@argus/common/bindings";
-import _ from "lodash";
-
-import { isHiddenObl } from "../utilities/func";
+} from "./bindings";
 
 type MultiRecord<K extends number, T> = Record<K, T[]>;
 

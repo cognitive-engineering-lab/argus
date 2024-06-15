@@ -1,8 +1,7 @@
+import TreeInfo from "@argus/common/TreeInfo";
 import { ProofNodeIdx } from "@argus/common/bindings";
+import { isTraitClause, mean, stdDev } from "@argus/common/func";
 import _ from "lodash";
-
-import { isTraitClause, mean, stdDev } from "../utilities/func";
-import TreeInfo from "./TreeInfo";
 
 interface HeuristicI {
   // Partition sets of failed nodes into two groups.

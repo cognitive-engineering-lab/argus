@@ -17,12 +17,12 @@ export async function argusData(dir: string) {
 }
 
 // TODO: move the "title" from execNotify into the opts, and use the `cmd` if not present.
-export const execSilent = (
+export const execSilent = async (
   cmd: string,
   args: string[],
   opts: ExecNotifyOpts
 ) => {
-  return _execNotify(cmd, args, opts, (..._args: any[]) => {});
+  return await _execNotify(cmd, args, opts, (..._args: any[]) => {});
 };
 
 export async function sleep(waitTime: number) {
@@ -71,13 +71,7 @@ export function isRustcMessage(obj: any): obj is DiagnosticMessage {
 export async function expandBottomUpView(page: Page) {
   let bs = await page.getByText("Bottom Up").all();
   try {
-    await Promise.all(
-      _.map(bs, async b => {
-        try {
-          await b.click();
-        } catch (e: any) {}
-      })
-    );
+    await Promise.all(_.map(bs, b => b.click()));
   } catch (e: any) {
     console.debug("Error clicking bottom up", e);
   }

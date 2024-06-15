@@ -1,4 +1,7 @@
 import { ProofNodeIdx } from "@argus/common/bindings";
+import { TreeRenderParams } from "@argus/common/communication";
+import { TreeAppContext } from "@argus/common/context";
+import { IcoTreeDown } from "@argus/print/Icons";
 import {
   FloatingFocusManager,
   FloatingPortal,
@@ -13,9 +16,7 @@ import classNames from "classnames";
 import _ from "lodash";
 import React, { useContext, useState } from "react";
 
-import { IcoTreeDown } from "../Icons";
-import { TreeAppContext } from "../utilities/context";
-import { DirRecursive, TreeRenderParams } from "./Directory";
+import { DirRecursive } from "./Directory";
 import Graph from "./Graph";
 import "./TopDown.css";
 

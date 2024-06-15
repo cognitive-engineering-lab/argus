@@ -31,11 +31,11 @@ import {
   TypeAndMut,
   UintTy,
 } from "@argus/common/bindings";
+import { anyElems, fnInputsAndOutput, tyIsUnit } from "@argus/common/func";
 import _, { isObject } from "lodash";
 import React from "react";
 
-import { Toggle } from "../../Toggle";
-import { anyElems, fnInputsAndOutput, tyIsUnit } from "../../utilities/func";
+import { Toggle } from "../Toggle";
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
 import {

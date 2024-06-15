@@ -4,18 +4,17 @@ import {
   Node as NodeTy,
   ResultIdx,
 } from "@argus/common/bindings";
-import React, { useContext } from "react";
-
-import { HoverInfo } from "../HoverInfo";
+import { TreeAppContext } from "@argus/common/context";
+import { HoverInfo } from "@argus/print/HoverInfo";
 import {
   IcoAmbiguous,
   IcoCheck,
   IcoError,
   IcoEyeClosed,
   IcoLoop,
-} from "../Icons";
-import { PrintGoal, PrintImplHeader } from "../print/print";
-import { TreeAppContext } from "../utilities/context";
+} from "@argus/print/Icons";
+import { PrintGoal, PrintImplHeader } from "@argus/print/lib";
+import React, { useContext } from "react";
 
 export const ResultRaw = ({ result }: { result: EvaluationResult }) => {
   return result === "yes" ? (

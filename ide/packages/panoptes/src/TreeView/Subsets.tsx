@@ -1,8 +1,8 @@
 import { SetHeuristic } from "@argus/common/bindings";
+import { AppContext, TreeAppContext } from "@argus/common/context";
 import _ from "lodash";
 import React, { useContext } from "react";
 
-import { AppContext, TreeAppContext } from "../utilities/context";
 import { BottomUpImpersonator, invertViewWithRoots } from "./BottomUp";
 
 // FIXME: we need to present the sets together in a conjunct, instead of the flat list.

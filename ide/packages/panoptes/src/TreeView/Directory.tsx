@@ -1,16 +1,16 @@
 import { ProofNodeIdx } from "@argus/common/bindings";
-import classNames from "classnames";
-import _ from "lodash";
-import React, { useContext, useEffect, useState } from "react";
-
+import { AppContext, TreeAppContext } from "@argus/common/context";
 import {
   IcoChevronDown,
   IcoChevronRight,
   IcoDot,
   IcoTriangleDown,
   IcoTriangleRight,
-} from "../Icons";
-import { AppContext, TreeAppContext } from "../utilities/context";
+} from "@argus/print/Icons";
+import classNames from "classnames";
+import _ from "lodash";
+import React, { useContext, useEffect, useState } from "react";
+
 import "./Directory.css";
 import { Node } from "./Node";
 
@@ -75,15 +75,6 @@ export const CollapsibleElement = ({
     </div>
   );
 };
-
-export type InfoWrapper = React.FC<{
-  n: ProofNodeIdx;
-  Child: React.ReactElement;
-}>;
-export interface TreeRenderParams {
-  Wrapper?: InfoWrapper;
-  styleEdges?: boolean;
-}
 
 export const DirNode = ({
   idx,

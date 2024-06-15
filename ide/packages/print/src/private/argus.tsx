@@ -5,11 +5,11 @@ import {
   ImplHeader,
   Ty,
 } from "@argus/common/bindings";
+import { anyElems } from "@argus/common/func";
 import _ from "lodash";
 import React from "react";
 
-import { Toggle } from "../../Toggle";
-import { anyElems } from "../../utilities/func";
+import { Toggle } from "../Toggle";
 import { PrintDefPath } from "./path";
 import { PrintClause } from "./predicate";
 import { Angled, CommaSeparated, Kw, PlusSeparated } from "./syntax";

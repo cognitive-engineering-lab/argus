@@ -1,9 +1,9 @@
-import { EvaluationMode, PanoptesConfig, SystemSpec } from "@argus/common/lib";
 import { createContext } from "react";
 
-import { TreeRenderParams } from "../TreeView/Directory";
-import TreeInfo from "../TreeView/TreeInfo";
-import { MessageSystem } from "../communication";
+import BodyInfo from "./BodyInfo";
+import TreeInfo from "./TreeInfo";
+import { MessageSystem, TreeRenderParams } from "./communication";
+import { EvaluationMode, Filename, PanoptesConfig, SystemSpec } from "./lib";
 
 export const AppContext = {
   MessageSystemContext: createContext<MessageSystem | undefined>(undefined),
@@ -12,6 +12,10 @@ export const AppContext = {
   >(undefined),
   SystemSpecContext: createContext<SystemSpec | undefined>(undefined),
 };
+
+export const FileContext = createContext<Filename | undefined>(undefined);
+
+export const BodyInfoContext = createContext<BodyInfo | undefined>(undefined);
 
 export const TreeAppContext = {
   TreeContext: createContext<TreeInfo | undefined>(undefined),

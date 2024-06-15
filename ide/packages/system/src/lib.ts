@@ -91,14 +91,21 @@ export const execNotifyBinary = (
   });
 
   stateListener("loading");
-  return new CPromise<Buffer>((resolve, reject, onCancel) => {
-    onCancel(() => {
+  const killProcess = () => {
+    try {
       msg(`Killing process ${proc.pid}`);
       killAll(proc.pid!, "SIGKILL", msg);
-      stateListener("error");
-    });
+    } catch (e: any) {
+      log(`Error killing process ${proc.pid}: ${e.toString()}`);
+    }
+  };
+  const peacefulCancel = () => {};
+
+  return new CPromise<Buffer>((resolve, reject, onCancel) => {
+    onCancel(killProcess);
 
     proc.addListener("close", _ => {
+      onCancel(peacefulCancel);
       stateListener("idle");
       if (opts?.ignoreExitCode || proc.exitCode === 0) {
         resolve(Buffer.concat(stdoutChunks));
@@ -108,6 +115,8 @@ export const execNotifyBinary = (
     });
 
     proc.addListener("error", e => {
+      onCancel(peacefulCancel);
+      stateListener("error");
       reject(e.toString());
     });
   });

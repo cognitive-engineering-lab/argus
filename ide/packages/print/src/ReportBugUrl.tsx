@@ -1,8 +1,7 @@
+import { AppContext } from "@argus/common/context";
 import { getArgusIssueUrl } from "@argus/common/lib";
 import { VSCodeProgressRing } from "@vscode/webview-ui-toolkit/react";
 import React, { useContext, useEffect, useState } from "react";
-
-import { AppContext } from "./utilities/context";
 
 const PASTE_SUCCESS: number = 201;
 const PASTE_PARTIAL: number = 206;

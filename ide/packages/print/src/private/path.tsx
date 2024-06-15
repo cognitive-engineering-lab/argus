@@ -1,10 +1,10 @@
 import { DefinedPath, PathSegment } from "@argus/common/bindings";
+import { takeRightUntil } from "@argus/common/func";
 import _ from "lodash";
 import React, { createContext, useContext } from "react";
 
-import { HoverInfo } from "../../HoverInfo";
-import { Toggle } from "../../Toggle";
-import { takeRightUntil } from "../../utilities/func";
+import { HoverInfo } from "../HoverInfo";
+import { Toggle } from "../Toggle";
 import { Angled, CommaSeparated, Kw } from "./syntax";
 import { PrintGenericArg, PrintTy } from "./ty";
 

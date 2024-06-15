@@ -12,14 +12,6 @@ import {
   testCases,
 } from "./utils";
 
-interface ReturnType {
-  workspace: string;
-  filename: string;
-  cause: string;
-  numberTreeNodes?: number;
-  rank?: number;
-}
-
 async function createWorkspaceRunner() {
   // Shared state among all runs
   const workspaceDir = path.resolve(__dirname, "..", "workspaces");

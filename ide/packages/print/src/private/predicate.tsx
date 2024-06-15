@@ -10,12 +10,12 @@ import {
   PredicateObligation,
   TraitPredicate,
 } from "@argus/common/bindings";
+import { anyElems } from "@argus/common/func";
 import _ from "lodash";
 import React from "react";
 
-import { HoverInfo } from "../../HoverInfo";
-import { IcoNote } from "../../Icons";
-import { anyElems } from "../../utilities/func";
+import { HoverInfo } from "../HoverInfo";
+import { IcoNote } from "../Icons";
 import { PrintGroupedClauses } from "./argus";
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";

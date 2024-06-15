@@ -34,13 +34,18 @@ export type PanoptesOptionalData = {
 
 export type SystemSpec = Omit<IssueOptions, "logText">;
 export type EvaluationMode = "release" | "rank" | "random";
+export interface FileInfo {
+  fn: Filename;
+  data: ObligationsInBody[];
+  signature?: string;
+}
 
 export type PanoptesConfig = PanoptesOptionalData &
   (
     | {
         type: "VSCODE_BACKING";
         spec: SystemSpec;
-        data: [Filename, ObligationsInBody[]][];
+        data: FileInfo[];
       }
     | {
         type: "WEB_BUNDLE";

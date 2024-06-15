@@ -1,8 +1,12 @@
-import { ObligationsInBody } from "@argus/common/bindings";
+import {
+  createClosedMessageSystem,
+  vscodeMessageSystem,
+} from "@argus/common/communication";
+import { AppContext } from "@argus/common/context";
 import {
   ErrorJumpTargetInfo,
   EvaluationMode,
-  Filename,
+  FileInfo,
   PanoptesConfig,
   SystemSpec,
   isSysMsgHavoc,
@@ -14,13 +18,7 @@ import { observer } from "mobx-react";
 import React, { useEffect, useState } from "react";
 
 import Workspace from "./Workspace";
-import {
-  createClosedMessageSystem,
-  vscodeMessageSystem,
-} from "./communication";
 import { highlightedObligation } from "./signals";
-import { AppContext } from "./utilities/context";
-import { bringToFront } from "./utilities/func";
 
 function blingObserver(info: ErrorJumpTargetInfo) {
   console.debug(`Highlighting obligation ${info}`);
@@ -34,15 +32,18 @@ const webSysSpec: SystemSpec = {
   vscodeVersion: "unknown",
 };
 
-function buildInitialData(
-  config: PanoptesConfig
-): [Filename, ObligationsInBody[]][] {
+/**
+ * Put all kinds of initial configuration state into a common format.
+ */
+function buildInitialData(config: PanoptesConfig): FileInfo[] {
   if (config.type === "VSCODE_BACKING") {
     return config.data;
   }
 
   const byName = _.groupBy(config.closedSystem, body => body.filename);
-  return _.map(byName, (bodies, fn) => [fn, _.map(bodies, b => b.body)]);
+  return _.map(byName, (bodies, fn) => {
+    return { fn, data: _.map(bodies, b => b.body) };
+  });
 }
 
 const App = observer(({ config }: { config: PanoptesConfig }) => {
@@ -73,11 +74,13 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
       return blingObserver(payload);
     } else if (isSysMsgOpenFile(payload)) {
       return setOpenFiles(currFiles => {
-        const files = _.filter(
-          currFiles,
-          ([filename, _]) => filename !== payload.file
-        );
-        return [[payload.file, payload.data], ...files];
+        const newEntry = {
+          fn: payload.file,
+          signature: payload.signature,
+          data: payload.data,
+        };
+        const fileExists = _.find(currFiles, ({ fn }) => fn === payload.file);
+        return fileExists ? currFiles : [...currFiles, newEntry];
       });
     } else if (isSysMsgHavoc(payload)) {
       return setOpenFiles([]);

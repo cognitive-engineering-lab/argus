@@ -25,6 +25,9 @@ window.initializeArgusBlocks = (root: HTMLElement) => {
 
 window.addEventListener(
   "load",
-  () => window.initializeArgusBlocks(document.body),
+  () => {
+    console.info("Loading Panoptes WebView");
+    window.initializeArgusBlocks(document.body);
+  },
   false
 );

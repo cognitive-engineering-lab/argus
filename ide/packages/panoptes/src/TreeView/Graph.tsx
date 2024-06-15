@@ -1,4 +1,6 @@
+import { TreeInfo } from "@argus/common/TreeInfo";
 import { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
+import { TreeAppContext } from "@argus/common/context";
 import _ from "lodash";
 import React, {
   MouseEventHandler,
@@ -11,10 +13,8 @@ import React, {
 // @ts-ignore
 import Tree, { Orientation, TreeLinkDatum, TreeNodeDatum } from "react-d3-tree";
 
-import { TreeAppContext } from "../utilities/context";
 import "./Graph.css";
 import { Node, Result } from "./Node";
-import { TreeInfo } from "./TreeInfo";
 
 const useCenteredTree = (
   defaultTranslate = { x: 0, y: 0 }

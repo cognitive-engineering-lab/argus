@@ -9,6 +9,7 @@ import {
 import {
   ConfigConsts,
   ErrorJumpTargetInfo,
+  FileInfo,
   Filename,
   PanoptesConfig,
   PanoptesToSystemCmds,
@@ -25,6 +26,7 @@ import _ from "lodash";
 import os from "os";
 import vscode from "vscode";
 
+import { log } from "./logging";
 import { globals } from "./main";
 import { RustEditor } from "./utils";
 
@@ -37,47 +39,49 @@ type BlessedMessage<T extends PanoptesToSystemCmds> = {
 
 export class View {
   private panel: vscode.WebviewPanel;
-  private isPanelDisposed: boolean;
   private readonly extensionUri: vscode.Uri;
   private disposables: vscode.Disposable[] = [];
 
   constructor(
     extensionUri: vscode.Uri,
-    initialData: [Filename, ObligationsInBody[]][],
+    initialData: FileInfo[],
     target?: ErrorJumpTargetInfo,
     readonly cleanup: () => void = () => {},
     column: vscode.ViewColumn = vscode.ViewColumn.Beside
   ) {
     this.extensionUri = extensionUri;
-    this.isPanelDisposed = true;
-    // getPanel creates a new panel if it doesn't exist.
-    this.panel = this.getPanel(initialData, target, column);
+    this.panel = this.makePanel(initialData, target, column);
   }
 
-  public getPanel(
-    initialData: [Filename, ObligationsInBody[]][] = [],
+  get getPanel() {
+    return this.panel;
+  }
+
+  makePanel(
+    initialData: FileInfo[] = [],
     target?: ErrorJumpTargetInfo,
     column: vscode.ViewColumn = vscode.ViewColumn.Beside
   ): vscode.WebviewPanel {
-    if (!this.isPanelDisposed) {
-      return this.panel;
-    }
-
-    this.panel = vscode.window.createWebviewPanel("argus", "Argus", column, {
+    const panel = vscode.window.createWebviewPanel("argus", "Argus", column, {
       enableScripts: true,
       retainContextWhenHidden: true,
       enableFindWidget: true,
       localResourceRoots: [this.extensionUri],
     });
-    this.isPanelDisposed = false;
 
     // Set the webview's initial html content
-    this.panel.webview.html = this.getHtmlForWebview(initialData, target);
+    panel.webview.html = getHtmlForWebview(
+      this.extensionUri,
+      panel,
+      initialData,
+      target
+    );
 
     // Listen for when the panel is disposed
     // This happens when the user closes the panel or when the panel is closed programatically
-    this.panel.onDidDispose(
+    panel.onDidDispose(
       () => {
+        log("Disposing panel");
         globals.ctx.view = undefined;
         this.dispose();
       },
@@ -86,19 +90,18 @@ export class View {
     );
 
     // Handle messages from the webview
-    this.panel.webview.onDidReceiveMessage(
+    panel.webview.onDidReceiveMessage(
       async message => await this.handleMessage(message),
       null,
       this.disposables
     );
 
-    return this.panel;
+    return panel;
   }
 
   public dispose() {
     // Clean up our resources
     this.cleanup();
-    this.isPanelDisposed = true;
     this.panel.dispose();
     while (this.disposables.length) {
       const x = this.disposables.pop();
@@ -190,48 +193,47 @@ export class View {
       payload: msg,
     } as MessageHandlerData<SystemToPanoptesMsg<T>>);
   }
+}
 
-  private getHtmlForWebview(
-    initialData: [Filename, ObligationsInBody[]][] = [],
-    target?: ErrorJumpTargetInfo
-  ) {
-    const panoptesDir = vscode.Uri.joinPath(
-      this.extensionUri,
+function getHtmlForWebview(
+  extensionUri: vscode.Uri,
+  panel: vscode.WebviewPanel,
+  initialData: FileInfo[] = [],
+  target?: ErrorJumpTargetInfo
+) {
+  const panoptesDir = vscode.Uri.joinPath(extensionUri, "dist", "panoptes");
+
+  const scriptUri = panel.webview.asWebviewUri(
+    vscode.Uri.joinPath(panoptesDir, "dist", "panoptes.iife.js")
+  );
+
+  const styleUri = panel.webview.asWebviewUri(
+    vscode.Uri.joinPath(panoptesDir, "dist", "style.css")
+  );
+
+  const codiconsUri = panel.webview.asWebviewUri(
+    vscode.Uri.joinPath(
+      panoptesDir,
+      "node_modules",
+      "@vscode/codicons",
       "dist",
-      "panoptes"
-    );
+      "codicon.css"
+    )
+  );
 
-    const scriptUri = this.panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(panoptesDir, "dist", "panoptes.iife.js")
-    );
+  const config: PanoptesConfig = {
+    type: "VSCODE_BACKING",
+    data: initialData,
+    target,
+    spec: {
+      osPlatform: os.platform(),
+      osRelease: os.release(),
+      vscodeVersion: vscode.version,
+    },
+  };
+  const configStr = configToString(config);
 
-    const styleUri = this.panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(panoptesDir, "dist", "style.css")
-    );
-
-    const codiconsUri = this.panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(
-        panoptesDir,
-        "node_modules",
-        "@vscode/codicons",
-        "dist",
-        "codicon.css"
-      )
-    );
-
-    const config: PanoptesConfig = {
-      type: "VSCODE_BACKING",
-      data: initialData,
-      target,
-      spec: {
-        osPlatform: os.platform(),
-        osRelease: os.release(),
-        vscodeVersion: vscode.version,
-      },
-    };
-    const configStr = configToString(config);
-
-    return `
+  return `
       <!DOCTYPE html>
       <html lang="en">
       <head>
@@ -247,5 +249,4 @@ export class View {
       </body>
       </html>
     `;
-  }
 }

@@ -1,5 +1,6 @@
 import { ObligationsInBody } from "@argus/common/bindings";
-import { Filename, SystemSpec } from "@argus/common/lib";
+import { FileInfo, Filename, SystemSpec } from "@argus/common/lib";
+import ReportBugUrl from "@argus/print/ReportBugUrl";
 import {
   VSCodeCheckbox,
   VSCodePanelTab,
@@ -11,7 +12,6 @@ import React, { useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import File from "./File";
-import ReportBugUrl from "./ReportBugUrl";
 import "./Workspace.css";
 
 // TODO: the workspace should manage a set of files. Currently the App is doing
@@ -34,9 +34,10 @@ const Workspace = ({
   files,
   reset,
 }: {
-  files: [Filename, ObligationsInBody[]][];
+  files: FileInfo[];
   reset: () => void;
 }) => {
+  const [active, setActive] = useState(0);
   const [showHidden, setShowHidden] = useState(false);
   const toggleHidden = () => setShowHidden(!showHidden);
 
@@ -48,32 +49,31 @@ const Workspace = ({
     </div>
   );
 
-  const tabs = _.map(files, ([filename, _], idx) => (
-    <VSCodePanelTab key={idx} id={`tab-${idx}`}>
-      {basename(filename)}
+  const mkActiveSet = (idx: number) => () => setActive(idx);
+  const tabName = (idx: number) => `tab-${idx}`;
+
+  const tabs = _.map(files, ({ fn }, idx) => (
+    <VSCodePanelTab key={idx} id={tabName(idx)} onClick={mkActiveSet(idx)}>
+      {basename(fn)}
     </VSCodePanelTab>
   ));
 
-  const fileComponents = _.map(files, ([filename, content], idx) => (
-    <ErrorBoundary
-      key={idx}
-      FallbackComponent={FatalErrorPanel}
-      onReset={reset}
-    >
-      <VSCodePanelView
+  const fileComponents = _.map(files, ({ fn, data }, idx) => (
+    <VSCodePanelView key={idx} style={{ paddingLeft: 0, paddingRight: 0 }}>
+      <ErrorBoundary
         key={idx}
-        id={`view-${idx}`}
-        style={{ paddingLeft: 0, paddingRight: 0 }}
+        FallbackComponent={FatalErrorPanel}
+        onReset={reset}
       >
-        <File file={filename} osibs={content} showHidden={showHidden} />
-      </VSCodePanelView>
-    </ErrorBoundary>
+        <File file={fn} osibs={data} showHidden={showHidden} />
+      </ErrorBoundary>
+    </VSCodePanelView>
   ));
 
   return (
     <>
       <div>{checkbox}</div>
-      <VSCodePanels>
+      <VSCodePanels activeid={tabName(active)}>
         {tabs}
         {fileComponents}
       </VSCodePanels>

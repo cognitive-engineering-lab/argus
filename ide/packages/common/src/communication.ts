@@ -1,14 +1,23 @@
-import { BodyBundle } from "@argus/common/bindings";
+import { messageHandler } from "@estruyf/vscode/dist/client";
+import _ from "lodash";
+
+import { BodyBundle, ProofNodeIdx } from "./bindings";
+import { rangeContains } from "./func";
 import {
   PanoptesToSystemCmds,
   PanoptesToSystemMsg,
   SystemReturn,
   isPanoMsgTree,
-} from "@argus/common/lib";
-import { messageHandler } from "@estruyf/vscode/dist/client";
-import _ from "lodash";
+} from "./lib";
 
-import { rangeContains } from "./utilities/func";
+export type InfoWrapper = React.FC<{
+  n: ProofNodeIdx;
+  Child: React.ReactElement;
+}>;
+export interface TreeRenderParams {
+  Wrapper?: InfoWrapper;
+  styleEdges?: boolean;
+}
 
 export interface MessageSystem {
   postData<T extends PanoptesToSystemCmds>(body: PanoptesToSystemMsg<T>): void;

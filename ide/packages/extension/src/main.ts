@@ -20,7 +20,12 @@ export async function activate(context: vscode.ExtensionContext) {
 
   log("Activating Argus ...");
 
-  const ctx = new Ctx(context, createCommands(), fetchWorkspace());
+  const wksp = fetchWorkspace();
+  if (wksp.kind !== "workspace-folder") {
+    throw new Error("Argus only works in Rust workspaces");
+  }
+
+  const ctx = new Ctx(context, createCommands(), wksp);
   const api = await activateBackend(ctx).catch(err => {
     showErrorDialog(`Cannot activate Argus extension: ${err.message}`);
     throw err;

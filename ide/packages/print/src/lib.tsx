@@ -10,9 +10,9 @@ import _ from "lodash";
 import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
-import ErrorDiv from "../ErrorDiv";
-import ReportBugUrl from "../ReportBugUrl";
-import "./print.css";
+import ErrorDiv from "./ErrorDiv";
+import ReportBugUrl from "./ReportBugUrl";
+import "./lib.css";
 import { PrintImplHeader as UnsafePrintImplHeader } from "./private/argus";
 import { PrintDefPath as UnsafePrintDefPath } from "./private/path";
 import { ToggleGenericDelimiterContext } from "./private/path";

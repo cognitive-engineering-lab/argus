@@ -220,11 +220,9 @@ export async function setup(_context: Ctx): Promise<CallArgus | null> {
     noOutput: boolean = false
   ): CPromise<ArgusResult<T>> => {
     log("Calling backend with args", args);
-    const editor = vscode.window.activeTextEditor;
     const strArgs = _.map(args, arg => arg.toString());
     globals.statusBar.setState("loading", "Waiting for Argus...");
 
-    // cancelable( new Promise(() => (editor ? editor.document.save() : undefined)))
     return execNotify(
       cargo,
       [...cargoArgs, "argus", ...strArgs],
@@ -243,6 +241,7 @@ export async function setup(_context: Ctx): Promise<CallArgus | null> {
 
         const outputTyped: Result<ArgusReturn<T>> = JSON.parse(output);
         if ("Err" in outputTyped) {
+          log("Argus failed with error", outputTyped.Err);
           globals.statusBar.setState("error", "Analysis failed");
           return outputTyped.Err;
         }
@@ -255,6 +254,7 @@ export async function setup(_context: Ctx): Promise<CallArgus | null> {
       })
       .catch(e => {
         globals.statusBar.setState("error", "Build failure");
+        log("Argus failed with error", e.toString());
         return {
           type: "build-error",
           error: e.toString(),

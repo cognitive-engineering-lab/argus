@@ -7,7 +7,12 @@ import {
   ObligationsInBody,
   SerializedTree,
 } from "@argus/common/bindings";
-import { CallArgus, ErrorJumpTargetInfo, Filename } from "@argus/common/lib";
+import {
+  CallArgus,
+  ErrorJumpTargetInfo,
+  FileInfo,
+  Filename,
+} from "@argus/common/lib";
 import { CancelablePromise as CPromise } from "cancelable-promise";
 import _ from "lodash";
 import * as vscode from "vscode";
@@ -78,33 +83,24 @@ export class Ctx {
   private highlightRanges: CharRange[] = [];
   private commandDisposables: Disposable[];
   private providingDisposables: Disposable[];
-  private commandFactories: Record<string, CommandFactory>;
-  private workspace: Workspace;
   private diagnosticCollection;
   private cache: BackendCache;
   public view: View | undefined;
 
   constructor(
     readonly extCtx: vscode.ExtensionContext,
-    commandFactories: Record<string, CommandFactory>,
-    workspace: Workspace
+    readonly commandFactories: Record<string, CommandFactory>,
+    readonly workspace: Workspace & { kind: "workspace-folder" }
   ) {
     this.commandDisposables = [];
     this.providingDisposables = [];
-
-    this.commandFactories = commandFactories;
-    this.workspace = workspace;
-
     this.diagnosticCollection =
       vscode.languages.createDiagnosticCollection("rust");
 
     this.cache = new BackendCache(
       () =>
         new CPromise(() => {
-          showErrorDialog(`
-            Argus backend left uninitialized.
-          `);
-
+          showErrorDialog("Argus backend left uninitialized.");
           return {
             type: "analysis-error",
             error: "Argus uninitialized.",
@@ -115,23 +111,28 @@ export class Ctx {
 
   dispose() {
     this.cache.havoc();
-
     _.forEach(this.commandDisposables, d => d.dispose());
-    this.commandDisposables = [];
-
     _.forEach(this.providingDisposables, d => d.dispose());
+    this.commandDisposables = [];
     this.providingDisposables = [];
   }
 
   async createOrShowView(target?: ErrorJumpTargetInfo) {
-    if (this.view) {
-      this.view.getPanel().reveal();
-    } else {
+    if (!this.view) {
+      log("Creating panel...");
       const initialData = await this.getFreshWebViewData();
-      this.view = new View(this.extCtx.extensionUri, initialData, target, () =>
-        this.cache.cancelAll()
+      this.view = new View(
+        this.extCtx.extensionUri,
+        initialData,
+        target,
+        () => {
+          this.view = undefined;
+          this.cache.havoc();
+        }
       );
     }
+    log("Revealing panel...");
+    this.view.getPanel.reveal();
   }
 
   get activeRustEditor(): RustEditor | undefined {
@@ -143,12 +144,16 @@ export class Ctx {
     return this.extCtx.extensionPath;
   }
 
+  // NOTE: callbacks that register events in this function should invoke
+  // actions on the `globals.ctx` instead of `this` to avoid issues with
+  // setup. Previously the setup failed but callbacks were still registered
+  // with `this` which caused the editor to be out of sync.
+  // FIXME: this probably demonstrates a flaw in the design anyways...
   async setupBackend() {
     log("setting up Argus backend");
     const b = await setup(this);
     if (b == null) {
-      showErrorDialog("Failed to setup Argus");
-      return;
+      throw new Error("Failed to setup Argus");
     }
 
     vscode.window.showInformationMessage(
@@ -159,7 +164,6 @@ export class Ctx {
     this.cache = new BackendCache(b);
 
     log("Argus backend preloaded");
-
     let openingEditor = new Promise<void[]>(() => []);
     if (this.activeRustEditor) {
       openingEditor = Promise.all(
@@ -168,12 +172,14 @@ export class Ctx {
     }
 
     // Register the commands with VSCode after the backend is setup.
+    globals.ctx = this;
     this.updateCommands();
 
     this.extCtx.subscriptions.push(this.diagnosticCollection);
     this.providingDisposables.push(
       vscode.languages.registerHoverProvider("rust", {
-        provideHover: async (doc, pos, tok) => this.provideHover(doc, pos, tok),
+        provideHover: async (doc, pos, tok) =>
+          globals.ctx.provideHover(doc, pos, tok),
       })
     );
 
@@ -197,11 +203,12 @@ export class Ctx {
         isDocumentInWorkspace(editor.document)
       ) {
         log(`Opening ${editor.document.fileName}`);
-        this.openEditor(editor);
+        globals.ctx.openEditor(editor);
       }
     });
 
     vscode.workspace.onDidSaveTextDocument(async document => {
+      const self = globals.ctx;
       const editor = vscode.window.activeTextEditor;
       if (
         editor &&
@@ -209,10 +216,10 @@ export class Ctx {
         editor.document === document &&
         isDocumentInWorkspace(editor.document)
       ) {
-        this.cache.havoc();
-        this.view!.havoc();
-        if (this.activeRustEditor) {
-          this.openEditor(this.activeRustEditor);
+        self.cache.havoc();
+        self.view!.havoc();
+        if (self.activeRustEditor) {
+          self.openEditor(self.activeRustEditor);
         }
       }
     });
@@ -266,7 +273,7 @@ export class Ctx {
   }
 
   cancelRunningTasks() {
-    this.cache.cancelAll();
+    this.cache.havoc();
   }
 
   // ------------------------------------
@@ -423,13 +430,18 @@ export class Ctx {
 
   private async getFreshWebViewData() {
     const initialData = await Promise.all(
-      _.map(this.visibleEditors, async e => [
-        e.document.fileName,
-        await this.cache.getObligationsInBody(e.document.fileName)[0],
-      ])
+      _.map(this.visibleEditors, async e => {
+        const fn = e.document.fileName;
+        const [pr, signature] = this.cache.getObligationsInBody(
+          e.document.fileName
+        );
+        const data = await pr;
+        if (data) {
+          return { fn, data, signature } as FileInfo;
+        }
+      })
     );
-    const f = _.filter(initialData, ([_, obl]) => obl !== undefined);
-    return f as [Filename, ObligationsInBody[]][];
+    return _.compact(initialData);
   }
 
   private updateCommands() {
@@ -459,13 +471,9 @@ class BackendCache {
     this.backend = backend;
   }
 
-  cancelAll() {
+  havoc() {
     _.forEach(this.obligationCache, ([p, _]) => p.cancel());
     _.forEach(this.treeCache, t => _.forEach(t, p => p.cancel()));
-  }
-
-  havoc() {
-    this.cancelAll();
     this.obligationCache = {};
     this.treeCache = {};
   }
