@@ -18,7 +18,6 @@ pub trait InferCtxtExt<'tcx> {
     &self,
     obligation: &'a PredicateObligation<'tcx>,
     result: EvaluationResult,
-    is_synthetic: bool,
   ) -> FulfillmentData<'a, 'tcx>;
 
   fn erase_non_local_data(
@@ -108,13 +107,11 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     &self,
     obligation: &'a PredicateObligation<'tcx>,
     result: EvaluationResult,
-    is_synthetic: bool,
   ) -> FulfillmentData<'a, 'tcx> {
     FulfillmentData {
       hash: self.predicate_hash(&obligation.predicate).into(),
       obligation,
       result,
-      is_synthetic,
     }
   }
 
@@ -142,7 +139,6 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
       kind: fdata.kind(),
       necessity,
       result: fdata.result,
-      is_synthetic: fdata.is_synthetic,
     }
   }
 }

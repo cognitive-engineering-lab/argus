@@ -7,7 +7,7 @@
 //! The goal is that each copied block of code is modified minimally,
 //! making replacement easier in the future.
 use rustc_infer::{
-  infer::InferCtxt,
+  infer::{self, InferCtxt},
   traits::{
     query::NoSolution, FulfillmentError, FulfillmentErrorCode,
     MismatchedProjectionTypes, PredicateObligation, SelectionError,
@@ -16,18 +16,22 @@ use rustc_infer::{
 use rustc_middle::ty::{
   self,
   error::{ExpectedFound, TypeError},
+  ToPolyTraitRef,
 };
+use rustc_span::DUMMY_SP;
+use rustc_trait_selection::traits::elaborate;
 
 use crate::EvaluationResult;
 
 pub mod fn_ctx;
 
-// #[derive(Debug)]
-// pub struct ImplCandidate<'tcx> {
-//   pub trait_ref: ty::TraitRef<'tcx>,
-//   pub similarity: CandidateSimilarity,
-//   pub impl_def_id: rustc_span::def_id::DefId,
-// }
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct ImplCandidate<'tcx> {
+  pub trait_ref: ty::TraitRef<'tcx>,
+  pub similarity: CandidateSimilarity,
+  pub impl_def_id: rustc_span::def_id::DefId,
+}
 
 #[derive(Copy, Clone, Debug)]
 #[allow(dead_code)]
@@ -44,11 +48,11 @@ macro_rules! bug {
 }
 
 pub trait InferCtxtExt<'tcx> {
-  // fn can_match_projection(
-  //   &self,
-  //   goal: ty::ProjectionPredicate<'tcx>,
-  //   assumption: ty::PolyProjectionPredicate<'tcx>,
-  // ) -> bool;
+  fn can_match_projection(
+    &self,
+    goal: ty::ProjectionPredicate<'tcx>,
+    assumption: ty::PolyProjectionPredicate<'tcx>,
+  ) -> bool;
 
   fn to_fulfillment_error(
     &self,
@@ -56,17 +60,17 @@ pub trait InferCtxtExt<'tcx> {
     result: EvaluationResult,
   ) -> Option<FulfillmentError<'tcx>>;
 
-  // fn can_match_trait(
-  //   &self,
-  //   goal: ty::TraitPredicate<'tcx>,
-  //   assumption: ty::PolyTraitPredicate<'tcx>,
-  // ) -> bool;
+  fn can_match_trait(
+    &self,
+    goal: ty::TraitPredicate<'tcx>,
+    assumption: ty::PolyTraitPredicate<'tcx>,
+  ) -> bool;
 
-  // fn error_implies(
-  //   &self,
-  //   cond: ty::Predicate<'tcx>,
-  //   error: ty::Predicate<'tcx>,
-  // ) -> bool;
+  fn error_implies(
+    &self,
+    cond: ty::Predicate<'tcx>,
+    error: ty::Predicate<'tcx>,
+  ) -> bool;
 
   // fn find_similar_impl_candidates(
   //   &self,
@@ -82,24 +86,24 @@ pub trait InferCtxtExt<'tcx> {
 }
 
 impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
-  // fn can_match_trait(
-  //   &self,
-  //   goal: ty::TraitPredicate<'tcx>,
-  //   assumption: ty::PolyTraitPredicate<'tcx>,
-  // ) -> bool {
-  //   if goal.polarity != assumption.polarity() {
-  //     return false;
-  //   }
+  fn can_match_trait(
+    &self,
+    goal: ty::TraitPredicate<'tcx>,
+    assumption: ty::PolyTraitPredicate<'tcx>,
+  ) -> bool {
+    if goal.polarity != assumption.polarity() {
+      return false;
+    }
 
-  //   let trait_goal = goal.trait_ref;
-  //   let trait_assumption = self.instantiate_binder_with_fresh_vars(
-  //     DUMMY_SP,
-  //     infer::BoundRegionConversionTime::HigherRankedType,
-  //     assumption.to_poly_trait_ref(),
-  //   );
+    let trait_goal = goal.trait_ref;
+    let trait_assumption = self.instantiate_binder_with_fresh_vars(
+      DUMMY_SP,
+      infer::BoundRegionConversionTime::HigherRankedType,
+      assumption.to_poly_trait_ref(),
+    );
 
-  //   self.can_eq(ty::ParamEnv::empty(), trait_goal, trait_assumption)
-  // }
+    self.can_eq(ty::ParamEnv::empty(), trait_goal, trait_assumption)
+  }
 
   // FIXME: there is no longer a single `to_error` function making this logic outdated.
   #[allow(clippy::match_same_arms)]
@@ -173,47 +177,47 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     )
   }
 
-  // fn can_match_projection(
-  //   &self,
-  //   goal: ty::ProjectionPredicate<'tcx>,
-  //   assumption: ty::PolyProjectionPredicate<'tcx>,
-  // ) -> bool {
-  //   let assumption = self.instantiate_binder_with_fresh_vars(
-  //     DUMMY_SP,
-  //     infer::BoundRegionConversionTime::HigherRankedType,
-  //     assumption,
-  //   );
+  fn can_match_projection(
+    &self,
+    goal: ty::ProjectionPredicate<'tcx>,
+    assumption: ty::PolyProjectionPredicate<'tcx>,
+  ) -> bool {
+    let assumption = self.instantiate_binder_with_fresh_vars(
+      DUMMY_SP,
+      infer::BoundRegionConversionTime::HigherRankedType,
+      assumption,
+    );
 
-  //   let param_env = ty::ParamEnv::empty();
-  //   self.can_eq(param_env, goal.projection_term, assumption.projection_term)
-  //     && self.can_eq(param_env, goal.term, assumption.term)
-  // }
+    let param_env = ty::ParamEnv::empty();
+    self.can_eq(param_env, goal.projection_term, assumption.projection_term)
+      && self.can_eq(param_env, goal.term, assumption.term)
+  }
 
-  // fn error_implies(
-  //   &self,
-  //   cond: ty::Predicate<'tcx>,
-  //   error: ty::Predicate<'tcx>,
-  // ) -> bool {
-  //   if cond == error {
-  //     return true;
-  //   }
+  fn error_implies(
+    &self,
+    cond: ty::Predicate<'tcx>,
+    error: ty::Predicate<'tcx>,
+  ) -> bool {
+    if cond == error {
+      return true;
+    }
 
-  //   if let Some(error) = error.as_trait_clause() {
-  //     self.enter_forall(error, |error| {
-  //       elaborate(self.tcx, std::iter::once(cond))
-  //         .filter_map(|implied| implied.as_trait_clause())
-  //         .any(|implied| self.can_match_trait(error, implied))
-  //     })
-  //   } else if let Some(error) = error.as_projection_clause() {
-  //     self.enter_forall(error, |error| {
-  //       elaborate(self.tcx, std::iter::once(cond))
-  //         .filter_map(|implied| implied.as_projection_clause())
-  //         .any(|implied| self.can_match_projection(error, implied))
-  //     })
-  //   } else {
-  //     false
-  //   }
-  // }
+    if let Some(error) = error.as_trait_clause() {
+      self.enter_forall(error, |error| {
+        elaborate(self.tcx, std::iter::once(cond))
+          .filter_map(|implied| implied.as_trait_clause())
+          .any(|implied| self.can_match_trait(error, implied))
+      })
+    } else if let Some(error) = error.as_projection_clause() {
+      self.enter_forall(error, |error| {
+        elaborate(self.tcx, std::iter::once(cond))
+          .filter_map(|implied| implied.as_projection_clause())
+          .any(|implied| self.can_match_projection(error, implied))
+      })
+    } else {
+      false
+    }
+  }
 
   // fn find_similar_impl_candidates(
   //   &self,

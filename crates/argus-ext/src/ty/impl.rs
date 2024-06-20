@@ -1,8 +1,9 @@
 use rustc_data_structures::stable_hasher::Hash64;
 use rustc_hir::{def_id::DefId, BodyId, HirId};
 use rustc_hir_typeck::inspect_typeck;
-use rustc_infer::traits::{
-  solve::CandidateSource, ObligationInspector, PredicateObligation,
+use rustc_infer::{
+  infer::InferCtxt,
+  traits::{solve::CandidateSource, ObligationInspector, PredicateObligation},
 };
 use rustc_middle::ty::{
   self, Predicate, Ty, TyCtxt, TypeSuperVisitable, TypeVisitable, TypeVisitor,
@@ -93,6 +94,13 @@ impl<'tcx> TyExt<'tcx> for Ty<'tcx> {
       | ty::TyKind::Pat(..)
       | ty::TyKind::Infer(..)
       | ty::TyKind::Error(..) => false,
+    }
+  }
+
+  fn base_ty(&self) -> ty::Ty<'tcx> {
+    match self.kind() {
+      ty::TyKind::Ref(_, ty, _) | ty::TyKind::RawPtr(ty, ..) => ty.base_ty(),
+      _ => *self,
     }
   }
 }
@@ -264,6 +272,13 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
       None
     }
   }
+
+  fn is_lang_item(&self, def_id: DefId) -> bool {
+    self
+      .lang_items()
+      .iter()
+      .any(|(_lang_item, lang_id)| def_id == lang_id)
+  }
 }
 
 impl PredicateObligationExt for PredicateObligation<'_> {
@@ -290,6 +305,10 @@ impl PredicateObligationExt for PredicateObligation<'_> {
 }
 
 impl<'tcx> PredicateExt<'tcx> for Predicate<'tcx> {
+  fn expect_trait_predicate(&self) -> ty::PolyTraitPredicate<'tcx> {
+    self.as_trait_predicate().expect("not a trait predicate")
+  }
+
   fn as_trait_predicate(&self) -> Option<ty::PolyTraitPredicate<'tcx>> {
     if let ty::PredicateKind::Clause(ty::ClauseKind::Trait(tp)) =
       self.kind().skip_binder()
@@ -312,10 +331,12 @@ impl<'tcx> PredicateExt<'tcx> for Predicate<'tcx> {
   }
 
   fn is_rhs_lang_item(&self, tcx: &TyCtxt) -> bool {
-    tcx
-      .lang_items()
-      .iter()
-      .any(|(_lang_item, def_id)| self.is_trait_pred_rhs(def_id))
+    if let Some(tp) = self.as_trait_predicate() {
+      let def_id = tp.def_id();
+      tcx.is_lang_item(def_id)
+    } else {
+      false
+    }
   }
 
   fn is_trait_pred_rhs(&self, def_id: DefId) -> bool {
@@ -341,35 +362,28 @@ impl<'tcx> PredicateExt<'tcx> for Predicate<'tcx> {
     }
   }
 
-  // FIXME: I don't think this is fully correct...but it's been sufficient
   #[allow(clippy::similar_names)]
-  fn is_refined_by(&self, other: &Self) -> bool {
-    let (Some(refinee), Some(refiner)) =
-      (self.as_trait_predicate(), other.as_trait_predicate())
-    else {
-      return false;
-    };
+  fn is_refined_by(&self, infcx: &InferCtxt<'tcx>, other: &Self) -> bool {
+    use std::panic;
 
-    let refinee = refinee.skip_binder();
-    let refiner = refiner.skip_binder();
-
-    // The trait bound must be equal
-    if refinee.def_id() != refiner.def_id()
-      // The RHS self ty cannot be an inference variable
-      || refiner.self_ty().is_ty_var()
-      // The impl polarity must be equal
-      || refinee.polarity != refiner.polarity
-    {
-      return false;
-    }
-
-    // LHS is _ and RHS is TY with same generic args
-    // The LHS self ty must be an inference variable
-    (refinee.self_ty().is_ty_var()
-      // The generic args must also be the same(...?)
-      && refinee.trait_ref.args == refiner.trait_ref.args)
-    // LHS TY == RHS TY and generic args were updated...(does this happen?)
-    || refinee.self_ty() == refiner.self_ty()
+    use crate::rustc::InferCtxtExt;
+    infcx.probe(move |_| {
+      // XXX: The core issue here is that we have a flat list of obligations, and we want
+      // to compare them. We only know which `InferCtxt` is associated with a single
+      // obligation, not the whole group of obligations that was tried in a single context.
+      // Testing is an error implies another means that we can leak inference variables while
+      // probing the ENA Tables. Bad. It's safe to catch this panic because we fork the
+      // inference contexts and only a single thread has access at a time.
+      panic::set_hook(Box::new(|_| {}));
+      let res = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        let refinee = infcx.freshen(*self);
+        let refiner = infcx.freshen(*other);
+        infcx.error_implies(refiner, refinee)
+      }))
+      .unwrap_or(false);
+      let _ = panic::take_hook();
+      res
+    })
   }
 }
 

@@ -4,28 +4,22 @@ import {
   BodyHash,
   Expr,
   ExprIdx,
-  MethodLookup,
-  MethodLookupIdx,
   Obligation,
   ObligationHash,
   ObligationIdx,
   ObligationsInBody,
 } from "./bindings";
-import { isHiddenObl, isObject } from "./func";
+import { isHiddenObl } from "./func";
 
 class BodyInfo {
   constructor(
     private readonly oib: ObligationsInBody,
     readonly idx: number,
-    readonly viewHiddenObligations: boolean = true
+    public readonly showHidden: boolean
   ) {}
 
   get hash(): BodyHash {
     return this.oib.hash;
-  }
-
-  get showHidden(): boolean {
-    return this.viewHiddenObligations;
   }
 
   get numErrors(): number {
@@ -40,8 +34,20 @@ class BodyInfo {
     return this.oib.name;
   }
 
+  notHidden(hash: ObligationIdx): boolean {
+    const o = this.getObligation(hash);
+    if (o === undefined) {
+      return false;
+    }
+    return this.showHidden || isHiddenObl(o);
+  }
+
   hasVisibleExprs() {
-    return _.some(this.exprs, idx => this.visibleObligations(idx).length > 0);
+    return _.some(this.exprs, idx => this.hasVisibleObligations(idx));
+  }
+
+  hasVisibleObligations(idx: ExprIdx) {
+    return _.some(this.oib.exprs[idx].obligations, i => this.notHidden(i));
   }
 
   byHash(hash: ObligationHash): Obligation | undefined {
@@ -54,26 +60,6 @@ class BodyInfo {
 
   getExpr(idx: ExprIdx): Expr {
     return this.oib.exprs[idx];
-  }
-
-  isErrorMethodCall(expr: Expr): boolean {
-    if (!(isObject(expr.kind) && "MethodCall" in expr.kind)) {
-      return false;
-    }
-
-    if (expr.kind.MethodCall.errorRecvr) {
-      return true;
-    }
-
-    const lookup = this.getMethodLookup(expr.kind.MethodCall.data);
-
-    // This is an error method call if there doesn't exist an entry with a result "yes".
-    return !_.some(lookup.table, step =>
-      _.some(
-        step.traitPredicates,
-        idx => this.getObligation(idx).result === "yes"
-      )
-    );
   }
 
   visibleObligations(idx: ExprIdx): ObligationIdx[] {
@@ -91,24 +77,6 @@ class BodyInfo {
       }
     });
     return sorted;
-  }
-
-  getMethodLookup(idx: MethodLookupIdx): MethodLookup {
-    console.debug(
-      "Method lookups: ",
-      this.oib.methodLookups.length,
-      idx,
-      this.oib.methodLookups
-    );
-    return this.oib.methodLookups[idx];
-  }
-
-  notHidden(hash: ObligationIdx): boolean {
-    const o = this.getObligation(hash);
-    if (o === undefined) {
-      return false;
-    }
-    return this.showHidden || isHiddenObl(o);
   }
 }
 

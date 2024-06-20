@@ -18,10 +18,7 @@ use crate::{
   ext::InferCtxtExt,
   proof_tree::{serialize::try_serialize, SerializedTree},
   types::{
-    intermediate::{
-      ErrorAssemblyCtx, Forgettable, FullData, ObligationQueriesInBody,
-      SyntheticQueriesInBody,
-    },
+    intermediate::{ErrorAssemblyCtx, Forgettable, FullData},
     ObligationHash, ObligationNecessity, ObligationsInBody,
   },
 };
@@ -102,13 +99,6 @@ pub fn process_obligation_for_tree<'tcx>(
   OBLIGATION_TARGET.get(|target| {
     let target = target.unwrap();
 
-    // A synthetic target requires that we do the method call queries.
-    if target.is_synthetic {
-      log::debug!("Deferring synthetic obligation tree search");
-      process_obligation(infcx, obl, result);
-      return;
-    }
-
     // Must go after the synthetic check.
     guard_inspection! {}
 
@@ -117,7 +107,7 @@ pub fn process_obligation_for_tree<'tcx>(
     // and we want to present it as such to the user.
     let obl = &infcx.resolve_vars_if_possible(obl.clone());
 
-    let fdata = infcx.bless_fulfilled(obl, result, false);
+    let fdata = infcx.bless_fulfilled(obl, result);
 
     if fdata.hash != target.hash {
       return;
@@ -155,35 +145,32 @@ pub fn build_tree_output<'tcx>(
   OBLIGATION_TARGET.get(|target| {
     let target = target.ok_or(anyhow!("missing target"))?;
     let (data, oib) = build_obligations_in_body(tcx, body_id, typeck_results);
-    pick_tree(target.hash, target.is_synthetic, || (&*data, &oib))
+    pick_tree(target.hash, || (&*data, &oib))
   })
 }
 
 pub(crate) fn pick_tree<'a, 'tcx: 'a>(
   hash: ObligationHash,
-  needs_search: bool,
   thunk: impl FnOnce() -> (&'a FullData<'tcx>, &'a ObligationsInBody),
 ) -> Result<SerializedTree> {
-  log::trace!("pick_tree {hash:?} {needs_search}");
+  log::trace!("pick_tree {hash:?}");
 
   guard_inspection! {
     anyhow::bail!("already inspecting tree")
   }
 
-  if !needs_search {
-    return tls::take_tree().ok_or(anyhow!(
-      "failed to find tree for obligation target {hash:?}"
-    ));
+  if let Some(tree) = tls::take_tree() {
+    return Ok(tree);
   }
 
   let (data, _) = thunk();
 
   let res: Result<SerializedTree> = data
     .iter()
-    .find_map(|(obligation, result, this_hash, infcx)| {
-      if this_hash == hash {
-        log::info!("Generating tree for obligation {:?}", obligation);
-        Some(generate_tree(infcx, obligation, result))
+    .find_map(|fdata| {
+      if fdata.hash == hash {
+        log::info!("Generating tree for obligation {:?}", fdata.obligation);
+        Some(generate_tree(&fdata.infcx, &fdata.obligation, fdata.result))
       } else {
         None
       }
@@ -221,8 +208,7 @@ pub(in crate::analysis) fn build_obligations_in_body<'tcx>(
   let obligations = tls::take_obligations();
   let obligation_data = tls::unsafe_take_data();
 
-  let obligation_data = ObligationQueriesInBody::new(obligation_data);
-  let mut synthetic_data = SyntheticQueriesInBody::new();
+  let obligation_data = FullData::new(obligation_data);
 
   let ctx = ErrorAssemblyCtx {
     tcx,
@@ -240,16 +226,9 @@ pub(in crate::analysis) fn build_obligations_in_body<'tcx>(
     typeck_results,
     obligations,
     &obligation_data,
-    &mut synthetic_data,
     &reported_errors,
     bins,
   );
 
-  (
-    Forgettable::new(FullData {
-      obligations: obligation_data,
-      synthetic: synthetic_data,
-    }),
-    oib,
-  )
+  (Forgettable::new(obligation_data), oib)
 }

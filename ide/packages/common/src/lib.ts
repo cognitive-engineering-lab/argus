@@ -146,7 +146,7 @@ export type ArgusArgs<T extends ArgusCliOptions> = T extends "preload"
   : T extends "obligations"
   ? ["obligations", Filename]
   : T extends "tree"
-  ? ["tree", Filename, string, number, number, number, number, boolean]
+  ? ["tree", Filename, string, number, number, number, number]
   : never;
 
 export type ArgusReturn<T extends ArgusCliOptions> = T extends "preload"

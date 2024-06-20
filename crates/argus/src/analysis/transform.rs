@@ -1,17 +1,16 @@
 use argus_ext::{
   infer::InferCtxtExt,
-  ty::{PredicateExt, TyCtxtExt, TypeckResultsExt},
+  ty::{
+    retain_error_sources, retain_method_calls, TyCtxtExt, TypeckResultsExt,
+  },
+  utils::SpanExt as ArgusSpanExt,
 };
 use index_vec::IndexVec;
 use indexmap::IndexSet;
-use itertools::Itertools;
 use rustc_data_structures::fx::{FxHashMap as HashMap, FxIndexMap};
-use rustc_hir::{self as hir, intravisit::Map, BodyId, HirId};
-use rustc_infer::{
-  infer::{canonical::OriginalQueryValues, InferCtxt, InferOk},
-  traits::{self, PredicateObligation},
-};
-use rustc_middle::ty::{self, ParamEnvAnd, Ty, TyCtxt, TypeckResults, Upcast};
+use rustc_hir::{BodyId, HirId};
+use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
+use rustc_middle::ty::{TyCtxt, TypeckResults};
 use rustc_span::Span;
 use rustc_utils::source_map::{range::CharRange, span::SpanExt};
 
@@ -46,7 +45,7 @@ pub fn compute_provenance<'tcx>(
   dataid: Option<UODIdx>,
 ) -> Provenance<Obligation> {
   let hir = infcx.tcx.hir();
-  let fdata = infcx.bless_fulfilled(obligation, result, false);
+  let fdata = infcx.bless_fulfilled(obligation, result);
   // If the span is coming from a macro, point to the callsite.
   let callsite_cause_span =
     infcx.tcx.to_local(body_id, fdata.obligation.cause.span);
@@ -57,7 +56,6 @@ pub fn compute_provenance<'tcx>(
   Provenance {
     hir_id,
     full_data: dataid,
-    synthetic_data: None,
     it: infcx.erase_non_local_data(body_id, fdata),
   }
 }
@@ -84,20 +82,10 @@ pub fn transform<'a, 'tcx: 'a>(
   body_id: BodyId,
   typeck_results: &'tcx TypeckResults<'tcx>,
   obligations: Vec<Provenance<Obligation>>,
-  obligation_data: &ObligationQueriesInBody<'tcx>,
-  synthetic_data: &mut SyntheticQueriesInBody<'tcx>,
+  obligation_data: &FullData<'tcx>,
   reported_trait_errors: &FxIndexMap<Span, Vec<ObligationHash>>,
   bins: Vec<Bin>,
 ) -> ObligationsInBody {
-  #[cfg(debug_assertions)]
-  {
-    debug_assert!(synthetic_data.is_empty(), "synthetic data not empty");
-    debug_assert!(
-      obligations.iter().all(|p| !p.is_synthetic),
-      "synthetic obligations exist before method call table construction"
-    );
-  }
-
   let mut obligations_idx = IndexVec::<ObligationIdx, _>::default();
 
   let obligations_with_idx = obligations
@@ -124,14 +112,12 @@ pub fn transform<'a, 'tcx: 'a>(
     raw_obligations: obligations_idx,
     obligations: &obligations_with_idx,
     full_data: obligation_data,
-    synthetic_data,
     reported_trait_errors,
 
     exprs_to_hir_id: HashMap::default(),
     ambiguity_errors: IndexSet::default(),
     trait_errors: Vec::default(),
     exprs: IndexVec::default(),
-    method_lookups: IndexVec::default(),
   };
 
   builder.sort_bins(bins);
@@ -165,7 +151,6 @@ pub fn transform<'a, 'tcx: 'a>(
     builder.trait_errors,
     builder.raw_obligations,
     builder.exprs,
-    builder.method_lookups,
   )
 }
 
@@ -173,13 +158,11 @@ struct ObligationsBuilder<'a, 'tcx: 'a> {
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
   body_span: Span,
-  full_data: &'a ObligationQueriesInBody<'tcx>,
+  full_data: &'a FullData<'tcx>,
   typeck_results: &'tcx TypeckResults<'tcx>,
   reported_trait_errors: &'a FxIndexMap<Span, Vec<ObligationHash>>,
 
-  // Mutable for adding synthetic data
   obligations: &'a Vec<Provenance<ObligationIdx>>,
-  synthetic_data: &'a mut SyntheticQueriesInBody<'tcx>,
 
   // Structures to be filled in
   raw_obligations: IndexVec<ObligationIdx, Obligation>,
@@ -187,7 +170,6 @@ struct ObligationsBuilder<'a, 'tcx: 'a> {
   ambiguity_errors: IndexSet<AmbiguityError>,
   trait_errors: Vec<TraitError>,
   exprs: IndexVec<ExprIdx, Expr>,
-  method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,
 }
 
 impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
@@ -197,9 +179,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
 
   fn local_snip(&self, span: Span) -> String {
     let source_map = self.tcx.sess.source_map();
-    source_map
-      .span_to_snippet(span)
-      .unwrap_or_else(|_| String::from("{unknown snippet}"))
+    span.sanitized_snippet(source_map)
   }
 
   fn sort_bins(&mut self, bins: Vec<Bin>) {
@@ -210,7 +190,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     for bin in bins {
       let Bin {
         hir_id,
-        obligations,
+        mut obligations,
         kind,
       } = bin;
       let span = self.to_local(hir.span_with_body(hir_id));
@@ -228,54 +208,52 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
           hir.span_with_body(hir_id),
           hir.span_with_body(hir_id).from_expansion()
         );
-      let mut ambiguous_call = None;
       let kind = match kind {
         BinKind::Misc => EK::Misc,
         BinKind::CallableExpr => EK::CallableExpr,
         BinKind::CallArg => EK::CallArg,
         BinKind::Call => EK::Call,
-        BinKind::MethodReceiver => EK::MethodReceiver,
-        BinKind::MethodCall => {
-          let hir::Node::Expr(
-            call_expr @ hir::Expr {
-              kind: hir::ExprKind::MethodCall(segment, recvr, args, call_span),
-              ..
-            },
-          ) = hir.hir_node(hir_id)
-          else {
-            unreachable!(
-              "bin kind is method call, but node is not method call"
-            );
-          };
-
-          if let Some((idx, error_recvr, error_call)) = self.relate_method_call(
-            call_expr,
-            segment,
-            recvr,
-            args,
-            *call_span,
-            &obligations,
-          ) {
-            if error_recvr || error_call {
-              ambiguous_call = Some(call_span);
-            }
-
-            EK::MethodCall {
-              data: idx,
-              error_recvr,
-            }
-          } else {
-            log::warn!(
-              "failed to build method call table for {}",
-              self.tcx.hir().node_to_string(call_expr.hir_id)
-            );
-            EK::Misc
-          }
-        }
       };
+
+      // We can only filter obligations that have known provenance data, so just split the
+      // others off and add them back in later.
+      let idx = itertools::partition(&mut obligations, |i| {
+        self.obligations[*i].full_data.is_some()
+      });
+      let obligations_no_data = obligations.split_off(idx);
+
+      // Given a usize index get the `FullObligationData` expected for it.
+      let gfdata = |i: usize| {
+        self
+          .full_data
+          .get(self.obligations[i].full_data.expect("yikes"))
+      };
+
+      // Filter down the set of obligations as much as possible.
+      //
+      // 1. Remove obligations that shouldn't have been checked. (I.e., a failed
+      // precondition dissalows it from succeeding.) Hopefully, in the future these
+      // aren't even solved for.
+      retain_error_sources(
+        &mut obligations,
+        |&i| gfdata(i).result,
+        |&i| gfdata(i).obligation.predicate,
+        |_| self.tcx,
+        |&a, &b| a == b,
+      );
+
+      retain_method_calls(
+        &mut obligations,
+        |&i| gfdata(i).result,
+        |&i| gfdata(i).obligation.predicate,
+        |_| self.tcx,
+        |&a, &b| a == b,
+      );
 
       let obligations = obligations
         .into_iter()
+        // marge back in indices without data
+        .chain(obligations_no_data.into_iter())
         .map(|idx| *self.obligations[idx])
         .collect::<Vec<_>>();
 
@@ -287,15 +265,8 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         kind,
         is_body,
       });
+
       self.exprs_to_hir_id.insert(expr_idx, hir_id);
-      if let Some(call_span) = ambiguous_call {
-        let range = CharRange::from_span(*call_span, source_map)
-          .expect("failed to get range for ambiguous call");
-        self.ambiguity_errors.insert(AmbiguityError {
-          idx: expr_idx,
-          range,
-        });
-      }
     }
   }
 
@@ -414,218 +385,6 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     }
   }
 
-  // FIXME: this entire method, can we actually get rid of it???
-  // 1. build the method call table (see ambiguous / )
-  #[allow(
-    dead_code,
-    unreachable_code,
-    unused_variables,
-    clippy::too_many_lines
-  )]
-  fn relate_method_call<'hir>(
-    &mut self,
-    // Expr of the entire call expression
-    call_expr: &'hir hir::Expr<'hir>,
-    // The method segment
-    _segment: &'hir hir::PathSegment<'hir>,
-    // Call receiver
-    recvr: &'hir hir::Expr<'hir>,
-    // Call arguments
-    _args: &'hir [hir::Expr<'hir>],
-    // Call expression span
-    call_span: Span,
-    // FIXME: type the `usize` here,
-    obligations: &[usize],
-  ) -> Option<(MethodLookupIdx, bool, bool)> {
-    panic!("We shouldn't be computing synthetic goals rn");
-
-    // Given that the receiver is of type error, we can tell users
-    // to annotate the receiver type if they want to get "better"
-    // error messages (potentially).
-    let error_recvr = matches!(
-      self.typeck_results.expr_ty(recvr).kind(),
-      ty::TyKind::Error(..)
-    );
-    let error_call = matches!(
-      self.typeck_results.expr_ty(call_expr).kind(),
-      ty::TyKind::Error(..)
-    );
-
-    let (necessary_queries, trait_candidates): (Vec<_>, Vec<_>) = obligations
-      .iter()
-      .filter_map(|&idx| {
-        let fdata = self.obligations[idx]
-          .full_data
-          .map(|fdidx| self.full_data.get(fdidx))?;
-
-        if fdata.obligation.predicate.is_trait_predicate() {
-          log::info!(
-            "Predicate is a trait predicate {:?}",
-            fdata.obligation.predicate
-          );
-        }
-
-        // Bounds for extension method calls are always trait predicates.
-        let tp = fdata.obligation.predicate.as_trait_predicate()?;
-        Some((idx, tp.def_id()))
-      })
-      .unzip();
-
-    let trait_candidates =
-      trait_candidates.into_iter().unique().collect::<Vec<_>>();
-
-    let mut param_env = None;
-    for &idx in &necessary_queries {
-      let query = self.obligations[idx]
-        .full_data
-        .map(|fdidx| self.full_data.get(fdidx))
-        .unwrap();
-
-      if let Some(pe) = param_env {
-        if pe != query.obligation.param_env {
-          log::error!(
-            "param environments are expected to match {:?} != {:?}",
-            pe,
-            query.obligation.param_env
-          );
-        }
-      } else {
-        param_env = Some(query.obligation.param_env);
-      }
-    }
-
-    let Some((full_query_idx, query)) =
-      necessary_queries.first().and_then(|&idx| {
-        self.obligations[idx]
-          .full_data
-          .map(|fdidx| (fdidx, self.full_data.get(fdidx)))
-      })
-    else {
-      log::warn!("necessary queries empty! {:?}", necessary_queries);
-      return None;
-    };
-
-    let infcx = &query.infcx;
-    let o = &query.obligation;
-    let self_ty = o
-      .predicate
-      .as_trait_predicate()
-      .expect("trait predicate")
-      .self_ty()
-      .skip_binder();
-    let param_env = o.param_env;
-
-    let mut original_values = OriginalQueryValues::default();
-    let param_env_and_self_ty = infcx.canonicalize_query(
-      ParamEnvAnd {
-        param_env,
-        value: self_ty,
-      },
-      &mut original_values,
-    );
-
-    let tcx = self.tcx;
-    let region = tcx.lifetimes.re_erased;
-    let steps = tcx.method_autoderef_steps(param_env_and_self_ty);
-
-    let ty_id = |ty: Ty<'tcx>| ty;
-
-    let ty_with_ref =
-      move |ty: Ty<'tcx>| Ty::new_ref(tcx, region, ty, hir::Mutability::Not);
-
-    let ty_with_mut_ref =
-      move |ty: Ty<'tcx>| Ty::new_ref(tcx, region, ty, hir::Mutability::Mut);
-
-    // TODO: rustc also considers raw pointers, ignoring for now ...
-    let ty_mutators: Vec<&dyn Fn(Ty<'tcx>) -> Ty<'tcx>> =
-      vec![&ty_id, &ty_with_ref, &ty_with_mut_ref];
-
-    let trait_candidates = trait_candidates
-      .into_iter()
-      .map(|trait_def_id| {
-        let trait_args = infcx.fresh_args_for_item(call_span, trait_def_id);
-        ty::TraitRef::new(tcx, trait_def_id, trait_args)
-      })
-      .collect::<Vec<_>>();
-
-    let mut table = Vec::default();
-
-    infcx.probe(|_| {
-      for ty_adjust in ty_mutators {
-        let mut method_steps = Vec::default();
-        for step in steps.steps {
-          let InferOk {
-            value: self_ty,
-            obligations: _,
-          } = infcx
-            .instantiate_query_response_and_region_obligations(
-              &traits::ObligationCause::misc(call_span, o.cause.body_id),
-              param_env,
-              &original_values,
-              &step.self_ty,
-            )
-            .unwrap_or_else(|_| unreachable!("whelp, that didn't work :("));
-
-          let self_ty = ty_adjust(self_ty);
-          let step = ReceiverAdjStep::new(infcx, self_ty);
-
-          let mut trait_predicates = Vec::default();
-          for trait_ref in &trait_candidates {
-            let trait_ref = trait_ref.with_self_ty(tcx, self_ty);
-
-            let predicate: ty::Predicate<'tcx> = trait_ref.upcast(self.tcx);
-            let obligation = traits::Obligation::new(
-              tcx,
-              o.cause.clone(),
-              param_env,
-              predicate,
-            );
-
-            infcx.probe(|_| {
-              let res = infcx.evaluate_obligation(&obligation);
-
-              let mut with_provenance =
-                compute_provenance(self.body_id, infcx, &obligation, res, None);
-
-              let syn_id = self.synthetic_data.add(SyntheticData {
-                full_data: full_query_idx,
-                hash: with_provenance.hash,
-                obligation: obligation.clone(),
-                infcx: infcx.fork(),
-              });
-
-              with_provenance.mark_as_synthetic(syn_id);
-
-              trait_predicates
-                .push(self.raw_obligations.push(with_provenance.forget()));
-            });
-
-            property_is_ok!(
-              self.is_valid(),
-              "obligation invalidated the builder: {obligation:?}"
-            );
-          }
-
-          method_steps.push(MethodStep {
-            recvr_ty: step,
-            trait_predicates,
-          });
-        }
-
-        table.extend(method_steps);
-      }
-    });
-
-    Some((
-      self.method_lookups.push(MethodLookup {
-        table,
-        candidates: ExtensionCandidates::new(infcx, trait_candidates),
-      }),
-      error_recvr,
-      error_call,
-    ))
-  }
-
   /// Find error nodes in the HIR and search for failed obligation failures in the node.
   fn relate_unreported_errors(&mut self) {
     // for all error nodes in the HIR, find a binned failure in that same node.
@@ -664,15 +423,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
   #[cfg(any(feature = "testing", debug_assertions))]
   fn is_valid(&self) -> anyhow::Result<()> {
     for obl in &self.raw_obligations {
-      if obl.is_synthetic {
-        // assert that synthetic obligation exists
-        let exists = self
-          .synthetic_data
-          .iter()
-          .any(|sdata| obl.hash == sdata.hash);
-
-        anyhow::ensure!(exists, "synthetic data not found for {:?}", obl);
-      } else if matches!(obl.necessity, ObligationNecessity::Yes)
+      if matches!(obl.necessity, ObligationNecessity::Yes)
         || (matches!(obl.necessity, ObligationNecessity::OnError)
           && obl.result.is_err())
       {

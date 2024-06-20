@@ -515,7 +515,6 @@ class BackendCache {
       range.start.column,
       range.end.line,
       range.end.column,
-      obl.isSynthetic,
     ]).then(res => {
       if (res.type !== "output") {
         globals.statusBar.setState("error");

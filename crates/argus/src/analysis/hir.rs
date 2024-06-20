@@ -65,8 +65,8 @@ pub enum BinKind {
   CallableExpr,
   CallArg,
   Call,
-  MethodCall,
-  MethodReceiver,
+  // MethodCall,
+  // MethodReceiver,
   Misc,
 }
 
@@ -126,11 +126,12 @@ impl<'a, 'tcx: 'a> HirVisitor<'_> for BinCreator<'a, 'tcx> {
         self.drain_nested(callable.hir_id, BinKind::CallableExpr);
         self.drain_nested(ex.hir_id, BinKind::Call);
       }
-      hir::ExprKind::MethodCall(_, func, args, _) => {
+      hir::ExprKind::MethodCall(segment, func, args, _) => {
         for arg in args {
           self.drain_nested(arg.hir_id, BinKind::CallArg);
         }
-        self.drain_nested(func.hir_id, BinKind::MethodReceiver);
+        self.drain_nested(segment.hir_id, BinKind::Call);
+        self.drain_nested(func.hir_id, BinKind::CallArg);
         // [ ] TODO (see above `FIXME`):
         // self.drain_nested(ex.hir_id, BinKind::MethodCall);
         self.drain_nested(ex.hir_id, BinKind::Misc);

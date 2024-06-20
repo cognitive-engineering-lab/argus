@@ -18,6 +18,10 @@ extern crate rustc_trait_selection;
 
 pub mod hash;
 pub mod infer;
+pub mod iter;
+// Most of the rustc code is copied from private rustc modules
+// and it's not worth fixing all the clippy warnings.
+#[allow(clippy::pedantic)]
 mod rustc;
 pub mod ty;
 pub mod utils;

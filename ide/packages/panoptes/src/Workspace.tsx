@@ -1,5 +1,5 @@
-import { ObligationsInBody } from "@argus/common/bindings";
-import { FileInfo, Filename, SystemSpec } from "@argus/common/lib";
+import { AppContext } from "@argus/common/context";
+import { FileInfo } from "@argus/common/lib";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
 import {
   VSCodeCheckbox,
@@ -41,12 +41,15 @@ const Workspace = ({
   const [showHidden, setShowHidden] = useState(false);
   const toggleHidden = () => setShowHidden(!showHidden);
 
-  const checkbox = (
-    <div style={{ position: "fixed", top: "0", right: "0" }}>
-      <VSCodeCheckbox onChange={toggleHidden} checked={showHidden}>
-        Show hidden information
-      </VSCodeCheckbox>
-    </div>
+  const Navbar = () => (
+    <>
+      <div className="workspace-nav">
+        <VSCodeCheckbox onChange={toggleHidden} checked={showHidden}>
+          Show hidden information
+        </VSCodeCheckbox>
+      </div>
+      <div className="spacer">{"\u00A0"}</div>
+    </>
   );
 
   const mkActiveSet = (idx: number) => () => setActive(idx);
@@ -65,19 +68,21 @@ const Workspace = ({
         FallbackComponent={FatalErrorPanel}
         onReset={reset}
       >
-        <File file={fn} osibs={data} showHidden={showHidden} />
+        <File file={fn} osibs={data} />
       </ErrorBoundary>
     </VSCodePanelView>
   ));
 
   return (
-    <>
-      <div>{checkbox}</div>
-      <VSCodePanels activeid={tabName(active)}>
-        {tabs}
-        {fileComponents}
-      </VSCodePanels>
-    </>
+    <AppContext.ShowHiddenObligationsContext.Provider value={showHidden}>
+      <Navbar />
+      <div className="workspace-area">
+        <VSCodePanels activeid={tabName(active)}>
+          {tabs}
+          {fileComponents}
+        </VSCodePanels>
+      </div>
+    </AppContext.ShowHiddenObligationsContext.Provider>
   );
 };
 

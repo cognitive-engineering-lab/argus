@@ -98,7 +98,7 @@ const ProofTreeWrapper = ({
     ) : tree === undefined ? (
       <NoTreeFound obligation={obligation} />
     ) : (
-      <TreeApp tree={tree} showHidden={bodyInfo.viewHiddenObligations} />
+      <TreeApp tree={tree} showHidden={bodyInfo.showHidden} />
     );
 
   return content;

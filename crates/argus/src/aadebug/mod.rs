@@ -1,6 +1,5 @@
 mod tree;
 mod ty;
-mod util;
 
 use std::time::Instant;
 

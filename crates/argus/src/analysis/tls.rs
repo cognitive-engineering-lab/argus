@@ -11,7 +11,7 @@ use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_span::Span;
 pub use unsafe_tls::{
   store as unsafe_store_data, take as unsafe_take_data, FullObligationData,
-  SynIdx, UODIdx,
+  UODIdx,
 };
 
 use crate::{
@@ -63,19 +63,19 @@ pub fn drain_implied_ambiguities<'tcx>(
       let provenance = &obls[i];
 
       // Drain all elements that are:
-      // 1. Ambiguous, and--
+      // 1. Ambiguous and--
       // 2. Implied by the passed obligation
-      let should_remove = provenance.result.is_maybe()
-        && provenance.full_data.map_or(false, |idx| {
-          unsafe_tls::borrow_in(idx, |fdata| {
-            fdata
-              .obligation
-              .predicate
-              .is_refined_by(&obligation.predicate)
-          })
-        });
+      let is_ambig = provenance.result.is_maybe();
+      let is_implied = provenance.full_data.map_or(false, |idx| {
+        unsafe_tls::borrow_in(idx, |fdata| {
+          let infcx = &fdata.infcx;
+          let previous_pred = &fdata.obligation.predicate;
+          let passing_pred = &obligation.predicate;
+          previous_pred.is_refined_by(infcx, passing_pred)
+        })
+      });
 
-      if should_remove {
+      if is_ambig && is_implied {
         set.push(i);
       }
     }
@@ -148,8 +148,7 @@ mod unsafe_tls {
 
   crate::define_idx! {
     usize,
-    UODIdx,
-    SynIdx
+    UODIdx
   }
 
   pub struct FullObligationData<'tcx> {

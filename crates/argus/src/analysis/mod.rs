@@ -10,7 +10,7 @@ use argus_ext::ty::TyCtxtExt;
 use fluid_let::fluid_let;
 use rustc_hir::BodyId;
 use rustc_middle::ty::TyCtxt;
-pub(crate) use tls::{FullObligationData, SynIdx, UODIdx};
+pub(crate) use tls::{FullObligationData, UODIdx};
 
 pub(crate) use crate::types::intermediate::{
   EvaluationResult, FulfillmentData,
@@ -75,7 +75,7 @@ pub fn bundle(tcx: TyCtxt, body_id: BodyId) -> Result<BodyBundle> {
     if obl.necessity == ObligationNecessity::Yes
       || (obl.necessity == ObligationNecessity::OnError && obl.result.is_err())
     {
-      if let Ok(stree) = entry::pick_tree(obl.hash, true, thunk) {
+      if let Ok(stree) = entry::pick_tree(obl.hash, thunk) {
         trees.insert(obl.hash, stree);
       }
     }

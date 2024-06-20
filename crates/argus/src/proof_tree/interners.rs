@@ -3,7 +3,9 @@ use std::{
   hash::Hash,
 };
 
-use argus_ext::{infer::InferCtxtExt, ty::VarCounterExt};
+use argus_ext::{
+  infer::InferCtxtExt, ty::VarCounterExt, utils::SpanExt as ArgusSpanExt,
+};
 use argus_ser as ser;
 use index_vec::{Idx, IndexVec};
 use rustc_data_structures::{fx::FxHashMap as HashMap, stable_hasher::Hash64};
@@ -230,14 +232,7 @@ impl Interners {
     // Second, try to get the span of the impl or just default to a fallback.
     let string = infcx.tcx.span_of_impl(def_id).map_or_else(
       |symb| format!("foreign impl from: {}", symb.as_str()),
-      |sp| {
-        infcx
-          .tcx
-          .sess
-          .source_map()
-          .span_to_snippet(sp)
-          .unwrap_or_else(|_| "failed to find impl".to_string())
-      },
+      |sp| sp.sanitized_snippet(infcx.tcx.sess.source_map()),
     );
 
     self.candidates.insert_no_key(CandidateData::from(string))

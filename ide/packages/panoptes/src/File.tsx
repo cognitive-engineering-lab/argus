@@ -1,6 +1,10 @@
 import BodyInfo from "@argus/common/BodyInfo";
 import { ObligationsInBody } from "@argus/common/bindings";
-import { BodyInfoContext, FileContext } from "@argus/common/context";
+import {
+  AppContext,
+  BodyInfoContext,
+  FileContext,
+} from "@argus/common/context";
 import { Filename } from "@argus/common/lib";
 import ErrorDiv from "@argus/print/ErrorDiv";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
@@ -8,7 +12,7 @@ import { PrintBodyName } from "@argus/print/lib";
 import { VSCodeDivider } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import { observer } from "mobx-react";
-import React, { Fragment } from "react";
+import React, { Fragment, useContext } from "react";
 
 import Expr from "./Expr";
 import "./File.css";
@@ -53,12 +57,11 @@ const ObligationBody = observer(({ bodyInfo }: { bodyInfo: BodyInfo }) => {
 const File = ({
   file,
   osibs,
-  showHidden = false,
 }: {
   file: Filename;
   osibs: ObligationsInBody[];
-  showHidden?: boolean;
 }) => {
+  const showHidden = useContext(AppContext.ShowHiddenObligationsContext);
   const bodyInfos = _.map(
     osibs,
     (osib, idx) => new BodyInfo(osib, idx, showHidden)

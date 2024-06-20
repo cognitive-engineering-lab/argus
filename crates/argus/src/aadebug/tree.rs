@@ -13,7 +13,6 @@ use serde::Serialize;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
-use super::util;
 use crate::{
   analysis::EvaluationResult,
   proof_tree::{topology::TreeTopology, ProofNodeIdx},
@@ -257,20 +256,6 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
     tree.goal(i).expect("invalid ancestor")
   }
 
-  fn as_trait_predicate(&self) -> Option<ty::PolyTraitPredicate<'tcx>> {
-    let predicate = self.goal.predicate.kind();
-    match predicate.skip_binder() {
-      ty::PredicateKind::Clause(ty::ClauseKind::Trait(t)) => {
-        Some(predicate.rebind(t))
-      }
-      _ => None,
-    }
-  }
-
-  fn expect_trait_predicate(&self) -> ty::PolyTraitPredicate<'tcx> {
-    self.as_trait_predicate().expect("trait-predicate")
-  }
-
   fn analyze(&self) -> Heuristic {
     // We should only be analyzing failed predicates
     assert!(!self.result.is_yes());
@@ -399,43 +384,16 @@ impl<'a, 'tcx> Candidate<'a, 'tcx> {
   }
 
   fn source_subgoals(&self) -> impl Iterator<Item = Goal<'a, 'tcx>> + '_ {
-    use smallvec::SmallVec;
-    let mut all_goals = self.all_subgoals().collect::<SmallVec<[_; 18]>>();
+    let mut all_goals = self.all_subgoals().collect::<Vec<_>>();
+    argus_ext::ty::retain_error_sources(
+      &mut all_goals,
+      |g| g.result,
+      |g| g.goal.predicate,
+      |g| g.infcx.tcx,
+      |a, b| a.idx == b.idx,
+    );
 
-    let idx = itertools::partition(&mut all_goals, |g| {
-      !g.result.is_yes() && g.as_trait_predicate().is_some()
-    });
-
-    let (trait_preds, _) = all_goals.split_at(idx);
-
-    let is_implied_by_failing_bound = |other: &Goal<'_, 'tcx>| {
-      trait_preds.iter().any(|bound| {
-        if let ty::TraitPredicate {
-          trait_ref,
-          polarity: ty::PredicatePolarity::Positive,
-        } = bound.expect_trait_predicate().skip_binder()
-          // Don't consider reflexive implication
-          && other.idx != bound.idx
-        {
-          other
-            .infcx
-            .tcx
-            .does_trait_ref_occur_in(trait_ref, other.goal.predicate)
-        } else {
-          false
-        }
-      })
-    };
-
-    let mut to_keep = vec![];
-    for (i, here) in all_goals.iter().enumerate() {
-      if !is_implied_by_failing_bound(here) {
-        log::debug!("Keeping Goal {:?}", here.goal.predicate);
-        to_keep.push(i);
-      }
-    }
-
-    util::pick_selected(all_goals, to_keep)
+    all_goals.into_iter()
   }
 }
 

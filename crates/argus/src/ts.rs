@@ -15,7 +15,6 @@ macro_rules! ts {
 fn export_bindings_indices() {
   ts! {
     ty::ExprIdx,
-    ty::MethodLookupIdx,
     ty::ObligationIdx,
 
     pty::ProofNodeIdx,

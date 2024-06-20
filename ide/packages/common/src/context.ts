@@ -11,6 +11,7 @@ export const AppContext = {
     (PanoptesConfig & { evalMode: EvaluationMode }) | undefined
   >(undefined),
   SystemSpecContext: createContext<SystemSpec | undefined>(undefined),
+  ShowHiddenObligationsContext: createContext<boolean>(false),
 };
 
 export const FileContext = createContext<Filename | undefined>(undefined);

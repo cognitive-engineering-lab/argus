@@ -56,7 +56,6 @@ enum ArgusCommand {
     start_column: usize,
     end_line: usize,
     end_column: usize,
-    is_synthetic: Option<bool>,
   },
 }
 
@@ -168,25 +167,19 @@ impl RustcPlugin for ArgusPlugin {
         start_column,
         end_line,
         end_column,
-        is_synthetic,
       } => {
-        let is_synthetic = is_synthetic.unwrap_or(false);
         let compute_target = || {
-          Some((
-            id,
-            CharRange {
-              start: CharPos {
-                line: *start_line,
-                column: *start_column,
-              },
-              end: CharPos {
-                line: *end_line,
-                column: *end_column,
-              },
-              filename: Filename::intern(&file),
+          Some((id, CharRange {
+            start: CharPos {
+              line: *start_line,
+              column: *start_column,
             },
-            is_synthetic,
-          ))
+            end: CharPos {
+              line: *end_line,
+              column: *end_column,
+            },
+            filename: Filename::intern(&file),
+          }))
         };
 
         let v = run(
