@@ -19,23 +19,31 @@ import "./File.css";
 import { CollapsibleElement } from "./TreeView/Directory";
 import { highlightedObligation } from "./signals";
 
+const FnIndicator = () => <em>ƒ</em>;
+
 const ObligationBody = observer(({ bodyInfo }: { bodyInfo: BodyInfo }) => {
   if (!bodyInfo.hasVisibleExprs()) {
     return null;
   }
 
-  const errCount = bodyInfo.numErrors;
   const bodyName =
     bodyInfo.name === undefined ? (
-      "{anon body}"
+      `{anonymous body}@${bodyInfo.start.line}:${bodyInfo.start.column}`
     ) : (
       <PrintBodyName defPath={bodyInfo.name} />
     );
 
+  const errCount =
+    bodyInfo.numErrors > 0 ? (
+      <span className="ErrorCount"> ({bodyInfo.numErrors})</span>
+    ) : null;
+
   const header = (
     <>
+      <FnIndicator />
+      {"\u00A0"}
       {bodyName}
-      {errCount > 0 ? <span className="ErrorCount">({errCount})</span> : null}
+      {errCount}
     </>
   );
 

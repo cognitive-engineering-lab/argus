@@ -6,7 +6,6 @@ use std::time::Instant;
 use anyhow::Result;
 use argus_ext::ty::EvaluationResultExt;
 use index_vec::IndexVec;
-use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_infer::traits::solve::GoalSource;
 use rustc_trait_selection::solve::inspect::{InspectCandidate, InspectGoal};
 use rustc_utils::timer::elapsed;
@@ -116,20 +115,13 @@ impl<'tcx> Storage<'tcx> {
 
     let tree_start = Instant::now();
 
-    let mut sets = HashMap::<usize, Vec<_>>::default();
-
-    for conjunct in tree.iter_correction_sets() {
-      let h = conjunct.weight(tree);
-      sets.entry(h.total).or_default().push(h);
-    }
-
-    for group in sets.values_mut() {
-      #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-      group.sort_by_key(|g| -(g.max_depth as i32));
-    }
-
-    let mut sets = sets.into_values().flatten().collect::<Vec<_>>();
-    sets.sort_by_key(|s| s.total);
+    let sets =
+      tree
+        .iter_correction_sets()
+        .fold(Vec::new(), |mut sets, conjunct| {
+          sets.push(conjunct.weight(tree));
+          sets
+        });
 
     elapsed("aadeg::into_results", tree_start);
 
@@ -138,99 +130,3 @@ impl<'tcx> Storage<'tcx> {
     }
   }
 }
-
-// ==========================
-// OLD CODE FOR FUDGING TYPES
-// ==========================
-
-// let failed_predicates = conjunct.iter(tree).collect::<Vec<_>>();
-
-// let predicate_tys = failed_predicates
-//   .iter()
-//   .map(|g| g.predicate())
-//   .collect::<HashSet<_>>();
-
-// // For all failed trait predicates:
-// // 1. build a type that implements the trait
-// // 2. find the last ancestor before a "built-in" impl (or the root)
-// // 3. group predicates by the chosen ancestor.
-// // 4. for each ancestor, substitute all the chosen types and evaluate the substitution.
-// //    NOTE: we don't substitute types for inference variables. We want to see if these
-// //    get naturally resolved by the other substitutions. If not, we include their weights.
-// let type_substs = failed_predicates
-//   .iter()
-//   .map(|g| LazyCell::new(move || tree.find_type_substitution_for(g)))
-//   .collect::<Vec<_>>();
-
-// let by_last_ancestor = failed_predicates
-//   .iter()
-//   .enumerate()
-//   .map(|(i, g)| {
-//     let ancestor: ProofNodeIdx = g.last_ancestor_pre_builtin().into();
-//     (ancestor, (i, g))
-//   })
-//   .into_group_map();
-
-// // The weight is an estimate of how much work it would take
-// // to fix all the failed predicates in the group.
-// //
-// // Weight 1: changing a type to implement a trait.
-// //   TODO: this can be further refined by "how much" a type needs to be
-// //   adjusted in order to implement a trait. Deferring this for now.
-// // Weight 2: changing an *inference variable* to implement a trait.
-// // Weight 3: changing a type to *be* another type.
-// //   NOTE change for normalization, not trait implementation
-// let (subs_worked, weight, conjunct_steps) =
-//   by_last_ancestor.into_iter().fold(
-//     (true, 0, vec![]),
-//     |(mut subs_worked, mut weight, mut conjunct_steps), (root, group)| {
-//       // All type substitutions will be applied in this context.
-//       // let tree::N::R {
-//       //   goal,
-//       //   infcx,
-//       //   result: original_result,
-//       // } = &self.ns[root]
-//       // else {
-//       //   unreachable!();
-//       // };
-
-//       // let type_substitutions = group
-//       //   .iter()
-//       //   .filter_map(|(i, _)| *type_substs[*i])
-//       //   .collect::<Vec<_>>();
-
-//       // let group_len = group.len();
-//       // let sub_len = type_substitutions.len();
-//       // let result =
-//       //   infcx.eval_substitution(&type_substitutions, goal.clone());
-
-//       // let (my_success, my_weight) = if result.is_yes() {
-//       //   // If a substitution worked then all predicates have weight 1.
-//       //   (true, sub_len)
-//       // } else if result.is_better_than(original_result) {
-//       //   // If it's "better," but still not a "yes," then
-//       //   // we weight each predicate by two.
-//       //   (true, group_len * 2 - sub_len)
-//       // } else {
-//       //   (false, group_len * 3)
-//       // };
-
-//       // subs_worked &= my_success;
-//       // weight += my_weight;
-
-//       // FIXME: remove hardcoded values
-//       conjunct_steps.push(GroupChange {
-//         nodes: group.iter().map(|(_, g)| (*g).into()).collect(),
-//         weight: 0,                      // my_weight,
-//         result: EvaluationResult::no(), //
-//       });
-
-//       // (subs_worked, weight, conjunct_steps)
-//       (true, weight, conjunct_steps)
-//     },
-//   );
-
-// problematic_sets.push(ConjunctAnalysis {
-//   indices: conjunct_steps,
-//   weight,
-// });

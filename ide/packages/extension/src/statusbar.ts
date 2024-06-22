@@ -94,4 +94,8 @@ export class StatusBar {
     this.bar.command = config.command;
     this.bar.tooltip = config.tooltip;
   }
+
+  dispose() {
+    this.bar.dispose();
+  }
 }

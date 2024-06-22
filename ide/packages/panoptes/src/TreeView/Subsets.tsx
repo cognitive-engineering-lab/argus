@@ -21,8 +21,10 @@ const FailedSubsets = () => {
         )
       )
     );
-  const suggestedPredicates = flattenSets(_.slice(tree.failedSets, 0, 3));
-  const others = flattenSets(_.slice(tree.failedSets, 3));
+
+  const sets = _.sortBy(tree.failedSets, s => s.momentum / s.velocity);
+  const suggestedPredicates = flattenSets(_.slice(sets, 0, 3));
+  const others = flattenSets(_.slice(sets, 3));
 
   return (
     <BottomUpImpersonator

@@ -3,15 +3,22 @@ import { Filename } from "@argus/common/lib";
 
 import { Cmd, Ctx } from "./ctx";
 import * as errors from "./errors";
+import { log } from "./logging";
+
+function trace(...args: any[]) {
+  log("[CMD]: ", ...args);
+}
 
 export function inspect(ctx: Ctx): Cmd {
   return async () => {
-    ctx.createOrShowView();
+    trace("inspect");
+    ctx.inspectAt();
   };
 }
 
 export function cancelTasks(ctx: Ctx): Cmd {
   return async () => {
+    trace("cancelTasks");
     ctx.cancelRunningTasks();
   };
 }
@@ -23,20 +30,19 @@ export function openError(ctx: Ctx): Cmd {
     ei: ExprIdx,
     oblHash: ObligationHash
   ) => {
-    if (ctx.view === undefined) {
-      await ctx.createOrShowView({
-        file,
-        bodyIdx: bh,
-        exprIdx: ei,
-        hash: oblHash,
-      });
-    }
-    ctx.view!.blingObligation(file, bh, ei, oblHash);
+    trace("openError", file, bh, ei, oblHash);
+    ctx.openError({
+      file,
+      bodyIdx: bh,
+      exprIdx: ei,
+      hash: oblHash,
+    });
   };
 }
 
 export function lastError(ctx: Ctx): Cmd {
   return async () => {
+    trace("lastError");
     return errors.lastError(ctx.extCtx);
   };
 }

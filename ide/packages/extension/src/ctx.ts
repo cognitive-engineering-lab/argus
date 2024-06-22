@@ -20,8 +20,8 @@ import * as vscode from "vscode";
 import { rangeHighlight } from "./decorate";
 import { showErrorDialog } from "./errors";
 import { log } from "./logging";
-import { globals } from "./main";
 import { setup } from "./setup";
+import { StatusBar } from "./statusbar";
 import {
   RustEditor,
   isDocumentInWorkspace,
@@ -82,10 +82,11 @@ export class Ctx {
   // Ranges used for highlighting code in the current Rust Editor.
   private highlightRanges: CharRange[] = [];
   private commandDisposables: Disposable[];
-  private providingDisposables: Disposable[];
+  private disposables: Disposable[];
   private diagnosticCollection;
   private cache: BackendCache;
-  public view: View | undefined;
+  private view: View | undefined;
+  public statusBar: StatusBar;
 
   constructor(
     readonly extCtx: vscode.ExtensionContext,
@@ -93,11 +94,13 @@ export class Ctx {
     readonly workspace: Workspace & { kind: "workspace-folder" }
   ) {
     this.commandDisposables = [];
-    this.providingDisposables = [];
+    this.disposables = [];
     this.diagnosticCollection =
       vscode.languages.createDiagnosticCollection("rust");
+    this.statusBar = new StatusBar(extCtx);
 
     this.cache = new BackendCache(
+      this.statusBar,
       () =>
         new CPromise(() => {
           showErrorDialog("Argus backend left uninitialized.");
@@ -111,28 +114,12 @@ export class Ctx {
 
   dispose() {
     this.cache.havoc();
+    this.view?.cleanup();
+    this.statusBar.dispose();
     _.forEach(this.commandDisposables, d => d.dispose());
-    _.forEach(this.providingDisposables, d => d.dispose());
+    _.forEach(this.disposables, d => d.dispose());
     this.commandDisposables = [];
-    this.providingDisposables = [];
-  }
-
-  async createOrShowView(target?: ErrorJumpTargetInfo) {
-    if (!this.view) {
-      log("Creating panel...");
-      const initialData = await this.getFreshWebViewData();
-      this.view = new View(
-        this.extCtx.extensionUri,
-        initialData,
-        target,
-        () => {
-          this.view = undefined;
-          this.cache.havoc();
-        }
-      );
-    }
-    log("Revealing panel...");
-    this.view.getPanel.reveal();
+    this.disposables = [];
   }
 
   get activeRustEditor(): RustEditor | undefined {
@@ -142,6 +129,10 @@ export class Ctx {
 
   get extensionPath(): string {
     return this.extCtx.extensionPath;
+  }
+
+  get visibleEditors(): RustEditor[] {
+    return _.filter(vscode.window.visibleTextEditors, isRustEditor);
   }
 
   // NOTE: callbacks that register events in this function should invoke
@@ -160,75 +151,105 @@ export class Ctx {
       "Loading Argus, this may take several minutes."
     );
 
-    await b(["preload"], true);
-    this.cache = new BackendCache(b);
+    await b(
+      ["preload"],
+      true, // Don't expect output
+      true // Ignore a failing exit code
+    );
+    this.cache = new BackendCache(this.statusBar, b);
 
     log("Argus backend preloaded");
+
     let openingEditor = new Promise<void[]>(() => []);
+    // Preload information for visible editors.
     if (this.activeRustEditor) {
       openingEditor = Promise.all(
         _.map(this.visibleEditors, e => this.openEditor(e))
       );
     }
 
+    log("Caching open editor information");
+
     // Register the commands with VSCode after the backend is setup.
-    globals.ctx = this;
+    // NOTE: nothing should be registered before the commands...
     this.updateCommands();
 
+    log("Updated commands");
+
     this.extCtx.subscriptions.push(this.diagnosticCollection);
-    this.providingDisposables.push(
+    this.disposables.push(
       vscode.languages.registerHoverProvider("rust", {
-        provideHover: async (doc, pos, tok) =>
-          globals.ctx.provideHover(doc, pos, tok),
+        provideHover: async (doc, pos, tok) => this.provideHover(doc, pos, tok),
       })
     );
 
-    vscode.workspace.onDidChangeTextDocument(event => {
-      const editor = vscode.window.activeTextEditor!;
-      if (
-        editor &&
-        isRustEditor(editor) &&
-        isDocumentInWorkspace(editor.document) &&
-        event.document === editor.document &&
-        editor.document.isDirty
-      ) {
-        globals.statusBar.setState("unsaved");
-      }
-    });
-
-    vscode.window.onDidChangeActiveTextEditor(async editor => {
-      if (
-        editor &&
-        isRustEditor(editor) &&
-        isDocumentInWorkspace(editor.document)
-      ) {
-        log(`Opening ${editor.document.fileName}`);
-        globals.ctx.openEditor(editor);
-      }
-    });
-
-    vscode.workspace.onDidSaveTextDocument(async document => {
-      const self = globals.ctx;
-      const editor = vscode.window.activeTextEditor;
-      if (
-        editor &&
-        isRustEditor(editor) &&
-        editor.document === document &&
-        isDocumentInWorkspace(editor.document)
-      ) {
-        self.cache.havoc();
-        self.view!.havoc();
-        if (self.activeRustEditor) {
-          self.openEditor(self.activeRustEditor);
+    this.disposables.push(
+      vscode.workspace.onDidChangeTextDocument(event => {
+        const editor = vscode.window.activeTextEditor!;
+        if (
+          editor &&
+          isRustEditor(editor) &&
+          isDocumentInWorkspace(editor.document) &&
+          event.document === editor.document &&
+          editor.document.isDirty
+        ) {
+          this.statusBar.setState("unsaved");
         }
-      }
-    });
+      })
+    );
 
-    await openingEditor;
+    this.disposables.push(
+      vscode.window.onDidChangeActiveTextEditor(async editor => {
+        if (
+          editor &&
+          isRustEditor(editor) &&
+          isDocumentInWorkspace(editor.document)
+        ) {
+          log(`Opening ${editor.document.fileName}`);
+          this.openEditor(editor);
+        }
+      })
+    );
+
+    this.disposables.push(
+      vscode.workspace.onDidSaveTextDocument(async document => {
+        const editor = vscode.window.activeTextEditor;
+        if (
+          editor &&
+          isRustEditor(editor) &&
+          editor.document === document &&
+          isDocumentInWorkspace(editor.document)
+        ) {
+          this.cache.havoc();
+          this.view!.havoc();
+          if (this.activeRustEditor) {
+            this.openEditor(this.activeRustEditor);
+          }
+        }
+      })
+    );
+
+    log("Argus backend setup complete");
   }
 
-  get visibleEditors(): RustEditor[] {
-    return _.filter(vscode.window.visibleTextEditors, isRustEditor);
+  async inspectAt(target?: ErrorJumpTargetInfo) {
+    if (!this.view) {
+      log("Creating panel...");
+      const initialData = await this.getFreshWebViewData();
+      this.view = new View(this, initialData, target, () => {
+        this.view = undefined;
+        this.cache.havoc();
+      });
+    }
+    log("Revealing panel");
+    this.view.getPanel.reveal();
+  }
+
+  async openError(target: ErrorJumpTargetInfo) {
+    await this.inspectAt(target);
+    // XXX: If the view is not initialized after calling `inspectAt`
+    // there is definitely a bug somewhere.
+    await this.view!.blingObligation(target);
   }
 
   private async openEditor(editor: RustEditor) {
@@ -397,7 +418,7 @@ export class Ctx {
     mdStr.isTrusted = true;
     mdStr.appendText(msg + "\n");
     _.forEach(highlightUris, uri =>
-      mdStr.appendMarkdown(`- [Open failure in argus debugger](${uri})\n`)
+      mdStr.appendMarkdown(`- [Open failure in Argus](${uri})\n`)
     );
     return mdStr;
   }
@@ -465,7 +486,7 @@ class BackendCache {
   private treeCache: Record<Filename, TreeRecord>;
   private backend: CallArgus;
 
-  constructor(backend: CallArgus) {
+  constructor(readonly statusBar: StatusBar, backend: CallArgus) {
     this.obligationCache = {};
     this.treeCache = {};
     this.backend = backend;
@@ -486,7 +507,7 @@ class BackendCache {
     const thunk = this.backend<"obligations">(["obligations", filename]).then(
       res => {
         if (res.type !== "output") {
-          globals.statusBar.setState("error");
+          this.statusBar.setState("error");
           showErrorDialog(res.error);
           return;
         }
@@ -517,7 +538,7 @@ class BackendCache {
       range.end.column,
     ]).then(res => {
       if (res.type !== "output") {
-        globals.statusBar.setState("error");
+        this.statusBar.setState("error");
         showErrorDialog(res.error);
         return;
       }
@@ -531,7 +552,7 @@ class BackendCache {
 
       This is likely a bug in Argus, please report it.
       `);
-        globals.statusBar.setState("error");
+        this.statusBar.setState("error");
         return;
       }
 

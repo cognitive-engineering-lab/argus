@@ -28,8 +28,8 @@ pub struct Dnf(Vec<And>);
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct SetHeuristic {
-  pub total: usize,
-  pub max_depth: usize,
+  pub momentum: usize,
+  pub velocity: usize,
   goals: Vec<Heuristic>,
 }
 
@@ -146,16 +146,19 @@ impl And {
       .iter()
       .map(|&idx| tree.goal(idx).expect("goal").analyze())
       .collect::<Vec<_>>();
-    let total = goals.iter().fold(0, |acc, g| acc + g.kind.weight());
+
+    let momentum = goals.iter().fold(0, |acc, g| acc + g.kind.weight());
+    let velocity = self
+      .0
+      .iter()
+      .map(|&idx| tree.topology.depth(idx))
+      .max()
+      .unwrap_or(0);
+
     SetHeuristic {
-      total,
+      momentum,
+      velocity,
       goals,
-      max_depth: self
-        .0
-        .iter()
-        .map(|&idx| tree.topology.depth(idx))
-        .max()
-        .unwrap_or(0),
     }
   }
 }

@@ -34,6 +34,18 @@ class BodyInfo {
     return this.oib.name;
   }
 
+  get range() {
+    return this.oib.range;
+  }
+
+  get start() {
+    return this.range.start;
+  }
+
+  get end() {
+    return this.range.end;
+  }
+
   notHidden(hash: ObligationIdx): boolean {
     const o = this.getObligation(hash);
     if (o === undefined) {

@@ -1,9 +1,6 @@
 import {
-  BodyHash,
   CharRange,
-  ExprIdx,
   Obligation,
-  ObligationHash,
   ObligationsInBody,
 } from "@argus/common/bindings";
 import {
@@ -26,8 +23,8 @@ import _ from "lodash";
 import os from "os";
 import vscode from "vscode";
 
+import { Ctx } from "./ctx";
 import { log } from "./logging";
-import { globals } from "./main";
 import { RustEditor } from "./utils";
 
 // Wraps around the MessageHandler data types from @estruyf/vscode.
@@ -39,17 +36,15 @@ type BlessedMessage<T extends PanoptesToSystemCmds> = {
 
 export class View {
   private panel: vscode.WebviewPanel;
-  private readonly extensionUri: vscode.Uri;
   private disposables: vscode.Disposable[] = [];
 
   constructor(
-    extensionUri: vscode.Uri,
+    private readonly ctx: Ctx,
     initialData: FileInfo[],
     target?: ErrorJumpTargetInfo,
     readonly cleanup: () => void = () => {},
     column: vscode.ViewColumn = vscode.ViewColumn.Beside
   ) {
-    this.extensionUri = extensionUri;
     this.panel = this.makePanel(initialData, target, column);
   }
 
@@ -57,7 +52,7 @@ export class View {
     return this.panel;
   }
 
-  makePanel(
+  private makePanel(
     initialData: FileInfo[] = [],
     target?: ErrorJumpTargetInfo,
     column: vscode.ViewColumn = vscode.ViewColumn.Beside
@@ -66,12 +61,12 @@ export class View {
       enableScripts: true,
       retainContextWhenHidden: true,
       enableFindWidget: true,
-      localResourceRoots: [this.extensionUri],
+      localResourceRoots: [this.ctx.extCtx.extensionUri],
     });
 
     // Set the webview's initial html content
     panel.webview.html = getHtmlForWebview(
-      this.extensionUri,
+      this.ctx.extCtx.extensionUri,
       panel,
       initialData,
       target
@@ -79,60 +74,54 @@ export class View {
 
     // Listen for when the panel is disposed
     // This happens when the user closes the panel or when the panel is closed programatically
-    panel.onDidDispose(
-      () => {
+    this.disposables.push(
+      panel.onDidDispose(() => {
         log("Disposing panel");
-        globals.ctx.view = undefined;
-        this.dispose();
-      },
-      null,
-      this.disposables
+        this.cleanup();
+        this.panel.dispose();
+        while (this.disposables.length) {
+          const x = this.disposables.pop();
+          if (x) {
+            x.dispose();
+          }
+        }
+      })
     );
 
     // Handle messages from the webview
-    panel.webview.onDidReceiveMessage(
-      async message => await this.handleMessage(message),
-      null,
-      this.disposables
+    this.disposables.push(
+      panel.webview.onDidReceiveMessage(async message => {
+        try {
+          await this.handleMessage(message);
+        } catch (e: any) {
+          log(`Handler threw error ${e.message}`);
+        }
+      })
     );
 
     return panel;
   }
 
-  public dispose() {
-    // Clean up our resources
-    this.cleanup();
-    this.panel.dispose();
-    while (this.disposables.length) {
-      const x = this.disposables.pop();
-      if (x) {
-        x.dispose();
-      }
-    }
-  }
-
-  // Public API, using static methods >:(
-
   public async havoc() {
-    this.messageWebview("havoc", {
+    messageWebview(this.panel.webview, "havoc", {
       type: "FROM_EXTENSION",
       command: "havoc",
     });
   }
 
-  public async blingObligation(
-    file: Filename,
-    bodyIdx: BodyHash,
-    exprIdx: ExprIdx,
-    obligation: ObligationHash
-  ) {
-    this.messageWebview("open-error", {
+  public async blingObligation({
+    file,
+    bodyIdx,
+    exprIdx,
+    hash,
+  }: ErrorJumpTargetInfo) {
+    messageWebview(this.panel.webview, "open-error", {
       type: "FROM_EXTENSION",
       command: "open-error",
       file,
       bodyIdx,
       exprIdx,
-      hash: obligation,
+      hash,
     });
   }
 
@@ -141,8 +130,7 @@ export class View {
     signature: string,
     data: ObligationsInBody[]
   ) {
-    console.debug("Sending open file message", editor.document.fileName);
-    this.messageWebview("open-file", {
+    messageWebview(this.panel.webview, "open-file", {
       type: "FROM_EXTENSION",
       command: "open-file",
       file: editor.document.fileName,
@@ -161,9 +149,9 @@ export class View {
         payload.range
       );
     } else if (isPanoMsgAddHighlight(payload)) {
-      return globals.ctx.addHighlightRange(payload.file, payload.range);
+      return this.ctx.addHighlightRange(payload.file, payload.range);
     } else if (isPanoMsgRemoveHighlight(payload)) {
-      return globals.ctx.removeHighlightRange(payload.file, payload.range);
+      return this.ctx.removeHighlightRange(payload.file, payload.range);
     }
   }
 
@@ -173,9 +161,9 @@ export class View {
     obl: Obligation,
     range: CharRange
   ) {
-    const tree = await globals.ctx.getTree(file, obl, range);
+    const tree = await this.ctx.getTree(file, obl, range);
     if (tree !== undefined) {
-      this.messageWebview(requestId, {
+      messageWebview(this.panel.webview, requestId, {
         type: "FROM_EXTENSION",
         file,
         command: "tree",
@@ -183,16 +171,17 @@ export class View {
       });
     }
   }
+}
 
-  private messageWebview<T extends SystemToPanoptesCmds>(
-    requestId: string,
-    msg: SystemToPanoptesMsg<T>
-  ) {
-    this.panel.webview.postMessage({
-      requestId: requestId,
-      payload: msg,
-    } as MessageHandlerData<SystemToPanoptesMsg<T>>);
-  }
+function messageWebview<T extends SystemToPanoptesCmds>(
+  webview: vscode.Webview,
+  requestId: string,
+  msg: SystemToPanoptesMsg<T>
+) {
+  webview.postMessage({
+    requestId: requestId,
+    payload: msg,
+  } as MessageHandlerData<SystemToPanoptesMsg<T>>);
 }
 
 function getHtmlForWebview(

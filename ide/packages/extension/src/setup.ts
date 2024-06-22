@@ -1,13 +1,13 @@
 import {
   ArgusArgs,
   ArgusCliOptions,
-  ArgusError,
   ArgusResult,
   ArgusReturn,
   CallArgus,
   Result,
 } from "@argus/common/lib";
 import {
+  ExecNotifyOpts,
   RustcToolchain,
   execNotify as _execNotify,
   cargoCommand,
@@ -21,7 +21,6 @@ import vscode from "vscode";
 
 import { Ctx } from "./ctx";
 import { log } from "./logging";
-import { globals } from "./main";
 import { isStatusBarState } from "./statusbar";
 
 declare const VERSION: string;
@@ -29,6 +28,8 @@ declare const TOOLCHAIN: {
   channel: string;
   components: string[];
 };
+
+let CTX: Ctx | undefined;
 
 // TODO: all of the calls to `showInformationMessage` should be replaced
 // with some automatic message on the statusBar indicator.
@@ -85,7 +86,12 @@ const findWorkspaceRoot = async (): Promise<string | null> => {
   return folderSubdirTil(entry.idx);
 };
 
-const execNotify = (cmd: string, args: string[], title: string, opts?: any) => {
+const execNotify = (
+  cmd: string,
+  args: string[],
+  title: string,
+  opts?: ExecNotifyOpts
+) => {
   return _execNotify(
     cmd,
     args,
@@ -95,7 +101,7 @@ const execNotify = (cmd: string, args: string[], title: string, opts?: any) => {
     },
     (...args) => log("Argus output", ...args),
     state =>
-      isStatusBarState(state) ? globals.statusBar.setState(state, title) : {}
+      isStatusBarState(state) ? CTX?.statusBar.setState(state, title) : {}
   );
 };
 
@@ -184,7 +190,10 @@ const checkVersionAndInstall = async (
   return true;
 };
 
-export async function setup(_context: Ctx): Promise<CallArgus | null> {
+export async function setup(context: Ctx): Promise<CallArgus | null> {
+  // FIXME: this is a hack to give the `context` dynamic scope in this file.
+  CTX = context;
+
   log("Getting workspace root");
 
   const workspaceRoot = await findWorkspaceRoot();
@@ -217,22 +226,26 @@ export async function setup(_context: Ctx): Promise<CallArgus | null> {
 
   return <T extends ArgusCliOptions>(
     args: ArgusArgs<T>,
-    noOutput: boolean = false
+    noOutput: boolean = false,
+    ignoreExitCode = false
   ): CPromise<ArgusResult<T>> => {
     log("Calling backend with args", args);
     const strArgs = _.map(args, arg => arg.toString());
-    globals.statusBar.setState("loading", "Waiting for Argus...");
+    context.statusBar.setState("loading", "Waiting for Argus...");
 
     return execNotify(
       cargo,
       [...cargoArgs, "argus", ...strArgs],
       "Waiting for Argus...",
-      argusOpts
+      {
+        ...argusOpts,
+        ignoreExitCode,
+      }
     )
       .then(output => {
         log("Received output from Argus");
         if (noOutput) {
-          globals.statusBar.setState("idle", "Argus is ready");
+          context.statusBar.setState("idle", "Argus is ready");
           return {
             type: "output",
             value: undefined as any,
@@ -240,20 +253,21 @@ export async function setup(_context: Ctx): Promise<CallArgus | null> {
         }
 
         const outputTyped: Result<ArgusReturn<T>> = JSON.parse(output);
+        log("Output Typed", outputTyped);
         if ("Err" in outputTyped) {
-          log("Argus failed with error", outputTyped.Err);
-          globals.statusBar.setState("error", "Analysis failed");
+          log("Argus failed with `Err`", outputTyped.Err);
+          context.statusBar.setState("error", "Analysis failed");
           return outputTyped.Err;
         }
 
-        globals.statusBar.setState("idle", "Argus is ready");
+        context.statusBar.setState("idle", "Argus is ready");
         return {
           type: "output",
           value: outputTyped.Ok,
         } as ArgusResult<T>;
       })
       .catch(e => {
-        globals.statusBar.setState("error", "Build failure");
+        context.statusBar.setState("error", "Build failure");
         log("Argus failed with error", e.toString());
         return {
           type: "build-error",

@@ -177,7 +177,8 @@ export type ArgusResult<T extends ArgusCliOptions> =
 // might be achievable with TS, but too tired rn to think about that.
 export type CallArgus = <T extends ArgusCliOptions>(
   _args: ArgusArgs<T>,
-  _no_output?: boolean
+  _noOutput?: boolean,
+  _ignoreExitCode?: boolean
 ) => CPromise<ArgusResult<T>>;
 
 // Type predicates (these shouldn't really exist ...)
