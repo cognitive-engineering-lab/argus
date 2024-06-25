@@ -27,7 +27,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
   log("Argus activated successfully");
   context.subscriptions.push(ctx);
-  globals.ctx = ctx;
+  globals = {
+    ctx,
+  };
 }
 
 // This method is called when your extension is deactivated
