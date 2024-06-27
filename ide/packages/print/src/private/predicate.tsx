@@ -1,4 +1,4 @@
-import {
+import type {
   AliasRelationDirection,
   BoundConstness,
   Clause,
@@ -8,10 +8,9 @@ import {
   PolyPredicateKind,
   PredicateKind,
   PredicateObligation,
-  TraitPredicate,
+  TraitPredicate
 } from "@argus/common/bindings";
 import { anyElems } from "@argus/common/func";
-import _ from "lodash";
 import React from "react";
 
 import { HoverInfo } from "../HoverInfo";
@@ -26,7 +25,7 @@ import {
   PrintGenericArg,
   PrintPolarity,
   PrintRegion,
-  PrintTy,
+  PrintTy
 } from "./ty";
 
 export const PrintPredicateObligation = ({ o }: { o: PredicateObligation }) => {
@@ -121,17 +120,17 @@ export const PrintPredicateKind = ({ o }: { o: PredicateKind }) => {
 };
 
 export const PrintAliasRelationDirection = ({
-  o,
+  o
 }: {
   o: AliasRelationDirection;
 }) => {
   if (o === "Equate") {
     return "==";
-  } else if (o === "Subtype") {
-    return "<:";
-  } else {
-    throw new Error("Unknown alias relation direction", o);
   }
+  if (o === "Subtype") {
+    return "<:";
+  }
+  throw new Error("Unknown alias relation direction", o);
 };
 
 export const PrintClause = ({ o }: { o: Clause }) => {
@@ -191,9 +190,8 @@ export const PrintClauseKind = ({ o }: { o: ClauseKind }) => {
 export const PrintBoundConstness = ({ o }: { o: BoundConstness }) => {
   if (o === "C") {
     return "const ";
-  } else {
-    return null;
   }
+  return null;
 };
 
 export const PrintTraitPredicate = ({ o }: { o: TraitPredicate }) => {

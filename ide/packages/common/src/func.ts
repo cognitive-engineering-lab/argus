@@ -1,8 +1,8 @@
 import _ from "lodash";
 
-import { CharRange, ObligationHash, Predicate, Ty } from "./bindings";
-import { MessageSystem } from "./communication";
-import { Filename } from "./lib";
+import type { CharRange, ObligationHash, Predicate, Ty } from "./bindings";
+import type { MessageSystem } from "./communication";
+import type { Filename } from "./lib";
 
 export function isObject(x: any): x is object {
   return typeof x === "object" && x !== null;
@@ -37,7 +37,7 @@ export function makeHighlightPosters(
       type: "FROM_WEBVIEW",
       file,
       command: "add-highlight",
-      range,
+      range
     });
   };
 
@@ -46,7 +46,7 @@ export function makeHighlightPosters(
       type: "FROM_WEBVIEW",
       file,
       command: "remove-highlight",
-      range,
+      range
     });
   };
 
@@ -86,7 +86,7 @@ export function mode(arr: number[]) {
 }
 
 export function stdDev(arr: number[], avg: number) {
-  return Math.sqrt(_.sum(_.map(arr, n => Math.pow(n - avg, 2))) / arr.length);
+  return Math.sqrt(_.sum(_.map(arr, n => (n - avg) ** 2)) / arr.length);
 }
 
 // FIXME: take into account the column ...

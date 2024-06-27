@@ -1,6 +1,6 @@
 import _ from "lodash";
 
-import {
+import type {
   CandidateData,
   CandidateIdx,
   EvaluationResult,
@@ -8,9 +8,8 @@ import {
   ProofNodeIdx,
   ResultIdx,
   SerializedTree,
-  TreeTopology,
+  TreeTopology
 } from "./bindings";
-import { isHiddenObl } from "./func";
 
 type MultiRecord<K extends number, T> = Record<K, T[]>;
 
@@ -66,7 +65,7 @@ function makeTreeView(
 
   if (children[root] !== undefined) {
     return {
-      topology: { children, parent },
+      topology: { children, parent }
     };
   }
 }
@@ -82,7 +81,7 @@ export class TreeInfo {
   private _maxHeight: Map<ProofNodeIdx, number>;
   private numInferVars: Map<ProofNodeIdx, number>;
 
-  static new(tree: SerializedTree, showHidden: boolean = false) {
+  static new(tree: SerializedTree, showHidden = false) {
     const childrenOf = (n: ProofNodeIdx) => {
       return tree.topology.children[n] ?? [];
     };
@@ -100,12 +99,12 @@ export class TreeInfo {
         // return isHiddenObl({ necessity: goalData.necessity, result })
         //   ? "remove-tree"
         //   : "remove-node";
-      } else if ("Candidate" in node) {
+      }
+      if ("Candidate" in node) {
         const candidate = tree.candidates[node.Candidate];
         return "Any" in candidate ? "remove-node" : "keep";
-      } else {
-        return "keep";
       }
+      return "keep";
     };
 
     const view = makeTreeView(tree.root, cf, childrenOf);
@@ -116,7 +115,7 @@ export class TreeInfo {
 
   constructor(
     private readonly tree: SerializedTree,
-    readonly showHidden: boolean = false,
+    readonly showHidden: boolean,
     readonly view: TreeView
   ) {
     this._maxHeight = new Map();
@@ -195,7 +194,7 @@ export class TreeInfo {
       from,
       to: this.root,
       path,
-      d: "to-root",
+      d: "to-root"
     };
   }
 
@@ -205,7 +204,7 @@ export class TreeInfo {
       from: to,
       to: f,
       path: _.reverse(path),
-      d: "from-root",
+      d: "from-root"
     };
   }
 

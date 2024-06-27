@@ -5,29 +5,28 @@ import {
   shift,
   useFloating,
   useHover,
-  useInteractions,
+  useInteractions
 } from "@floating-ui/react";
-import _ from "lodash";
 import React, { useState } from "react";
 
 import "./HoverInfo.css";
 
 export const HoverInfo = ({
   Content,
-  children,
+  children
 }: React.PropsWithChildren<{ Content: React.FC }>) => {
   const [isOpen, setIsOpen] = useState(false);
   const { refs, floatingStyles, context } = useFloating({
     open: isOpen,
     onOpenChange: setIsOpen,
     placement: "top",
-    middleware: [offset(() => 5), flip(), shift()],
+    middleware: [offset(() => 5), flip(), shift()]
   });
 
   const hover = useHover(context, {
     delay: {
-      open: 500,
-    },
+      open: 500
+    }
   });
 
   const { getReferenceProps, getFloatingProps } = useInteractions([hover]);

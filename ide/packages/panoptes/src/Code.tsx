@@ -1,7 +1,7 @@
 import MonoSpace from "@argus/print/MonoSpace";
 import { VSCodeProgressRing } from "@vscode/webview-ui-toolkit/react";
 import React, { useEffect, useState } from "react";
-import { Highlighter, getHighlighter } from "shiki";
+import { type Highlighter, getHighlighter } from "shiki";
 
 import "./Code.css";
 
@@ -10,7 +10,7 @@ const mkHighlighter = (() => {
   try {
     h = getHighlighter({
       themes: ["dark-plus", "light-plus"],
-      langs: ["rust"],
+      langs: ["rust"]
     });
   } catch (e: any) {
     console.error("Failed to initialize Shiki highlighter", e);
@@ -24,16 +24,16 @@ const codeToHtml = async ({ code, lang }: { code: string; lang: string }) => {
   const highlighter = await mkHighlighter();
   // TODO: I haven't tested that this works because Shiki has yet to fail :)
   if (!highlighter) {
-    return "<pre>" + code + "</pre>";
+    return `<pre>${code}</pre>`;
   }
 
   return highlighter.codeToHtml(code, {
     lang,
     themes: {
       dark: "dark-plus",
-      light: "light-plus",
+      light: "light-plus"
     },
-    defaultColor: "light",
+    defaultColor: "light"
   });
 };
 
@@ -55,6 +55,7 @@ const Code = ({ code }: { code: string }) => {
     <MonoSpace>
       <span
         className="shiki-wrapper"
+        /* biome-ignore lint/security/noDangerouslySetInnerHtml: shiki */
         dangerouslySetInnerHTML={{ __html: html }}
       />
     </MonoSpace>

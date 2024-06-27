@@ -1,8 +1,8 @@
-import {
+import type {
   CharRange,
   ObligationIdx,
   Obligation as ObligationTy,
-  SerializedTree,
+  SerializedTree
 } from "@argus/common/bindings";
 import { BodyInfoContext, FileContext } from "@argus/common/context";
 import { AppContext } from "@argus/common/context";
@@ -11,14 +11,13 @@ import ErrorDiv from "@argus/print/ErrorDiv";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
 import { PrintObligation } from "@argus/print/lib";
 import classNames from "classnames";
-import _ from "lodash";
 import { observer } from "mobx-react";
 import React, {
   useContext,
   useEffect,
   useLayoutEffect,
   useRef,
-  useState,
+  useState
 } from "react";
 
 import "./Obligation.css";
@@ -56,7 +55,7 @@ const NoTreeFound = ({ obligation }: { obligation: ObligationTy }) => {
           logText={JSON.stringify({
             filename,
             bodyName: bodyInfo.name,
-            obligation,
+            obligation
           })}
         />
       </p>
@@ -66,7 +65,7 @@ const NoTreeFound = ({ obligation }: { obligation: ObligationTy }) => {
 
 const ProofTreeWrapper = ({
   range,
-  obligation,
+  obligation
 }: {
   range: CharRange;
   obligation: ObligationTy;
@@ -85,7 +84,7 @@ const ProofTreeWrapper = ({
         file: file,
         command: "tree",
         predicate: obligation,
-        range: range,
+        range: range
       });
       setTree(tree.tree);
     };
@@ -120,7 +119,7 @@ const Obligation = observer(
     const isTargetObligation =
       highlightedObligation.value?.hash === obligation.hash;
     const className = classNames("ObligationCard", {
-      bling: isTargetObligation,
+      bling: isTargetObligation
     });
 
     useLayoutEffect(() => {

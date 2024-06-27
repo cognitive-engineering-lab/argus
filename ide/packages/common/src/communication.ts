@@ -1,13 +1,13 @@
 import { messageHandler } from "@estruyf/vscode/dist/client";
 import _ from "lodash";
 
-import { BodyBundle, ProofNodeIdx } from "./bindings";
+import type { BodyBundle, ProofNodeIdx } from "./bindings";
 import { rangeContains } from "./func";
 import {
-  PanoptesToSystemCmds,
-  PanoptesToSystemMsg,
-  SystemReturn,
-  isPanoMsgTree,
+  type PanoptesToSystemCmds,
+  type PanoptesToSystemMsg,
+  type SystemReturn,
+  isPanoMsgTree
 } from "./lib";
 
 export type InfoWrapper = React.FC<{
@@ -34,7 +34,7 @@ export const vscodeMessageSystem: MessageSystem = {
 
   requestData<T extends PanoptesToSystemCmds>(body: PanoptesToSystemMsg<T>) {
     return messageHandler.request<SystemReturn<T>>(body.command, body);
-  },
+  }
 };
 
 export function createClosedMessageSystem(bodies: BodyBundle[]): MessageSystem {
@@ -61,7 +61,7 @@ export function createClosedMessageSystem(bodies: BodyBundle[]): MessageSystem {
         const foundBodies = _.filter(rangesInFile, bundle =>
           rangeContains(bundle.body.range, obligationRange)
         );
-        if (foundBodies.length == 0) {
+        if (foundBodies.length === 0) {
           return reject(new Error(`body in range ${body.range} not found`));
         }
 
@@ -72,12 +72,12 @@ export function createClosedMessageSystem(bodies: BodyBundle[]): MessageSystem {
         );
         if (tree === undefined) {
           console.error("Body", foundBodies, "hash", body.predicate.hash);
-          return reject(new Error(`Obligation hash not found in maps`));
+          return reject(new Error("Obligation hash not found in maps"));
         }
 
         const treeReturn = { tree } as SystemReturn<"tree">;
         resolve(treeReturn as SystemReturn<T>);
       });
-    },
+    }
   };
 }

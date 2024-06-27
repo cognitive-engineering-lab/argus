@@ -1,5 +1,5 @@
-import { TreeInfo } from "@argus/common/TreeInfo";
-import { ProofNodeIdx, SetHeuristic } from "@argus/common/bindings";
+import type { TreeInfo } from "@argus/common/TreeInfo";
+import type { ProofNodeIdx, SetHeuristic } from "@argus/common/bindings";
 import { TreeAppContext } from "@argus/common/context";
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
@@ -72,7 +72,7 @@ function formOptions(
   return {
     target: targetElement,
     onYes,
-    onNo,
+    onNo
   };
 }
 
@@ -134,7 +134,7 @@ const Erotisi = () => {
 
   const CandidateQ = ({
     node,
-    others,
+    others
   }: {
     node: ProofNodeIdx;
     others?: ProofNodeIdx[];

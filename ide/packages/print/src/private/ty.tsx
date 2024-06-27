@@ -1,4 +1,4 @@
-import {
+import type {
   Abi,
   AliasTerm,
   AliasTy,
@@ -24,12 +24,13 @@ import {
   PolyExistentialPredicates,
   PolyFnSig,
   Region,
+  // biome-ignore lint: lint/suspicious/noShadowRestrictedNames
   Symbol,
   Trait,
   Ty,
   TyKind,
   TypeAndMut,
-  UintTy,
+  UintTy
 } from "@argus/common/bindings";
 import { anyElems, fnInputsAndOutput, tyIsUnit } from "@argus/common/func";
 import _, { isObject } from "lodash";
@@ -45,13 +46,13 @@ import {
   Parenthesized,
   Placeholder,
   PlusSeparated,
-  SqBraced,
+  SqBraced
 } from "./syntax";
 import { PrintTerm } from "./term";
 
 export const PrintBinder = ({
   binder,
-  innerF,
+  innerF
 }: {
   binder: any;
   innerF: any;
@@ -66,92 +67,118 @@ export const PrintTy = ({ o }: { o: Ty }) => {
 export const PrintTyKind = ({ o }: { o: TyKind }) => {
   if ("Bool" === o) {
     return "bool";
-  } else if ("Char" === o) {
+  }
+  if ("Char" === o) {
     return "char";
-  } else if ("Str" === o) {
+  }
+  if ("Str" === o) {
     return "str";
-  } else if ("Never" === o) {
+  }
+  if ("Never" === o) {
     return "!";
-  } else if ("Error" === o) {
+  }
+  if ("Error" === o) {
     return "{error}";
-  } else if ("Int" in o) {
+  }
+  if ("Int" in o) {
     return <PrintIntTy o={o.Int} />;
-  } else if ("Uint" in o) {
+  }
+  if ("Uint" in o) {
     return <PrintUintTy o={o.Uint} />;
-  } else if ("Float" in o) {
+  }
+  if ("Float" in o) {
     return <PrintFloatTy o={o.Float} />;
-  } else if ("Pat" in o) {
+  }
+  if ("Pat" in o) {
     const [ty] = o.Pat;
     return <PrintTy o={ty} />;
-  } else if ("Adt" in o) {
+  }
+  if ("Adt" in o) {
     return <PrintDefPath o={o.Adt} />;
-  } else if ("Array" in o) {
+  }
+  if ("Array" in o) {
     const [ty, sz] = o.Array;
     return (
       <SqBraced>
         <PrintTy o={ty} />; <PrintConst o={sz} />
       </SqBraced>
     );
-  } else if ("Slice" in o) {
+  }
+  if ("Slice" in o) {
     return (
       <SqBraced>
         <PrintTy o={o.Slice} />
       </SqBraced>
     );
-  } else if ("RawPtr" in o) {
+  }
+  if ("RawPtr" in o) {
     const m = o.RawPtr.mutbl === "Not" ? "const" : "mut";
     return (
       <>
         *{m} <PrintTy o={o.RawPtr.ty} />
       </>
     );
-  } else if ("Ref" in o) {
+  }
+  if ("Ref" in o) {
     const [r, ty, mtbl] = o.Ref;
     const tyAndMut = {
       ty: ty,
-      mutbl: mtbl,
+      mutbl: mtbl
     };
     return (
       <>
         &<PrintRegion o={r} /> <PrintTypeAndMut o={tyAndMut} />
       </>
     );
-  } else if ("FnDef" in o) {
+  }
+  if ("FnDef" in o) {
     return <PrintFnDef o={o.FnDef} />;
-  } else if ("FnPtr" in o) {
+  }
+  if ("FnPtr" in o) {
     return <PrintPolyFnSig o={o.FnPtr} />;
-  } else if ("Tuple" in o) {
+  }
+  if ("Tuple" in o) {
     const components = _.map(o.Tuple, t => () => <PrintTy o={t} />);
     return (
       <Parenthesized>
         <CommaSeparated components={components} />
       </Parenthesized>
     );
-  } else if ("Placeholder" in o) {
-    return <PrintPlaceholderTy o={o.Placeholder} />;
-  } else if ("Infer" in o) {
-    return <PrintInferTy o={o.Infer} />;
-  } else if ("Foreign" in o) {
-    return <PrintDefPath o={o.Foreign} />;
-  } else if ("Closure" in o) {
-    return <PrintDefPath o={o.Closure} />;
-  } else if ("CoroutineClosure" in o) {
-    return <PrintCoroutineClosureTy o={o.CoroutineClosure} />;
-  } else if ("Param" in o) {
-    return <PrintParamTy o={o.Param} />;
-  } else if ("Bound" in o) {
-    return <PrintBoundTy o={o.Bound} />;
-  } else if ("Alias" in o) {
-    return <PrintAliasTyKind o={o.Alias} />;
-  } else if ("Dynamic" in o) {
-    return <PrintDynamicTy o={o.Dynamic} />;
-  } else if ("Coroutine" in o) {
-    return <PrintCoroutineTy o={o.Coroutine} />;
-  } else if ("CoroutineWitness" in o) {
-    return <PrintCoroutineWitnessTy o={o.CoroutineWitness} />;
-  } else {
-    throw new Error("Unknown ty kind", o);
   }
+  if ("Placeholder" in o) {
+    return <PrintPlaceholderTy o={o.Placeholder} />;
+  }
+  if ("Infer" in o) {
+    return <PrintInferTy o={o.Infer} />;
+  }
+  if ("Foreign" in o) {
+    return <PrintDefPath o={o.Foreign} />;
+  }
+  if ("Closure" in o) {
+    return <PrintDefPath o={o.Closure} />;
+  }
+  if ("CoroutineClosure" in o) {
+    return <PrintCoroutineClosureTy o={o.CoroutineClosure} />;
+  }
+  if ("Param" in o) {
+    return <PrintParamTy o={o.Param} />;
+  }
+  if ("Bound" in o) {
+    return <PrintBoundTy o={o.Bound} />;
+  }
+  if ("Alias" in o) {
+    return <PrintAliasTyKind o={o.Alias} />;
+  }
+  if ("Dynamic" in o) {
+    return <PrintDynamicTy o={o.Dynamic} />;
+  }
+  if ("Coroutine" in o) {
+    return <PrintCoroutineTy o={o.Coroutine} />;
+  }
+  if ("CoroutineWitness" in o) {
+    return <PrintCoroutineWitnessTy o={o.CoroutineWitness} />;
+  }
+  throw new Error("Unknown ty kind", o);
 };
 
 export const PrintCoroutineTy = ({ o }: { o: CoroutineTyKind }) => {
@@ -171,7 +198,7 @@ export const PrintCoroutineTy = ({ o }: { o: CoroutineTyKind }) => {
 };
 
 export const PrintCoroutineClosureTy = ({
-  o,
+  o
 }: {
   o: CoroutineClosureTyKind;
 }) => {
@@ -180,7 +207,7 @@ export const PrintCoroutineClosureTy = ({
 };
 
 export const PrintCoroutineWitnessTy = ({
-  o,
+  o
 }: {
   o: CoroutineWitnessTyKind;
 }) => {
@@ -192,7 +219,7 @@ export const PrintCoroutineWitnessTy = ({
 };
 
 export const PrintPolyExistentialPredicates = ({
-  o,
+  o
 }: {
   o: PolyExistentialPredicates;
 }) => {
@@ -253,7 +280,7 @@ export const PrintPolyFnSig = ({ o }: { o: PolyFnSig }) => {
   const InnerSig = ({
     inputs,
     output,
-    cVariadic,
+    cVariadic
   }: {
     inputs: Ty[];
     output: Ty;
@@ -293,7 +320,7 @@ export const PrintPolyFnSig = ({ o }: { o: PolyFnSig }) => {
       "Aapcs",
       "Win64",
       "SysV64",
-      "System",
+      "System"
     ];
 
     const fromString = (abi: string) => {
@@ -377,16 +404,16 @@ export const PrintInferTy = ({ o }: { o: InferTy }) => {
     o === "IntVar"
       ? () => <DBraced>int</DBraced>
       : o === "FloatVar"
-      ? () => <DBraced>float</DBraced>
-      : o === "Unresolved"
-      ? () => "_"
-      : "Unnamed" in o
-      ? () => <PrintDefPath o={o.Unnamed} />
-      : "SourceInfo" in o
-      ? () => <code>{o.SourceInfo}</code>
-      : () => {
-          throw new Error("Unknown infer ty", o);
-        };
+        ? () => <DBraced>float</DBraced>
+        : o === "Unresolved"
+          ? () => "_"
+          : "Unnamed" in o
+            ? () => <PrintDefPath o={o.Unnamed} />
+            : "SourceInfo" in o
+              ? () => <code>{o.SourceInfo}</code>
+              : () => {
+                  throw new Error("Unknown infer ty", o);
+                };
 
   return (
     <Placeholder>
@@ -407,13 +434,14 @@ export const PrintTypeAndMut = ({ o }: { o: TypeAndMut }) => {
 export const PrintGenericArg = ({ o }: { o: GenericArg }) => {
   if ("Type" in o) {
     return <PrintTy o={o.Type} />;
-  } else if ("Lifetime" in o) {
-    return <PrintRegion o={o.Lifetime} />;
-  } else if ("Const" in o) {
-    return <PrintConst o={o.Const} />;
-  } else {
-    throw new Error("Unknown generic arg", o);
   }
+  if ("Lifetime" in o) {
+    return <PrintRegion o={o.Lifetime} />;
+  }
+  if ("Const" in o) {
+    return <PrintConst o={o.Const} />;
+  }
+  throw new Error("Unknown generic arg", o);
 };
 
 export const PrintRegion = ({ o }: { o: Region }) => {
@@ -452,9 +480,8 @@ export const PrintIntTy = ({ o }: { o: IntTy }) => {
 export const PrintBoundVariable = ({ o }: { o: BoundVariable }) => {
   if ("Error" in o) {
     return <DBraced>{o.Error}</DBraced>;
-  } else {
-    throw new Error("Unknown bound variable", o);
   }
+  throw new Error("Unknown bound variable", o);
 };
 
 export const PrintPolarity = ({ o }: { o: Polarity }) => {

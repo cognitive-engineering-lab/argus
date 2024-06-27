@@ -1,7 +1,7 @@
-import { BodyHash, ExprIdx, ObligationHash } from "@argus/common/bindings";
-import { Filename } from "@argus/common/lib";
+import type { BodyHash, ExprIdx, ObligationHash } from "@argus/common/bindings";
+import type { Filename } from "@argus/common/lib";
 
-import { Cmd, Ctx } from "./ctx";
+import type { Cmd, Ctx } from "./ctx";
 import * as errors from "./errors";
 import { log } from "./logging";
 
@@ -35,7 +35,7 @@ export function openError(ctx: Ctx): Cmd {
       file,
       bodyIdx: bh,
       exprIdx: ei,
-      hash: oblHash,
+      hash: oblHash
     });
   };
 }

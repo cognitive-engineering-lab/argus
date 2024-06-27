@@ -9,13 +9,13 @@ const PASTE_PARTIAL: number = 206;
 const ReportBugUrl = ({
   error,
   displayText = "Report Bug",
-  logText,
+  logText
 }: {
   error: string;
   displayText?: string;
   logText?: string;
 }) => {
-  const initialLogState = logText ? undefined : `No available log :(`;
+  const initialLogState = logText ? undefined : "No available log :(";
   const [logState, setLogState] = useState(initialLogState);
   const systemSpec = useContext(AppContext.SystemSpecContext)!;
   const errMsg = (e: string) => `Failed to call to paste.rs: '${e}'`;
@@ -25,7 +25,7 @@ const ReportBugUrl = ({
       fetch("https://paste.rs/", {
         method: "POST",
         mode: "cors",
-        body: logText,
+        body: logText
       })
         .then(response => response.json())
         .then(data => {
@@ -45,7 +45,7 @@ const ReportBugUrl = ({
     <a
       href={getArgusIssueUrl(error, {
         logText: logState,
-        ...systemSpec,
+        ...systemSpec
       })}
     >
       {displayText}

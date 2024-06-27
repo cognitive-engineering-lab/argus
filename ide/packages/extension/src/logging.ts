@@ -5,14 +5,14 @@ export const asyncWithProgress = async <T>(thunk: () => Promise<T>) => {
     {
       location: vscode.ProgressLocation.Notification,
       title: "Running",
-      cancellable: true,
+      cancellable: true
     },
     async progress => {
       progress.report({ increment: 0 });
       let v = await thunk();
       progress.report({
         increment: 100,
-        message: "Done",
+        message: "Done"
       });
       return v;
     }

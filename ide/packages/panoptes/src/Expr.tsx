@@ -1,8 +1,8 @@
-import { ExprIdx } from "@argus/common/bindings";
+import type { ExprIdx } from "@argus/common/bindings";
 import {
   AppContext,
   BodyInfoContext,
-  FileContext,
+  FileContext
 } from "@argus/common/context";
 import { makeHighlightPosters } from "@argus/common/func";
 import classNames from "classnames";
@@ -53,7 +53,7 @@ const Expr = observer(({ idx }: { idx: ExprIdx }) => {
   // If there is no targeted obligation then we want to highlight
   // the expression level div.
   const className = classNames({
-    bling: highlightedObligation.value && !highlightedObligation.value.hash,
+    bling: highlightedObligation.value && !highlightedObligation.value.hash
   });
 
   return (

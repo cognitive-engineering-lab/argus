@@ -1,15 +1,15 @@
+import path from "node:path";
 import _ from "lodash";
-import path from "path";
 import { chromium } from "playwright";
 
-import { RootCause } from "./rootCauses";
+import type { RootCause } from "./rootCauses";
 import {
   argusData,
   expandBottomUpView,
   forFileInBundle,
   openPage,
   sleep,
-  testCases,
+  testCases
 } from "./utils";
 
 async function createWorkspaceRunner() {
@@ -64,7 +64,7 @@ async function createWorkspaceRunner() {
         filename,
         cause: cause.message,
         numberTreeNodes,
-        rank,
+        rank
       };
     });
   };

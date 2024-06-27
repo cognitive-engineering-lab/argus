@@ -1,12 +1,11 @@
-import {
+import type {
   DefinedPath,
   ExtensionCandidates,
   GoalData,
   ImplHeader,
   Obligation,
-  Ty,
+  Ty
 } from "@argus/common/bindings";
-import _ from "lodash";
 import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
@@ -19,7 +18,7 @@ import { PrintDefPath as UnsafePrintDefPath } from "./private/path";
 import { ToggleGenericDelimiterContext } from "./private/path";
 import {
   PrintGoalPredicate as UnsafePrintGoalPredicate,
-  PrintPredicateObligation as UnsafePrintPredicateObligation,
+  PrintPredicateObligation as UnsafePrintPredicateObligation
 } from "./private/predicate";
 import { PrintTy as UnsafePrintTy } from "./private/ty";
 
@@ -30,14 +29,14 @@ import { PrintTy as UnsafePrintTy } from "./private/ty";
 // Additionally, this component sets the contents to stlye with the editor monospace font.
 export const PrintWithFallback = ({
   object,
-  Content,
+  Content
 }: {
   object: any;
   Content: React.FC;
 }) => {
   const FallbackFromError = ({
     error,
-    resetErrorBoundary: _,
+    resetErrorBoundary: _
   }: {
     error: any;
     resetErrorBoundary: (...args: any[]) => void;
@@ -117,7 +116,7 @@ export const PrintGoal = ({ o }: { o: GoalData }) => {
 // The individual components aren't typed, so we'll require passing the entire array for now.
 export const PrintExtensionCandidate = ({
   candidates,
-  idx,
+  idx
 }: {
   candidates: ExtensionCandidates;
   idx: number;

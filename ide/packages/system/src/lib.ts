@@ -1,11 +1,11 @@
+import cp from "node:child_process";
+import os from "node:os";
+import path from "node:path";
 import { CancelablePromise as CPromise } from "cancelable-promise";
-import cp from "child_process";
-import os from "os";
-import path from "path";
 
 export const LIBRARY_PATHS: Partial<Record<NodeJS.Platform, string>> = {
   darwin: "DYLD_LIBRARY_PATH",
-  win32: "LIB",
+  win32: "LIB"
 };
 
 export interface RustcToolchain {
@@ -46,12 +46,12 @@ export function killAll(
   signal: string | number = "SIGTERM",
   logger: (...args: any[]) => void = console.debug
 ) {
-  if (process.platform == "win32") {
+  if (process.platform === "win32") {
     cp.exec(`taskkill /PID ${pid} /T /F`, (error, stdout, stderr) => {
-      logger("taskkill stdout: " + stdout);
-      logger("taskkill stderr: " + stderr);
+      logger(`taskkill stdout: ${stdout}`);
+      logger(`taskkill stderr: ${stderr}`);
       if (error) {
-        logger("error: " + error.message);
+        logger(`error: ${error.message}`);
       }
     });
   } else {
@@ -144,7 +144,7 @@ export async function getCargoOpts(
     "rustup",
     ["which", "--toolchain", config.channel, "rustc"],
     {
-      title: "Waiting for rustc...",
+      title: "Waiting for rustc..."
     }
   );
 
@@ -152,13 +152,13 @@ export async function getCargoOpts(
     rustcPath,
     ["--print", "target-libdir", "--print", "sysroot"],
     {
-      title: "Waiting for rustc...",
+      title: "Waiting for rustc..."
     }
   );
 
   const [targetLibdir, sysroot] = targetInfo.split("\n");
   const libraryPath = LIBRARY_PATHS[process.platform] || "LD_LIBRARY_PATH";
-  const PATH = cargoBin() + ";" + process.env.PATH;
+  const PATH = `${cargoBin()};${process.env.PATH}`;
 
   // For each element in libraryPath, we need to add the targetLibdir as its value.
   // This should then get added to the opts object.
@@ -170,8 +170,8 @@ export async function getCargoOpts(
       SYSROOT: sysroot,
       PATH,
       ...additionalOpts,
-      ...process.env,
-    },
+      ...process.env
+    }
   };
 
   return opts;

@@ -1,4 +1,4 @@
-import { SetHeuristic } from "@argus/common/bindings";
+import type { SetHeuristic } from "@argus/common/bindings";
 import { AppContext, TreeAppContext } from "@argus/common/context";
 import _ from "lodash";
 import React, { useContext } from "react";

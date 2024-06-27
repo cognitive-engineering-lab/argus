@@ -1,8 +1,8 @@
-import { TreeInfo, TreeView } from "@argus/common/TreeInfo";
-import { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
-import { TreeRenderParams } from "@argus/common/communication";
+import type { TreeInfo, TreeView } from "@argus/common/TreeInfo";
+import type { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
+import type { TreeRenderParams } from "@argus/common/communication";
 import { TreeAppContext } from "@argus/common/context";
-import { EvaluationMode } from "@argus/common/lib";
+import type { EvaluationMode } from "@argus/common/lib";
 import { PrintGoal } from "@argus/print/lib";
 import _ from "lodash";
 import React, { useContext } from "react";
@@ -16,7 +16,10 @@ type TreeViewWithRoot = TreeView & { root: ProofNodeIdx };
 
 class TopologyBuilder {
   private topo: TreeTopology;
-  constructor(readonly root: ProofNodeIdx, readonly tree: TreeInfo) {
+  constructor(
+    readonly root: ProofNodeIdx,
+    readonly tree: TreeInfo
+  ) {
     this.topo = { children: {}, parent: {} };
   }
 
@@ -86,9 +89,8 @@ export function invertViewWithRoots(
       const node = tree.node(leaf);
       if ("Goal" in node) {
         return node.Goal;
-      } else {
-        throw new Error("Leaves must be goals");
       }
+      throw new Error("Leaves must be goals");
     })
   );
 
@@ -113,7 +115,7 @@ export function invertViewWithRoots(
 const RenderEvaluationViews = ({
   recommended,
   others,
-  mode,
+  mode
 }: {
   recommended: TreeViewWithRoot[];
   others: TreeViewWithRoot[];
@@ -164,7 +166,7 @@ const RenderEvaluationViews = ({
  */
 export const RenderBottomUpViews = ({
   recommended,
-  others,
+  others
 }: {
   recommended: TreeViewWithRoot[];
   others: TreeViewWithRoot[];
@@ -189,12 +191,12 @@ export const RenderBottomUpViews = ({
   const renderParams: TreeRenderParams = {
     Wrapper: ({
       n: _n,
-      Child,
+      Child
     }: {
       n: ProofNodeIdx;
       Child: React.ReactElement;
     }) => Child,
-    styleEdges: false,
+    styleEdges: false
   };
 
   return (
@@ -221,7 +223,7 @@ export function liftTo(
 export const BottomUpImpersonator = ({
   recommended,
   others,
-  mode,
+  mode
 }: {
   recommended: TreeViewWithRoot[];
   others: TreeViewWithRoot[];

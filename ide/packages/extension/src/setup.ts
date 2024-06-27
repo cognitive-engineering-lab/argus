@@ -1,25 +1,25 @@
-import {
+import path from "node:path";
+import type {
   ArgusArgs,
   ArgusCliOptions,
   ArgusResult,
   ArgusReturn,
   CallArgus,
-  Result,
+  Result
 } from "@argus/common/lib";
 import {
-  ExecNotifyOpts,
-  RustcToolchain,
+  type ExecNotifyOpts,
+  type RustcToolchain,
   execNotify as _execNotify,
   cargoCommand,
-  getCargoOpts,
+  getCargoOpts
 } from "@argus/system";
-import { CancelablePromise as CPromise } from "cancelable-promise";
+import type { CancelablePromise as CPromise } from "cancelable-promise";
 import _ from "lodash";
 import open from "open";
-import path from "path";
 import vscode from "vscode";
 
-import { Ctx } from "./ctx";
+import type { Ctx } from "./ctx";
 import { log } from "./logging";
 import { isStatusBarState } from "./statusbar";
 
@@ -37,7 +37,7 @@ let CTX: Ctx | undefined;
 function getCurrentToolchain(): RustcToolchain {
   return {
     version: VERSION,
-    ...TOOLCHAIN,
+    ...TOOLCHAIN
   };
 }
 
@@ -77,7 +77,7 @@ const findWorkspaceRoot = async (): Promise<string | null> => {
   const prefixHasToml = await Promise.all(
     _.range(components.length).map(idx => ({
       idx,
-      has: hasCargoToml(folderSubdirTil(idx)),
+      has: hasCargoToml(folderSubdirTil(idx))
     }))
   );
   const entry = prefixHasToml.find(({ has }) => has);
@@ -97,7 +97,7 @@ const execNotify = (
     args,
     {
       title,
-      ...opts,
+      ...opts
     },
     (...args) => log("Argus output", ...args),
     state =>
@@ -111,14 +111,14 @@ const checkVersionAndInstall = async (
   cargo: string,
   cargoArgs: string[]
 ): Promise<boolean> => {
-  let version;
+  let version: string;
   try {
     version = await execNotify(
       cargo,
       [...cargoArgs, "argus", "-V"],
       "Waiting for Argus...",
       {
-        cwd: workspaceRoot,
+        cwd: workspaceRoot
       }
     );
   } catch (e) {
@@ -129,7 +129,7 @@ const checkVersionAndInstall = async (
     log(
       `Argus binary version ${version} does not match expected IDE version ${VERSION}`
     );
-    const components = config.components.map(c => ["-c", c]).flat();
+    const components = config.components.flatMap(c => ["-c", c]);
     try {
       vscode.window.showInformationMessage(
         "Installing nightly Rust (this may take a minute)"
@@ -142,7 +142,7 @@ const checkVersionAndInstall = async (
           config.channel,
           "--profile",
           "minimal",
-          ...components,
+          ...components
         ],
         "Installing nightly Rust..."
       );
@@ -177,7 +177,7 @@ const checkVersionAndInstall = async (
         "argus-cli",
         "--version",
         config.version,
-        "--force",
+        "--force"
       ],
       "Installing Argus from source... (this may take a minute)"
     );
@@ -221,12 +221,12 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
 
   const argusOpts = await getCargoOpts(config, workspaceRoot, {
     RUST_LOG: "info",
-    RUST_BACKTRACE: "1",
+    RUST_BACKTRACE: "1"
   });
 
   return <T extends ArgusCliOptions>(
     args: ArgusArgs<T>,
-    noOutput: boolean = false,
+    noOutput = false,
     ignoreExitCode = false
   ): CPromise<ArgusResult<T>> => {
     log("Calling backend with args", args);
@@ -239,7 +239,7 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
       "Waiting for Argus...",
       {
         ...argusOpts,
-        ignoreExitCode,
+        ignoreExitCode
       }
     )
       .then(output => {
@@ -248,7 +248,7 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
           context.statusBar.setState("idle", "Argus is ready");
           return {
             type: "output",
-            value: undefined as any,
+            value: undefined as any
           } as ArgusResult<T>;
         }
 
@@ -263,7 +263,7 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
         context.statusBar.setState("idle", "Argus is ready");
         return {
           type: "output",
-          value: outputTyped.Ok,
+          value: outputTyped.Ok
         } as ArgusResult<T>;
       })
       .catch(e => {
@@ -271,7 +271,7 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
         log("Argus failed with error", e.toString());
         return {
           type: "build-error",
-          error: e.toString(),
+          error: e.toString()
         } as ArgusResult<T>;
       });
   };

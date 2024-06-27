@@ -1,9 +1,9 @@
-import {
+import type {
   ClauseBound,
   ClauseWithBounds,
   GroupedClauses,
   ImplHeader,
-  Ty,
+  Ty
 } from "@argus/common/bindings";
 import { anyElems } from "@argus/common/func";
 import _ from "lodash";
@@ -67,7 +67,7 @@ export const PrintGroupedClauses = ({ o }: { o: GroupedClauses }) => {
 
 export const PrintWhereClause = ({
   predicates,
-  tysWOBound,
+  tysWOBound
 }: {
   predicates: GroupedClauses;
   tysWOBound: Ty[];
@@ -121,9 +121,9 @@ const PrintClauseBound = ({ o }: { o: ClauseBound }) => {
         <PrintDefPath o={path} />
       </>
     );
-  } else if ("Region" in o) {
-    return <PrintRegion o={o.Region} />;
-  } else {
-    throw new Error("Unknown clause bound", o);
   }
+  if ("Region" in o) {
+    return <PrintRegion o={o.Region} />;
+  }
+  throw new Error("Unknown clause bound", o);
 };

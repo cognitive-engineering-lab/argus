@@ -1,13 +1,13 @@
 import _ from "lodash";
 
-import {
+import type {
   BodyHash,
   Expr,
   ExprIdx,
   Obligation,
   ObligationHash,
   ObligationIdx,
-  ObligationsInBody,
+  ObligationsInBody
 } from "./bindings";
 import { isHiddenObl } from "./func";
 

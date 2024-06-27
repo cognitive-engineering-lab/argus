@@ -1,7 +1,7 @@
-import { CancelablePromise as CPromise } from "cancelable-promise";
+import type { CancelablePromise as CPromise } from "cancelable-promise";
 import newGithubIssueUrl from "new-github-issue-url";
 
-import {
+import type {
   BodyBundle,
   BodyHash,
   CharRange,
@@ -9,7 +9,7 @@ import {
   Obligation,
   ObligationHash,
   ObligationsInBody,
-  SerializedTree,
+  SerializedTree
 } from "./bindings";
 
 export interface ErrorJumpTargetInfo {
@@ -21,7 +21,7 @@ export interface ErrorJumpTargetInfo {
 
 export const ConfigConsts = {
   PANOPTES_NAME: "panoptes",
-  EMBED_NAME: "argus-embed",
+  EMBED_NAME: "argus-embed"
 };
 
 // ----------------------------------------------------
@@ -79,8 +79,8 @@ export type CommonData = {
 export type SystemReturn<T extends PanoptesToSystemCmds> = T extends "tree"
   ? { tree?: SerializedTree }
   : T extends "obligations"
-  ? { obligations: ObligationsInBody[] }
-  : {};
+    ? { obligations: ObligationsInBody[] }
+    : {};
 
 export interface OpenErrorPayload {
   command: "open-error";
@@ -111,14 +111,14 @@ export type SystemToPanoptesMsg<T extends SystemToPanoptesCmds> = {
       (T extends "open-file"
         ? { data: ObligationsInBody[]; signature: string }
         : T extends "open-error"
-        ? {
-            bodyIdx: BodyHash;
-            exprIdx: ExprIdx;
-            hash: ObligationHash;
-          }
-        : T extends "tree"
-        ? { tree?: SerializedTree }
-        : never));
+          ? {
+              bodyIdx: BodyHash;
+              exprIdx: ExprIdx;
+              hash: ObligationHash;
+            }
+          : T extends "tree"
+            ? { tree?: SerializedTree }
+            : never));
 
 export type PanoptesToSystemCmds =
   | "obligations"
@@ -131,10 +131,10 @@ export type PanoptesToSystemMsg<T extends PanoptesToSystemCmds> = CommonData & {
 } & (T extends "obligations"
     ? {}
     : T extends "tree"
-    ? { predicate: Obligation; range: CharRange }
-    : T extends "add-highlight" | "remove-highlight"
-    ? { range: CharRange }
-    : never);
+      ? { predicate: Obligation; range: CharRange }
+      : T extends "add-highlight" | "remove-highlight"
+        ? { range: CharRange }
+        : never);
 
 // ------------------------------------------------------
 // Interface between the system and rustc plugin
@@ -144,18 +144,18 @@ export type ArgusCliOptions = "preload" | "tree" | "obligations";
 export type ArgusArgs<T extends ArgusCliOptions> = T extends "preload"
   ? ["preload"]
   : T extends "obligations"
-  ? ["obligations", Filename]
-  : T extends "tree"
-  ? ["tree", Filename, string, number, number, number, number]
-  : never;
+    ? ["obligations", Filename]
+    : T extends "tree"
+      ? ["tree", Filename, string, number, number, number, number]
+      : never;
 
 export type ArgusReturn<T extends ArgusCliOptions> = T extends "preload"
-  ? void
+  ? undefined
   : T extends "tree"
-  ? Array<SerializedTree | undefined>
-  : T extends "obligations"
-  ? ObligationsInBody[]
-  : never;
+    ? Array<SerializedTree | undefined>
+    : T extends "obligations"
+      ? ObligationsInBody[]
+      : never;
 
 // serde-compatible type
 export type Result<T> = { Ok: T } | { Err: ArgusError };
@@ -255,7 +255,7 @@ export function getArgusIssueUrl(err: string, opts: IssueOptions) {
 ${bts}
 ${err}
 ${bts}
-${opts.logText}`,
+${opts.logText}`
   });
 
   return url;

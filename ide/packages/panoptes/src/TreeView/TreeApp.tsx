@@ -1,10 +1,10 @@
 import TreeInfo from "@argus/common/TreeInfo";
-import { SerializedTree } from "@argus/common/bindings";
+import type { SerializedTree } from "@argus/common/bindings";
 import { AppContext, TreeAppContext } from "@argus/common/context";
 import {
   VSCodePanelTab,
   VSCodePanelView,
-  VSCodePanels,
+  VSCodePanels
 } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import React, { useContext } from "react";
@@ -17,7 +17,7 @@ import TreeCycle from "./TreeCycle";
 
 const TreeApp = ({
   tree,
-  showHidden = false,
+  showHidden = false
 }: {
   tree: SerializedTree | undefined;
   showHidden?: boolean;

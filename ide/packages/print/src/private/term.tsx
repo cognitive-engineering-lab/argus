@@ -1,4 +1,4 @@
-import {
+import type {
   AdtAggregateKind,
   BinOp,
   Const,
@@ -6,7 +6,7 @@ import {
   LeafKind,
   Term,
   UnOp,
-  ValTree,
+  ValTree
 } from "@argus/common/bindings";
 import _ from "lodash";
 import React from "react";
@@ -19,18 +19,18 @@ import {
   CommaSeparated,
   DBraced,
   Parenthesized,
-  SqBraced,
+  SqBraced
 } from "./syntax";
 import { PrintSymbol, PrintTy } from "./ty";
 
 export const PrintTerm = ({ o }: { o: Term }) => {
   if ("Ty" in o) {
     return <PrintTy o={o.Ty} />;
-  } else if ("Const" in o) {
-    return <PrintConst o={o.Const} />;
-  } else {
-    throw new Error("Unknown term", o);
   }
+  if ("Const" in o) {
+    return <PrintConst o={o.Const} />;
+  }
+  throw new Error("Unknown term", o);
 };
 
 export const PrintExpr = ({ o }: { o: ExprDef }) => {
@@ -51,7 +51,8 @@ export const PrintExpr = ({ o }: { o: ExprDef }) => {
         <PrintConst o={rhs} />
       </>
     );
-  } else if ("UnOp" in o) {
+  }
+  if ("UnOp" in o) {
     const [op, expr] = o.UnOp;
     return (
       <>
@@ -59,7 +60,8 @@ export const PrintExpr = ({ o }: { o: ExprDef }) => {
         <PrintConst o={expr} />
       </>
     );
-  } else if ("FunctionCall" in o) {
+  }
+  if ("FunctionCall" in o) {
     const [callable, args] = o.FunctionCall;
     const argEs = _.map(args, arg => () => <PrintConst o={arg} />);
     return (
@@ -68,7 +70,8 @@ export const PrintExpr = ({ o }: { o: ExprDef }) => {
         <CommaSeparated components={argEs} />)
       </>
     );
-  } else if ("Cast" in o) {
+  }
+  if ("Cast" in o) {
     // TODO: handle cast kind "use"
     const [_castKind, expr, ty] = o.Cast;
     return (
@@ -84,61 +87,81 @@ export const PrintExpr = ({ o }: { o: ExprDef }) => {
 const PrintBinOp = ({ o }: { o: Exclude<BinOp, "Cmp"> }) => {
   if (o === "Add") {
     return "+";
-  } else if (o === "AddUnchecked") {
-    return "+";
-  } else if (o === "Sub") {
-    return "-";
-  } else if (o === "SubUnchecked") {
-    return "-";
-  } else if (o === "Mul") {
-    return "*";
-  } else if (o === "MulUnchecked") {
-    return "*";
-  } else if (o === "Div") {
-    return "/";
-  } else if (o === "Rem") {
-    return "%";
-  } else if (o === "BitXor") {
-    return "^";
-  } else if (o === "BitAnd") {
-    return "&";
-  } else if (o === "BitOr") {
-    return "|";
-  } else if (o === "Shl") {
-    return "<<";
-  } else if (o === "ShlUnchecked") {
-    return "<<";
-  } else if (o === "Shr") {
-    return ">>";
-  } else if (o === "ShrUnchecked") {
-    return ">>";
-  } else if (o === "Eq") {
-    return "==";
-  } else if (o === "Lt") {
-    return "<";
-  } else if (o === "Le") {
-    return "<=";
-  } else if (o === "Ne") {
-    return "!=";
-  } else if (o === "Ge") {
-    return ">=";
-  } else if (o === "Gt") {
-    return ">";
-  } else if (o === "Offset") {
-    return ".";
-  } else {
-    throw new Error("Unknown binop", o);
   }
+  if (o === "AddUnchecked") {
+    return "+";
+  }
+  if (o === "Sub") {
+    return "-";
+  }
+  if (o === "SubUnchecked") {
+    return "-";
+  }
+  if (o === "Mul") {
+    return "*";
+  }
+  if (o === "MulUnchecked") {
+    return "*";
+  }
+  if (o === "Div") {
+    return "/";
+  }
+  if (o === "Rem") {
+    return "%";
+  }
+  if (o === "BitXor") {
+    return "^";
+  }
+  if (o === "BitAnd") {
+    return "&";
+  }
+  if (o === "BitOr") {
+    return "|";
+  }
+  if (o === "Shl") {
+    return "<<";
+  }
+  if (o === "ShlUnchecked") {
+    return "<<";
+  }
+  if (o === "Shr") {
+    return ">>";
+  }
+  if (o === "ShrUnchecked") {
+    return ">>";
+  }
+  if (o === "Eq") {
+    return "==";
+  }
+  if (o === "Lt") {
+    return "<";
+  }
+  if (o === "Le") {
+    return "<=";
+  }
+  if (o === "Ne") {
+    return "!=";
+  }
+  if (o === "Ge") {
+    return ">=";
+  }
+  if (o === "Gt") {
+    return ">";
+  }
+  if (o === "Offset") {
+    return ".";
+  }
+  throw new Error("Unknown binop", o);
 };
 
 const PrintUnOp = ({ o }: { o: UnOp }) => {
   if (o === "Not") {
     return "!";
-  } else if (o === "Neg") {
-    return "-";
-  } else {
-    throw new Error("Unknown unop", o);
   }
+  if (o === "Neg") {
+    return "-";
+  }
+  throw new Error("Unknown unop", o);
 };
 
 export const PrintValueTree = ({ o }: { o: ValTree }) => {
@@ -216,7 +239,7 @@ const PrintAggregateAdtNoVariants = ({ o: _ }: { o: unknown }) => {
 const PrintAggregateAdt = ({
   fields,
   valuePath,
-  kind,
+  kind
 }: {
   fields: Const[];
   valuePath: any;
@@ -243,12 +266,11 @@ const PrintAggregateAdt = ({
       const components = _.map(
         _.zip(kind.names, fields),
         ([name, field]) =>
-          () =>
-            (
-              <>
-                <PrintSymbol o={name!} />: <PrintConst o={field!} />
-              </>
-            )
+          () => (
+            <>
+              <PrintSymbol o={name!} />: <PrintConst o={field!} />
+            </>
+          )
       );
 
       return (

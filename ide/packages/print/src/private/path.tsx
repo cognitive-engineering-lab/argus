@@ -1,4 +1,4 @@
-import { DefinedPath, PathSegment } from "@argus/common/bindings";
+import type { DefinedPath, PathSegment } from "@argus/common/bindings";
 import { takeRightUntil } from "@argus/common/func";
 import _ from "lodash";
 import React, { createContext, useContext } from "react";
@@ -57,7 +57,7 @@ export const PrintDefPath = ({ o }: { o: DefinedPath }) => {
 
   const PrintAsGenericPath = ({
     Prefix,
-    Rest,
+    Rest
   }: {
     Prefix: React.FC;
     Rest: React.FC;
@@ -75,7 +75,7 @@ export const PrintDefPath = ({ o }: { o: DefinedPath }) => {
   };
 
   const PrintAsAssociatedType = ({
-    o,
+    o
   }: {
     o: [PathSegment & { type: "GenericDelimiters" }, ...DefinedPath];
   }) => {
@@ -133,7 +133,7 @@ export const PrintPathSegment = ({ o }: { o: PathSegment }) => {
     }
     case "DefPathDataName": {
       const suffix =
-        o.disambiguator !== undefined && o.disambiguator != 0
+        o.disambiguator !== undefined && o.disambiguator !== 0
           ? `#${o.disambiguator}`
           : null;
       return (

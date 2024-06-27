@@ -1,5 +1,4 @@
-import { ErrorJumpTargetInfo } from "@argus/common/lib";
-import _ from "lodash";
+import type { ErrorJumpTargetInfo } from "@argus/common/lib";
 import { action, makeObservable, observable } from "mobx";
 
 class HighlightTarget {
@@ -9,7 +8,7 @@ class HighlightTarget {
     makeObservable(this, {
       value: observable,
       reset: action,
-      set: action,
+      set: action
     });
     this.value = undefined;
   }

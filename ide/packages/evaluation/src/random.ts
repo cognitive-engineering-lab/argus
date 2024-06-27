@@ -1,17 +1,16 @@
-import { BodyBundle } from "@argus/common/bindings";
-import { execNotify as _execNotify } from "@argus/system";
+import path from "node:path";
+import type { BodyBundle } from "@argus/common/bindings";
 import _ from "lodash";
-import path from "path";
 import { chromium } from "playwright";
 
-import { RootCause } from "./rootCauses";
+import type { RootCause } from "./rootCauses";
 import {
   argusData,
   expandBottomUpView,
   forFileInBundle,
   openPage,
   sleep,
-  testCases,
+  testCases
 } from "./utils";
 
 async function createInnerRun(N: number) {
@@ -74,7 +73,7 @@ async function createInnerRun(N: number) {
         workspace,
         filename,
         cause: cause.message,
-        ranks: noUndef,
+        ranks: noUndef
       });
     }
 

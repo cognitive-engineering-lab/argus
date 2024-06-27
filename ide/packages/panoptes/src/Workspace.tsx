@@ -1,9 +1,9 @@
-import { FileInfo } from "@argus/common/lib";
+import type { FileInfo } from "@argus/common/lib";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
 import {
   VSCodePanelTab,
   VSCodePanelView,
-  VSCodePanels,
+  VSCodePanels
 } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import React, { useState } from "react";
@@ -24,13 +24,15 @@ const FatalErrorPanel = ({ error, resetErrorBoundary }: any) => (
     Whoops! This is not a drill, a fatal error occurred. Please{" "}
     <ReportBugUrl displayText="click here" error={error.message} />
     to report this error to the Argus team.
-    <button onClick={resetErrorBoundary}>Reset Argus</button>
+    <button type="button" onClick={resetErrorBoundary}>
+      Reset Argus
+    </button>
   </div>
 );
 
 const Workspace = ({
   files,
-  reset,
+  reset
 }: {
   files: FileInfo[];
   reset: () => void;

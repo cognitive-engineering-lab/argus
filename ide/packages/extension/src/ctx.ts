@@ -1,17 +1,17 @@
-import {
+import type {
   BodyHash,
   CharRange,
   ExprIdx,
   Obligation,
   ObligationHash,
   ObligationsInBody,
-  SerializedTree,
+  SerializedTree
 } from "@argus/common/bindings";
-import {
+import type {
   CallArgus,
   ErrorJumpTargetInfo,
   FileInfo,
-  Filename,
+  Filename
 } from "@argus/common/lib";
 import { CancelablePromise as CPromise } from "cancelable-promise";
 import _ from "lodash";
@@ -23,12 +23,12 @@ import { log } from "./logging";
 import { setup } from "./setup";
 import { StatusBar } from "./statusbar";
 import {
-  RustEditor,
+  type RustEditor,
   isDocumentInWorkspace,
   isRustDocument,
   isRustEditor,
   makeid,
-  rustRangeToVscodeRange,
+  rustRangeToVscodeRange
 } from "./utils";
 import { View } from "./view";
 
@@ -53,7 +53,7 @@ export function fetchWorkspace(): Workspace {
       ? { kind: "empty" }
       : {
           kind: "detached-files",
-          files: rustDocuments,
+          files: rustDocuments
         }
     : { kind: "workspace-folder" };
 }
@@ -106,7 +106,7 @@ export class Ctx {
           showErrorDialog("Argus backend left uninitialized.");
           return {
             type: "analysis-error",
-            error: "Argus uninitialized.",
+            error: "Argus uninitialized."
           };
         })
     );
@@ -160,12 +160,9 @@ export class Ctx {
 
     log("Argus backend preloaded");
 
-    let openingEditor = new Promise<void[]>(() => []);
     // Preload information for visible editors.
     if (this.activeRustEditor) {
-      openingEditor = Promise.all(
-        _.map(this.visibleEditors, e => this.openEditor(e))
-      );
+      this.visibleEditors.forEach(e => this.openEditor(e));
     }
 
     log("Caching open editor information");
@@ -179,7 +176,7 @@ export class Ctx {
     this.extCtx.subscriptions.push(this.diagnosticCollection);
     this.disposables.push(
       vscode.languages.registerHoverProvider("rust", {
-        provideHover: async (doc, pos, tok) => this.provideHover(doc, pos, tok),
+        provideHover: async (doc, pos, tok) => this.provideHover(doc, pos, tok)
       })
     );
 
@@ -329,7 +326,7 @@ export class Ctx {
         eidx: e.idx,
         hashes: e.hashes,
         range: e.range,
-        type: "trait",
+        type: "trait"
       }))
     );
     const ambiRecs: Rec[] = _.flatMap(info, ob => {
@@ -339,7 +336,7 @@ export class Ctx {
         eidx: e.idx,
         hashes: [ob.obligations[ob.exprs[e.idx].obligations[0]].hash],
         range: e.range,
-        type: "ambig",
+        type: "ambig"
       }));
     });
     const recs = _.concat(traitRecs, ambiRecs);
@@ -361,7 +358,7 @@ export class Ctx {
     });
 
     return {
-      contents: _.compact(messages),
+      contents: _.compact(messages)
     };
   }
 
@@ -394,7 +391,7 @@ export class Ctx {
 
     this.diagnosticCollection.set(editor.document.uri, [
       ...traitDiags,
-      ...ambigDiags,
+      ...ambigDiags
     ]);
   }
 
@@ -416,7 +413,7 @@ export class Ctx {
     const msg = diagnosticMessage(type);
     const mdStr = new vscode.MarkdownString();
     mdStr.isTrusted = true;
-    mdStr.appendText(msg + "\n");
+    mdStr.appendText(`${msg}\n`);
     _.forEach(highlightUris, uri =>
       mdStr.appendMarkdown(`- [Open failure in Argus](${uri})\n`)
     );
@@ -486,7 +483,10 @@ class BackendCache {
   private treeCache: Record<Filename, TreeRecord>;
   private backend: CallArgus;
 
-  constructor(readonly statusBar: StatusBar, backend: CallArgus) {
+  constructor(
+    readonly statusBar: StatusBar,
+    backend: CallArgus
+  ) {
     this.obligationCache = {};
     this.treeCache = {};
     this.backend = backend;
@@ -535,7 +535,7 @@ class BackendCache {
       range.start.line,
       range.start.column,
       range.end.line,
-      range.end.column,
+      range.end.column
     ]).then(res => {
       if (res.type !== "output") {
         this.statusBar.setState("error");

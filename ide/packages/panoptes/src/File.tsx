@@ -1,11 +1,11 @@
 import BodyInfo from "@argus/common/BodyInfo";
-import { ObligationsInBody } from "@argus/common/bindings";
+import type { ObligationsInBody } from "@argus/common/bindings";
 import {
   AppContext,
   BodyInfoContext,
-  FileContext,
+  FileContext
 } from "@argus/common/context";
-import { Filename } from "@argus/common/lib";
+import type { Filename } from "@argus/common/lib";
 import ErrorDiv from "@argus/print/ErrorDiv";
 import MonoSpace from "@argus/print/MonoSpace";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
@@ -67,7 +67,7 @@ const ObligationBody = observer(({ bodyInfo }: { bodyInfo: BodyInfo }) => {
 
 const File = ({
   file,
-  osibs,
+  osibs
 }: {
   file: Filename;
   osibs: ObligationsInBody[];

@@ -1,31 +1,30 @@
-import {
+import os from "node:os";
+import type {
   CharRange,
   Obligation,
-  ObligationsInBody,
+  ObligationsInBody
 } from "@argus/common/bindings";
 import {
   ConfigConsts,
-  ErrorJumpTargetInfo,
-  FileInfo,
-  Filename,
-  PanoptesConfig,
-  PanoptesToSystemCmds,
-  PanoptesToSystemMsg,
-  SystemToPanoptesCmds,
-  SystemToPanoptesMsg,
+  type ErrorJumpTargetInfo,
+  type FileInfo,
+  type Filename,
+  type PanoptesConfig,
+  type PanoptesToSystemCmds,
+  type PanoptesToSystemMsg,
+  type SystemToPanoptesCmds,
+  type SystemToPanoptesMsg,
   configToString,
   isPanoMsgAddHighlight,
   isPanoMsgRemoveHighlight,
-  isPanoMsgTree,
+  isPanoMsgTree
 } from "@argus/common/lib";
-import { MessageHandlerData } from "@estruyf/vscode";
-import _ from "lodash";
-import os from "os";
+import type { MessageHandlerData } from "@estruyf/vscode";
 import vscode from "vscode";
 
-import { Ctx } from "./ctx";
+import type { Ctx } from "./ctx";
 import { log } from "./logging";
-import { RustEditor } from "./utils";
+import type { RustEditor } from "./utils";
 
 // Wraps around the MessageHandler data types from @estruyf/vscode.
 type BlessedMessage<T extends PanoptesToSystemCmds> = {
@@ -61,7 +60,7 @@ export class View {
       enableScripts: true,
       retainContextWhenHidden: true,
       enableFindWidget: true,
-      localResourceRoots: [this.ctx.extCtx.extensionUri],
+      localResourceRoots: [this.ctx.extCtx.extensionUri]
     });
 
     // Set the webview's initial html content
@@ -105,7 +104,7 @@ export class View {
   public async havoc() {
     messageWebview(this.panel.webview, "havoc", {
       type: "FROM_EXTENSION",
-      command: "havoc",
+      command: "havoc"
     });
   }
 
@@ -113,7 +112,7 @@ export class View {
     file,
     bodyIdx,
     exprIdx,
-    hash,
+    hash
   }: ErrorJumpTargetInfo) {
     messageWebview(this.panel.webview, "open-error", {
       type: "FROM_EXTENSION",
@@ -121,7 +120,7 @@ export class View {
       file,
       bodyIdx,
       exprIdx,
-      hash,
+      hash
     });
   }
 
@@ -135,7 +134,7 @@ export class View {
       command: "open-file",
       file: editor.document.fileName,
       signature,
-      data,
+      data
     });
   }
 
@@ -167,7 +166,7 @@ export class View {
         type: "FROM_EXTENSION",
         file,
         command: "tree",
-        tree,
+        tree
       });
     }
   }
@@ -180,7 +179,7 @@ function messageWebview<T extends SystemToPanoptesCmds>(
 ) {
   webview.postMessage({
     requestId: requestId,
-    payload: msg,
+    payload: msg
   } as MessageHandlerData<SystemToPanoptesMsg<T>>);
 }
 
@@ -217,8 +216,8 @@ function getHtmlForWebview(
     spec: {
       osPlatform: os.platform(),
       osRelease: os.release(),
-      vscodeVersion: vscode.version,
-    },
+      vscodeVersion: vscode.version
+    }
   };
   const configStr = configToString(config);
 

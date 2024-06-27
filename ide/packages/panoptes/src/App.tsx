@@ -1,17 +1,17 @@
 import {
   createClosedMessageSystem,
-  vscodeMessageSystem,
+  vscodeMessageSystem
 } from "@argus/common/communication";
 import { AppContext } from "@argus/common/context";
 import {
-  ErrorJumpTargetInfo,
-  EvaluationMode,
-  FileInfo,
-  PanoptesConfig,
-  SystemSpec,
+  type ErrorJumpTargetInfo,
+  type EvaluationMode,
+  type FileInfo,
+  type PanoptesConfig,
+  type SystemSpec,
   isSysMsgHavoc,
   isSysMsgOpenError,
-  isSysMsgOpenFile,
+  isSysMsgOpenFile
 } from "@argus/common/lib";
 import { VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
@@ -31,7 +31,7 @@ function blingObserver(info: ErrorJumpTargetInfo) {
 const webSysSpec: SystemSpec = {
   osPlatform: "web-bundle",
   osRelease: "web-bundle",
-  vscodeVersion: "unknown",
+  vscodeVersion: "unknown"
 };
 
 /**
@@ -55,7 +55,7 @@ function listener(
   setOpenFiles: React.Dispatch<React.SetStateAction<FileInfo[]>>
 ) {
   const {
-    payload,
+    payload
   }: {
     payload: any;
   } = e.data;
@@ -69,7 +69,7 @@ function listener(
       const newEntry = {
         fn: payload.file,
         signature: payload.signature,
-        data: payload.data,
+        data: payload.data
       };
       const fileExists = _.find(currFiles, ({ fn }) => fn === payload.file);
       return fileExists ? currFiles : [...currFiles, newEntry];

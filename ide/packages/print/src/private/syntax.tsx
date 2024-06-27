@@ -69,7 +69,7 @@ export const SqBraced = ({ children }: React.PropsWithChildren) => {
 
 const Interspersed = ({
   components,
-  sep,
+  sep
 }: {
   components: React.FC[];
   sep: string;

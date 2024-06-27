@@ -10,13 +10,13 @@ declare global {
 
 window.initializeArgusBlocks = (root: HTMLElement) => {
   root
-    .querySelectorAll<HTMLDivElement>("." + ConfigConsts.EMBED_NAME)
+    .querySelectorAll<HTMLDivElement>(`.${ConfigConsts.EMBED_NAME}`)
     .forEach(elem => {
       elem.classList.remove(ConfigConsts.EMBED_NAME);
       elem.classList.add(ConfigConsts.PANOPTES_NAME);
 
       const panoConfig = maybeStringToConfig(elem.dataset.config);
-      if (!panoConfig) throw new Error(`missing data-config`);
+      if (!panoConfig) throw new Error("missing data-config");
 
       const root = ReactDOM.createRoot(elem);
       root.render(<App config={panoConfig} />);

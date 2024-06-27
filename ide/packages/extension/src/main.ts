@@ -1,7 +1,7 @@
-import vscode from "vscode";
+import type vscode from "vscode";
 
 import * as commands from "./commands";
-import { CommandFactory, Ctx, fetchWorkspace } from "./ctx";
+import { type CommandFactory, Ctx, fetchWorkspace } from "./ctx";
 import { showErrorDialog } from "./errors";
 import { log } from "./logging";
 
@@ -28,7 +28,7 @@ export async function activate(context: vscode.ExtensionContext) {
   log("Argus activated successfully");
   context.subscriptions.push(ctx);
   globals = {
-    ctx,
+    ctx
   };
 }
 
@@ -46,6 +46,6 @@ function createCommands(): Record<string, CommandFactory> {
 
     // Private commands used internally, these should not appear in the command palette.
     openError: { enabled: commands.openError },
-    lastError: { enabled: commands.lastError },
+    lastError: { enabled: commands.lastError }
   };
 }

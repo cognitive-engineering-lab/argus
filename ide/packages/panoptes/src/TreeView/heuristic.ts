@@ -1,5 +1,5 @@
-import TreeInfo from "@argus/common/TreeInfo";
-import { ProofNodeIdx } from "@argus/common/bindings";
+import type TreeInfo from "@argus/common/TreeInfo";
+import type { ProofNodeIdx } from "@argus/common/bindings";
 import { isTraitClause, mean, stdDev } from "@argus/common/func";
 import _ from "lodash";
 
@@ -24,9 +24,10 @@ type Strategy = {
 
 type PartitionTup<T> = [T[], T[]];
 function takeN(n: number) {
-  return function <T>(groups: T[]): PartitionTup<T> {
-    return [_.slice(groups, 0, n), _.slice(groups, n)];
-  };
+  return <T>(groups: T[]): PartitionTup<T> => [
+    _.slice(groups, 0, n),
+    _.slice(groups, n)
+  ];
 }
 
 function takeAll<T>(groups: T[]) {
@@ -46,9 +47,8 @@ class Heuristic implements HeuristicI {
           if ("Goal" in node) {
             const goal = this.tree.goal(node.Goal);
             return goal.isMainTv ? 1 : 0;
-          } else {
-            return 0;
           }
+          return 0;
         })(),
       0
     );
@@ -110,12 +110,12 @@ class Heuristic implements HeuristicI {
       {
         size: this.numOutliers(failedValues, g => this.maxDepth(g)),
         sorter: this.sortByDepth(),
-        partitioner: takeN,
+        partitioner: takeN
       },
       {
         size: this.numOutliers(failedValues, g => this.numPrincipled(g)),
         sorter: this.sortByNPT(),
-        partitioner: takeN,
+        partitioner: takeN
       },
       {
         size: this.numOutliers(
@@ -123,8 +123,8 @@ class Heuristic implements HeuristicI {
           group => group.length / this.numPrincipled(group)
         ),
         sorter: this.sortByNPTRatio(),
-        partitioner: takeN,
-      },
+        partitioner: takeN
+      }
     ];
 
     const sortedAndPartitioned = _.map(strategies, s =>
@@ -136,14 +136,14 @@ class Heuristic implements HeuristicI {
       sortedAndPartitioned,
       ([accImp, accRest], [imp, rest]) => [
         _.concat(accImp, _.flatten(imp)),
-        _.concat(accRest, _.flatten(rest)),
+        _.concat(accRest, _.flatten(rest))
       ],
       [[], []] as PartitionTup<ProofNodeIdx>
     );
 
     const [importantGroups, restWithDups] = [
       _.uniq(importantGroupsNonUnq),
-      _.uniq(restNonUnq),
+      _.uniq(restNonUnq)
     ];
 
     // Remove recommended nodes from the hidden nodes, this can happen if
@@ -183,10 +183,9 @@ class Heuristic implements HeuristicI {
         return (
           !goal.isMainTv && (result === "no" || result === "maybe-overflow")
         );
-      } else {
-        // Leaves should only be goals...
-        throw new Error(`Leaves should only be goals ${node}`);
       }
+      // Leaves should only be goals...
+      throw new Error(`Leaves should only be goals ${node}`);
     });
   }
 
@@ -194,7 +193,7 @@ class Heuristic implements HeuristicI {
     const defaultStrategy = {
       size: failedGroups.length,
       sorter: this.sortByDepth(),
-      partitioner: (_: any) => takeAll,
+      partitioner: (_: any) => takeAll
     };
     const [important, hiddenLeaves] = this.applyStrategy(
       failedGroups,
@@ -205,7 +204,7 @@ class Heuristic implements HeuristicI {
     );
     return [
       argusRecommendedLeaves,
-      _.concat(_.flatten(hiddenLeaves), others),
+      _.concat(_.flatten(hiddenLeaves), others)
     ] as PartitionTup<ProofNodeIdx>;
   }
 
@@ -254,7 +253,7 @@ class Heuristic implements HeuristicI {
     const recommendedOrder = _.sortBy(data, [
       sortErrorsFirst,
       bubbleTraitClauses,
-      sortWeightPaths,
+      sortWeightPaths
     ]);
 
     return recommendedOrder;

@@ -1,8 +1,8 @@
-import {
+import type {
   CandidateIdx,
   EvaluationResult,
   Node as NodeTy,
-  ResultIdx,
+  ResultIdx
 } from "@argus/common/bindings";
 import { TreeAppContext } from "@argus/common/context";
 import { HoverInfo } from "@argus/print/HoverInfo";
@@ -11,7 +11,7 @@ import {
   IcoCheck,
   IcoError,
   IcoEyeClosed,
-  IcoLoop,
+  IcoLoop
 } from "@argus/print/Icons";
 import { PrintGoal, PrintImplHeader } from "@argus/print/lib";
 import React, { useContext } from "react";

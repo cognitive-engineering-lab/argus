@@ -1,9 +1,9 @@
-import {
+import type {
   Const,
   ConstScalarInt,
   InferConst,
   ParamConst,
-  UnevaluatedConst,
+  UnevaluatedConst
 } from "@argus/common/bindings";
 import React from "react";
 
@@ -39,9 +39,8 @@ export const PrintConst = ({ o }: { o: Const }) => {
 const PrintInferConst = ({ o }: { o: InferConst }) => {
   if (o === "Anon") {
     return <Placeholder>_</Placeholder>;
-  } else {
-    throw new Error("Unknown infer const kind", o);
   }
+  throw new Error("Unknown infer const kind", o);
 };
 
 const PrintParamConst = ({ o }: { o: ParamConst }) => {
