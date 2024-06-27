@@ -7,6 +7,7 @@ import {
 } from "@argus/common/context";
 import { Filename } from "@argus/common/lib";
 import ErrorDiv from "@argus/print/ErrorDiv";
+import MonoSpace from "@argus/print/MonoSpace";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
 import { PrintBodyName } from "@argus/print/lib";
 import { VSCodeDivider } from "@vscode/webview-ui-toolkit/react";
@@ -40,9 +41,11 @@ const ObligationBody = observer(({ bodyInfo }: { bodyInfo: BodyInfo }) => {
 
   const header = (
     <>
-      <FnIndicator />
-      {"\u00A0"}
-      {bodyName}
+      <MonoSpace>
+        <FnIndicator />
+        {"\u00A0"}
+        {bodyName}
+      </MonoSpace>
       {errCount}
     </>
   );

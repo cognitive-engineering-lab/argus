@@ -5,6 +5,10 @@ import React, { useContext } from "react";
 
 import { BottomUpImpersonator, invertViewWithRoots } from "./BottomUp";
 
+export function sortedSubsets(sets: SetHeuristic[]) {
+  return _.sortBy(sets, sets => sets.momentum / sets.velocity);
+}
+
 // FIXME: we need to present the sets together in a conjunct, instead of the flat list.
 // The flat list is currently the best way to get evaluation metrics.
 const FailedSubsets = () => {
@@ -22,7 +26,7 @@ const FailedSubsets = () => {
       )
     );
 
-  const sets = _.sortBy(tree.failedSets, s => s.momentum / s.velocity);
+  const sets = sortedSubsets(tree.failedSets);
   const suggestedPredicates = flattenSets(_.slice(sets, 0, 3));
   const others = flattenSets(_.slice(sets, 3));
 

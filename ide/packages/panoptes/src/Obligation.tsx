@@ -21,7 +21,7 @@ import React, {
   useState,
 } from "react";
 
-import "./File.css";
+import "./Obligation.css";
 import { CollapsibleElement } from "./TreeView/Directory";
 import { ResultRaw } from "./TreeView/Node";
 import TreeApp from "./TreeView/TreeApp";

@@ -9,7 +9,7 @@ import {
 import _ from "lodash";
 import React, { useContext } from "react";
 
-import BottomUp from "./BottomUp";
+import Erotisi from "./Erotisi";
 import FailedSubsets from "./Subsets";
 import TopDown from "./TopDown";
 import "./TreeApp.css";
@@ -46,11 +46,8 @@ const TreeApp = ({
 
   const tabs: [string, React.FC][] = [["Top Down", TopDown]];
 
-  // if (treeInfo.errorLeaves().length > 0) {
-  //   tabs.unshift(["Bottom Up", BottomUp]);
-  // }
-
-  if (true) {
+  if (treeInfo.errorLeaves().length > 0) {
+    tabs.unshift(["Help Me", Erotisi]);
     tabs.unshift(["Bottom Up", FailedSubsets]);
   }
 

@@ -11,6 +11,7 @@ import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import ErrorDiv from "./ErrorDiv";
+import MonoSpace from "./MonoSpace";
 import ReportBugUrl from "./ReportBugUrl";
 import "./lib.css";
 import { PrintImplHeader as UnsafePrintImplHeader } from "./private/argus";
@@ -25,8 +26,8 @@ import { PrintTy as UnsafePrintTy } from "./private/ty";
 // NOTE: please Please PLEASE wrap all printing components in this
 // `PrintWithFallback`. Pretty printing is still a fragile process and
 // I don't have full confidence in it yet.
-// Nothing should be imported from the 'private' directory except
-// from within this file.
+//
+// Additionally, this component sets the contents to stlye with the editor monospace font.
 export const PrintWithFallback = ({
   object,
   Content,
@@ -66,7 +67,9 @@ export const PrintWithFallback = ({
         console.error(details);
       }}
     >
-      <Content />
+      <MonoSpace>
+        <Content />
+      </MonoSpace>
     </ErrorBoundary>
   );
 };

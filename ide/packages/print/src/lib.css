@@ -1,6 +1,6 @@
 .PrintError {
-    background: #FF6961;
-    color: white;
+    background: var(--vscode-error-background);
+    color: var(--vscode-error-foreground);
     font-weight: bold;
     overflow-y: scroll;
     padding: 1em;

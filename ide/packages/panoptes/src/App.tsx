@@ -13,10 +13,12 @@ import {
   isSysMsgOpenError,
   isSysMsgOpenFile,
 } from "@argus/common/lib";
+import { VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import { observer } from "mobx-react";
 import React, { useEffect, useState } from "react";
 
+import "./App.css";
 import Workspace from "./Workspace";
 import { highlightedObligation } from "./signals";
 
@@ -46,8 +48,41 @@ function buildInitialData(config: PanoptesConfig): FileInfo[] {
   });
 }
 
+// NOTE: this listener should only listen for posted messages, not
+// for things that could be an expected response from a webview request.
+function listener(
+  e: MessageEvent,
+  setOpenFiles: React.Dispatch<React.SetStateAction<FileInfo[]>>
+) {
+  const {
+    payload,
+  }: {
+    payload: any;
+  } = e.data;
+
+  console.debug("Received message from system", payload);
+
+  if (isSysMsgOpenError(payload)) {
+    return blingObserver(payload);
+  } else if (isSysMsgOpenFile(payload)) {
+    return setOpenFiles(currFiles => {
+      const newEntry = {
+        fn: payload.file,
+        signature: payload.signature,
+        data: payload.data,
+      };
+      const fileExists = _.find(currFiles, ({ fn }) => fn === payload.file);
+      return fileExists ? currFiles : [...currFiles, newEntry];
+    });
+  } else if (isSysMsgHavoc(payload)) {
+    return setOpenFiles([]);
+  }
+}
+
 const App = observer(({ config }: { config: PanoptesConfig }) => {
   const [openFiles, setOpenFiles] = useState(buildInitialData(config));
+  const [showHidden, setShowHidden] = useState(false);
+
   const messageSystem =
     config.type === "WEB_BUNDLE"
       ? createClosedMessageSystem(config.closedSystem)
@@ -59,54 +94,46 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
   const configNoUndef: PanoptesConfig & { evalMode: EvaluationMode } =
     config as any;
 
-  // NOTE: this listener should only listen for posted messages, not
-  // for things that could be an expected response from a webview request.
-  const listener = (e: MessageEvent) => {
-    const {
-      payload,
-    }: {
-      payload: any;
-    } = e.data;
-
-    console.debug("Received message from system", payload);
-
-    if (isSysMsgOpenError(payload)) {
-      return blingObserver(payload);
-    } else if (isSysMsgOpenFile(payload)) {
-      return setOpenFiles(currFiles => {
-        const newEntry = {
-          fn: payload.file,
-          signature: payload.signature,
-          data: payload.data,
-        };
-        const fileExists = _.find(currFiles, ({ fn }) => fn === payload.file);
-        return fileExists ? currFiles : [...currFiles, newEntry];
-      });
-    } else if (isSysMsgHavoc(payload)) {
-      return setOpenFiles([]);
-    }
-  };
-
   useEffect(() => {
-    window.addEventListener("message", listener);
+    const listen = (e: MessageEvent) => listener(e, setOpenFiles);
+    window.addEventListener("message", listen);
     if (config.target !== undefined) {
       blingObserver(config.target);
     }
-    return () => window.removeEventListener("message", listener);
+    return () => window.removeEventListener("message", listen);
   }, []);
 
-  const resetState = () => {
-    return setOpenFiles(currFiles => currFiles);
-  };
+  const Navbar = (
+    <>
+      <div className="app-nav">
+        <VSCodeCheckbox
+          onChange={() => setShowHidden(!showHidden)}
+          checked={showHidden}
+        >
+          Show hidden information
+        </VSCodeCheckbox>
+      </div>
+      <div className="spacer">{"\u00A0"}</div>
+    </>
+  );
 
+  // Rerender the App without changing the base files.
+  const resetState = () => setOpenFiles(currFiles => currFiles);
   return (
-    <AppContext.ConfigurationContext.Provider value={configNoUndef}>
-      <AppContext.SystemSpecContext.Provider value={systemSpec}>
-        <AppContext.MessageSystemContext.Provider value={messageSystem}>
-          <Workspace files={openFiles} reset={resetState} />
-        </AppContext.MessageSystemContext.Provider>
-      </AppContext.SystemSpecContext.Provider>
-    </AppContext.ConfigurationContext.Provider>
+    <div className="AppRoot">
+      {Navbar}
+      <AppContext.ConfigurationContext.Provider value={configNoUndef}>
+        <AppContext.SystemSpecContext.Provider value={systemSpec}>
+          <AppContext.MessageSystemContext.Provider value={messageSystem}>
+            <AppContext.ShowHiddenObligationsContext.Provider
+              value={showHidden}
+            >
+              <Workspace files={openFiles} reset={resetState} />
+            </AppContext.ShowHiddenObligationsContext.Provider>
+          </AppContext.MessageSystemContext.Provider>
+        </AppContext.SystemSpecContext.Provider>
+      </AppContext.ConfigurationContext.Provider>
+    </div>
   );
 });
 

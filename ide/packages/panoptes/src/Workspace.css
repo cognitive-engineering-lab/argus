@@ -1,26 +1,3 @@
 vscode-panel-view {
     flex-direction: column;
 }
-
-.workspace-nav {
-    /* make the navbar as big as the page and cover other content */
-    width: 100%;
-    z-index: 1;
-    background-color: var(--background);
-
-    /* push things to the right */
-    text-align: right;
-
-    /* sticky to the top-right corner of the argus window */
-    position: fixed; 
-    top: 0; 
-    right: 0;
-
-    /* Some breathing room. Make sure the `spacer` has the same value. */
-    margin-bottom: 0.25em;
-}
-
-.spacer {
-    width: 100%;
-    margin-bottom: 0.25em;
-}

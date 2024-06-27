@@ -1,7 +1,7 @@
 import { TreeInfo, TreeView } from "@argus/common/TreeInfo";
 import { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
 import { TreeRenderParams } from "@argus/common/communication";
-import { AppContext, TreeAppContext } from "@argus/common/context";
+import { TreeAppContext } from "@argus/common/context";
 import { EvaluationMode } from "@argus/common/lib";
 import { PrintGoal } from "@argus/print/lib";
 import _ from "lodash";
@@ -11,7 +11,6 @@ import { createRoot } from "react-dom/client";
 
 import "./BottomUp.css";
 import { CollapsibleElement, DirRecursive } from "./Directory";
-import { treeHeuristic } from "./heuristic";
 
 type TreeViewWithRoot = TreeView & { root: ProofNodeIdx };
 
@@ -238,32 +237,3 @@ export const BottomUpImpersonator = ({
     />
   );
 };
-
-const BottomUp = () => {
-  const tree = useContext(TreeAppContext.TreeContext)!;
-  const evaluationMode =
-    useContext(AppContext.ConfigurationContext)?.evalMode ?? "release";
-
-  const H = treeHeuristic(tree);
-
-  const leaves = _.uniq(
-    _.compact(_.map(tree.errorLeaves(), n => liftTo(tree, n, "Goal")))
-  );
-
-  const failedGroups = _.groupBy(leaves, leaf => tree.parent(leaf));
-  const [argusRecommendedLeaves, hiddenLeaves] = H.partition(failedGroups);
-  const sortViews = (views: TreeViewWithRoot[]) => H.rank(views, v => v.root);
-  const argusViews = sortViews(
-    invertViewWithRoots(argusRecommendedLeaves, tree)
-  );
-  const otherViews = sortViews(invertViewWithRoots(hiddenLeaves, tree));
-  return (
-    <BottomUpImpersonator
-      recommended={argusViews}
-      others={otherViews}
-      mode={evaluationMode}
-    />
-  );
-};
-
-export default BottomUp;

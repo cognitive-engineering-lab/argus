@@ -9,7 +9,8 @@ pre.shiki {
 /* The code should always blend in with the view panel */
 
 .shiki code {
-    background-color: var(--background);
+  font-family: var(--vscode-editor-font-family);
+  background-color: var(--background);
 }
 
 /* Change the code colors based on VSCode exported body classes */

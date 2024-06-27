@@ -1,8 +1,6 @@
-import { AppContext } from "@argus/common/context";
 import { FileInfo } from "@argus/common/lib";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
 import {
-  VSCodeCheckbox,
   VSCodePanelTab,
   VSCodePanelView,
   VSCodePanels,
@@ -38,19 +36,6 @@ const Workspace = ({
   reset: () => void;
 }) => {
   const [active, setActive] = useState(0);
-  const [showHidden, setShowHidden] = useState(false);
-  const toggleHidden = () => setShowHidden(!showHidden);
-
-  const Navbar = () => (
-    <>
-      <div className="workspace-nav">
-        <VSCodeCheckbox onChange={toggleHidden} checked={showHidden}>
-          Show hidden information
-        </VSCodeCheckbox>
-      </div>
-      <div className="spacer">{"\u00A0"}</div>
-    </>
-  );
 
   const mkActiveSet = (idx: number) => () => setActive(idx);
   const tabName = (idx: number) => `tab-${idx}`;
@@ -74,15 +59,12 @@ const Workspace = ({
   ));
 
   return (
-    <AppContext.ShowHiddenObligationsContext.Provider value={showHidden}>
-      <Navbar />
-      <div className="workspace-area">
-        <VSCodePanels activeid={tabName(active)}>
-          {tabs}
-          {fileComponents}
-        </VSCodePanels>
-      </div>
-    </AppContext.ShowHiddenObligationsContext.Provider>
+    <div className="workspace-area">
+      <VSCodePanels activeid={tabName(active)}>
+        {tabs}
+        {fileComponents}
+      </VSCodePanels>
+    </div>
   );
 };
 

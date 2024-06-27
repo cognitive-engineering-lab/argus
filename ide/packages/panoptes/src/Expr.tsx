@@ -11,7 +11,6 @@ import { observer } from "mobx-react";
 import React, { useContext } from "react";
 
 import Code from "./Code";
-import "./File.css";
 import { ObligationFromIdx } from "./Obligation";
 import { CollapsibleElement } from "./TreeView/Directory";
 import { highlightedObligation } from "./signals";
@@ -36,7 +35,6 @@ const Expr = observer(({ idx }: { idx: ExprIdx }) => {
   }
 
   const visibleObligations = bodyInfo.visibleObligations(idx);
-
   if (visibleObligations.length === 0) {
     return null;
   }

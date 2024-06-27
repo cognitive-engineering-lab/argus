@@ -10,6 +10,7 @@ import {
   SerializedTree,
   TreeTopology,
 } from "./bindings";
+import { isHiddenObl } from "./func";
 
 type MultiRecord<K extends number, T> = Record<K, T[]>;
 
@@ -93,11 +94,12 @@ export class TreeInfo {
       const node = tree.nodes[n];
       if ("Goal" in node) {
         const goalData = tree.goals[node.Goal];
-        // const result = tree.results[goalData.result];
+        const result = tree.results[goalData.result];
         return "keep";
+        // FIXME: I think this logic is correct...but when enabled argus crashes.
         // return isHiddenObl({ necessity: goalData.necessity, result })
         //   ? "remove-tree"
-        //   : "keep";
+        //   : "remove-node";
       } else if ("Candidate" in node) {
         const candidate = tree.candidates[node.Candidate];
         return "Any" in candidate ? "remove-node" : "keep";
@@ -202,7 +204,7 @@ export class TreeInfo {
     return {
       from: to,
       to: f,
-      path: path.reverse(),
+      path: _.reverse(path),
       d: "from-root",
     };
   }
