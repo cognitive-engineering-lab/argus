@@ -4,8 +4,6 @@
 
 Argus is a tool to help you with compiler errors related to traits. If you have ever seen an error that says `the trait bound ... is not satisfied`, that is a good opportunity to use Argus. An IDE extension is available for VSCode which provides the Argus Inspection Panel.
 
-> 📝 Argus development has temporarily moved to a **private repository** to respect grant conditions. Releases are expected to continue shortly. 
-
 ## Limitations
 
 > :warning: **Argus is research software and is under active development!** :warning:
