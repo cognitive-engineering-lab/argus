@@ -85,7 +85,7 @@ pub fn test_obligations_no_crash(
     compile_normal(source, move |tcx| {
       for_each_body(tcx, |body_id, tcx| {
         let (full_data, obligations_in_body) =
-          analysis::body_data(tcx, body_id).expect("failed to get obligations");
+          analysis::body_data(tcx, body_id);
 
         assert_pass(full_data, obligations_in_body);
       })
@@ -98,17 +98,15 @@ pub fn test_obligations_no_crash(
 
 pub fn test_locate_tree<'a, 'tcx: 'a>(
   hash: ObligationHash,
-  needs_search: bool,
   thunk: impl FnOnce() -> (&'a FullData<'tcx>, &'a ObligationsInBody),
 ) -> Result<SerializedTree> {
-  analysis::entry::pick_tree(hash, needs_search, thunk)
+  analysis::entry::pick_tree(hash, thunk)
 }
 
 pub fn test_tree_for_target(
   path: &Path,
   mut range: CharRange,
   hash: ObligationHash,
-  is_synthetic: bool,
   mut assert_pass: impl FnMut(Result<SerializedTree>) + Send + Sync,
 ) {
   let inner = || -> Result<()> {
@@ -130,7 +128,6 @@ pub fn test_tree_for_target(
       let target = Target {
         span: body_span,
         hash,
-        is_synthetic,
       };
 
       let tree_opt = analysis::OBLIGATION_TARGET

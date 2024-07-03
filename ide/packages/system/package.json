@@ -19,5 +19,8 @@
   },
   "typedoc": {
     "entryPoint": "./src/lib.ts"
+  },
+  "devDependencies": {
+    "cancelable-promise": "^4.3.1"
   }
 }

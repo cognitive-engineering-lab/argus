@@ -27,7 +27,31 @@
     "commands": [
       {
         "command": "argus.inspectWorkspace",
-        "title": "Argus: Inspect Workspace"
+        "title": "Argus: Inspect current file"
+      },
+      {
+        "command": "argus.cancelTasks",
+        "title": "Argus: Cancel running tasks"
+      },
+      {
+        "command": "argus.pinMBData",
+        "title": "Argus: Pin mini-buffer data"
+      },
+      {
+        "command": "argus.unpinMBData",
+        "title": "Argus: Unpin mini-buffer data"
+      }
+    ],
+    "keybindings": [
+      {
+          "command": "argus.pinMBData",
+          "key": "ctrl+alt+T",
+          "mac": "shift+cmd+t"
+      },
+      {
+          "command": "argus.unpinMBData",
+          "key": "ctrl+alt+U",
+          "mac": "shift+cmd+u"
       }
     ]
   },
@@ -69,6 +93,7 @@
     "@types/react": "^18.2.14",
     "@types/react-dom": "^18.2.6",
     "@types/vscode": "^1.79.0",
+    "cancelable-promise": "^4.3.1",
     "lodash": "^4.17.21",
     "new-github-issue-url": "^1.0.0",
     "open": "^8.2.1",

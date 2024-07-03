@@ -1,0 +1,16 @@
+.PrintError {
+    background: var(--vscode-error-background);
+    color: var(--vscode-error-foreground);
+    font-weight: bold;
+    overflow-y: scroll;
+    padding: 1em;
+}
+
+.DefPathContainer {
+    display: inline-block;
+}
+
+.ImplFallback > h1 {
+    font-size: 0.5em;
+    font-style: italic;
+}

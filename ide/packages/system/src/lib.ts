@@ -1,16 +1,27 @@
-import cp from "child_process";
-import os from "os";
-import path from "path";
+import cp from "node:child_process";
+import os from "node:os";
+import path from "node:path";
+import { CancelablePromise as CPromise } from "cancelable-promise";
 
 export const LIBRARY_PATHS: Partial<Record<NodeJS.Platform, string>> = {
   darwin: "DYLD_LIBRARY_PATH",
-  win32: "LIB",
+  win32: "LIB"
 };
 
 export interface RustcToolchain {
   version: string;
   channel: string;
   components: string[];
+}
+
+export async function runInDir<T>(dir: string, thunk: () => Promise<T>) {
+  const cd = process.cwd();
+  try {
+    process.chdir(dir);
+    return thunk();
+  } finally {
+    process.chdir(cd);
+  }
 }
 
 export const cargoBin = () => {
@@ -30,32 +41,71 @@ export type ExecNotifyOpts = {
   title?: string;
 } & cp.SpawnOptionsWithoutStdio;
 
-export const execNotifyBinary = async (
+export function killAll(
+  pid: number,
+  signal: string | number = "SIGTERM",
+  logger: (...args: any[]) => void = console.debug
+) {
+  if (process.platform === "win32") {
+    cp.exec(`taskkill /PID ${pid} /T /F`, (error, stdout, stderr) => {
+      logger(`taskkill stdout: ${stdout}`);
+      logger(`taskkill stderr: ${stderr}`);
+      if (error) {
+        logger(`error: ${error.message}`);
+      }
+    });
+  } else {
+    // NOTE: calling this usually throws the error 'ESRCH', meaning that
+    // the given pid isn't running. However, this is also the only solution
+    // that killds the entire process family, so I'm not sure where the error
+    // is coming from.
+    process.kill(-pid, signal);
+  }
+}
+
+export const execNotifyBinary = (
   log: (...args: any[]) => void,
   stateListener: (state: string) => void,
   cmd: string,
   args: string[],
   opts?: ExecNotifyOpts
-): Promise<Buffer> => {
-  log("Running command: ", cmd, args, opts);
+): CPromise<Buffer> => {
+  const msg = (...args: any[]) => {
+    log(...args);
+    console.debug(...args);
+  };
 
-  const proc = cp.spawn(cmd, args, opts ?? {});
+  const proc = cp.spawn(cmd, args, { ...opts, detached: true });
+  msg(`process ${proc.pid}, command: `, cmd, args, opts);
 
-  const stdoutChunks: Buffer[] = [];
+  let stdoutChunks: Buffer[] = [];
   proc.stdout.on("data", data => {
     stdoutChunks.push(data);
   });
 
-  const stderrChunks: string[] = [];
+  let stderrChunks: string[] = [];
   proc.stderr.setEncoding("utf8");
   proc.stderr.on("data", data => {
-    log(data);
+    msg(data);
     stderrChunks.push(data);
   });
 
   stateListener("loading");
-  return new Promise<Buffer>((resolve, reject) => {
+  const killProcess = () => {
+    try {
+      msg(`Killing process ${proc.pid}`);
+      killAll(proc.pid!, "SIGKILL", msg);
+    } catch (e: any) {
+      log(`Error killing process ${proc.pid}: ${e.toString()}`);
+    }
+  };
+  const peacefulCancel = () => {};
+
+  return new CPromise<Buffer>((resolve, reject, onCancel) => {
+    onCancel(killProcess);
+
     proc.addListener("close", _ => {
+      onCancel(peacefulCancel);
       stateListener("idle");
       if (opts?.ignoreExitCode || proc.exitCode === 0) {
         resolve(Buffer.concat(stdoutChunks));
@@ -65,31 +115,24 @@ export const execNotifyBinary = async (
     });
 
     proc.addListener("error", e => {
+      onCancel(peacefulCancel);
+      stateListener("error");
       reject(e.toString());
     });
   });
 };
 
-export async function runInDir<T>(dir: string, thunk: () => Promise<T>) {
-  const cd = process.cwd();
-  try {
-    process.chdir(dir);
-    return await thunk();
-  } finally {
-    process.chdir(cd);
-  }
-}
-
-export async function execNotify(
+export function execNotify(
   cmd: string,
   args: string[],
   opts?: ExecNotifyOpts,
   log: (...args: any[]) => void = console.debug,
   stateListener: (state: string) => void = (..._args: any[]) => {}
-): Promise<string> {
-  const buffer = await execNotifyBinary(log, stateListener, cmd, args, opts);
-  const text = buffer.toString("utf8");
-  return text.trimEnd();
+): CPromise<string> {
+  return execNotifyBinary(log, stateListener, cmd, args, opts).then(buffer => {
+    const text = buffer.toString("utf8");
+    return text.trimEnd();
+  });
 }
 
 export async function getCargoOpts(
@@ -101,7 +144,7 @@ export async function getCargoOpts(
     "rustup",
     ["which", "--toolchain", config.channel, "rustc"],
     {
-      title: "Waiting for rustc...",
+      title: "Waiting for rustc..."
     }
   );
 
@@ -109,13 +152,13 @@ export async function getCargoOpts(
     rustcPath,
     ["--print", "target-libdir", "--print", "sysroot"],
     {
-      title: "Waiting for rustc...",
+      title: "Waiting for rustc..."
     }
   );
 
   const [targetLibdir, sysroot] = targetInfo.split("\n");
   const libraryPath = LIBRARY_PATHS[process.platform] || "LD_LIBRARY_PATH";
-  const PATH = cargoBin() + ";" + process.env.PATH;
+  const PATH = `${cargoBin()};${process.env.PATH}`;
 
   // For each element in libraryPath, we need to add the targetLibdir as its value.
   // This should then get added to the opts object.
@@ -127,8 +170,8 @@ export async function getCargoOpts(
       SYSROOT: sysroot,
       PATH,
       ...additionalOpts,
-      ...process.env,
-    },
+      ...process.env
+    }
   };
 
   return opts;

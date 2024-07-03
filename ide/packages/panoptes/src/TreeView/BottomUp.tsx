@@ -1,25 +1,25 @@
-import { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
+import type { TreeInfo, TreeView } from "@argus/common/TreeInfo";
+import type { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
+import type { TreeRenderParams } from "@argus/common/communication";
+import { TreeAppContext } from "@argus/common/context";
+import type { EvaluationMode } from "@argus/common/lib";
+import { PrintGoal } from "@argus/print/lib";
 import _ from "lodash";
 import React, { useContext } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import { PrintGoal } from "../print/print";
-import { AppContext, TreeAppContext } from "../utilities/context";
 import "./BottomUp.css";
-import {
-  CollapsibleElement,
-  DirRecursive,
-  TreeRenderParams,
-} from "./Directory";
-import { TreeInfo, TreeView } from "./TreeInfo";
-import { treeHeuristic } from "./heuristic";
+import { CollapsibleElement, DirRecursive } from "./Directory";
 
 type TreeViewWithRoot = TreeView & { root: ProofNodeIdx };
 
 class TopologyBuilder {
   private topo: TreeTopology;
-  constructor(readonly root: ProofNodeIdx, readonly tree: TreeInfo) {
+  constructor(
+    readonly root: ProofNodeIdx,
+    readonly tree: TreeInfo
+  ) {
     this.topo = { children: {}, parent: {} };
   }
 
@@ -80,7 +80,7 @@ class TopologyBuilder {
  * be 'distinct' nodes, but their inner `GoalIdx` will be the same. We want to root all of
  * these together.
  */
-function invertViewWithRoots(
+export function invertViewWithRoots(
   leaves: ProofNodeIdx[],
   tree: TreeInfo
 ): TreeViewWithRoot[] {
@@ -89,9 +89,8 @@ function invertViewWithRoots(
       const node = tree.node(leaf);
       if ("Goal" in node) {
         return node.Goal;
-      } else {
-        throw new Error("Leaves must be goals");
       }
+      throw new Error("Leaves must be goals");
     })
   );
 
@@ -116,7 +115,7 @@ function invertViewWithRoots(
 const RenderEvaluationViews = ({
   recommended,
   others,
-  mode,
+  mode
 }: {
   recommended: TreeViewWithRoot[];
   others: TreeViewWithRoot[];
@@ -165,9 +164,9 @@ const RenderEvaluationViews = ({
 /**
  * The actual entry point for rendering the bottom up view. All others are used in testing or evaluation.
  */
-const RenderBottomUpViews = ({
+export const RenderBottomUpViews = ({
   recommended,
-  others,
+  others
 }: {
   recommended: TreeViewWithRoot[];
   others: TreeViewWithRoot[];
@@ -192,12 +191,12 @@ const RenderBottomUpViews = ({
   const renderParams: TreeRenderParams = {
     Wrapper: ({
       n: _n,
-      Child,
+      Child
     }: {
       n: ProofNodeIdx;
       Child: React.ReactElement;
     }) => Child,
-    styleEdges: false,
+    styleEdges: false
   };
 
   return (
@@ -208,43 +207,35 @@ const RenderBottomUpViews = ({
   );
 };
 
-const BottomUp = () => {
-  const tree = useContext(TreeAppContext.TreeContext)!;
-  const evaluationMode =
-    useContext(AppContext.ConfigurationContext)?.evalMode ?? "release";
+export function liftTo(
+  tree: TreeInfo,
+  idx: ProofNodeIdx,
+  target: "Goal" | "Candidate"
+) {
+  let curr: ProofNodeIdx | undefined = idx;
+  while (curr !== undefined && !(target in tree.node(curr))) {
+    curr = tree.parent(curr);
+  }
+  return curr;
+}
 
-  const liftTo = (idx: ProofNodeIdx, target: "Goal" | "Candidate") => {
-    let curr: ProofNodeIdx | undefined = idx;
-    while (curr !== undefined && !(target in tree.node(curr))) {
-      curr = tree.parent(curr);
-    }
-    return curr;
-  };
-
-  const H = treeHeuristic(tree);
-
-  const leaves = _.uniq(
-    _.compact(_.map(tree.errorLeaves(), n => liftTo(n, "Goal")))
-  );
-
-  const failedGroups = _.groupBy(leaves, leaf => tree.parent(leaf));
-  const [argusRecommendedLeaves, hiddenLeaves] = H.partition(failedGroups);
-  const sortViews = (views: TreeViewWithRoot[]) => H.rank(views, v => v.root);
-  const argusViews = sortViews(
-    invertViewWithRoots(argusRecommendedLeaves, tree)
-  );
-  const otherViews = sortViews(invertViewWithRoots(hiddenLeaves, tree));
-
-  // A bit of a hack to allow the evaluation script to render the bottom up view differently.
-  return evaluationMode === "release" ? (
-    <RenderBottomUpViews recommended={argusViews} others={otherViews} />
+// A bit of a hack to allow the evaluation script to render the bottom up view differently.
+export const BottomUpImpersonator = ({
+  recommended,
+  others,
+  mode
+}: {
+  recommended: TreeViewWithRoot[];
+  others: TreeViewWithRoot[];
+  mode: EvaluationMode;
+}) => {
+  return mode === "release" ? (
+    <RenderBottomUpViews recommended={recommended} others={others} />
   ) : (
     <RenderEvaluationViews
-      recommended={argusViews}
-      others={otherViews}
-      mode={evaluationMode}
+      recommended={recommended}
+      others={others}
+      mode={mode}
     />
   );
 };
-
-export default BottomUp;

@@ -3,8 +3,13 @@ use std::{
   hash::Hash,
 };
 
-use index_vec::{Idx, IndexVec};
-use rustc_data_structures::{fx::FxHashMap as HashMap, stable_hasher::Hash64};
+use argus_ext::{
+  infer::InferCtxtExt, ty::VarCounterExt, utils::SpanExt as ArgusSpanExt,
+};
+use argus_ser as ser;
+use argus_ser::interner::Interner;
+use index_vec::IndexVec;
+use rustc_data_structures::stable_hasher::Hash64;
 use rustc_hir::def_id::DefId;
 use rustc_infer::infer::InferCtxt;
 use rustc_trait_selection::{
@@ -16,40 +21,10 @@ use rustc_trait_selection::{
 };
 
 use super::*;
-use crate::{ext::TyCtxtExt, types::intermediate::EvaluationResult};
-
-#[derive(Default)]
-struct Interner<K: PartialEq + Eq + Hash, I: Idx, D> {
-  values: IndexVec<I, D>,
-  keys: HashMap<K, I>,
-}
-
-impl<K, I, D> Interner<K, I, D>
-where
-  K: PartialEq + Eq + Hash,
-  I: Idx,
-{
-  fn default() -> Self {
-    Self {
-      values: IndexVec::default(),
-      keys: HashMap::default(),
-    }
-  }
-
-  fn get(&mut self, key: K) -> Option<I> {
-    self.keys.get(&key).cloned()
-  }
-
-  fn insert(&mut self, k: K, d: D) -> I {
-    let idx = self.values.push(d);
-    self.keys.insert(k, idx);
-    idx
-  }
-
-  fn insert_no_key(&mut self, d: D) -> I {
-    self.values.push(d)
-  }
-}
+use crate::{
+  ext::InferCtxtExt as InferCtxtExt_, tls,
+  types::intermediate::EvaluationResult,
+};
 
 pub struct Interners {
   goals: Interner<(Hash64, ResultIdx), GoalIdx, GoalData>,
@@ -81,25 +56,29 @@ impl Interners {
     IndexVec<ResultIdx, ResultData>,
   ) {
     (
-      self.goals.values,
-      self.candidates.values,
-      self.results.values,
+      self.goals.consume(),
+      self.candidates.consume(),
+      self.results.consume(),
     )
   }
 
+  // NOTE: used in `test_utils`.
+  #[allow(dead_code)]
   pub fn goal(&self, g: GoalIdx) -> &GoalData {
-    &self.goals.values[g]
+    self.goals.get_data(&g).expect("missing goal idx")
   }
 
+  // NOTE: used in `test_utils`.
+  #[allow(dead_code)]
   pub fn candidate(&self, c: CandidateIdx) -> &CandidateData {
-    &self.candidates.values[c]
+    self.candidates.get_data(&c).expect("missing candidate idx")
   }
 
   pub fn mk_result_node(&mut self, result: EvaluationResult) -> Node {
     Node::Result(self.intern_result(result))
   }
 
-  pub fn mk_goal_node<'tcx>(&mut self, goal: &InspectGoal<'_, 'tcx>) -> Node {
+  pub fn mk_goal_node(&mut self, goal: &InspectGoal) -> Node {
     let infcx = goal.infcx();
     let result_idx = self.intern_result(goal.result());
     let goal = goal.goal();
@@ -107,10 +86,7 @@ impl Interners {
     Node::Goal(goal_idx)
   }
 
-  pub fn mk_candidate_node<'tcx>(
-    &mut self,
-    candidate: &InspectCandidate<'_, 'tcx>,
-  ) -> Node {
+  pub fn mk_candidate_node(&mut self, candidate: &InspectCandidate) -> Node {
     let can_idx = match candidate.kind() {
       ProbeKind::Root { .. } => self.intern_can_string("root"),
       ProbeKind::NormalizedSelfTyAssembly => {
@@ -150,7 +126,7 @@ impl Interners {
   }
 
   fn intern_result(&mut self, result: EvaluationResult) -> ResultIdx {
-    if let Some(result_idx) = self.results.get(result) {
+    if let Some(result_idx) = self.results.get_idx(&result) {
       return result_idx;
     }
 
@@ -166,16 +142,16 @@ impl Interners {
     let goal = infcx.resolve_vars_if_possible(*goal);
     let hash = infcx.predicate_hash(&goal.predicate);
     let hash = (hash, result_idx);
-    if let Some(goal_idx) = self.goals.get(hash) {
+    if let Some(goal_idx) = self.goals.get_idx(&hash) {
       return goal_idx;
     }
 
     let necessity = infcx.guess_predicate_necessity(&goal.predicate);
-    let num_vars =
-      serialize::var_counter::count_vars(infcx.tcx, goal.predicate);
+    let num_vars = goal.predicate.count_vars(infcx.tcx);
     let is_main_tv = goal.predicate.is_main_ty_var();
-    let goal_value = serialize_to_value(infcx, &GoalPredicateDef(goal))
-      .expect("failed to serialize goal");
+    let goal_value = tls::unsafe_access_interner(|ty_interner| {
+      ser::to_value_expect(infcx, ty_interner, &ser::GoalPredicateDef(goal))
+    });
 
     self.goals.insert(hash, GoalData {
       value: goal_value,
@@ -190,7 +166,7 @@ impl Interners {
   }
 
   fn intern_can_string(&mut self, s: &'static str) -> CandidateIdx {
-    if let Some(i) = self.candidates.get(CanKey::Str(s)) {
+    if let Some(i) = self.candidates.get_idx(&CanKey::Str(s)) {
       return i;
     }
 
@@ -198,7 +174,7 @@ impl Interners {
   }
 
   fn intern_can_param_env(&mut self, idx: usize) -> CandidateIdx {
-    if let Some(i) = self.candidates.get(CanKey::ParamEnv(idx)) {
+    if let Some(i) = self.candidates.get_idx(&CanKey::ParamEnv(idx)) {
       return i;
     }
 
@@ -208,31 +184,27 @@ impl Interners {
   }
 
   fn intern_impl(&mut self, infcx: &InferCtxt, def_id: DefId) -> CandidateIdx {
-    if let Some(i) = self.candidates.get(CanKey::Impl(def_id)) {
+    if let Some(i) = self.candidates.get_idx(&CanKey::Impl(def_id)) {
       return i;
     }
 
     // First, try to get an impl header from the def_id ty
-    if let Some(header) = infcx.tcx.get_impl_header(def_id) {
+    if let Some(header) = ser::get_opt_impl_header(infcx.tcx, def_id) {
       return self.candidates.insert(
         CanKey::Impl(def_id),
-        CandidateData::new_impl_header(infcx, &header),
+        CandidateData::new_impl_header(
+          infcx,
+          &header,
+          infcx.tcx.is_user_visible_dep(def_id.krate),
+        ),
       );
     }
 
     // Second, try to get the span of the impl or just default to a fallback.
-    let string = infcx
-      .tcx
-      .span_of_impl(def_id)
-      .map(|sp| {
-        infcx
-          .tcx
-          .sess
-          .source_map()
-          .span_to_snippet(sp)
-          .unwrap_or_else(|_| "failed to find impl".to_string())
-      })
-      .unwrap_or_else(|symb| format!("foreign impl from: {}", symb.as_str()));
+    let string = infcx.tcx.span_of_impl(def_id).map_or_else(
+      |symb| format!("foreign impl from: {}", symb.as_str()),
+      |sp| sp.sanitized_snippet(infcx.tcx.sess.source_map()),
+    );
 
     self.candidates.insert_no_key(CandidateData::from(string))
   }

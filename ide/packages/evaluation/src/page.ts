@@ -1,14 +1,14 @@
-import { BodyBundle } from "@argus/common/bindings";
+import path from "node:path";
+import type { BodyBundle } from "@argus/common/bindings";
 import {
   ConfigConsts,
-  ErrorJumpTargetInfo,
-  EvaluationMode,
-  Filename,
-  PanoptesConfig,
-  configToString,
+  type ErrorJumpTargetInfo,
+  type EvaluationMode,
+  type Filename,
+  type PanoptesConfig,
+  configToString
 } from "@argus/common/lib";
 import _ from "lodash";
-import path from "path";
 
 import { PORT } from "./serve";
 
@@ -711,8 +711,8 @@ function findErrorTargetInBundles(bundles: BodyBundle[]) {
             file: b.filename,
             bodyIdx: b.body.hash,
             exprIdx: e.idx,
-            hash,
-          } as ErrorJumpTargetInfo)
+            hash
+          }) as ErrorJumpTargetInfo
       )
     )
   );
@@ -725,14 +725,14 @@ function findErrorTargetInBundles(bundles: BodyBundle[]) {
           file: b.filename,
           bodyIdx: b.body.hash,
           exprIdx: e.idx,
-          hash: b.body.obligations[b.body.exprs[e.idx].obligations[0]].hash,
-        } as ErrorJumpTargetInfo)
+          hash: b.body.obligations[b.body.exprs[e.idx].obligations[0]].hash
+        }) as ErrorJumpTargetInfo
     )
   );
 
   const potentialTargets = _.flatten([
     ..._.flatten(traitErrors),
-    ...ambiguityErrors,
+    ...ambiguityErrors
   ]);
   return potentialTargets[0];
 }
@@ -747,7 +747,7 @@ export function webHtml(
     type: "WEB_BUNDLE",
     target: findErrorTargetInBundles(bundles),
     closedSystem: bundles,
-    evalMode,
+    evalMode
   };
 
   const panoptesDir = path.resolve(__dirname, "..", "..", "panoptes");

@@ -12,7 +12,7 @@ fn obligations() {
           || (obl.necessity == ObligationNecessity::OnError
             && obl.result.is_err())
         {
-          let res = tu::test_locate_tree(obl.hash, true, || t);
+          let res = tu::test_locate_tree(obl.hash, || t);
           if res.is_err() {
             missing.push((res, obl))
           }

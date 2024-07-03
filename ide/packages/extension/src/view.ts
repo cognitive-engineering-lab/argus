@@ -1,32 +1,30 @@
-import {
-  BodyHash,
+import os from "node:os";
+import type {
   CharRange,
-  ExprIdx,
   Obligation,
-  ObligationHash,
-  ObligationsInBody,
+  ObligationsInBody
 } from "@argus/common/bindings";
 import {
   ConfigConsts,
-  ErrorJumpTargetInfo,
-  Filename,
-  PanoptesConfig,
-  PanoptesToSystemCmds,
-  PanoptesToSystemMsg,
-  SystemToPanoptesCmds,
-  SystemToPanoptesMsg,
+  type ErrorJumpTargetInfo,
+  type FileInfo,
+  type Filename,
+  type PanoptesConfig,
+  type PanoptesToSystemCmds,
+  type PanoptesToSystemMsg,
+  type SystemToPanoptesCmds,
+  type SystemToPanoptesMsg,
   configToString,
   isPanoMsgAddHighlight,
   isPanoMsgRemoveHighlight,
-  isPanoMsgTree,
+  isPanoMsgTree
 } from "@argus/common/lib";
-import { MessageHandlerData } from "@estruyf/vscode";
-import _ from "lodash";
-import os from "os";
+import type { MessageHandlerData } from "@estruyf/vscode";
 import vscode from "vscode";
 
-import { globals } from "./main";
-import { RustEditor } from "./utils";
+import type { Ctx } from "./ctx";
+import { log } from "./logging";
+import type { RustEditor } from "./utils";
 
 // Wraps around the MessageHandler data types from @estruyf/vscode.
 type BlessedMessage<T extends PanoptesToSystemCmds> = {
@@ -37,97 +35,90 @@ type BlessedMessage<T extends PanoptesToSystemCmds> = {
 
 export class View {
   private panel: vscode.WebviewPanel;
-  private isPanelDisposed: boolean;
-  private readonly extensionUri: vscode.Uri;
   private disposables: vscode.Disposable[] = [];
 
   constructor(
-    extensionUri: vscode.Uri,
-    initialData: [Filename, ObligationsInBody[]][],
+    private readonly ctx: Ctx,
+    initialData: FileInfo[],
     target?: ErrorJumpTargetInfo,
+    readonly cleanup: () => void = () => {},
     column: vscode.ViewColumn = vscode.ViewColumn.Beside
   ) {
-    this.extensionUri = extensionUri;
-    this.isPanelDisposed = true;
-    // getPanel creates a new panel if it doesn't exist.
-    this.panel = this.getPanel(initialData, target, column);
+    this.panel = this.makePanel(initialData, target, column);
   }
 
-  public getPanel(
-    initialData: [Filename, ObligationsInBody[]][] = [],
-    target?: ErrorJumpTargetInfo,
-    column: vscode.ViewColumn = vscode.ViewColumn.Beside
-  ): vscode.WebviewPanel {
-    if (!this.isPanelDisposed) {
-      return this.panel;
-    }
-
-    this.panel = vscode.window.createWebviewPanel("argus", "Argus", column, {
-      enableScripts: true,
-      retainContextWhenHidden: true,
-      enableFindWidget: true,
-      localResourceRoots: [this.extensionUri],
-    });
-    this.isPanelDisposed = false;
-
-    // Set the webview's initial html content
-    this.panel.webview.html = this.getHtmlForWebview(initialData, target);
-
-    // Listen for when the panel is disposed
-    // This happens when the user closes the panel or when the panel is closed programatically
-    this.panel.onDidDispose(
-      () => {
-        globals.ctx.view = undefined;
-        this.dispose();
-      },
-      null,
-      this.disposables
-    );
-
-    // Handle messages from the webview
-    this.panel.webview.onDidReceiveMessage(
-      async message => await this.handleMessage(message),
-      null,
-      this.disposables
-    );
-
+  get getPanel() {
     return this.panel;
   }
 
-  public dispose() {
-    // Clean up our resources
-    this.isPanelDisposed = true;
-    this.panel.dispose();
-    while (this.disposables.length) {
-      const x = this.disposables.pop();
-      if (x) {
-        x.dispose();
-      }
-    }
+  private makePanel(
+    initialData: FileInfo[] = [],
+    target?: ErrorJumpTargetInfo,
+    column: vscode.ViewColumn = vscode.ViewColumn.Beside
+  ): vscode.WebviewPanel {
+    const panel = vscode.window.createWebviewPanel("argus", "Argus", column, {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+      enableFindWidget: true,
+      localResourceRoots: [this.ctx.extCtx.extensionUri]
+    });
+
+    // Set the webview's initial html content
+    panel.webview.html = getHtmlForWebview(
+      this.ctx.extCtx.extensionUri,
+      panel,
+      initialData,
+      target
+    );
+
+    // Listen for when the panel is disposed
+    // This happens when the user closes the panel or when the panel is closed programatically
+    this.disposables.push(
+      panel.onDidDispose(() => {
+        log("Disposing panel");
+        this.cleanup();
+        this.panel.dispose();
+        while (this.disposables.length) {
+          const x = this.disposables.pop();
+          if (x) {
+            x.dispose();
+          }
+        }
+      })
+    );
+
+    // Handle messages from the webview
+    this.disposables.push(
+      panel.webview.onDidReceiveMessage(async message => {
+        try {
+          await this.handleMessage(message);
+        } catch (e: any) {
+          log(`Handler threw error ${e.message}`);
+        }
+      })
+    );
+
+    return panel;
   }
 
-  // Public API, using static methods >:(
-
   public async havoc() {
-    this.messageWebview("havoc", {
-      type: "FROM_EXTENSION",
-      command: "havoc",
+    messageWebview(this.panel.webview, "havoc", {
+      type: "FROM_EXTENSION"
     });
   }
 
-  public async blingObligation(
-    file: Filename,
-    bodyIdx: BodyHash,
-    exprIdx: ExprIdx,
-    obligation: ObligationHash
-  ) {
-    this.messageWebview("open-error", {
+  public async blingObligation({
+    file,
+    bodyIdx,
+    exprIdx,
+    hash
+  }: ErrorJumpTargetInfo) {
+    messageWebview(this.panel.webview, "open-error", {
       type: "FROM_EXTENSION",
-      command: "open-error",
       file,
       bodyIdx,
       exprIdx,
-      hash: obligation,
+      hash
     });
   }
 
@@ -136,13 +127,11 @@ export class View {
     signature: string,
     data: ObligationsInBody[]
   ) {
-    console.debug("Sending open file message", editor.document.fileName);
-    this.messageWebview("open-file", {
+    messageWebview(this.panel.webview, "open-file", {
       type: "FROM_EXTENSION",
-      command: "open-file",
       file: editor.document.fileName,
       signature,
-      data,
+      data
     });
   }
 
@@ -156,9 +145,9 @@ export class View {
         payload.range
       );
     } else if (isPanoMsgAddHighlight(payload)) {
-      return globals.ctx.addHighlightRange(payload.file, payload.range);
+      return this.ctx.addHighlightRange(payload.file, payload.range);
     } else if (isPanoMsgRemoveHighlight(payload)) {
-      return globals.ctx.removeHighlightRange(payload.file, payload.range);
+      return this.ctx.removeHighlightRange(payload.file, payload.range);
     }
   }
 
@@ -168,68 +157,85 @@ export class View {
     obl: Obligation,
     range: CharRange
   ) {
-    const tree = await globals.ctx.getTree(file, obl, range);
+    const tree = await this.ctx.getTree(file, obl, range);
     if (tree !== undefined) {
-      this.messageWebview(requestId, {
-        type: "FROM_EXTENSION",
-        file,
-        command: "tree",
-        tree,
-      });
+      messageWebview(
+        this.panel.webview,
+        "tree",
+        {
+          type: "FROM_EXTENSION",
+          file,
+          tree
+        },
+        requestId
+      );
     }
   }
 
-  private messageWebview<T extends SystemToPanoptesCmds>(
-    requestId: string,
-    msg: SystemToPanoptesMsg<T>
-  ) {
-    this.panel.webview.postMessage({
-      requestId: requestId,
-      payload: msg,
-    } as MessageHandlerData<SystemToPanoptesMsg<T>>);
+  sendPinRequest() {
+    messageWebview(this.panel.webview, "pin", {
+      type: "FROM_EXTENSION"
+    });
   }
 
-  private getHtmlForWebview(
-    initialData: [Filename, ObligationsInBody[]][] = [],
-    target?: ErrorJumpTargetInfo
-  ) {
-    const panoptesDir = vscode.Uri.joinPath(
-      this.extensionUri,
+  sendUnpinRequest() {
+    messageWebview(this.panel.webview, "unpin", {
+      type: "FROM_EXTENSION"
+    });
+  }
+}
+
+function messageWebview<T extends SystemToPanoptesCmds>(
+  webview: vscode.Webview,
+  command: T,
+  msg: Omit<SystemToPanoptesMsg<T>, "command">,
+  requestId: string = command
+) {
+  webview.postMessage({
+    requestId,
+    payload: { command, ...msg }
+  } as MessageHandlerData<SystemToPanoptesMsg<T>>);
+}
+
+function getHtmlForWebview(
+  extensionUri: vscode.Uri,
+  panel: vscode.WebviewPanel,
+  initialData: FileInfo[] = [],
+  target?: ErrorJumpTargetInfo
+) {
+  const panoptesDir = vscode.Uri.joinPath(extensionUri, "dist", "panoptes");
+
+  const scriptUri = panel.webview.asWebviewUri(
+    vscode.Uri.joinPath(panoptesDir, "dist", "panoptes.iife.js")
+  );
+
+  const styleUri = panel.webview.asWebviewUri(
+    vscode.Uri.joinPath(panoptesDir, "dist", "style.css")
+  );
+
+  const codiconsUri = panel.webview.asWebviewUri(
+    vscode.Uri.joinPath(
+      panoptesDir,
+      "node_modules",
+      "@vscode/codicons",
       "dist",
-      "panoptes"
-    );
+      "codicon.css"
+    )
+  );
 
-    const scriptUri = this.panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(panoptesDir, "dist", "panoptes.iife.js")
-    );
+  const config: PanoptesConfig = {
+    type: "VSCODE_BACKING",
+    data: initialData,
+    target,
+    spec: {
+      osPlatform: os.platform(),
+      osRelease: os.release(),
+      vscodeVersion: vscode.version
+    }
+  };
+  const configStr = configToString(config);
 
-    const styleUri = this.panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(panoptesDir, "dist", "style.css")
-    );
-
-    const codiconsUri = this.panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(
-        panoptesDir,
-        "node_modules",
-        "@vscode/codicons",
-        "dist",
-        "codicon.css"
-      )
-    );
-
-    const config: PanoptesConfig = {
-      type: "VSCODE_BACKING",
-      data: initialData,
-      target,
-      spec: {
-        osPlatform: os.platform(),
-        osRelease: os.release(),
-        vscodeVersion: vscode.version,
-      },
-    };
-    const configStr = configToString(config);
-
-    return `
+  return `
       <!DOCTYPE html>
       <html lang="en">
       <head>
@@ -245,5 +251,4 @@ export class View {
       </body>
       </html>
     `;
-  }
 }

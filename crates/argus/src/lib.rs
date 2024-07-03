@@ -9,110 +9,67 @@
     hash_extract_if,
     box_patterns,
     control_flow_enum,
-    if_let_guard
+    if_let_guard,
+    lazy_cell
 )]
-
-extern crate rustc_apfloat;
-extern crate rustc_ast;
+#![warn(clippy::pedantic)]
+#![allow(
+  clippy::missing_errors_doc,
+  clippy::wildcard_imports,
+  clippy::must_use_candidate,
+  clippy::module_name_repetitions
+)]
 extern crate rustc_data_structures;
+#[cfg(feature = "testing")]
 extern crate rustc_driver;
-extern crate rustc_errors;
-extern crate rustc_hash;
 extern crate rustc_hir;
-extern crate rustc_hir_analysis;
 extern crate rustc_hir_typeck;
 extern crate rustc_infer;
+
+#[cfg(feature = "testing")]
+extern crate rustc_errors;
+
 #[cfg(feature = "testing")]
 extern crate rustc_interface;
-extern crate rustc_macros;
 extern crate rustc_middle;
-extern crate rustc_next_trait_solver;
-extern crate rustc_query_system;
-extern crate rustc_serialize;
-extern crate rustc_session;
 extern crate rustc_span;
-extern crate rustc_target;
 extern crate rustc_trait_selection;
-extern crate rustc_type_ir;
 
+mod aadebug;
 pub mod analysis;
-pub mod emitter;
 pub mod ext;
-// TODO: remove when upstreamed to rustc-plugin
-pub mod find_bodies;
+pub mod find_bodies; // TODO: remove when upstreamed to rustc-plugin
 mod proof_tree;
-mod rustc;
-mod serialize;
-#[cfg(all(feature = "testing"))]
+#[cfg(feature = "testing")]
 pub mod test_utils;
-#[cfg(all(feature = "testing", test))]
-mod ts;
+mod tls;
 pub mod types;
 
-#[macro_export]
-macro_rules! define_idx {
-  ($t:ident, $($ty:tt),*) => {
-      $(
-        index_vec::define_index_type! {
-            pub struct $ty = $t;
-        }
-      )*
-      crate::define_tsrs_alias!($($ty,)* => $t);
-  }
-}
+#[cfg(feature = "testing")]
+mod tests {
+  #[test]
+  fn export_bindings_indices() {
+    use crate::{proof_tree as pty, types as ty};
 
-#[macro_export]
-macro_rules! define_tsrs_alias {
-    ($($($ty:ty,)* => $l:ident),*) => {$($(
-        #[cfg(feature = "testing")]
-        impl ts_rs::TS for $ty {
-            const EXPORT_TO: Option<&'static str> =
-              Some(concat!("bindings/", stringify!($ty), ".ts"));
-            fn name() -> String {
-                stringify!($ty).to_owned()
-            }
-            fn name_with_type_args(args: Vec<String>) -> String {
-              assert!(
-                  args.is_empty(),
-                  "called name_with_type_args on {}",
-                  stringify!($ty)
-              );
-              <$l as ts_rs::TS>::name()
-            }
-            fn decl() -> String {
-              format!(
-                "type {}{} = {};",
-                stringify!($ty),
-                "",
-                <$l as ts_rs::TS>::name()
-              )
-            }
-            fn inline() -> String {
-              <$l as ts_rs::TS>::name()
-            }
-            fn dependencies() -> Vec<ts_rs::Dependency> {
-                vec![]
-            }
-            fn transparent() -> bool {
-                false
-            }
-        }
-    )*)*};
-}
+    argus_ser::ts! {
+      ty::ExprIdx,
+      ty::ObligationIdx,
 
-#[macro_export]
-macro_rules! serialize_as_number {
-    (PATH ( $field_path:tt ){ $($name:ident,)* }) => {
-        $(
-            impl serde::Serialize for $name {
-                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where
-                    S: Serializer,
-                {
-                    let s = format!("{}", self.$field_path.as_usize());
-                    serializer.serialize_str(&s)
-                }
-            }
-        )*
+      pty::ProofNodeIdx,
+      pty::GoalIdx,
+      pty::CandidateIdx,
+      pty::ResultIdx,
     }
+  }
+
+  #[test]
+  fn export_bindings_rustc_utils() {
+    use rustc_utils::source_map::{filename as fty, range as uty};
+
+    argus_ser::ts! {
+      uty::CharPos,
+      uty::CharRange,
+      fty::FilenameIndex,
+    }
+  }
 }

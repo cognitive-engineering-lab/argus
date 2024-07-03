@@ -1,0 +1,37 @@
+[package]
+name = "argus-ser"
+version = "0.1.6"
+edition = "2021"
+authors = ["Gavin Gray <gavinleroy6@gmail.com>"]
+repository = "https://github.com/cognitive-engineering-lab/argus"
+description = "Rustc Ty serialization and TS bindings."
+license = "MIT"
+
+[features]
+testing = [
+  "ts-rs",
+  "rustc_utils/serde",
+  "rustc_utils/ts-rs",
+]
+
+[lib]
+doctest = false
+
+[dependencies]
+log.workspace = true
+anyhow.workspace = true
+fluid-let.workspace = true
+rustc_utils.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+smallvec = "1.11.2"
+ts-rs = { version = "7.1.1", features = ["indexmap-impl"], optional = true }
+index_vec = { version = "0.1.3", features = ["serde"] }
+
+[dev-dependencies]
+argus-ser = { path = ".", features = ["testing"] }
+
+[package.metadata.rust-analyzer]
+# This crate uses #[feature(rustc_private)].
+# See https://github.com/rust-analyzer/rust-analyzer/pull/7891
+rustc_private = true

@@ -1,8 +1,8 @@
-import { ProofCycle } from "@argus/common/bindings";
+import type { ProofCycle } from "@argus/common/bindings";
+import { TreeAppContext } from "@argus/common/context";
 import _ from "lodash";
 import React, { useContext } from "react";
 
-import { TreeAppContext } from "../utilities/context";
 import { DirRecursive } from "./Directory";
 
 const TreeCycle = ({ path }: { path: ProofCycle }) => {

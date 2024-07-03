@@ -1,4 +1,7 @@
-import { ProofNodeIdx } from "@argus/common/bindings";
+import type { ProofNodeIdx } from "@argus/common/bindings";
+import type { TreeRenderParams } from "@argus/common/communication";
+import { TreeAppContext } from "@argus/common/context";
+import { IcoTreeDown } from "@argus/print/Icons";
 import {
   FloatingFocusManager,
   FloatingPortal,
@@ -7,21 +10,19 @@ import {
   useClick,
   useDismiss,
   useFloating,
-  useInteractions,
+  useInteractions
 } from "@floating-ui/react";
 import classNames from "classnames";
 import _ from "lodash";
 import React, { useContext, useState } from "react";
 
-import { IcoTreeDown } from "../Icons";
-import { TreeAppContext } from "../utilities/context";
-import { DirRecursive, TreeRenderParams } from "./Directory";
+import { DirRecursive } from "./Directory";
 import Graph from "./Graph";
 import "./TopDown.css";
 
 export const WrapTreeIco = ({
   n,
-  Child,
+  Child
 }: {
   n: ProofNodeIdx;
   Child: React.ReactElement;
@@ -32,14 +33,14 @@ export const WrapTreeIco = ({
     open: isOpen,
     onOpenChange: setIsOpen,
     placement: "bottom",
-    middleware: [offset(() => 5), shift()],
+    middleware: [offset(() => 5), shift()]
   });
 
   const click = useClick(context);
   const dismiss = useDismiss(context);
   const { getReferenceProps, getFloatingProps } = useInteractions([
     click,
-    dismiss,
+    dismiss
   ]);
 
   return (
@@ -101,7 +102,7 @@ const TopDown = () => {
           default:
             return 4;
         }
-      },
+      }
     ]);
 
   const getChildren = (idx: ProofNodeIdx) => {
@@ -118,7 +119,7 @@ const TopDown = () => {
 
   const renderParams: TreeRenderParams = {
     Wrapper: WrapTreeIco,
-    styleEdges: true,
+    styleEdges: true
   };
 
   return (

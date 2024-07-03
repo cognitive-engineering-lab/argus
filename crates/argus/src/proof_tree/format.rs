@@ -74,7 +74,7 @@ impl Write for Indentor<'_, '_> {
   }
 }
 
-impl<'a, 'b, 'tcx> ProofTreeFormatter<'a, 'b> {
+impl<'a, 'b> ProofTreeFormatter<'a, 'b> {
   pub(super) fn new(f: &'a mut (dyn Write + 'b), span: Span) -> Self {
     ProofTreeFormatter { f, span }
   }
@@ -101,7 +101,7 @@ impl<'a, 'b, 'tcx> ProofTreeFormatter<'a, 'b> {
     self.nested(move |this| {
       for (i, can) in candidates.into_iter().enumerate() {
         write!(this.f, "CANDIDATE {i}: ")?;
-        this.format_candidate(can)?;
+        this.format_candidate(&can)?;
       }
       Ok(())
     })
@@ -109,7 +109,7 @@ impl<'a, 'b, 'tcx> ProofTreeFormatter<'a, 'b> {
 
   fn format_candidate(
     &mut self,
-    candidate: InspectCandidate<'_, 'tcx>,
+    candidate: &InspectCandidate,
   ) -> std::fmt::Result {
     write!(self.f, "{:?}", candidate.kind())?;
     self.nested(|this| {
@@ -127,6 +127,6 @@ impl<'a, 'b, 'tcx> ProofTreeVisitor<'tcx> for ProofTreeFormatter<'a, 'b> {
   }
 
   fn visit_goal(&mut self, goal: &InspectGoal<'_, 'tcx>) -> Self::Result {
-    self.format_goal(goal).unwrap()
+    self.format_goal(goal).unwrap();
   }
 }

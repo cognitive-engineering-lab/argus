@@ -1,3 +1,4 @@
+use argus_ext::ty::TyCtxtExt;
 use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_hir::{
   self as hir, intravisit::Visitor as HirVisitor, BodyId, HirId,
@@ -5,7 +6,7 @@ use rustc_hir::{
 use rustc_middle::ty::TyCtxt;
 use rustc_span::Span;
 
-use crate::{ext::TyCtxtExt, types::intermediate::ErrorAssemblyCtx};
+use crate::types::intermediate::ErrorAssemblyCtx;
 
 pub fn associate_obligations_nodes(ctx: &ErrorAssemblyCtx) -> Vec<Bin> {
   let mut grouped: HashMap<_, Vec<_>> = HashMap::default();
@@ -64,8 +65,8 @@ pub enum BinKind {
   CallableExpr,
   CallArg,
   Call,
-  MethodCall,
-  MethodReceiver,
+  // MethodCall,
+  // MethodReceiver,
   Misc,
 }
 
@@ -104,7 +105,7 @@ impl BinCreator<'_, '_> {
         hir_id: target,
         obligations,
         kind,
-      })
+      });
     }
   }
 }
@@ -125,11 +126,12 @@ impl<'a, 'tcx: 'a> HirVisitor<'_> for BinCreator<'a, 'tcx> {
         self.drain_nested(callable.hir_id, BinKind::CallableExpr);
         self.drain_nested(ex.hir_id, BinKind::Call);
       }
-      hir::ExprKind::MethodCall(_, func, args, _) => {
+      hir::ExprKind::MethodCall(segment, func, args, _) => {
         for arg in args {
           self.drain_nested(arg.hir_id, BinKind::CallArg);
         }
-        self.drain_nested(func.hir_id, BinKind::MethodReceiver);
+        self.drain_nested(segment.hir_id, BinKind::Call);
+        self.drain_nested(func.hir_id, BinKind::CallArg);
         // [ ] TODO (see above `FIXME`):
         // self.drain_nested(ex.hir_id, BinKind::MethodCall);
         self.drain_nested(ex.hir_id, BinKind::Misc);
@@ -141,9 +143,9 @@ impl<'a, 'tcx: 'a> HirVisitor<'_> for BinCreator<'a, 'tcx> {
 
 // ------------------------------------------------
 
-/// Find the HirId of the node that is the "most enclosing" of the span.
-pub fn find_most_enclosing_node<'tcx>(
-  tcx: &TyCtxt<'tcx>,
+/// Find the `HirId` of the node that is the "most enclosing" of the span.
+pub fn find_most_enclosing_node(
+  tcx: TyCtxt,
   body_id: BodyId,
   span: Span,
 ) -> Option<HirId> {

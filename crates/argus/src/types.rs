@@ -1,6 +1,7 @@
 use std::{collections::HashMap, hash::Hash, ops::Deref, str::FromStr};
 
 use anyhow::Result;
+use argus_ser::{self as ser, interner::TyIdx};
 use index_vec::IndexVec;
 use indexmap::IndexSet;
 use rustc_data_structures::stable_hasher::Hash64;
@@ -10,7 +11,7 @@ use rustc_middle::{
     query::NoSolution,
     solve::{Certainty, MaybeCause},
   },
-  ty::{self, Ty, TyCtxt, TypeckResults},
+  ty::{self, TyCtxt, TypeckResults},
 };
 use rustc_span::{def_id::DefId, Span};
 use rustc_utils::source_map::range::{CharRange, ToSpan};
@@ -18,25 +19,14 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
-use self::intermediate::EvaluationResult;
+pub use self::intermediate::{EvaluationResult, EvaluationResultDef};
 use crate::{
-  analysis::{FullObligationData, SynIdx, UODIdx},
   proof_tree::SerializedTree,
-  serialize::{
-    safe::{PathDefNoArgs, TraitRefPrintOnlyTraitPathDef},
-    serialize_to_value,
-    ty::{
-      Polarity, RegionDef, Slice__ClauseDef, Slice__GenericArgDef,
-      Slice__TyDef, TyDef,
-    },
-  },
+  tls::{self, FullObligationData, UODIdx},
 };
 
-// -----------------
-
-crate::define_idx! { usize,
+ser::define_idx! { usize,
   ExprIdx,
-  MethodLookupIdx,
   ObligationIdx
 }
 
@@ -48,15 +38,6 @@ pub struct BodyBundle {
   pub filename: String,
   pub body: ObligationsInBody,
   pub trees: HashMap<ObligationHash, SerializedTree>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub struct MethodLookup {
-  pub candidates: ExtensionCandidates,
-  pub table: Vec<MethodStep>,
 }
 
 #[derive(Serialize)]
@@ -75,39 +56,12 @@ impl ExtensionCandidates {
   ) -> Self {
     let wrapped = traits
       .into_iter()
-      .map(TraitRefPrintOnlyTraitPathDef)
+      .map(ser::TraitRefPrintOnlyTraitPathDef)
       .collect::<Vec<_>>();
-    let json = serialize_to_value(infcx, &wrapped)
-      .expect("failed to serialied trait refs for method lookup");
+    let json = tls::unsafe_access_interner(|ty_interner| {
+      ser::to_value_expect(infcx, ty_interner, &wrapped)
+    });
     ExtensionCandidates { data: json }
-  }
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub struct MethodStep {
-  pub recvr_ty: ReceiverAdjStep,
-  pub trait_predicates: Vec<ObligationIdx>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub struct ReceiverAdjStep {
-  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
-  ty: serde_json::Value,
-}
-
-impl ReceiverAdjStep {
-  pub fn new<'tcx>(infcx: &InferCtxt<'tcx>, ty: Ty<'tcx>) -> Self {
-    #[derive(Serialize)]
-    struct Wrapper<'tcx>(#[serde(with = "TyDef")] Ty<'tcx>);
-    let value =
-      serialize_to_value(infcx, &Wrapper(ty)).expect("failed to serialize ty");
-    ReceiverAdjStep { ty: value }
   }
 }
 
@@ -130,14 +84,8 @@ pub struct Expr {
 pub enum ExprKind {
   Misc,
   CallableExpr,
-  MethodReceiver,
   Call,
   CallArg,
-  #[serde(rename_all = "camelCase")]
-  MethodCall {
-    data: MethodLookupIdx,
-    error_recvr: bool,
-  },
 }
 
 #[derive(Serialize)]
@@ -151,7 +99,7 @@ pub struct AmbiguityError {
 
 impl Hash for AmbiguityError {
   fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-    self.idx.hash(state)
+    self.idx.hash(state);
   }
 }
 
@@ -202,8 +150,8 @@ pub struct ObligationsInBody {
   #[cfg_attr(feature = "testing", ts(type = "Expr[]"))]
   pub exprs: IndexVec<ExprIdx, Expr>,
 
-  #[cfg_attr(feature = "testing", ts(type = "MethodLookup[]"))]
-  pub method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,
+  #[cfg_attr(feature = "testing", ts(type = "TyVal[]"))]
+  pub tys: IndexVec<TyIdx, serde_json::Value>,
 }
 
 impl ObligationsInBody {
@@ -214,11 +162,14 @@ impl ObligationsInBody {
     trait_errors: Vec<TraitError>,
     obligations: IndexVec<ObligationIdx, Obligation>,
     exprs: IndexVec<ExprIdx, Expr>,
-    method_lookups: IndexVec<MethodLookupIdx, MethodLookup>,
   ) -> Self {
-    let json_name = id.and_then(|(infcx, id)| {
-      serialize_to_value(infcx, &PathDefNoArgs(id)).ok()
+    let json_name = id.map(|(infcx, id)| {
+      tls::unsafe_access_interner(|ty_interner| {
+        ser::to_value_expect(infcx, ty_interner, &ser::PathDefNoArgs(id))
+      })
     });
+
+    let tys = tls::take_interned_tys();
     ObligationsInBody {
       name: json_name,
       hash: BodyHash::new(),
@@ -227,7 +178,7 @@ impl ObligationsInBody {
       trait_errors,
       obligations,
       exprs,
-      method_lookups,
+      tys,
     }
   }
 }
@@ -256,69 +207,9 @@ pub struct Obligation {
   pub range: CharRange,
   pub kind: ObligationKind,
   pub necessity: ObligationNecessity,
-  #[serde(with = "intermediate::EvaluationResultDef")]
+  #[serde(with = "EvaluationResultDef")]
   #[cfg_attr(feature = "testing", ts(type = "EvaluationResult"))]
-  pub result: intermediate::EvaluationResult,
-  pub is_synthetic: bool,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub struct ImplHeader<'tcx> {
-  #[serde(with = "Slice__GenericArgDef")]
-  #[cfg_attr(feature = "testing", ts(type = "GenericArg[]"))]
-  pub args: Vec<ty::GenericArg<'tcx>>,
-
-  #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
-  pub name: TraitRefPrintOnlyTraitPathDef<'tcx>,
-
-  #[serde(with = "TyDef")]
-  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
-  pub self_ty: ty::Ty<'tcx>,
-
-  pub predicates: GroupedClauses<'tcx>,
-
-  #[serde(with = "Slice__TyDef")]
-  #[cfg_attr(feature = "testing", ts(type = "Ty[]"))]
-  pub tys_without_default_bounds: Vec<Ty<'tcx>>,
-}
-
-#[derive(Serialize)]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub struct GroupedClauses<'tcx> {
-  pub grouped: Vec<ClauseWithBounds<'tcx>>,
-  #[serde(with = "Slice__ClauseDef")]
-  #[cfg_attr(feature = "testing", ts(type = "Clause[]"))]
-  pub other: Vec<ty::Clause<'tcx>>,
-}
-
-#[derive(Serialize)]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub struct ClauseWithBounds<'tcx> {
-  #[serde(with = "TyDef")]
-  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
-  pub ty: ty::Ty<'tcx>,
-  pub bounds: Vec<ClauseBound<'tcx>>,
-}
-
-#[derive(Serialize)]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub enum ClauseBound<'tcx> {
-  Trait(
-    Polarity,
-    #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
-    TraitRefPrintOnlyTraitPathDef<'tcx>,
-  ),
-  Region(
-    #[serde(with = "RegionDef")]
-    #[cfg_attr(feature = "testing", ts(type = "Region"))]
-    ty::Region<'tcx>,
-  ),
+  pub result: EvaluationResult,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
@@ -332,10 +223,9 @@ pub enum ObligationNecessity {
 
 impl ObligationNecessity {
   pub fn is_necessary(&self, res: EvaluationResult) -> bool {
-    use ObligationNecessity::*;
     matches!(
       (self, res),
-      (Yes, _) // TODO: | (OnError, Err(..))
+      (ObligationNecessity::Yes, _) // TODO: | (OnError, Err(..))
     )
   }
 }
@@ -373,14 +263,11 @@ pub struct ObligationHash(
 pub struct Target {
   pub hash: ObligationHash,
   pub span: Span,
-  pub is_synthetic: bool,
 }
 
 pub trait ToTarget {
   fn to_target(self, tcx: TyCtxt) -> Result<Target>;
 }
-
-// ------------------------------
 
 impl Deref for ObligationHash {
   type Target = u64;
@@ -421,17 +308,6 @@ impl<U: Into<ObligationHash>, T: ToSpan> ToTarget for (U, T) {
     self.1.to_span(tcx).map(|span| Target {
       hash: self.0.into(),
       span,
-      is_synthetic: false,
-    })
-  }
-}
-
-impl<U: Into<ObligationHash>, T: ToSpan> ToTarget for (U, T, bool) {
-  fn to_target(self, tcx: TyCtxt) -> Result<Target> {
-    self.1.to_span(tcx).map(|span| Target {
-      hash: self.0.into(),
-      span,
-      is_synthetic: self.2,
     })
   }
 }
@@ -489,7 +365,6 @@ pub(super) mod intermediate {
     pub hir_id: HirId,
     // Index into the full provenance data, this is stored for interesting obligations.
     pub full_data: Option<UODIdx>,
-    pub synthetic_data: Option<SynIdx>,
     pub it: T,
   }
 
@@ -499,7 +374,6 @@ pub(super) mod intermediate {
         it: f(&self.it),
         hir_id: self.hir_id,
         full_data: self.full_data,
-        synthetic_data: self.synthetic_data,
       }
     }
   }
@@ -514,15 +388,6 @@ pub(super) mod intermediate {
   impl<T: Sized> Provenance<T> {
     pub fn forget(self) -> T {
       self.it
-    }
-  }
-
-  impl Provenance<Obligation> {
-    pub(crate) fn mark_as_synthetic(&mut self, idx: SynIdx) {
-      if self.synthetic_data.is_none() {
-        self.synthetic_data = Some(idx);
-        self.it.is_synthetic = true;
-      }
     }
   }
 
@@ -542,7 +407,7 @@ pub(super) mod intermediate {
 
   impl<T: Hash> Hash for Provenance<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-      self.it.hash(state)
+      self.it.hash(state);
     }
   }
 
@@ -555,7 +420,7 @@ pub(super) mod intermediate {
   impl<T: Sized> ForgetProvenance for Vec<Provenance<T>> {
     type Target = Vec<T>;
     fn forget(self) -> Self::Target {
-      self.into_iter().map(|f| f.forget()).collect()
+      self.into_iter().map(Provenance::forget).collect()
     }
   }
 
@@ -582,7 +447,6 @@ pub(super) mod intermediate {
     pub hash: ObligationHash,
     pub obligation: &'a PredicateObligation<'tcx>,
     pub result: EvaluationResult,
-    pub is_synthetic: bool,
   }
 
   impl FulfillmentData<'_, '_> {
@@ -601,83 +465,15 @@ pub(super) mod intermediate {
     pub body_id: BodyId,
     pub typeck_results: &'tcx TypeckResults<'tcx>,
     pub obligations: &'a Vec<Provenance<Obligation>>,
-    pub obligation_data: &'a ObligationQueriesInBody<'tcx>,
+    pub obligation_data: &'a FullData<'tcx>,
   }
 
   #[derive(PartialEq)]
-  pub struct FullData<'tcx> {
-    pub(crate) obligations: ObligationQueriesInBody<'tcx>,
-    pub(crate) synthetic: SyntheticQueriesInBody<'tcx>,
-  }
+  pub struct FullData<'tcx>(IndexVec<UODIdx, FullObligationData<'tcx>>);
 
   impl<'tcx> FullData<'tcx> {
-    pub fn iter<'me>(
-      &'me self,
-    ) -> impl Iterator<
-      Item = (&PredicateObligation<'tcx>, ObligationHash, &InferCtxt<'tcx>),
-    > + 'me {
-      self
-        .synthetic
-        .iter()
-        .map(|sdata| (&sdata.obligation, sdata.hash, &sdata.infcx))
-        .chain(
-          self
-            .obligations
-            .iter()
-            .map(|fdata| (&fdata.obligation, fdata.hash, &fdata.infcx)),
-        )
-    }
-  }
-
-  pub(crate) struct SyntheticData<'tcx> {
-    // points to the used `InferCtxt`
-    pub full_data: UODIdx,
-    pub obligation: PredicateObligation<'tcx>,
-    pub hash: ObligationHash,
-    // TODO: get rid of this, but it seems that the internal
-    // mutability is screwing something up so the hashes can
-    // no longer be found after they're added (for synthetic
-    // data only).
-    pub infcx: InferCtxt<'tcx>,
-  }
-
-  impl PartialEq for SyntheticData<'_> {
-    fn eq(&self, other: &Self) -> bool {
-      self.obligation == other.obligation && self.full_data == other.full_data
-    }
-  }
-
-  #[derive(PartialEq)]
-  pub(crate) struct SyntheticQueriesInBody<'tcx>(
-    IndexVec<SynIdx, SyntheticData<'tcx>>,
-  );
-
-  impl<'tcx> SyntheticQueriesInBody<'tcx> {
-    pub fn new() -> Self {
-      SyntheticQueriesInBody(Default::default())
-    }
-
-    pub fn is_empty(&self) -> bool {
-      self.0.is_empty()
-    }
-
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &SyntheticData<'tcx>> {
-      self.0.iter()
-    }
-
-    pub(crate) fn add(&mut self, data: SyntheticData<'tcx>) -> SynIdx {
-      self.0.push(data)
-    }
-  }
-
-  #[derive(PartialEq)]
-  pub(crate) struct ObligationQueriesInBody<'tcx>(
-    IndexVec<UODIdx, FullObligationData<'tcx>>,
-  );
-
-  impl<'tcx> ObligationQueriesInBody<'tcx> {
     pub(crate) fn new(v: IndexVec<UODIdx, FullObligationData<'tcx>>) -> Self {
-      ObligationQueriesInBody(v)
+      FullData(v)
     }
 
     pub(crate) fn get(&self, idx: UODIdx) -> &FullObligationData<'tcx> {

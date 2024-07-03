@@ -13,7 +13,7 @@ runs:
       shell: bash
 
     - name: Install Depot
-      run: cargo install --git https://github.com/cognitive-engineering-lab/depot.git depot-js && depot setup
+      run: curl https://raw.githubusercontent.com/cognitive-engineering-lab/depot/main/scripts/install.sh | sh
       shell: bash
 
     - name: Install Test Libraries
@@ -29,5 +29,5 @@ runs:
       shell: bash
 
     - name: Install Argus
-      run: cargo install --path crates/argus_cli --debug --locked
+      run: cargo install --path crates/argus-cli --debug --locked
       shell: bash

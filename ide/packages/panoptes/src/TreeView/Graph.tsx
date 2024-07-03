@@ -1,20 +1,21 @@
-import { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
+import type { TreeInfo } from "@argus/common/TreeInfo";
+import type { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
+import { TreeAppContext } from "@argus/common/context";
 import _ from "lodash";
 import React, {
-  MouseEventHandler,
+  type MouseEventHandler,
   useCallback,
   useContext,
   useLayoutEffect,
   useRef,
-  useState,
+  useState
 } from "react";
 // @ts-ignore
+// biome-ignore lint/style/useImportType: ts-ignore
 import Tree, { Orientation, TreeLinkDatum, TreeNodeDatum } from "react-d3-tree";
 
-import { TreeAppContext } from "../utilities/context";
 import "./Graph.css";
 import { Node, Result } from "./Node";
-import { TreeInfo } from "./TreeInfo";
 
 const useCenteredTree = (
   defaultTranslate = { x: 0, y: 0 }
@@ -43,7 +44,7 @@ const getEdgeClass =
 const TreeNode = ({
   nodeDatum,
   toggleNode,
-  hoverNode,
+  hoverNode
 }: {
   nodeDatum: TreeNodeDatum;
   toggleNode: MouseEventHandler<SVGRectElement>;
@@ -61,12 +62,13 @@ const TreeNode = ({
     if (ref.current) {
       setDimensions({
         width: ref.current.offsetWidth,
-        height: ref.current.offsetHeight,
+        height: ref.current.offsetHeight
       });
     }
   }, []);
 
   const RectangleNode = () => (
+    /* biome-ignore lint/a11y/useKeyWithClickEvents: TODO */
     <rect
       data-sidx={idx}
       x={-dimensions.width / 2}
@@ -114,14 +116,14 @@ const topologyToTreeData = (
 ): TreeNodeDatum => {
   let kids = topology.children[idx];
   let obj: TreeNodeDatum = {
-    name: idx,
+    name: idx
   };
 
   if (kids) {
     let kobjs = _.map(kids, k => topologyToTreeData(topology, k));
     obj = {
       ...obj,
-      children: kobjs,
+      children: kobjs
     };
   }
 

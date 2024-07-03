@@ -1,0 +1,4 @@
+.MonospaceArea {
+    font-family: var(--vscode-editor-font-family);
+    font-size: var(--vscode-editor-font-size);
+}

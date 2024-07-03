@@ -1,17 +1,15 @@
-import { ObligationsInBody } from "@argus/common/bindings";
-import { Filename, SystemSpec } from "@argus/common/lib";
+import type { FileInfo } from "@argus/common/lib";
+import ReportBugUrl from "@argus/print/ReportBugUrl";
 import {
-  VSCodeCheckbox,
   VSCodePanelTab,
   VSCodePanelView,
-  VSCodePanels,
+  VSCodePanels
 } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import React, { useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import File from "./File";
-import ReportBugUrl from "./ReportBugUrl";
 import "./Workspace.css";
 
 // TODO: the workspace should manage a set of files. Currently the App is doing
@@ -26,58 +24,49 @@ const FatalErrorPanel = ({ error, resetErrorBoundary }: any) => (
     Whoops! This is not a drill, a fatal error occurred. Please{" "}
     <ReportBugUrl displayText="click here" error={error.message} />
     to report this error to the Argus team.
-    <button onClick={resetErrorBoundary}>Reset Argus</button>
+    <button type="button" onClick={resetErrorBoundary}>
+      Reset Argus
+    </button>
   </div>
 );
 
 const Workspace = ({
   files,
-  reset,
+  reset
 }: {
-  files: [Filename, ObligationsInBody[]][];
+  files: FileInfo[];
   reset: () => void;
 }) => {
-  const [showHidden, setShowHidden] = useState(false);
-  const toggleHidden = () => setShowHidden(!showHidden);
+  const [active, setActive] = useState(0);
 
-  const checkbox = (
-    <div style={{ position: "fixed", top: "0", right: "0" }}>
-      <VSCodeCheckbox onChange={toggleHidden} checked={showHidden}>
-        Show hidden information
-      </VSCodeCheckbox>
-    </div>
-  );
+  const mkActiveSet = (idx: number) => () => setActive(idx);
+  const tabName = (idx: number) => `tab-${idx}`;
 
-  const tabs = _.map(files, ([filename, _], idx) => (
-    <VSCodePanelTab key={idx} id={`tab-${idx}`}>
-      {basename(filename)}
+  const tabs = _.map(files, ({ fn }, idx) => (
+    <VSCodePanelTab key={idx} id={tabName(idx)} onClick={mkActiveSet(idx)}>
+      {basename(fn)}
     </VSCodePanelTab>
   ));
 
-  const fileComponents = _.map(files, ([filename, content], idx) => (
-    <ErrorBoundary
-      key={idx}
-      FallbackComponent={FatalErrorPanel}
-      onReset={reset}
-    >
-      <VSCodePanelView
+  const fileComponents = _.map(files, ({ fn, data }, idx) => (
+    <VSCodePanelView key={idx} style={{ paddingLeft: 0, paddingRight: 0 }}>
+      <ErrorBoundary
         key={idx}
-        id={`view-${idx}`}
-        style={{ paddingLeft: 0, paddingRight: 0 }}
+        FallbackComponent={FatalErrorPanel}
+        onReset={reset}
       >
-        <File file={filename} osibs={content} showHidden={showHidden} />
-      </VSCodePanelView>
-    </ErrorBoundary>
+        <File file={fn} osibs={data} />
+      </ErrorBoundary>
+    </VSCodePanelView>
   ));
 
   return (
-    <>
-      {/* <div>{checkbox}</div> */}
-      <VSCodePanels>
+    <div className="workspace-area">
+      <VSCodePanels activeid={tabName(active)}>
         {tabs}
         {fileComponents}
       </VSCodePanels>
-    </>
+    </div>
   );
 };
 

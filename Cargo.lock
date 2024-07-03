@@ -28,6 +28,7 @@ name = "argus-cli"
 version = "0.1.6"
 dependencies = [
  "anyhow",
+ "argus-ext",
  "argus-lib",
  "clap",
  "env_logger 0.9.3",
@@ -40,11 +41,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "argus-ext"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "fluid-let",
+ "itertools",
+ "log",
+ "regex",
+ "rustc_utils",
+ "smallvec",
+]
+
+[[package]]
 name = "argus-lib"
 version = "0.1.6"
 dependencies = [
  "anyhow",
+ "argus-ext",
  "argus-lib",
+ "argus-ser",
  "env_logger 0.9.3",
  "fluid-let",
  "index_vec",
@@ -60,6 +76,22 @@ dependencies = [
  "text-diff",
  "ts-rs",
  "uuid",
+]
+
+[[package]]
+name = "argus-ser"
+version = "0.1.6"
+dependencies = [
+ "anyhow",
+ "argus-ser",
+ "fluid-let",
+ "index_vec",
+ "log",
+ "rustc_utils",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "ts-rs",
 ]
 
 [[package]]
@@ -431,9 +463,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.10.3"
+version = "1.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b62dbe01f0b06f9d8dc7d49e05a0785f153b00b2c227856282f671e0318c9b15"
+checksum = "b91213439dad192326a0d7c6ee3955910425f441d7038e0d6933b0aec5c4517f"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -549,9 +581,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.12.0"
+version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2593d31f82ead8df961d8bd23a64c2ccf2eb5dd34b0a34bfb4dd54011c72009e"
+checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
 
 [[package]]
 name = "syn"

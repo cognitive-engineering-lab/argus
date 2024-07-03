@@ -24,7 +24,6 @@
 }
 
 .DirNode {
-    font-family: Menlo, Monaco, "Courier New", monospace;
     display: flex;
     flex-direction: column;    
     gap: 10px;

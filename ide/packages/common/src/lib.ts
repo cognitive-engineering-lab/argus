@@ -1,7 +1,7 @@
+import type { CancelablePromise as CPromise } from "cancelable-promise";
 import newGithubIssueUrl from "new-github-issue-url";
-import { unescape } from "querystring";
 
-import {
+import type {
   BodyBundle,
   BodyHash,
   CharRange,
@@ -9,7 +9,7 @@ import {
   Obligation,
   ObligationHash,
   ObligationsInBody,
-  SerializedTree,
+  SerializedTree
 } from "./bindings";
 
 export interface ErrorJumpTargetInfo {
@@ -21,7 +21,7 @@ export interface ErrorJumpTargetInfo {
 
 export const ConfigConsts = {
   PANOPTES_NAME: "panoptes",
-  EMBED_NAME: "argus-embed",
+  EMBED_NAME: "argus-embed"
 };
 
 // ----------------------------------------------------
@@ -34,13 +34,18 @@ export type PanoptesOptionalData = {
 
 export type SystemSpec = Omit<IssueOptions, "logText">;
 export type EvaluationMode = "release" | "rank" | "random";
+export interface FileInfo {
+  fn: Filename;
+  data: ObligationsInBody[];
+  signature?: string;
+}
 
 export type PanoptesConfig = PanoptesOptionalData &
   (
     | {
         type: "VSCODE_BACKING";
         spec: SystemSpec;
-        data: [Filename, ObligationsInBody[]][];
+        data: FileInfo[];
       }
     | {
         type: "WEB_BUNDLE";
@@ -74,8 +79,8 @@ export type CommonData = {
 export type SystemReturn<T extends PanoptesToSystemCmds> = T extends "tree"
   ? { tree?: SerializedTree }
   : T extends "obligations"
-  ? { obligations: ObligationsInBody[] }
-  : {};
+    ? { obligations: ObligationsInBody[] }
+    : {};
 
 export interface OpenErrorPayload {
   command: "open-error";
@@ -92,65 +97,88 @@ export type PayloadTypes = {
 };
 
 export type SystemToPanoptesCmds =
+  // Destroy all obligation and tree data
   | "havoc"
+  // (Un-)Pin mini-buffer data for inspection
+  | "pin"
+  | "unpin"
+  // Open the current file into the webview workspace
   | "open-file"
+  // Highlight and error and scroll it into view
   | "open-error"
+  // Send the requested tree to the webview
   | "tree";
 
 export type SystemToPanoptesMsg<T extends SystemToPanoptesCmds> = {
   command: T;
   type: FROM_EXT;
-} & (T extends "havoc"
+} & (T extends "havoc" | "pin" | "unpin"
   ? {}
-  : CommonData &
+  : // ^^^ NOTE ^^^
+    // Havoc and Pin are global operations and don't require View state
+    CommonData &
       (T extends "open-file"
         ? { data: ObligationsInBody[]; signature: string }
         : T extends "open-error"
-        ? {
-            bodyIdx: BodyHash;
-            exprIdx: ExprIdx;
-            hash: ObligationHash;
-          }
-        : T extends "tree"
-        ? { tree?: SerializedTree }
-        : never));
+          ? {
+              bodyIdx: BodyHash;
+              exprIdx: ExprIdx;
+              hash: ObligationHash;
+            }
+          : T extends "tree"
+            ? { tree?: SerializedTree }
+            : never));
 
 export type PanoptesToSystemCmds =
+  // Request obligations associated with the current file
   | "obligations"
+  // Request the proof tree for the given obligation
   | "tree"
+  // Add a highlight to the current file
   | "add-highlight"
+  // Remove a highlight from the current file
   | "remove-highlight";
+
 export type PanoptesToSystemMsg<T extends PanoptesToSystemCmds> = CommonData & {
   command: T;
   type: FROM_WV;
 } & (T extends "obligations"
     ? {}
     : T extends "tree"
-    ? { predicate: Obligation; range: CharRange }
-    : T extends "add-highlight" | "remove-highlight"
-    ? { range: CharRange }
-    : never);
+      ? { predicate: Obligation; range: CharRange }
+      : T extends "add-highlight" | "remove-highlight"
+        ? { range: CharRange }
+        : never);
 
 // ------------------------------------------------------
 // Interface between the system and rustc plugin
 
-export type ArgusCliOptions = "preload" | "tree" | "obligations";
+export type ArgusCliOptions =
+  // Type-check the open workspace (eqv to running `cargo check`)
+  | "preload"
+  // Generate a proof tree for the given obligation
+  | "tree"
+  // Record obligations for the given file
+  | "obligations";
 
+/**
+ * The arguments associated with each command for invoking the Argus backend.
+ */
 export type ArgusArgs<T extends ArgusCliOptions> = T extends "preload"
   ? ["preload"]
   : T extends "obligations"
-  ? ["obligations", Filename]
-  : T extends "tree"
-  ? ["tree", Filename, string, number, number, number, number, boolean]
-  : never;
+    ? ["obligations", Filename]
+    : T extends "tree"
+      ? ["tree", Filename, string, number, number, number, number]
+      : never;
 
 export type ArgusReturn<T extends ArgusCliOptions> = T extends "preload"
-  ? void
+  ? undefined
   : T extends "tree"
-  ? Array<SerializedTree | undefined>
-  : T extends "obligations"
-  ? ObligationsInBody[]
-  : never;
+    ? Array<SerializedTree | undefined>
+    : T extends "obligations"
+      ? ObligationsInBody[]
+      : never;
 
 // serde-compatible type
 export type Result<T> = { Ok: T } | { Err: ArgusError };
@@ -172,8 +200,9 @@ export type ArgusResult<T extends ArgusCliOptions> =
 // might be achievable with TS, but too tired rn to think about that.
 export type CallArgus = <T extends ArgusCliOptions>(
   _args: ArgusArgs<T>,
-  _no_output?: boolean
-) => Promise<ArgusResult<T>>;
+  _noOutput?: boolean,
+  _ignoreExitCode?: boolean
+) => CPromise<ArgusResult<T>>;
 
 // Type predicates (these shouldn't really exist ...)
 
@@ -181,49 +210,29 @@ function objWCmd(m: any): m is { command: string } {
   return typeof m === "object" && "command" in m;
 }
 
-export function isSysMsgOpenError(
-  msg: unknown
-): msg is SystemToPanoptesMsg<"open-error"> {
-  return objWCmd(msg) && msg.command === "open-error";
-}
+const makeSysMsgPredicateF =
+  <T extends SystemToPanoptesCmds>(cmd: T) =>
+  (msg: unknown): msg is SystemToPanoptesMsg<T> =>
+    objWCmd(msg) && msg.command === cmd;
 
-export function isSysMsgOpenFile(
-  msg: unknown
-): msg is SystemToPanoptesMsg<"open-file"> {
-  return objWCmd(msg) && msg.command === "open-file";
-}
-
-export function isSysMsgHavoc(
-  msg: unknown
-): msg is SystemToPanoptesMsg<"havoc"> {
-  return objWCmd(msg) && msg.command === "havoc";
-}
+export const isSysMsgOpenError = makeSysMsgPredicateF("open-error");
+export const isSysMsgOpenFile = makeSysMsgPredicateF("open-file");
+export const isSysMsgHavoc = makeSysMsgPredicateF("havoc");
+export const isSysMsgPin = makeSysMsgPredicateF("pin");
+export const isSysMsgUnpin = makeSysMsgPredicateF("unpin");
 
 // ------------------------------------------------------
 
-export function isPanoMsgObligations(
-  msg: unknown
-): msg is PanoptesToSystemMsg<"obligations"> {
-  return objWCmd(msg) && msg.command === "obligations";
-}
+const makePanoMsgPredicateF =
+  <T extends PanoptesToSystemCmds>(cmd: T) =>
+  (msg: unknown): msg is PanoptesToSystemMsg<T> =>
+    objWCmd(msg) && msg.command === cmd;
 
-export function isPanoMsgTree(
-  msg: unknown
-): msg is PanoptesToSystemMsg<"tree"> {
-  return objWCmd(msg) && msg.command === "tree";
-}
-
-export function isPanoMsgAddHighlight(
-  msg: unknown
-): msg is PanoptesToSystemMsg<"add-highlight"> {
-  return objWCmd(msg) && msg.command === "add-highlight";
-}
-
-export function isPanoMsgRemoveHighlight(
-  msg: unknown
-): msg is PanoptesToSystemMsg<"remove-highlight"> {
-  return objWCmd(msg) && msg.command === "remove-highlight";
-}
+export const isPanoMsgObligations = makePanoMsgPredicateF("obligations");
+export const isPanoMsgTree = makePanoMsgPredicateF("tree");
+export const isPanoMsgAddHighlight = makePanoMsgPredicateF("add-highlight");
+export const isPanoMsgRemoveHighlight =
+  makePanoMsgPredicateF("remove-highlight");
 
 export interface IssueOptions {
   osPlatform: string;
@@ -249,7 +258,7 @@ export function getArgusIssueUrl(err: string, opts: IssueOptions) {
 ${bts}
 ${err}
 ${bts}
-${opts.logText}`,
+${opts.logText}`
   });
 
   return url;

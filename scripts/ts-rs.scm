@@ -9,7 +9,16 @@
              )
 
 
-(define gen-dir "crates/argus/bindings")
+;; add the bindings directory from each subdir of crates/
+(define gen-dirs
+  (let* ((rx (make-regexp "\\.{1,2}"))
+         (argus-dir? (lambda (d) (not (regexp-exec rx d)))))
+    (filter-map (lambda (d)
+                  (and (argus-dir? d)
+                       (let ((dir (format #f "crates/~a/bindings" d)))
+                         (and (file-exists? dir) dir))))
+                (scandir "crates"))))
+
 ;; Include files here if hand-written TS bindings are required.
 (define ext-dirs '())
 
@@ -109,7 +118,7 @@
 
 (define (main)
   (build-binding-interface
-   (cons gen-dir ext-dirs)
+   (append gen-dirs ext-dirs)
    dest-dir
    evaluation-result
    ))

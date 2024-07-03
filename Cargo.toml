@@ -1,7 +1,15 @@
 [workspace]
 members = [ "crates/*" ]
-exclude = [ "crates/argus_cli/tests/workspaces", "examples" ]
+exclude = [ "crates/argus-cli/tests/workspaces", "examples" ]
 resolver = "2"
+
+[workspace.dependencies]
+log = "0.4"
+anyhow = "1.0.75"
+serde = { version = "1.0.192", features = ["derive"] }
+serde_json = "1.0.108"
+rustc_utils = { version = "=0.10.0-nightly-2024-05-20", features = ["serde"] }
+fluid-let = "1.0.0"
 
 [profile.dev.package.similar]
 opt-level = 3

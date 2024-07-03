@@ -1,24 +1,16 @@
+import path from "node:path";
 import _ from "lodash";
-import path from "path";
 import { chromium } from "playwright";
 
-import { RootCause } from "./rootCauses";
+import type { RootCause } from "./rootCauses";
 import {
   argusData,
   expandBottomUpView,
   forFileInBundle,
   openPage,
   sleep,
-  testCases,
+  testCases
 } from "./utils";
-
-interface ReturnType {
-  workspace: string;
-  filename: string;
-  cause: string;
-  numberTreeNodes?: number;
-  rank?: number;
-}
 
 async function createWorkspaceRunner() {
   // Shared state among all runs
@@ -36,7 +28,10 @@ async function createWorkspaceRunner() {
         | { file: string; message: string }
         | undefined;
 
-      if (!cause) return;
+      if (!cause) {
+        console.debug(`MISSING: cause ${workspace}/${filename}`);
+        return;
+      }
       const page = await openPage(context, filename, bundles, "rank");
 
       await sleep(5000);
@@ -69,7 +64,7 @@ async function createWorkspaceRunner() {
         filename,
         cause: cause.message,
         numberTreeNodes,
-        rank,
+        rank
       };
     });
   };

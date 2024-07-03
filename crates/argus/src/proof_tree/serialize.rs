@@ -1,6 +1,5 @@
-use std::collections::HashSet;
-
 use anyhow::{bail, Result};
+use argus_ext::ty::{EvaluationResultExt, TyExt};
 use index_vec::IndexVec;
 use rustc_hir::def_id::DefId;
 use rustc_infer::infer::InferCtxt;
@@ -12,27 +11,65 @@ use rustc_trait_selection::{
 };
 
 use super::{interners::Interners, *};
+use crate::aadebug;
 
-pub struct SerializedTreeVisitor {
+pub struct SerializedTreeVisitor<'tcx> {
   pub root: Option<ProofNodeIdx>,
   pub previous: Option<ProofNodeIdx>,
   pub nodes: IndexVec<ProofNodeIdx, Node>,
   pub topology: TreeTopology,
-  pub unnecessary_roots: HashSet<ProofNodeIdx>,
   pub cycle: Option<ProofCycle>,
+  pub projection_values: HashMap<TyIdx, TyIdx>,
+
+  deferred_leafs: Vec<(ProofNodeIdx, EvaluationResult)>,
   interners: Interners,
+  aadebug: aadebug::Storage<'tcx>,
 }
 
-impl SerializedTreeVisitor {
-  pub fn new() -> Self {
+impl SerializedTreeVisitor<'_> {
+  pub fn new(maybe_ambiguous: bool) -> Self {
     SerializedTreeVisitor {
       root: None,
       previous: None,
       nodes: IndexVec::default(),
       topology: TreeTopology::new(),
-      unnecessary_roots: HashSet::default(),
       cycle: None,
+      projection_values: HashMap::default(),
+
+      deferred_leafs: Vec::default(),
       interners: Interners::default(),
+      aadebug: aadebug::Storage::new(maybe_ambiguous),
+    }
+  }
+
+  fn check_goal_projection(&mut self, goal: &InspectGoal) {
+    if let ty::PredicateKind::AliasRelate(
+      t1,
+      t2,
+      ty::AliasRelationDirection::Equate,
+    ) = goal.goal().predicate.kind().skip_binder()
+      && let Some(mut t1) = t1.ty()
+      && let Some(mut t2) = t2.ty()
+      // Disallow projections involving two aliases
+      && !(t1.is_alias() && t2.is_alias())
+      && t1 != t2
+    {
+      if t2.is_alias() {
+        // We want the map to go from alias -> concrete, swap the
+        // types so that the alias is on the LHS. This doesn't change
+        // the semantics because we only save `Equate` relations.
+        std::mem::swap(&mut t1, &mut t2);
+      }
+
+      if let Some((t1, t2)) = crate::tls::unsafe_access_interner(|interner| {
+        let idx1: TyIdx = interner.borrow().get_idx(&t1)?;
+        let idx2: TyIdx = interner.borrow().get_idx(&t2)?;
+        Some((idx1, idx2))
+      }) && t1 != t2
+      {
+        let not_empty = self.projection_values.insert(t1, t2);
+        debug_assert!(not_empty.is_none());
+      }
     }
   }
 
@@ -71,28 +108,42 @@ impl SerializedTreeVisitor {
 
     let SerializedTreeVisitor {
       root: Some(root),
-      nodes,
-      topology,
-      unnecessary_roots,
+      mut nodes,
+      mut topology,
       cycle,
-      interners,
+      projection_values,
+      mut interners,
+      aadebug,
+      deferred_leafs,
       ..
     } = self
     else {
       bail!("missing root node!");
     };
 
+    let analysis = aadebug.into_results(root, &topology);
+
+    // Handle the deferred leafs (an inconvenience we'll deal with later)
+    for (parent, res) in deferred_leafs {
+      let leaf = interners.mk_result_node(res);
+      let leaf_idx = nodes.push(leaf);
+      topology.add(parent, leaf_idx);
+    }
+
     let (goals, candidates, results) = interners.take();
+    let tys = crate::tls::take_interned_tys();
 
     Ok(SerializedTree {
       root,
+      nodes,
       goals,
       candidates,
       results,
-      nodes,
+      tys,
+      projection_values,
       topology,
-      unnecessary_roots,
       cycle,
+      analysis,
     })
   }
 
@@ -100,6 +151,8 @@ impl SerializedTreeVisitor {
   // comparing the JSON values is a bad idea in general. (This is what comparing
   // interned keys does essentially). We should wait until the new trait solver
   // has some mechanism for detecting cycles and piggy back off that.
+  // FIXME: this is currently dissabled but we should check for cycles again...
+  #[allow(dead_code)]
   fn check_for_cycle_from(&mut self, from: ProofNodeIdx) {
     if self.cycle.is_some() {
       return;
@@ -116,7 +169,7 @@ impl SerializedTreeVisitor {
   }
 }
 
-impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
+impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
   type Result = ();
 
   fn span(&self) -> Span {
@@ -124,8 +177,16 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
   }
 
   fn visit_goal(&mut self, goal: &InspectGoal<'_, 'tcx>) -> Self::Result {
+    log::trace!("visit_goal {:?}", goal.goal());
+
     let here_node = self.interners.mk_goal_node(goal);
-    let here_idx = self.nodes.push(here_node.clone());
+    let here_idx = self.nodes.push(here_node);
+    // Push node into the analysis tree.
+    self.aadebug.push_goal(here_idx, goal).unwrap();
+
+    // After interning the goal we can check whether or not
+    // it's an successful alias relate predicate for two types.
+    self.check_goal_projection(goal);
 
     if self.root.is_none() {
       self.root = Some(here_idx);
@@ -138,25 +199,28 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
     // Check if there was an "overflow" from the freshly added node,
     // XXX: this is largely a HACK for right now; it ignores
     // how the solver actually works, and is ignorant of inference vars.
-    self.check_for_cycle_from(here_idx);
+    // self.check_for_cycle_from(here_idx);
 
-    let here_parent = self.previous.clone();
+    let here_parent = self.previous;
 
     let add_result_if_empty = |this: &mut Self, n: ProofNodeIdx| {
       if this.topology.is_leaf(n) {
-        let result = goal.result();
-        let leaf = this.interners.mk_result_node(result);
-        let leaf_idx = this.nodes.push(leaf);
-        this.topology.add(n, leaf_idx);
+        this.deferred_leafs.push((n, goal.result()));
       }
     };
 
     for c in goal.candidates() {
       let here_candidate = self.interners.mk_candidate_node(&c);
       let candidate_idx = self.nodes.push(here_candidate);
+      self
+        .aadebug
+        .push_candidate(candidate_idx, goal, &c)
+        .unwrap();
+
       self.topology.add(here_idx, candidate_idx);
       self.previous = Some(candidate_idx);
       c.visit_nested_in_probe(self);
+      // FIXME: is this necessary now that we store all nodes?
       add_result_if_empty(self, candidate_idx);
     }
 
@@ -165,8 +229,9 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor {
   }
 }
 
-pub fn serialize_proof_tree<'tcx>(
+pub fn try_serialize<'tcx>(
   goal: solve::Goal<'tcx, Predicate<'tcx>>,
+  result: EvaluationResult,
   span: Span,
   infcx: &InferCtxt<'tcx>,
   _def_id: DefId,
@@ -174,53 +239,8 @@ pub fn serialize_proof_tree<'tcx>(
   super::format::dump_proof_tree(goal, span, infcx);
 
   infcx.probe(|_| {
-    let mut visitor = SerializedTreeVisitor::new();
+    let mut visitor = SerializedTreeVisitor::new(result.is_maybe());
     infcx.visit_proof_tree(goal, &mut visitor);
     visitor.into_tree()
   })
-}
-
-pub(super) mod var_counter {
-  use rustc_middle::ty::{TyCtxt, TypeFoldable, TypeSuperFoldable};
-  use rustc_type_ir::fold::TypeFolder;
-
-  use super::*;
-
-  pub fn count_vars<'tcx, T>(tcx: TyCtxt<'tcx>, t: T) -> usize
-  where
-    T: TypeFoldable<TyCtxt<'tcx>>,
-  {
-    let mut folder = TyVarCounterVisitor { tcx, count: 0 };
-    t.fold_with(&mut folder);
-    folder.count
-  }
-
-  pub(super) struct TyVarCounterVisitor<'tcx> {
-    pub tcx: TyCtxt<'tcx>,
-    pub count: usize,
-  }
-
-  impl<'tcx> TypeFolder<TyCtxt<'tcx>> for TyVarCounterVisitor<'tcx> {
-    fn interner(&self) -> TyCtxt<'tcx> {
-      self.tcx
-    }
-
-    fn fold_ty(&mut self, ty: ty::Ty<'tcx>) -> ty::Ty<'tcx> {
-      match ty.kind() {
-        ty::Infer(ty::TyVar(_))
-        | ty::Infer(ty::IntVar(_))
-        | ty::Infer(ty::FloatVar(_)) => self.count += 1,
-        _ => {}
-      };
-      ty.super_fold_with(self)
-    }
-
-    fn fold_const(&mut self, c: ty::Const<'tcx>) -> ty::Const<'tcx> {
-      match c.kind() {
-        ty::ConstKind::Infer(_) => self.count += 1,
-        _ => {}
-      };
-      c.super_fold_with(self)
-    }
-  }
 }

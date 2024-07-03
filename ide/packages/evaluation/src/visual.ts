@@ -1,9 +1,8 @@
-import { BodyBundle } from "@argus/common/bindings";
-import { Filename } from "@argus/common/lib";
-import { execNotify as _execNotify } from "@argus/system";
-import fs from "fs";
+import fs from "node:fs";
+import path from "node:path";
+import type { BodyBundle } from "@argus/common/bindings";
+import type { Filename } from "@argus/common/lib";
 import _ from "lodash";
-import path from "path";
 import { chromium } from "playwright";
 //@ts-ignore
 import uniqueFilename from "unique-filename";
@@ -16,7 +15,7 @@ import {
   forFileInBundle,
   isRustcMessage,
   openPage,
-  testCases,
+  testCases
 } from "./utils";
 
 function ensureDir(dir: fs.PathLike) {
@@ -29,7 +28,7 @@ function ensureDir(dir: fs.PathLike) {
 async function argusScreenshots(
   outDir: fs.PathLike,
   bundles: BodyBundle[],
-  title: string = "Argus Output"
+  _title = "Argus Output"
 ) {
   const browser = await chromium.launch({ headless: !global.debugging });
   const context = await browser.newContext();
@@ -45,7 +44,7 @@ async function argusScreenshots(
   };
 
   return forFileInBundle(bundles, async (filename, bundles) => {
-    const outfile = uniqueFilename(outDir) + ".png";
+    const outfile = `${uniqueFilename(outDir)}.png`;
     await innerDoScreenshot(outfile, filename, bundles);
     return { filename, outfile };
   });
@@ -69,7 +68,7 @@ async function outputInDir(resultsDir: string) {
 
     const [rustcMessages, argusBundles] = await Promise.all([
       cargoMessages(fullSubdir),
-      argusData(fullSubdir),
+      argusData(fullSubdir)
     ]);
 
     const result =

@@ -1,16 +1,16 @@
-import { ProofNodeIdx } from "@argus/common/bindings";
-import classNames from "classnames";
-import _ from "lodash";
-import React, { useContext, useEffect, useState } from "react";
-
+import type { ProofNodeIdx } from "@argus/common/bindings";
+import { AppContext, TreeAppContext } from "@argus/common/context";
 import {
   IcoChevronDown,
   IcoChevronRight,
   IcoDot,
   IcoTriangleDown,
-  IcoTriangleRight,
-} from "../Icons";
-import { AppContext, TreeAppContext } from "../utilities/context";
+  IcoTriangleRight
+} from "@argus/print/Icons";
+import classNames from "classnames";
+import _ from "lodash";
+import React, { useContext, useEffect, useState } from "react";
+
 import "./Directory.css";
 import { Node } from "./Node";
 
@@ -18,7 +18,7 @@ export type ElementPair = [React.ReactElement, React.ReactElement];
 
 const defaultCollapseArrows: ElementPair = [
   <IcoChevronDown />,
-  <IcoChevronRight />,
+  <IcoChevronRight />
 ];
 
 export const CollapsibleElement = ({
@@ -26,7 +26,7 @@ export const CollapsibleElement = ({
   icons = defaultCollapseArrows,
   indentChildren = false,
   startOpen = false,
-  Children,
+  Children
 }: {
   info: React.ReactElement;
   icons?: ElementPair;
@@ -60,11 +60,12 @@ export const CollapsibleElement = ({
 
   const collapseCN = classNames("DirNodeChildren", {
     indent: indentChildren,
-    collapsed: !isOpen,
+    collapsed: !isOpen
   });
 
   return (
     <div className="DirNode">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: TODO */}
       <div className="DirNodeLabel" onClick={toggleCollapse}>
         <div className="toggle">
           {Children !== null ? (isOpen ? openIco : closedIco) : null}
@@ -76,18 +77,9 @@ export const CollapsibleElement = ({
   );
 };
 
-export type InfoWrapper = React.FC<{
-  n: ProofNodeIdx;
-  Child: React.ReactElement;
-}>;
-export interface TreeRenderParams {
-  Wrapper?: InfoWrapper;
-  styleEdges?: boolean;
-}
-
 export const DirNode = ({
   idx,
-  Children,
+  Children
 }: {
   idx: number;
   Children: React.FC | null;
@@ -114,7 +106,7 @@ export const DirNode = ({
 
 export const DirRecursive = ({
   level,
-  getNext,
+  getNext
 }: {
   level: ProofNodeIdx[];
   getNext: (idx: ProofNodeIdx) => ProofNodeIdx[];
@@ -125,7 +117,7 @@ export const DirRecursive = ({
   const className = classNames("DirRecursive", {
     "is-candidate": styleEdges && "Candidate" in node,
     "is-subgoal": styleEdges && "Goal" in node,
-    "generic-edge": !styleEdges,
+    "generic-edge": !styleEdges
   });
 
   return (

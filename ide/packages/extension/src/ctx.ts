@@ -1,34 +1,39 @@
-import {
+import type {
   BodyHash,
   CharRange,
   ExprIdx,
   Obligation,
   ObligationHash,
   ObligationsInBody,
-  SerializedTree,
+  SerializedTree
 } from "@argus/common/bindings";
-import { CallArgus, ErrorJumpTargetInfo, Filename } from "@argus/common/lib";
+import type {
+  CallArgus,
+  ErrorJumpTargetInfo,
+  FileInfo,
+  Filename
+} from "@argus/common/lib";
+import { CancelablePromise as CPromise } from "cancelable-promise";
 import _ from "lodash";
 import * as vscode from "vscode";
 
 import { rangeHighlight } from "./decorate";
 import { showErrorDialog } from "./errors";
-import { globals } from "./main";
+import { log } from "./logging";
 import { setup } from "./setup";
+import { StatusBar } from "./statusbar";
 import {
-  RustEditor,
+  type RustEditor,
   isDocumentInWorkspace,
   isRustDocument,
   isRustEditor,
   makeid,
-  rustRangeToVscodeRange,
+  rustRangeToVscodeRange
 } from "./utils";
 import { View } from "./view";
 
 // NOTE: much of this file was inspired (or taken) from the rust-analyzer extension.
 // See: https://github.com/rust-lang/rust-analyzer/blob/master/editors/code/src/ctx.ts#L1
-
-// TODO: opening obligations / trees need to be cancellable.
 
 export type Workspace =
   | { kind: "empty" }
@@ -48,7 +53,7 @@ export function fetchWorkspace(): Workspace {
       ? { kind: "empty" }
       : {
           kind: "detached-files",
-          files: rustDocuments,
+          files: rustDocuments
         }
     : { kind: "workspace-folder" };
 }
@@ -77,53 +82,44 @@ export class Ctx {
   // Ranges used for highlighting code in the current Rust Editor.
   private highlightRanges: CharRange[] = [];
   private commandDisposables: Disposable[];
-  private providingDisposables: Disposable[];
-  private commandFactories: Record<string, CommandFactory>;
-  private workspace: Workspace;
+  private disposables: Disposable[];
   private diagnosticCollection;
   private cache: BackendCache;
-  public view: View | undefined;
+  private view: View | undefined;
+  public statusBar: StatusBar;
 
   constructor(
     readonly extCtx: vscode.ExtensionContext,
-    commandFactories: Record<string, CommandFactory>,
-    workspace: Workspace
+    readonly commandFactories: Record<string, CommandFactory>,
+    readonly workspace: Workspace & { kind: "workspace-folder" }
   ) {
     this.commandDisposables = [];
-    this.providingDisposables = [];
-
-    this.commandFactories = commandFactories;
-    this.workspace = workspace;
-
+    this.disposables = [];
     this.diagnosticCollection =
       vscode.languages.createDiagnosticCollection("rust");
+    this.statusBar = new StatusBar(extCtx);
 
-    this.cache = new BackendCache(async () => {
-      showErrorDialog(`
-        Argus backend left uninitialized.
-      `);
-      return {
-        type: "analysis-error",
-        error: "Argus uninitialized.",
-      };
-    });
+    this.cache = new BackendCache(
+      this.statusBar,
+      () =>
+        new CPromise(() => {
+          showErrorDialog("Argus backend left uninitialized.");
+          return {
+            type: "analysis-error",
+            error: "Argus uninitialized."
+          };
+        })
+    );
   }
 
   dispose() {
+    this.cache.havoc();
+    this.view?.cleanup();
+    this.statusBar.dispose();
     _.forEach(this.commandDisposables, d => d.dispose());
+    _.forEach(this.disposables, d => d.dispose());
     this.commandDisposables = [];
-
-    _.forEach(this.providingDisposables, d => d.dispose());
-    this.providingDisposables = [];
-  }
-
-  async createOrShowView(target?: ErrorJumpTargetInfo) {
-    if (this.view) {
-      this.view.getPanel().reveal();
-    } else {
-      const initialData = await this.getFreshWebViewData();
-      this.view = new View(this.extCtx.extensionUri, initialData, target);
-    }
+    this.disposables = [];
   }
 
   get activeRustEditor(): RustEditor | undefined {
@@ -135,82 +131,130 @@ export class Ctx {
     return this.extCtx.extensionPath;
   }
 
+  get visibleEditors(): RustEditor[] {
+    return _.filter(vscode.window.visibleTextEditors, isRustEditor);
+  }
+
+  // NOTE: callbacks that register events in this function should invoke
+  // actions on the `globals.ctx` instead of `this` to avoid issues with
+  // setup. Previously the setup failed but callbacks were still registered
+  // with `this` which caused the editor to be out of sync.
+  // FIXME: this probably demonstrates a flaw in the design anyways...
   async setupBackend() {
+    log("setting up Argus backend");
     const b = await setup(this);
     if (b == null) {
-      showErrorDialog("Failed to setup Argus");
-      return;
+      throw new Error("Failed to setup Argus");
     }
 
     vscode.window.showInformationMessage(
       "Loading Argus, this may take several minutes."
     );
 
-    await b(["preload"], true);
-    this.cache = new BackendCache(b);
+    await b(
+      ["preload"],
+      true, // Don't expect output
+      true // Ignore a failing exit code
+    );
+    this.cache = new BackendCache(this.statusBar, b);
 
-    let openingEditor = new Promise<void[]>(() => []);
+    log("Argus backend preloaded");
+
+    // Preload information for visible editors.
     if (this.activeRustEditor) {
-      openingEditor = Promise.all(
-        _.map(this.visibleEditors, e => this.openEditor(e))
-      );
+      this.visibleEditors.forEach(e => this.openEditor(e));
     }
 
+    log("Caching open editor information");
+
     // Register the commands with VSCode after the backend is setup.
+    // NOTE: nothing should be registered before the commands...
     this.updateCommands();
 
+    log("Updated commands");
+
     this.extCtx.subscriptions.push(this.diagnosticCollection);
-    this.providingDisposables.push(
+    this.disposables.push(
       vscode.languages.registerHoverProvider("rust", {
-        provideHover: async (doc, pos, tok) => this.provideHover(doc, pos, tok),
+        provideHover: async (doc, pos, tok) => this.provideHover(doc, pos, tok)
       })
     );
 
-    vscode.workspace.onDidChangeTextDocument(event => {
-      const editor = vscode.window.activeTextEditor!;
-      if (
-        editor &&
-        isRustEditor(editor) &&
-        isDocumentInWorkspace(editor.document) &&
-        event.document === editor.document &&
-        editor.document.isDirty
-      ) {
-        globals.statusBar.setState("unsaved");
-      }
-    });
-
-    vscode.window.onDidChangeActiveTextEditor(async editor => {
-      if (
-        editor &&
-        isRustEditor(editor) &&
-        isDocumentInWorkspace(editor.document)
-      ) {
-        console.debug(`Opening ${editor.document.fileName}`);
-        this.openEditor(editor);
-      }
-    });
-
-    vscode.workspace.onDidSaveTextDocument(async document => {
-      const editor = vscode.window.activeTextEditor;
-      if (
-        editor &&
-        isRustEditor(editor) &&
-        editor.document === document &&
-        isDocumentInWorkspace(editor.document)
-      ) {
-        this.cache.havoc();
-        this.view!.havoc();
-        if (this.activeRustEditor) {
-          this.openEditor(this.activeRustEditor);
+    this.disposables.push(
+      vscode.workspace.onDidChangeTextDocument(event => {
+        const editor = vscode.window.activeTextEditor!;
+        if (
+          editor &&
+          isRustEditor(editor) &&
+          isDocumentInWorkspace(editor.document) &&
+          event.document === editor.document &&
+          editor.document.isDirty
+        ) {
+          this.statusBar.setState("unsaved");
         }
-      }
-    });
+      })
+    );
 
-    await openingEditor;
+    this.disposables.push(
+      vscode.window.onDidChangeActiveTextEditor(async editor => {
+        if (
+          editor &&
+          isRustEditor(editor) &&
+          isDocumentInWorkspace(editor.document)
+        ) {
+          log(`Opening ${editor.document.fileName}`);
+          this.openEditor(editor);
+        }
+      })
+    );
+
+    this.disposables.push(
+      vscode.workspace.onDidSaveTextDocument(async document => {
+        const editor = vscode.window.activeTextEditor;
+        if (
+          editor &&
+          isRustEditor(editor) &&
+          editor.document === document &&
+          isDocumentInWorkspace(editor.document)
+        ) {
+          this.cache.havoc();
+          this.view!.havoc();
+          if (this.activeRustEditor) {
+            this.openEditor(this.activeRustEditor);
+          }
+        }
+      })
+    );
+
+    log("Argus backend setup complete");
   }
 
-  get visibleEditors(): RustEditor[] {
-    return _.filter(vscode.window.visibleTextEditors, isRustEditor);
+  async inspectAt(target?: ErrorJumpTargetInfo) {
+    if (!this.view) {
+      log("Creating panel...");
+      const initialData = await this.getFreshWebViewData();
+      this.view = new View(this, initialData, target, () => {
+        this.view = undefined;
+        this.cache.havoc();
+      });
+    }
+    log("Revealing panel");
+    this.view.getPanel.reveal();
+  }
+
+  async pinMBData() {
+    this.view?.sendPinRequest();
+  }
+
+  async unpinMBData() {
+    this.view?.sendUnpinRequest();
+  }
+
+  async openError(target: ErrorJumpTargetInfo) {
+    await this.inspectAt(target);
+    // XXX: If the view is not initialized after calling `inspectAt`
+    // there is definitely a bug somewhere.
+    await this.view!.blingObligation(target);
   }
 
   private async openEditor(editor: RustEditor) {
@@ -218,7 +262,7 @@ export class Ctx {
     const [obl, sig] = await this.loadObligations(editor);
     if (obl) {
       if (this.view === undefined) {
-        console.debug("View not initialized, skipping editor open.");
+        log("View not initialized, skipping editor open.");
       }
       return this.view?.openEditor(editor, sig, obl);
     }
@@ -254,6 +298,10 @@ export class Ctx {
     return this.cache.getTreeForObligation(filename, obligation, range);
   }
 
+  cancelRunningTasks() {
+    this.cache.havoc();
+  }
+
   // ------------------------------------
   // Diagnostic helpers
 
@@ -263,7 +311,7 @@ export class Ctx {
     _token: vscode.CancellationToken
   ) {
     if (!isRustDocument(document) || !isDocumentInWorkspace(document)) {
-      console.debug("Document not in workspace", document);
+      log("Document not in workspace", document);
       return;
     }
 
@@ -286,7 +334,7 @@ export class Ctx {
         eidx: e.idx,
         hashes: e.hashes,
         range: e.range,
-        type: "trait",
+        type: "trait"
       }))
     );
     const ambiRecs: Rec[] = _.flatMap(info, ob => {
@@ -296,7 +344,7 @@ export class Ctx {
         eidx: e.idx,
         hashes: [ob.obligations[ob.exprs[e.idx].obligations[0]].hash],
         range: e.range,
-        type: "ambig",
+        type: "ambig"
       }));
     });
     const recs = _.concat(traitRecs, ambiRecs);
@@ -304,7 +352,7 @@ export class Ctx {
       const range = rustRangeToVscodeRange(rec.range);
 
       if (!range.contains(position)) {
-        console.debug("Skipping position outside of range", range, position);
+        log("Skipping position outside of range", range, position);
         return;
       }
 
@@ -318,7 +366,7 @@ export class Ctx {
     });
 
     return {
-      contents: _.compact(messages),
+      contents: _.compact(messages)
     };
   }
 
@@ -351,7 +399,7 @@ export class Ctx {
 
     this.diagnosticCollection.set(editor.document.uri, [
       ...traitDiags,
-      ...ambigDiags,
+      ...ambigDiags
     ]);
   }
 
@@ -373,9 +421,9 @@ export class Ctx {
     const msg = diagnosticMessage(type);
     const mdStr = new vscode.MarkdownString();
     mdStr.isTrusted = true;
-    mdStr.appendText(msg + "\n");
+    mdStr.appendText(`${msg}\n`);
     _.forEach(highlightUris, uri =>
-      mdStr.appendMarkdown(`- [Open failure in argus debugger](${uri})\n`)
+      mdStr.appendMarkdown(`- [Open failure in Argus](${uri})\n`)
     );
     return mdStr;
   }
@@ -408,13 +456,18 @@ export class Ctx {
 
   private async getFreshWebViewData() {
     const initialData = await Promise.all(
-      _.map(this.visibleEditors, async e => [
-        e.document.fileName,
-        await this.cache.getObligationsInBody(e.document.fileName)[0],
-      ])
+      _.map(this.visibleEditors, async e => {
+        const fn = e.document.fileName;
+        const [pr, signature] = this.cache.getObligationsInBody(
+          e.document.fileName
+        );
+        const data = await pr;
+        if (data) {
+          return { fn, data, signature } as FileInfo;
+        }
+      })
     );
-    const f = _.filter(initialData, ([_, obl]) => obl !== undefined);
-    return f as [Filename, ObligationsInBody[]][];
+    return _.compact(initialData);
   }
 
   private updateCommands() {
@@ -430,25 +483,26 @@ export class Ctx {
   }
 }
 
-// TODO: all running operations on the system need to be cancellable.
+// Aliases to keep type coercions shorter.
+type PTuple = [CPromise<ObligationsInBody[] | undefined>, string];
+type TreeRecord = Record<ObligationHash, CPromise<SerializedTree | undefined>>;
 class BackendCache {
-  private obligationCache: Record<
-    Filename,
-    [Promise<ObligationsInBody[] | undefined>, string]
-  >;
-  private treeCache: Record<
-    Filename,
-    Record<ObligationHash, Promise<SerializedTree | undefined>>
-  >;
+  private obligationCache: Record<Filename, PTuple>;
+  private treeCache: Record<Filename, TreeRecord>;
   private backend: CallArgus;
 
-  constructor(backend: CallArgus) {
+  constructor(
+    readonly statusBar: StatusBar,
+    backend: CallArgus
+  ) {
     this.obligationCache = {};
     this.treeCache = {};
     this.backend = backend;
   }
 
   havoc() {
+    _.forEach(this.obligationCache, ([p, _]) => p.cancel());
+    _.forEach(this.treeCache, t => _.forEach(t, p => p.cancel()));
     this.obligationCache = {};
     this.treeCache = {};
   }
@@ -458,21 +512,18 @@ class BackendCache {
       return this.obligationCache[filename];
     }
 
-    const thunk = async () => {
-      const res = await this.backend<"obligations">(["obligations", filename]);
-
-      if (res.type !== "output") {
-        globals.statusBar.setState("error");
-        showErrorDialog(res.error);
-        return;
+    const thunk = this.backend<"obligations">(["obligations", filename]).then(
+      res => {
+        if (res.type !== "output") {
+          this.statusBar.setState("error");
+          showErrorDialog(res.error);
+          return;
+        }
+        return res.value;
       }
-      return res.value;
-    };
+    );
 
-    this.obligationCache[filename] = [thunk(), makeid(8)] as [
-      Promise<ObligationsInBody[] | undefined>,
-      string
-    ];
+    this.obligationCache[filename] = [thunk, makeid(8)] as PTuple;
     return this.obligationCache[filename];
   }
 
@@ -485,20 +536,17 @@ class BackendCache {
       this.treeCache[filename] = {};
     }
 
-    const thunk = async () => {
-      const res = await this.backend<"tree">([
-        "tree",
-        filename,
-        obl.hash,
-        range.start.line,
-        range.start.column,
-        range.end.line,
-        range.end.column,
-        obl.isSynthetic,
-      ]);
-
+    const thunk = this.backend<"tree">([
+      "tree",
+      filename,
+      obl.hash,
+      range.start.line,
+      range.start.column,
+      range.end.line,
+      range.end.column
+    ]).then(res => {
       if (res.type !== "output") {
-        globals.statusBar.setState("error");
+        this.statusBar.setState("error");
         showErrorDialog(res.error);
         return;
       }
@@ -512,14 +560,14 @@ class BackendCache {
 
       This is likely a bug in Argus, please report it.
       `);
-        globals.statusBar.setState("error");
+        this.statusBar.setState("error");
         return;
       }
 
       return tree0;
-    };
+    });
 
-    this.treeCache[filename][obl.hash] = thunk();
+    this.treeCache[filename][obl.hash] = thunk;
     return this.treeCache[filename][obl.hash];
   }
 }

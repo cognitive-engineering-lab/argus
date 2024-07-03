@@ -10,6 +10,7 @@
     "packages/common",
     "packages/panoptes",
     "packages/itests",
-    "packages/system"
+    "packages/system",
+    "packages/print"
   ]
 }

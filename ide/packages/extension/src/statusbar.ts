@@ -6,7 +6,7 @@ const statusBarStates = [
   "idle",
   "error",
   "loading",
-  "notfound",
+  "notfound"
 ] as const;
 
 export type StatusBarState = (typeof statusBarStates)[number];
@@ -29,30 +29,30 @@ const defaultConfigs: Record<StatusBarState, StatusBarConfig> = {
     foreground: "statusBarItem.warningForeground",
     background: "statusBarItem.warningBackground",
     icon: "check",
-    command: "argus.inspectWorkspace",
+    command: "argus.inspectWorkspace"
   },
   unsaved: {
     foreground: "statusBarItem.foreground",
     background: "statusBarItem.background",
     icon: "circle-slash",
-    command: "argus.inspectWorkspace",
+    command: "argus.inspectWorkspace"
   },
   idle: {
     foreground: "statusBarItem.foreground",
     background: "statusBarItem.background",
-    command: "argus.inspectWorkspace",
+    command: "argus.inspectWorkspace"
   },
   error: {
     foreground: "statusBarItem.errorForeground",
     background: "statusBarItem.errorBackground",
     icon: "x",
-    command: "argus.lastError",
+    command: "argus.lastError"
   },
   loading: {
     foreground: "statusBarItem.foreground",
     background: "statusBarItem.background",
     icon: "sync~spin",
-    command: "argus.inspectWorkspace",
+    command: "argus.inspectWorkspace"
   },
   notfound: {
     foreground: "statusBarItem.foreground",
@@ -60,8 +60,8 @@ const defaultConfigs: Record<StatusBarState, StatusBarConfig> = {
     icon: "question",
     command: "argus.inspectWorkspace",
     tooltip:
-      "Argus could not get Cargo to find this file (this is probably a Argus bug)",
-  },
+      "Argus could not get Cargo to find this file (this is probably a Argus bug)"
+  }
 };
 
 export class StatusBar {
@@ -80,7 +80,7 @@ export class StatusBar {
     this.bar.show();
   }
 
-  setState(state: StatusBarState, tooltip: string = "") {
+  setState(state: StatusBarState, tooltip = "") {
     this.state = state;
     this.bar.tooltip = tooltip;
     this.render();
@@ -93,5 +93,9 @@ export class StatusBar {
     this.bar.text = `$(${config.icon}) ${this.name}`;
     this.bar.command = config.command;
     this.bar.tooltip = config.tooltip;
+  }
+
+  dispose() {
+    this.bar.dispose();
   }
 }

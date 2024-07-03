@@ -1,0 +1,25 @@
+[package]
+name = "argus-ext"
+version = "0.1.6"
+edition = "2021"
+authors = ["Gavin Gray <gavinleroy6@gmail.com>"]
+repository = "https://github.com/cognitive-engineering-lab/argus"
+description = "Trait debugger analysis for IDE interactions."
+license = "MIT"
+
+[lib]
+doctest = false
+
+[dependencies]
+rustc_utils.workspace = true
+log.workspace = true
+anyhow.workspace = true
+fluid-let.workspace = true
+itertools = "0.12.0"
+smallvec = "1.11.2"
+regex = "1.10.5"
+
+[package.metadata.rust-analyzer]
+# This crate uses #[feature(rustc_private)].
+# See https://github.com/rust-analyzer/rust-analyzer/pull/7891
+rustc_private = true

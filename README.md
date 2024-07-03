@@ -34,7 +34,7 @@ Some additional software is needed to build Argus from source. For the TypeScrip
 ```sh
 $ cargo make init-bindings
 
-$ cargo install --path crates/argus_cli
+$ cargo install --path crates/argus-cli
 
 $ cd ide && depot build
 ```

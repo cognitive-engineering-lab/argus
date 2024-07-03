@@ -1,28 +1,28 @@
-import { BodyBundle } from "@argus/common/bindings";
-import { EvaluationMode, Filename, Result } from "@argus/common/lib";
-import { ExecNotifyOpts, execNotify as _execNotify } from "@argus/system";
-import fs from "fs";
+import fs from "node:fs";
+import type { BodyBundle } from "@argus/common/bindings";
+import type { EvaluationMode, Filename, Result } from "@argus/common/lib";
+import { type ExecNotifyOpts, execNotify as _execNotify } from "@argus/system";
 import _ from "lodash";
-import { BrowserContext, Page } from "playwright";
+import type { BrowserContext, Page } from "playwright";
 import tmp from "tmp";
 
 import { webHtml } from "./page";
 
 export async function argusData(dir: string) {
   const argusOutput = await execSilent("cargo", ["argus", "bundle"], {
-    cwd: dir,
+    cwd: dir
   });
   const bundles: Result<BodyBundle[]> = JSON.parse(argusOutput);
   return bundles;
 }
 
 // TODO: move the "title" from execNotify into the opts, and use the `cmd` if not present.
-export const execSilent = (
+export const execSilent = async (
   cmd: string,
   args: string[],
   opts: ExecNotifyOpts
 ) => {
-  return _execNotify(cmd, args, opts, (..._args: any[]) => {});
+  return await _execNotify(cmd, args, opts, (..._args: any[]) => {});
 };
 
 export async function sleep(waitTime: number) {
@@ -38,7 +38,7 @@ export function testCases() {
     "easy_ml",
     "entrait",
     "nalgebra",
-    "uom",
+    "uom"
   ] as const;
 
   return _testCases.filter(test => test.match(global.testMatcher));
@@ -71,13 +71,7 @@ export function isRustcMessage(obj: any): obj is DiagnosticMessage {
 export async function expandBottomUpView(page: Page) {
   let bs = await page.getByText("Bottom Up").all();
   try {
-    await Promise.all(
-      _.map(bs, async b => {
-        try {
-          await b.click();
-        } catch (e: any) {}
-      })
-    );
+    await Promise.all(_.map(bs, b => b.click()));
   } catch (e: any) {
     console.debug("Error clicking bottom up", e);
   }
@@ -107,7 +101,7 @@ export async function openPage(
   const page = await context.newPage();
   await page.goto(`file://${tmpobj.name}`, {
     waitUntil: "domcontentloaded",
-    timeout: 30_000,
+    timeout: 30_000
   });
   return page;
 }

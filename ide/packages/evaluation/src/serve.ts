@@ -1,6 +1,6 @@
-import fs from "fs";
-import http from "http";
-import url from "url";
+import fs from "node:fs";
+import http from "node:http";
+import url from "node:url";
 
 export const PORT = 8080;
 

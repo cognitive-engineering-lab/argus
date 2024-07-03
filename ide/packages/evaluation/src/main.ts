@@ -46,6 +46,7 @@ async function main() {
       if (cacheDirectory === undefined)
         throw new Error("Must provide a cache directory");
       await withServerOnPort(PORT, () => runVisual(cacheDirectory));
+      break;
     }
     default:
       throw new Error("Invalid CLI argument");
