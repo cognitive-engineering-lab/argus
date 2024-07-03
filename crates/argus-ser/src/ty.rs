@@ -9,23 +9,49 @@ use smallvec::SmallVec;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
-use super::{r#const::*, term::*, *};
+use super::{interner::TyIdx, r#const::*, term::*, *};
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "Ty"))]
-pub struct TyDef<'tcx>(
+pub struct TyDef(TyIdx);
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "TyVal"))]
+pub struct TyVal<'tcx>(
   #[serde(with = "TyKindDef")]
   #[cfg_attr(feature = "testing", ts(type = "TyKind"))]
   &'tcx ty::TyKind<'tcx>,
 );
 
-impl<'tcx> TyDef<'tcx> {
-  pub fn serialize<S>(value: &ty::Ty<'tcx>, s: S) -> Result<S::Ok, S::Error>
+impl TyDef {
+  pub fn serialize<S>(value: &ty::Ty, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    Self(value.kind()).serialize(s)
+    let ty_idx;
+    if let Some(tyidx) =
+      TyInterner::access(|interner| interner.borrow().get_idx(value))
+    {
+      ty_idx = tyidx;
+    } else {
+      // FIXME: we shouldn't be calling `to_value` directly here, rather, we should use the current
+      // serializer and specialize on it and save the values only when we're serializing to JSON.
+      // If we don't need specialization the `min_specialization` feature can be removed.
+      // if let Some(ty_json) = <S::Ok as SerAsJSON<S>>::as_json(&ty_val) {
+      // } else {
+      //   todo!("type interning only implemented for JSON values");
+      // }
+
+      let ty_val = serde_json::to_value(TyVal(value.kind())).expect("TODO");
+
+      ty_idx = TyInterner::access(|interner| {
+        interner.borrow_mut().insert(*value, ty_val)
+      });
+    }
+    Self(ty_idx).serialize(s)
+    // Self(TyIdx::from_usize(0)).serialize(s)
   }
 }
 
@@ -234,88 +260,89 @@ pub enum AliasTyKindDef<'tcx> {
 
 impl<'tcx> AliasTyKindDef<'tcx> {
   pub fn new(kind: ty::AliasTyKind, ty: ty::AliasTy<'tcx>) -> Self {
-    let infcx = get_dynamic_ctx();
-    match (kind, ty) {
-      (
-        ty::AliasTyKind::Projection
-        | ty::AliasTyKind::Inherent
-        | ty::AliasTyKind::Weak,
-        ref data,
-      ) => {
-        if !(infcx.should_print_verbose() || with_no_queries())
-          && infcx.tcx.is_impl_trait_in_trait(data.def_id)
-        {
-          // CHANGE: return this.pretty_print_opaque_impl_type(data.def_id, data.args);
-          Self::OpaqueImpl {
-            data: OpaqueImpl::new(data.def_id, data.args),
-          }
-        } else {
-          // CHANGE: p!(print(data))
-          Self::AliasTy { data: *data }
-        }
-      }
-      (ty::AliasTyKind::Opaque, ty::AliasTy { def_id, args, .. }) => {
-        // We use verbose printing in 'NO_QUERIES' mode, to
-        // avoid needing to call `predicates_of`. This should
-        // only affect certain debug messages (e.g. messages printed
-        // from `rustc_middle::ty` during the computation of `tcx.predicates_of`),
-        // and should have no effect on any compiler output.
-        // [Unless `-Zverbose-internals` is used, e.g. in the output of
-        // `tests/ui/nll/ty-outlives/impl-trait-captures.rs`, for
-        // example.]
-        if infcx.should_print_verbose() {
-          // FIXME(eddyb) print this with `print_def_path`.
-          // CHANGE: p!(write("Opaque({:?}, {})", def_id, args.print_as_list()));
-          // return Ok(())
-          // NOTE: I'm taking the risk of using print_def_path here
-          // as indicated by the above comment. If things break, look here.
-          return Self::DefPath {
-            data: path::PathDefWithArgs::new(def_id, args),
-          };
-        }
-
-        let parent = infcx.tcx.parent(def_id);
-        match infcx.tcx.def_kind(parent) {
-          DefKind::TyAlias | DefKind::AssocTy => {
-            // NOTE: I know we should check for NO_QUERIES here, but it's alright.
-            // `type_of` on a type alias or assoc type should never cause a cycle.
-            if let ty::Alias(ty::Opaque, ty::AliasTy { def_id: d, .. }) =
-              *infcx.tcx.type_of(parent).instantiate_identity().kind()
-            {
-              if d == def_id {
-                // If the type alias directly starts with the `impl` of the
-                // opaque type we're printing, then skip the `::{opaque#1}`.
-                // CHANGE: p!(print_def_path(parent, args));
-                // return Ok(())
-                return Self::DefPath {
-                  data: path::PathDefWithArgs::new(parent, args),
-                };
-              }
+    InferCtxt::access(|infcx| {
+      match (kind, ty) {
+        (
+          ty::AliasTyKind::Projection
+          | ty::AliasTyKind::Inherent
+          | ty::AliasTyKind::Weak,
+          ref data,
+        ) => {
+          if !(infcx.should_print_verbose() || with_no_queries())
+            && infcx.tcx.is_impl_trait_in_trait(data.def_id)
+          {
+            // CHANGE: return this.pretty_print_opaque_impl_type(data.def_id, data.args);
+            Self::OpaqueImpl {
+              data: OpaqueImpl::new(data.def_id, data.args),
             }
-            // Complex opaque type, e.g. `type Foo = (i32, impl Debug);`
-            // CHANGE: p!(print_def_path(def_id, args));
+          } else {
+            // CHANGE: p!(print(data))
+            Self::AliasTy { data: *data }
+          }
+        }
+        (ty::AliasTyKind::Opaque, ty::AliasTy { def_id, args, .. }) => {
+          // We use verbose printing in 'NO_QUERIES' mode, to
+          // avoid needing to call `predicates_of`. This should
+          // only affect certain debug messages (e.g. messages printed
+          // from `rustc_middle::ty` during the computation of `tcx.predicates_of`),
+          // and should have no effect on any compiler output.
+          // [Unless `-Zverbose-internals` is used, e.g. in the output of
+          // `tests/ui/nll/ty-outlives/impl-trait-captures.rs`, for
+          // example.]
+          if infcx.should_print_verbose() {
+            // FIXME(eddyb) print this with `print_def_path`.
+            // CHANGE: p!(write("Opaque({:?}, {})", def_id, args.print_as_list()));
             // return Ok(())
+            // NOTE: I'm taking the risk of using print_def_path here
+            // as indicated by the above comment. If things break, look here.
             return Self::DefPath {
               data: path::PathDefWithArgs::new(def_id, args),
             };
           }
-          _ => {
-            if with_no_queries() {
-              // CHANGE: p!(print_def_path(def_id, &[]));
-              // return Ok(())
-              Self::DefPath {
-                data: path::PathDefWithArgs::new(def_id, &[]),
+
+          let parent = infcx.tcx.parent(def_id);
+          match infcx.tcx.def_kind(parent) {
+            DefKind::TyAlias | DefKind::AssocTy => {
+              // NOTE: I know we should check for NO_QUERIES here, but it's alright.
+              // `type_of` on a type alias or assoc type should never cause a cycle.
+              if let ty::Alias(ty::Opaque, ty::AliasTy { def_id: d, .. }) =
+                *infcx.tcx.type_of(parent).instantiate_identity().kind()
+              {
+                if d == def_id {
+                  // If the type alias directly starts with the `impl` of the
+                  // opaque type we're printing, then skip the `::{opaque#1}`.
+                  // CHANGE: p!(print_def_path(parent, args));
+                  // return Ok(())
+                  return Self::DefPath {
+                    data: path::PathDefWithArgs::new(parent, args),
+                  };
+                }
               }
-            } else {
-              // CHANGE: return this.pretty_print_opaque_impl_type(def_id, args);
-              Self::OpaqueImpl {
-                data: OpaqueImpl::new(def_id, args),
+              // Complex opaque type, e.g. `type Foo = (i32, impl Debug);`
+              // CHANGE: p!(print_def_path(def_id, args));
+              // return Ok(())
+              return Self::DefPath {
+                data: path::PathDefWithArgs::new(def_id, args),
+              };
+            }
+            _ => {
+              if with_no_queries() {
+                // CHANGE: p!(print_def_path(def_id, &[]));
+                // return Ok(())
+                Self::DefPath {
+                  data: path::PathDefWithArgs::new(def_id, &[]),
+                }
+              } else {
+                // CHANGE: return this.pretty_print_opaque_impl_type(def_id, args);
+                Self::OpaqueImpl {
+                  data: OpaqueImpl::new(def_id, args),
+                }
               }
             }
           }
         }
       }
-    }
+    })
   }
 }
 
@@ -414,24 +441,24 @@ impl<'tcx> CoroutineTyKindDef<'tcx> {
     def_id: DefId,
     args: &'tcx ty::List<ty::GenericArg<'tcx>>,
   ) -> Self {
-    let infcx = get_dynamic_ctx();
-    let tcx = infcx.tcx;
+    InferCtxt::access(|infcx| {
+      let tcx = infcx.tcx;
+      let coroutine_kind = tcx.coroutine_kind(def_id).unwrap();
+      let upvar_tys = args.as_coroutine().tupled_upvars_ty();
+      let witness = args.as_coroutine().witness();
+      let movability = coroutine_kind.movability();
 
-    let coroutine_kind = tcx.coroutine_kind(def_id).unwrap();
-    let upvar_tys = args.as_coroutine().tupled_upvars_ty();
-    let witness = args.as_coroutine().witness();
-    let movability = coroutine_kind.movability();
-
-    Self {
-      path: path::PathDefWithArgs::new(def_id, args),
-      movability,
-      upvar_tys,
-      witness,
-      should_print_movability: matches!(
-        coroutine_kind,
-        hir::CoroutineKind::Coroutine(_)
-      ),
-    }
+      Self {
+        path: path::PathDefWithArgs::new(def_id, args),
+        movability,
+        upvar_tys,
+        witness,
+        should_print_movability: matches!(
+          coroutine_kind,
+          hir::CoroutineKind::Coroutine(_)
+        ),
+      }
+    })
   }
 }
 
@@ -517,12 +544,13 @@ pub struct FnDef<'tcx> {
 
 impl<'tcx> FnDef<'tcx> {
   pub fn new(def_id: DefId, args: &'tcx [ty::GenericArg<'tcx>]) -> Self {
-    let infcx = get_dynamic_ctx();
-    let sig = infcx.tcx.fn_sig(def_id).instantiate(infcx.tcx, args);
-    Self {
-      sig,
-      path: path::ValuePathWithArgs::new(def_id, args),
-    }
+    InferCtxt::access(|infcx| {
+      let sig = infcx.tcx.fn_sig(def_id).instantiate(infcx.tcx, args);
+      Self {
+        sig,
+        path: path::ValuePathWithArgs::new(def_id, args),
+      }
+    })
   }
 }
 
@@ -706,20 +734,21 @@ pub enum AliasTyDef<'tcx> {
 
 impl<'tcx> AliasTyDef<'tcx> {
   pub fn new(value: &ty::AliasTy<'tcx>) -> Self {
-    let cx = get_dynamic_ctx();
-    if let DefKind::Impl { of_trait: false } =
-      cx.tcx.def_kind(cx.tcx.parent(value.def_id))
-    {
-      // CHANGE: p!(pretty_print_inherent_projection(self))
-      Self::Inherent {
-        data: path::AliasPath::new(*value),
+    InferCtxt::access(|cx| {
+      if let DefKind::Impl { of_trait: false } =
+        cx.tcx.def_kind(cx.tcx.parent(value.def_id))
+      {
+        // CHANGE: p!(pretty_print_inherent_projection(self))
+        Self::Inherent {
+          data: path::AliasPath::new(*value),
+        }
+      } else {
+        // CHANGE: p!(print_def_path(self.def_id, self.args));
+        Self::PathDef {
+          data: path::PathDefWithArgs::new(value.def_id, value.args),
+        }
       }
-    } else {
-      // CHANGE: p!(print_def_path(self.def_id, self.args));
-      Self::PathDef {
-        data: path::PathDefWithArgs::new(value.def_id, value.args),
-      }
-    }
+    })
   }
 
   pub fn serialize<S>(
@@ -1034,40 +1063,40 @@ impl<'tcx> InferTyDef<'tcx> {
   pub fn new(value: &ty::InferTy) -> Self {
     // See: `ty_getter` in `printer.ty_infer_name_resolver = Some(Box::new(ty_getter))`
     // from: `rustc_infer::infer::error_reporting::need_type_info.rs`
+    InferCtxt::access(|infcx| {
+      let tcx = infcx.tcx;
 
-    let infcx = get_dynamic_ctx();
-    let tcx = infcx.tcx;
-
-    let root_value = if let ty::InferTy::TyVar(v) = value {
-      ty::InferTy::TyVar(infcx.root_var(*v))
-    } else {
-      *value
-    };
-
-    let ty = ty::Ty::new_infer(tcx, root_value);
-
-    if let Some(origin) = infcx.type_var_origin(ty)
-      && let Some(def_id) = origin.param_def_id
-    {
-      Self::Unnamed(path::PathDefNoArgs::new(def_id))
-    } else if let Some(origin) = infcx.type_var_origin(ty)
-      && !origin.span.is_dummy()
-    {
-      let span = origin.span.source_callsite();
-      if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(span) {
-        Self::SourceInfo(snippet)
+      let root_value = if let ty::InferTy::TyVar(v) = value {
+        ty::InferTy::TyVar(infcx.root_var(*v))
       } else {
-        Self::Unresolved
-      }
-    } else {
-      match value {
-        ty::InferTy::IntVar(_) | ty::InferTy::FreshIntTy(_) => Self::IntVar,
-        ty::InferTy::FloatVar(_) | ty::InferTy::FreshFloatTy(_) => {
-          Self::FloatVar
+        *value
+      };
+
+      let ty = ty::Ty::new_infer(tcx, root_value);
+
+      if let Some(origin) = infcx.type_var_origin(ty)
+        && let Some(def_id) = origin.param_def_id
+      {
+        Self::Unnamed(path::PathDefNoArgs::new(def_id))
+      } else if let Some(origin) = infcx.type_var_origin(ty)
+        && !origin.span.is_dummy()
+      {
+        let span = origin.span.source_callsite();
+        if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(span) {
+          Self::SourceInfo(snippet)
+        } else {
+          Self::Unresolved
         }
-        ty::InferTy::TyVar(_) | ty::InferTy::FreshTy(_) => Self::Unresolved,
+      } else {
+        match value {
+          ty::InferTy::IntVar(_) | ty::InferTy::FreshIntTy(_) => Self::IntVar,
+          ty::InferTy::FloatVar(_) | ty::InferTy::FreshFloatTy(_) => {
+            Self::FloatVar
+          }
+          ty::InferTy::TyVar(_) | ty::InferTy::FreshTy(_) => Self::Unresolved,
+        }
       }
-    }
+    })
   }
 
   pub fn serialize<S>(value: &ty::InferTy, s: S) -> Result<S::Ok, S::Error>
@@ -1457,21 +1486,23 @@ impl<'tcx> TraitPredicateDef<'tcx> {
     }
   }
   fn bound_constness(trait_ref: &ty::TraitRef<'tcx>) -> BoundConstness {
-    let infcx = get_dynamic_ctx();
-    let tcx = &infcx.tcx;
-    let Some(idx) = tcx.generics_of(trait_ref.def_id).host_effect_index else {
-      return BoundConstness::No;
-    };
-    let arg = trait_ref.args.const_at(idx);
+    InferCtxt::access(|infcx| {
+      let tcx = &infcx.tcx;
+      let Some(idx) = tcx.generics_of(trait_ref.def_id).host_effect_index
+      else {
+        return BoundConstness::No;
+      };
+      let arg = trait_ref.args.const_at(idx);
 
-    if arg == tcx.consts.false_ {
-      BoundConstness::C
-      // FIXME: const infer is a newer feature we'll need to handle in the future
-      // } else if arg != tcx.consts.true_ && !arg.has_infer() {
-      //   BoundConstness::TC
-    } else {
-      BoundConstness::No
-    }
+      if arg == tcx.consts.false_ {
+        BoundConstness::C
+        // FIXME: const infer is a newer feature we'll need to handle in the future
+        // } else if arg != tcx.consts.true_ && !arg.has_infer() {
+        //   BoundConstness::TC
+      } else {
+        BoundConstness::No
+      }
+    })
   }
   pub fn serialize<S>(
     value: &ty::TraitPredicate<'tcx>,
@@ -1885,183 +1916,185 @@ impl<'tcx> OpaqueImpl<'tcx> {
     def_id: DefId,
     args: &'tcx ty::List<ty::GenericArg<'tcx>>,
   ) -> Self {
-    let infcx = get_dynamic_ctx();
-    let tcx = infcx.tcx;
+    InferCtxt::access(|infcx| {
+      let tcx = infcx.tcx;
 
-    // Grab the "TraitA + TraitB" from `impl TraitA + TraitB`,
-    // by looking up the projections associated with the def_id.
-    let bounds = tcx.explicit_item_bounds(def_id);
+      // Grab the "TraitA + TraitB" from `impl TraitA + TraitB`,
+      // by looking up the projections associated with the def_id.
+      let bounds = tcx.explicit_item_bounds(def_id);
 
-    log::trace!("Explicit item bounds {:?}", bounds);
+      log::trace!("Explicit item bounds {:?}", bounds);
 
-    let mut traits = FxIndexMap::default();
-    let mut fn_traits = FxIndexMap::default();
-    let mut has_sized_bound = false;
-    let mut has_negative_sized_bound = false;
-    let mut lifetimes = SmallVec::<[ty::Region<'tcx>; 1]>::new();
+      let mut traits = FxIndexMap::default();
+      let mut fn_traits = FxIndexMap::default();
+      let mut has_sized_bound = false;
+      let mut has_negative_sized_bound = false;
+      let mut lifetimes = SmallVec::<[ty::Region<'tcx>; 1]>::new();
 
-    for (predicate, _) in bounds.iter_instantiated_copied(tcx, args) {
-      let bound_predicate = predicate.kind();
+      for (predicate, _) in bounds.iter_instantiated_copied(tcx, args) {
+        let bound_predicate = predicate.kind();
 
-      match bound_predicate.skip_binder() {
-        ty::ClauseKind::Trait(pred) => {
-          let trait_ref = bound_predicate.rebind(pred.trait_ref);
+        match bound_predicate.skip_binder() {
+          ty::ClauseKind::Trait(pred) => {
+            let trait_ref = bound_predicate.rebind(pred.trait_ref);
 
-          // Don't print `+ Sized`, but rather `+ ?Sized` if absent.
-          if Some(trait_ref.def_id()) == tcx.lang_items().sized_trait() {
-            match pred.polarity {
-              ty::PredicatePolarity::Positive => {
-                has_sized_bound = true;
-                continue;
+            // Don't print `+ Sized`, but rather `+ ?Sized` if absent.
+            if Some(trait_ref.def_id()) == tcx.lang_items().sized_trait() {
+              match pred.polarity {
+                ty::PredicatePolarity::Positive => {
+                  has_sized_bound = true;
+                  continue;
+                }
+                ty::PredicatePolarity::Negative => {
+                  has_negative_sized_bound = true;
+                }
               }
-              ty::PredicatePolarity::Negative => {
-                has_negative_sized_bound = true;
+            }
+
+            Self::insert_trait_and_projection(
+              tcx,
+              trait_ref,
+              pred.polarity,
+              None,
+              &mut traits,
+              &mut fn_traits,
+            );
+          }
+          ty::ClauseKind::Projection(pred) => {
+            let proj_ref = bound_predicate.rebind(pred);
+            let trait_ref = proj_ref.required_poly_trait_ref(tcx);
+
+            // Projection type entry -- the def-id for naming, and the ty.
+            let proj_ty = (proj_ref.projection_def_id(), proj_ref.term());
+
+            Self::insert_trait_and_projection(
+              tcx,
+              trait_ref,
+              ty::PredicatePolarity::Positive,
+              Some(proj_ty),
+              &mut traits,
+              &mut fn_traits,
+            );
+          }
+          ty::ClauseKind::TypeOutlives(outlives) => {
+            lifetimes.push(outlives.1);
+          }
+          _ => {}
+        }
+      }
+
+      let mut here_opaque_type = OpaqueImpl {
+        fn_traits: vec![],
+        traits: vec![],
+        lifetimes: vec![],
+        has_sized_bound: false,
+        has_negative_sized_bound: false,
+      };
+
+      for (fn_once_trait_ref, entry) in fn_traits {
+        Self::wrap_binder(&fn_once_trait_ref, |trait_ref| {
+          let generics = tcx.generics_of(trait_ref.def_id);
+          let own_args = generics.own_args_no_defaults(tcx, trait_ref.args);
+
+          match (entry.return_ty, own_args[0].expect_ty()) {
+            (Some(return_ty), arg_tys)
+              if matches!(arg_tys.kind(), ty::Tuple(_)) =>
+            {
+              let kind = if entry.fn_trait_ref.is_some() {
+                ty::ClosureKind::Fn
+              } else if entry.fn_mut_trait_ref.is_some() {
+                ty::ClosureKind::FnMut
+              } else {
+                ty::ClosureKind::FnOnce
+              };
+
+              let params = arg_tys.tuple_fields().iter().collect::<Vec<_>>();
+              let ret_ty = return_ty.skip_binder().ty();
+
+              here_opaque_type.fn_traits.push(FnTrait {
+                params,
+                ret_ty,
+                kind,
+              });
+            }
+            // If we got here, we can't print as a `impl Fn(A, B) -> C`. Just record the
+            // trait_refs we collected in the OpaqueFnEntry as normal trait refs.
+            _ => {
+              if entry.has_fn_once {
+                traits
+                  .entry((fn_once_trait_ref, ty::PredicatePolarity::Positive))
+                  .or_default()
+                  .extend(
+                    // Group the return ty with its def id, if we had one.
+                    entry.return_ty.map(|ty| {
+                      (tcx.require_lang_item(LangItem::FnOnceOutput, None), ty)
+                    }),
+                  );
+              }
+              if let Some(trait_ref) = entry.fn_mut_trait_ref {
+                traits
+                  .entry((trait_ref, ty::PredicatePolarity::Positive))
+                  .or_default();
+              }
+              if let Some(trait_ref) = entry.fn_trait_ref {
+                traits
+                  .entry((trait_ref, ty::PredicatePolarity::Positive))
+                  .or_default();
               }
             }
           }
-
-          Self::insert_trait_and_projection(
-            tcx,
-            trait_ref,
-            pred.polarity,
-            None,
-            &mut traits,
-            &mut fn_traits,
-          );
-        }
-        ty::ClauseKind::Projection(pred) => {
-          let proj_ref = bound_predicate.rebind(pred);
-          let trait_ref = proj_ref.required_poly_trait_ref(tcx);
-
-          // Projection type entry -- the def-id for naming, and the ty.
-          let proj_ty = (proj_ref.projection_def_id(), proj_ref.term());
-
-          Self::insert_trait_and_projection(
-            tcx,
-            trait_ref,
-            ty::PredicatePolarity::Positive,
-            Some(proj_ty),
-            &mut traits,
-            &mut fn_traits,
-          );
-        }
-        ty::ClauseKind::TypeOutlives(outlives) => {
-          lifetimes.push(outlives.1);
-        }
-        _ => {}
+        });
       }
-    }
 
-    let mut here_opaque_type = OpaqueImpl {
-      fn_traits: vec![],
-      traits: vec![],
-      lifetimes: vec![],
-      has_sized_bound: false,
-      has_negative_sized_bound: false,
-    };
+      // Print the rest of the trait types (that aren't Fn* family of traits)
+      for ((trait_ref, polarity), assoc_items) in traits {
+        Self::wrap_binder(&trait_ref, |trait_ref| {
+          let trait_name = TraitRefPrintOnlyTraitPathDef::new(trait_ref);
 
-    for (fn_once_trait_ref, entry) in fn_traits {
-      Self::wrap_binder(&fn_once_trait_ref, |trait_ref| {
-        let generics = tcx.generics_of(trait_ref.def_id);
-        let own_args = generics.own_args_no_defaults(tcx, trait_ref.args);
+          let generics = tcx.generics_of(trait_ref.def_id);
+          let own_args = generics.own_args_no_defaults(tcx, trait_ref.args);
+          let mut assoc_args = vec![];
 
-        match (entry.return_ty, own_args[0].expect_ty()) {
-          (Some(return_ty), arg_tys)
-            if matches!(arg_tys.kind(), ty::Tuple(_)) =>
-          {
-            let kind = if entry.fn_trait_ref.is_some() {
-              ty::ClosureKind::Fn
-            } else if entry.fn_mut_trait_ref.is_some() {
-              ty::ClosureKind::FnMut
+          for (assoc_item_def_id, term) in assoc_items {
+            // Skip printing `<{coroutine@} as Coroutine<_>>::Return` from async blocks,
+            // unless we can find out what coroutine return type it comes from.
+            let term = if let Some(ty) = term.skip_binder().ty()
+              && let ty::Alias(ty::Projection, proj) = ty.kind()
+              && let Some(assoc) = tcx.opt_associated_item(proj.def_id)
+              && assoc.trait_container(tcx)
+                == tcx.lang_items().coroutine_trait()
+              && assoc.name == rustc_span::sym::Return
+            {
+              if let ty::Coroutine(_, args) = args.type_at(0).kind() {
+                let return_ty = args.as_coroutine().return_ty();
+                if return_ty.is_ty_var() {
+                  continue;
+                }
+                return_ty.into()
+              } else {
+                continue;
+              }
             } else {
-              ty::ClosureKind::FnOnce
+              term.skip_binder()
             };
 
-            let params = arg_tys.tuple_fields().iter().collect::<Vec<_>>();
-            let ret_ty = return_ty.skip_binder().ty();
-
-            here_opaque_type.fn_traits.push(FnTrait {
-              params,
-              ret_ty,
-              kind,
-            });
+            let name = tcx.associated_item(assoc_item_def_id).name;
+            assoc_args.push(AssocItemDef { name, term });
           }
-          // If we got here, we can't print as a `impl Fn(A, B) -> C`. Just record the
-          // trait_refs we collected in the OpaqueFnEntry as normal trait refs.
-          _ => {
-            if entry.has_fn_once {
-              traits
-                .entry((fn_once_trait_ref, ty::PredicatePolarity::Positive))
-                .or_default()
-                .extend(
-                  // Group the return ty with its def id, if we had one.
-                  entry.return_ty.map(|ty| {
-                    (tcx.require_lang_item(LangItem::FnOnceOutput, None), ty)
-                  }),
-                );
-            }
-            if let Some(trait_ref) = entry.fn_mut_trait_ref {
-              traits
-                .entry((trait_ref, ty::PredicatePolarity::Positive))
-                .or_default();
-            }
-            if let Some(trait_ref) = entry.fn_trait_ref {
-              traits
-                .entry((trait_ref, ty::PredicatePolarity::Positive))
-                .or_default();
-            }
-          }
-        }
-      });
-    }
 
-    // Print the rest of the trait types (that aren't Fn* family of traits)
-    for ((trait_ref, polarity), assoc_items) in traits {
-      Self::wrap_binder(&trait_ref, |trait_ref| {
-        let trait_name = TraitRefPrintOnlyTraitPathDef::new(trait_ref);
-
-        let generics = tcx.generics_of(trait_ref.def_id);
-        let own_args = generics.own_args_no_defaults(tcx, trait_ref.args);
-        let mut assoc_args = vec![];
-
-        for (assoc_item_def_id, term) in assoc_items {
-          // Skip printing `<{coroutine@} as Coroutine<_>>::Return` from async blocks,
-          // unless we can find out what coroutine return type it comes from.
-          let term = if let Some(ty) = term.skip_binder().ty()
-            && let ty::Alias(ty::Projection, proj) = ty.kind()
-            && let Some(assoc) = tcx.opt_associated_item(proj.def_id)
-            && assoc.trait_container(tcx) == tcx.lang_items().coroutine_trait()
-            && assoc.name == rustc_span::sym::Return
-          {
-            if let ty::Coroutine(_, args) = args.type_at(0).kind() {
-              let return_ty = args.as_coroutine().return_ty();
-              if return_ty.is_ty_var() {
-                continue;
-              }
-              return_ty.into()
-            } else {
-              continue;
-            }
-          } else {
-            term.skip_binder()
-          };
-
-          let name = tcx.associated_item(assoc_item_def_id).name;
-          assoc_args.push(AssocItemDef { name, term });
-        }
-
-        here_opaque_type.traits.push(Trait {
-          polarity,
-          trait_name,
-          own_args,
-          assoc_args,
+          here_opaque_type.traits.push(Trait {
+            polarity,
+            trait_name,
+            own_args,
+            assoc_args,
+          });
         });
-      });
-    }
+      }
 
-    here_opaque_type.has_sized_bound = has_sized_bound;
-    here_opaque_type.has_negative_sized_bound = has_negative_sized_bound;
+      here_opaque_type.has_sized_bound = has_sized_bound;
+      here_opaque_type.has_negative_sized_bound = has_negative_sized_bound;
 
-    here_opaque_type
+      here_opaque_type
+    })
   }
 }

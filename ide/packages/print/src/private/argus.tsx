@@ -10,38 +10,43 @@ import _ from "lodash";
 import React from "react";
 
 import { Toggle } from "../Toggle";
+import { AllowProjectionSubst } from "../context";
 import { PrintDefPath } from "./path";
 import { PrintClause } from "./predicate";
 import { Angled, CommaSeparated, Kw, PlusSeparated } from "./syntax";
 import { PrintGenericArg, PrintPolarity, PrintRegion, PrintTy } from "./ty";
 
+// NOTE: it looks ugly, but we need to disable projection substitution for all parts
+// of the impl blocks.
 export const PrintImplHeader = ({ o }: { o: ImplHeader }) => {
   console.debug("Printing ImplHeader", o);
-  const genArgs = _.map(o.args, arg => () => <PrintGenericArg o={arg} />);
+  const genArgs = _.map(o.args, arg => () => (
+    <AllowProjectionSubst.Provider value={false}>
+      <PrintGenericArg o={arg} />
+    </AllowProjectionSubst.Provider>
+  ));
   const argsWAngle =
     genArgs.length === 0 ? null : (
-      <Angled>
-        <Toggle
-          summary={".."}
-          Children={() => <CommaSeparated components={genArgs} />}
-        />
-      </Angled>
+      <AllowProjectionSubst.Provider value={false}>
+        <Angled>
+          <Toggle
+            summary={".."}
+            Children={() => <CommaSeparated components={genArgs} />}
+          />
+        </Angled>
+      </AllowProjectionSubst.Provider>
     );
-  const trait = <PrintDefPath o={o.name} />;
-  const selfTy = <PrintTy o={o.selfTy} />;
-  const whereClause = (
-    <PrintWhereClause
-      predicates={o.predicates}
-      tysWOBound={o.tysWithoutDefaultBounds}
-    />
-  );
 
   return (
-    <>
+    <AllowProjectionSubst.Provider value={false}>
       <Kw>impl</Kw>
-      {argsWAngle} {trait} <Kw>for</Kw> {selfTy}
-      {whereClause}
-    </>
+      {argsWAngle} <PrintDefPath o={o.name} /> <Kw>for</Kw>{" "}
+      <PrintTy o={o.selfTy} />
+      <PrintWhereClause
+        predicates={o.predicates}
+        tysWOBound={o.tysWithoutDefaultBounds}
+      />
+    </AllowProjectionSubst.Provider>
   );
 };
 

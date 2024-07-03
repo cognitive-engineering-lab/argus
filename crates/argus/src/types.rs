@@ -1,7 +1,7 @@
 use std::{collections::HashMap, hash::Hash, ops::Deref, str::FromStr};
 
 use anyhow::Result;
-use argus_ser::{self as ser};
+use argus_ser::{self as ser, interner::TyIdx};
 use index_vec::IndexVec;
 use indexmap::IndexSet;
 use rustc_data_structures::stable_hasher::Hash64;
@@ -21,11 +21,11 @@ use ts_rs::TS;
 
 pub use self::intermediate::{EvaluationResult, EvaluationResultDef};
 use crate::{
-  analysis::{FullObligationData, UODIdx},
   proof_tree::SerializedTree,
+  tls::{self, FullObligationData, UODIdx},
 };
 
-crate::define_idx! { usize,
+ser::define_idx! { usize,
   ExprIdx,
   ObligationIdx
 }
@@ -58,7 +58,9 @@ impl ExtensionCandidates {
       .into_iter()
       .map(ser::TraitRefPrintOnlyTraitPathDef)
       .collect::<Vec<_>>();
-    let json = ser::to_value_expect(infcx, &wrapped);
+    let json = tls::unsafe_access_interner(|ty_interner| {
+      ser::to_value_expect(infcx, ty_interner, &wrapped)
+    });
     ExtensionCandidates { data: json }
   }
 }
@@ -147,6 +149,9 @@ pub struct ObligationsInBody {
 
   #[cfg_attr(feature = "testing", ts(type = "Expr[]"))]
   pub exprs: IndexVec<ExprIdx, Expr>,
+
+  #[cfg_attr(feature = "testing", ts(type = "TyVal[]"))]
+  pub tys: IndexVec<TyIdx, serde_json::Value>,
 }
 
 impl ObligationsInBody {
@@ -158,8 +163,13 @@ impl ObligationsInBody {
     obligations: IndexVec<ObligationIdx, Obligation>,
     exprs: IndexVec<ExprIdx, Expr>,
   ) -> Self {
-    let json_name = id
-      .map(|(infcx, id)| ser::to_value_expect(infcx, &ser::PathDefNoArgs(id)));
+    let json_name = id.map(|(infcx, id)| {
+      tls::unsafe_access_interner(|ty_interner| {
+        ser::to_value_expect(infcx, ty_interner, &ser::PathDefNoArgs(id))
+      })
+    });
+
+    let tys = tls::take_interned_tys();
     ObligationsInBody {
       name: json_name,
       hash: BodyHash::new(),
@@ -168,6 +178,7 @@ impl ObligationsInBody {
       trait_errors,
       obligations,
       exprs,
+      tys,
     }
   }
 }

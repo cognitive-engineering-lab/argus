@@ -103,8 +103,7 @@ export class View {
 
   public async havoc() {
     messageWebview(this.panel.webview, "havoc", {
-      type: "FROM_EXTENSION",
-      command: "havoc"
+      type: "FROM_EXTENSION"
     });
   }
 
@@ -116,7 +115,6 @@ export class View {
   }: ErrorJumpTargetInfo) {
     messageWebview(this.panel.webview, "open-error", {
       type: "FROM_EXTENSION",
-      command: "open-error",
       file,
       bodyIdx,
       exprIdx,
@@ -131,7 +129,6 @@ export class View {
   ) {
     messageWebview(this.panel.webview, "open-file", {
       type: "FROM_EXTENSION",
-      command: "open-file",
       file: editor.document.fileName,
       signature,
       data
@@ -162,24 +159,41 @@ export class View {
   ) {
     const tree = await this.ctx.getTree(file, obl, range);
     if (tree !== undefined) {
-      messageWebview(this.panel.webview, requestId, {
-        type: "FROM_EXTENSION",
-        file,
-        command: "tree",
-        tree
-      });
+      messageWebview(
+        this.panel.webview,
+        "tree",
+        {
+          type: "FROM_EXTENSION",
+          file,
+          tree
+        },
+        requestId
+      );
     }
+  }
+
+  sendPinRequest() {
+    messageWebview(this.panel.webview, "pin", {
+      type: "FROM_EXTENSION"
+    });
+  }
+
+  sendUnpinRequest() {
+    messageWebview(this.panel.webview, "unpin", {
+      type: "FROM_EXTENSION"
+    });
   }
 }
 
 function messageWebview<T extends SystemToPanoptesCmds>(
   webview: vscode.Webview,
-  requestId: string,
-  msg: SystemToPanoptesMsg<T>
+  command: T,
+  msg: Omit<SystemToPanoptesMsg<T>, "command">,
+  requestId: string = command
 ) {
   webview.postMessage({
-    requestId: requestId,
-    payload: msg
+    requestId,
+    payload: { command, ...msg }
   } as MessageHandlerData<SystemToPanoptesMsg<T>>);
 }
 

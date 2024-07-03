@@ -1,15 +1,11 @@
 import type { DefinedPath, PathSegment } from "@argus/common/bindings";
 import { takeRightUntil } from "@argus/common/func";
 import _ from "lodash";
-import React, { createContext, useContext } from "react";
-
-import { HoverInfo } from "../HoverInfo";
+import React, { useContext } from "react";
 import { Toggle } from "../Toggle";
+import { AllowPathTrim, AllowToggle, DefPathRender, TyCtxt } from "../context";
 import { Angled, CommaSeparated, Kw } from "./syntax";
 import { PrintGenericArg, PrintTy } from "./ty";
-
-// Change this to true if we want to by default toggle type parameter lists
-export const ToggleGenericDelimiterContext = createContext(false);
 
 // Special case the printing for associated types. Things that look like
 // `<Type as Trait>::AssocType`, we want to print this as `<...>::AssocType` so that
@@ -47,13 +43,13 @@ export const PrintDefPath = ({ o }: { o: DefinedPath }) => {
     return null;
   }
 
-  const hoverContent = () => (
-    <div className="DirNode">
-      <span className="DefPathFull">
-        <PrintDefPathFull o={o} />
-      </span>
-    </div>
-  );
+  const tyCtxt = useContext(TyCtxt)!;
+  const toggle = useContext(AllowPathTrim);
+  if (!toggle) {
+    return <PrintDefPathFull o={o} />;
+  }
+
+  const PrintCustomDefPath = useContext(DefPathRender);
 
   const PrintAsGenericPath = ({
     Prefix,
@@ -63,14 +59,12 @@ export const PrintDefPath = ({ o }: { o: DefinedPath }) => {
     Rest: React.FC;
   }) => {
     return (
-      <div className="DefPathContainer">
-        <HoverInfo Content={hoverContent}>
-          <span className="DefPathShort">
-            <Prefix />
-          </span>
-        </HoverInfo>
-        <Rest />
-      </div>
+      <PrintCustomDefPath
+        fullPath={o}
+        ctx={tyCtxt}
+        Head={<Prefix />}
+        Rest={<Rest />}
+      />
     );
   };
 
@@ -163,11 +157,10 @@ export const PrintPathSegment = ({ o }: { o: PathSegment }) => {
         return null;
       }
       // Use a metric of "type size" rather than inner lenght.
-      const useToggle =
-        useContext(ToggleGenericDelimiterContext) && o.inner.length > 3;
+      const useToggle = useContext(AllowToggle) && o.inner.length > 3;
       return (
         // TODO: do we want to allow nested toggles?
-        <ToggleGenericDelimiterContext.Provider value={false}>
+        <AllowToggle.Provider value={false}>
           <Angled>
             {useToggle ? (
               <Toggle
@@ -178,7 +171,7 @@ export const PrintPathSegment = ({ o }: { o: PathSegment }) => {
               <PrintDefPathFull o={o.inner} />
             )}
           </Angled>
-        </ToggleGenericDelimiterContext.Provider>
+        </AllowToggle.Provider>
       );
     }
     case "CommaSeparated": {

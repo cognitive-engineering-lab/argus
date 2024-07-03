@@ -1,6 +1,12 @@
 import _ from "lodash";
 
-import type { CharRange, ObligationHash, Predicate, Ty } from "./bindings";
+import type {
+  CharRange,
+  ObligationHash,
+  Predicate,
+  Ty,
+  TyVal
+} from "./bindings";
 import type { MessageSystem } from "./communication";
 import type { Filename } from "./lib";
 
@@ -119,7 +125,7 @@ export function takeRightUntil<T>(arr: T[], pred: (t: T) => boolean) {
 
 export type Unit = { Tuple: Ty[] };
 
-export function tyIsUnit(o: Ty): o is Unit {
+export function tyIsUnit(o: TyVal): o is Unit {
   return isObject(o) && "Tuple" in o && o.Tuple.length === 0;
 }
 

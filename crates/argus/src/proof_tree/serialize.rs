@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use argus_ext::ty::EvaluationResultExt;
+use argus_ext::ty::{EvaluationResultExt, TyExt};
 use index_vec::IndexVec;
 use rustc_hir::def_id::DefId;
 use rustc_infer::infer::InferCtxt;
@@ -19,6 +19,7 @@ pub struct SerializedTreeVisitor<'tcx> {
   pub nodes: IndexVec<ProofNodeIdx, Node>,
   pub topology: TreeTopology,
   pub cycle: Option<ProofCycle>,
+  pub projection_values: HashMap<TyIdx, TyIdx>,
 
   deferred_leafs: Vec<(ProofNodeIdx, EvaluationResult)>,
   interners: Interners,
@@ -33,10 +34,42 @@ impl SerializedTreeVisitor<'_> {
       nodes: IndexVec::default(),
       topology: TreeTopology::new(),
       cycle: None,
+      projection_values: HashMap::default(),
 
       deferred_leafs: Vec::default(),
       interners: Interners::default(),
       aadebug: aadebug::Storage::new(maybe_ambiguous),
+    }
+  }
+
+  fn check_goal_projection(&mut self, goal: &InspectGoal) {
+    if let ty::PredicateKind::AliasRelate(
+      t1,
+      t2,
+      ty::AliasRelationDirection::Equate,
+    ) = goal.goal().predicate.kind().skip_binder()
+      && let Some(mut t1) = t1.ty()
+      && let Some(mut t2) = t2.ty()
+      // Disallow projections involving two aliases
+      && !(t1.is_alias() && t2.is_alias())
+      && t1 != t2
+    {
+      if t2.is_alias() {
+        // We want the map to go from alias -> concrete, swap the
+        // types so that the alias is on the LHS. This doesn't change
+        // the semantics because we only save `Equate` relations.
+        std::mem::swap(&mut t1, &mut t2);
+      }
+
+      if let Some((t1, t2)) = crate::tls::unsafe_access_interner(|interner| {
+        let idx1: TyIdx = interner.borrow().get_idx(&t1)?;
+        let idx2: TyIdx = interner.borrow().get_idx(&t2)?;
+        Some((idx1, idx2))
+      }) && t1 != t2
+      {
+        let not_empty = self.projection_values.insert(t1, t2);
+        debug_assert!(not_empty.is_none());
+      }
     }
   }
 
@@ -78,6 +111,7 @@ impl SerializedTreeVisitor<'_> {
       mut nodes,
       mut topology,
       cycle,
+      projection_values,
       mut interners,
       aadebug,
       deferred_leafs,
@@ -97,6 +131,7 @@ impl SerializedTreeVisitor<'_> {
     }
 
     let (goals, candidates, results) = interners.take();
+    let tys = crate::tls::take_interned_tys();
 
     Ok(SerializedTree {
       root,
@@ -104,6 +139,8 @@ impl SerializedTreeVisitor<'_> {
       goals,
       candidates,
       results,
+      tys,
+      projection_values,
       topology,
       cycle,
       analysis,
@@ -146,6 +183,10 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
     let here_idx = self.nodes.push(here_node);
     // Push node into the analysis tree.
     self.aadebug.push_goal(here_idx, goal).unwrap();
+
+    // After interning the goal we can check whether or not
+    // it's an successful alias relate predicate for two types.
+    self.check_goal_projection(goal);
 
     if self.root.is_none() {
       self.root = Some(here_idx);

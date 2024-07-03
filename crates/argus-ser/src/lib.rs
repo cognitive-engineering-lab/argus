@@ -23,7 +23,13 @@
 //!
 //! If you need to serialize an optional type then prefix it with `Option__`, and
 //! lists of elements are serialized with a prefixed `Slice__`.
-#![feature(rustc_private, let_chains, if_let_guard, decl_macro)]
+#![feature(
+  rustc_private,
+  let_chains,
+  if_let_guard,
+  decl_macro,
+  associated_type_defaults
+)]
 #![allow(non_camel_case_types, non_snake_case)]
 extern crate rustc_apfloat;
 extern crate rustc_data_structures;
@@ -37,18 +43,24 @@ extern crate rustc_trait_selection;
 // Make these public to expose the `XXX_Def` wrappers.
 pub mod r#const;
 pub mod custom;
+mod r#dyn;
 mod path;
 mod safe;
 pub mod term;
 pub mod ty;
 use std::cell::Cell;
+pub mod interner;
 
 pub use custom::*;
+pub(crate) use r#dyn::DynCtxt;
 use rustc_infer::infer::InferCtxt;
 use rustc_trait_selection::traits::solve::Goal;
 // These types are safe for dependents to use.
 pub use safe::*;
 use serde::Serialize;
+use serde_json as json;
+
+use crate::interner::TyInterner;
 
 /// # Panics
 ///
@@ -56,40 +68,24 @@ use serde::Serialize;
 /// happens because the *wrong* `InferCtxt` has been passed. Double-check
 /// that, then report an issue if it's not the case.
 pub fn to_value_expect<'a, 'tcx: 'a, T: Serialize + 'a>(
-  infcx: &InferCtxt<'tcx>,
+  infcx: &'a InferCtxt<'tcx>,
+  ty_interner: &'a TyInterner<'tcx>,
   value: &T,
-) -> serde_json::Value {
-  to_value(infcx, value).expect("failed to serialize value")
+) -> json::Value {
+  to_value(infcx, ty_interner, value).expect("failed to serialize value")
 }
 
 /// Entry function to serialize anything from rustc.
 pub fn to_value<'a, 'tcx: 'a, T: Serialize + 'a>(
-  infcx: &InferCtxt<'tcx>,
+  infcx: &'a InferCtxt<'tcx>,
+  ty_interner: &'a TyInterner<'tcx>,
   value: &T,
-) -> Result<serde_json::Value, serde_json::Error> {
-  in_dynamic_ctx(infcx, || serde_json::to_value(value))
-}
-
-// NOTE: setting the dynamic TCX should *only* happen
-// before calling the serialize function, it must guarantee
-// that the 'tcx lifetime is the same as that of the serialized item.
-fluid_let::fluid_let! {static INFCX: &'static InferCtxt<'static>}
-
-fn in_dynamic_ctx<T>(infcx: &InferCtxt, f: impl FnOnce() -> T) -> T {
-  let infcx: &'static InferCtxt<'static> =
-    unsafe { std::mem::transmute(infcx) };
-  INFCX.set(infcx, f)
-}
-
-fn get_dynamic_ctx<'a, 'tcx: 'a>() -> &'a InferCtxt<'tcx> {
-  let infcx: &'static InferCtxt<'static> = INFCX
-    .copied()
-    .unwrap_or_else(|| unreachable!("no dynamic context set"));
-  unsafe {
-    std::mem::transmute::<&'static InferCtxt<'static>, &'a InferCtxt<'tcx>>(
-      infcx,
-    )
-  }
+) -> Result<json::Value, json::Error> {
+  log::trace!("Setting Interner");
+  TyInterner::invoke_in(ty_interner, || {
+    log::trace!("Setting InferCtxt");
+    InferCtxt::invoke_in(infcx, || json::to_value(value))
+  })
 }
 
 trait InferCtxtSerializeExt {
@@ -184,3 +180,112 @@ define_helper!(
     /// Adds the `crate::` prefix to paths where appropriate.
     fn with_crate_prefix(CratePrefixGuard, SHOULD_PREFIX_WITH_CRATE);
 );
+
+// ----------------------------------------
+// Argus index helpers
+
+#[macro_export]
+macro_rules! ts {
+  ($($ty:ty,)*) => {
+    $({
+      let error_msg = format!("Failed to export TS binding for type '{}'", stringify!($ty));
+      <$ty as ts_rs::TS>::export().expect(error_msg.as_ref());
+    })*
+  };
+}
+
+#[macro_export]
+macro_rules! impl_raw_cnv {
+  // FIXME: how can I match the type literally here?
+  // (usize, $($t:tt)*) => {
+  //   index_vec::define_index_type! {
+  //     $($t)*
+  //   }
+  // };
+  ($_ty:ty, $($t:tt)*) => {
+    index_vec::define_index_type! {
+      $($t)*
+      // IMPL_RAW_CONVERSION = true;
+    }
+  };
+}
+
+#[macro_export]
+macro_rules! define_idx {
+  ($t:ident, $($ty:tt),*) => {
+      $($crate::impl_raw_cnv! {
+          $t,
+          pub struct $ty = $t;
+        })*
+      $crate::define_tsrs_alias!($($ty,)* => $t);
+  }
+}
+
+#[macro_export]
+macro_rules! define_tsrs_alias {
+    ($($($ty:ty,)* => $l:ident),*) => {$($(
+        #[cfg(feature = "testing")]
+        impl ts_rs::TS for $ty {
+            const EXPORT_TO: Option<&'static str> =
+              Some(concat!("bindings/", stringify!($ty), ".ts"));
+            fn name() -> String {
+                stringify!($ty).to_owned()
+            }
+            fn name_with_type_args(args: Vec<String>) -> String {
+              assert!(
+                  args.is_empty(),
+                  "called name_with_type_args on {}",
+                  stringify!($ty)
+              );
+              <$l as ts_rs::TS>::name()
+            }
+            fn decl() -> String {
+              format!(
+                "type {}{} = {};",
+                stringify!($ty),
+                "",
+                <$l as ts_rs::TS>::name()
+              )
+            }
+            fn inline() -> String {
+              <$l as ts_rs::TS>::name()
+            }
+            fn dependencies() -> Vec<ts_rs::Dependency> {
+                vec![]
+            }
+            fn transparent() -> bool {
+                false
+            }
+        }
+    )*)*};
+}
+
+#[macro_export]
+macro_rules! serialize_as_number {
+    (PATH ( $field_path:tt ){ $($name:ident,)* }) => {
+        $(
+            impl serde::Serialize for $name {
+                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where
+                    S: Serializer,
+                {
+                    let s = format!("{}", self.$field_path.as_usize());
+                    serializer.serialize_str(&s)
+                }
+            }
+        )*
+    }
+}
+
+// ---------------------
+// Export TS-RS bindings
+
+#[cfg(feature = "testing")]
+mod tests {
+  #[test]
+  fn export_bindings_indices() {
+    crate::ts! {
+      crate::interner::TyIdx,
+    }
+  }
+}

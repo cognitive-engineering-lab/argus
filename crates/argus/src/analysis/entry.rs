@@ -11,12 +11,11 @@ use rustc_trait_selection::traits::solve::Goal;
 
 use crate::{
   analysis::{
-    hir,
-    tls::{self},
-    transform, EvaluationResult, INCLUDE_SUCCESSES, OBLIGATION_TARGET,
+    hir, transform, EvaluationResult, INCLUDE_SUCCESSES, OBLIGATION_TARGET,
   },
   ext::InferCtxtExt,
   proof_tree::{serialize::try_serialize, SerializedTree},
+  tls,
   types::{
     intermediate::{ErrorAssemblyCtx, Forgettable, FullData},
     ObligationHash, ObligationNecessity, ObligationsInBody,

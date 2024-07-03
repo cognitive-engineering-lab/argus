@@ -13,9 +13,12 @@ import ErrorDiv from "./ErrorDiv";
 import MonoSpace from "./MonoSpace";
 import ReportBugUrl from "./ReportBugUrl";
 import "./lib.css";
+import { AllowToggle } from "./context";
 import { PrintImplHeader as UnsafePrintImplHeader } from "./private/argus";
-import { PrintDefPath as UnsafePrintDefPath } from "./private/path";
-import { ToggleGenericDelimiterContext } from "./private/path";
+import {
+  PrintDefPath as UnsafePrintDefPath,
+  PrintDefPathFull as UnsafePrintDefPathFull
+} from "./private/path";
 import {
   PrintGoalPredicate as UnsafePrintGoalPredicate,
   PrintPredicateObligation as UnsafePrintPredicateObligation
@@ -81,21 +84,21 @@ export const PrintTy = ({ ty }: { ty: Ty }) => {
 
 export const PrintObligation = ({ obligation }: { obligation: Obligation }) => {
   const InnerContent = () => (
-    <ToggleGenericDelimiterContext.Provider value={true}>
+    <AllowToggle.Provider value={true}>
       <UnsafePrintPredicateObligation o={obligation.obligation} />
-    </ToggleGenericDelimiterContext.Provider>
+    </AllowToggle.Provider>
   );
   return <PrintWithFallback object={obligation} Content={InnerContent} />;
 };
 
 export const PrintImplHeader = ({ impl }: { impl: ImplHeader }) => {
   return (
-    <ToggleGenericDelimiterContext.Provider value={true}>
+    <AllowToggle.Provider value={true}>
       <PrintWithFallback
         object={impl}
         Content={() => <UnsafePrintImplHeader o={impl} />}
       />
-    </ToggleGenericDelimiterContext.Provider>
+    </AllowToggle.Provider>
   );
 };
 
@@ -105,10 +108,10 @@ export const PrintGoal = ({ o }: { o: GoalData }) => {
       <div style={{ opacity: 0.5 }}>{o.debugComparison}</div>
     );
   const Content = () => (
-    <ToggleGenericDelimiterContext.Provider value={true}>
+    <AllowToggle.Provider value={true}>
       <UnsafePrintGoalPredicate o={o.value} />
       {debugString}
-    </ToggleGenericDelimiterContext.Provider>
+    </AllowToggle.Provider>
   );
   return <PrintWithFallback object={o} Content={Content} />;
 };
@@ -138,6 +141,15 @@ export const PrintBodyName = ({ defPath }: { defPath: DefinedPath }) => {
       object={defPath}
       // Content={() => <UnsafePrintDefPathFull o={defPath} />}
       Content={() => <UnsafePrintDefPath o={defPath} />}
+    />
+  );
+};
+
+export const PrintDefPathFull = ({ defPath }: { defPath: DefinedPath }) => {
+  return (
+    <PrintWithFallback
+      object={defPath}
+      Content={() => <UnsafePrintDefPathFull o={defPath} />}
     />
   );
 };

@@ -16,11 +16,11 @@ use rustc_utils::source_map::{range::CharRange, span::SpanExt};
 
 use super::{
   hir::{self as hier_hir, Bin, BinKind},
-  tls::UODIdx,
   EvaluationResult,
 };
 use crate::{
   ext::InferCtxtExt as LocalInferCtxtExt,
+  tls::UODIdx,
   types::{intermediate::*, *},
 };
 

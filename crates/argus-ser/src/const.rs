@@ -173,32 +173,33 @@ enum UnevaluatedConstDef<'tcx> {
 
 impl<'tcx> UnevaluatedConstDef<'tcx> {
   fn new(value: &UnevaluatedConst<'tcx>) -> Self {
-    let infcx = get_dynamic_ctx();
-    let UnevaluatedConst { def, args } = value;
-    match infcx.tcx.def_kind(def) {
-      DefKind::Const | DefKind::AssocConst => Self::ValuePath {
-        data: path::ValuePathWithArgs::new(*def, args),
-      },
-      DefKind::AnonConst => {
-        if def.is_local()
-          && let span = infcx.tcx.def_span(def)
-          && let Ok(snip) = infcx.tcx.sess.source_map().span_to_snippet(span)
-        {
-          Self::AnonSnippet { data: snip }
-        } else {
-          // Do not call `print_value_path` as if a parent of this anon const is an impl it will
-          // attempt to print out the impl trait ref i.e. `<T as Trait>::{constant#0}`. This would
-          // cause printing to enter an infinite recursion if the anon const is in the self type i.e.
-          // `impl<T: Default> Default for [T; 32 - 1 - 1 - 1] {`
-          // where we would try to print `<[T; /* print `constant#0` again */] as Default>::{constant#0}`
-          Self::AnonLocation {
-            krate: infcx.tcx.crate_name(def.krate),
-            path: path::BasicPathNoArgs::new(*def),
+    InferCtxt::access(|infcx| {
+      let UnevaluatedConst { def, args } = value;
+      match infcx.tcx.def_kind(def) {
+        DefKind::Const | DefKind::AssocConst => Self::ValuePath {
+          data: path::ValuePathWithArgs::new(*def, args),
+        },
+        DefKind::AnonConst => {
+          if def.is_local()
+            && let span = infcx.tcx.def_span(def)
+            && let Ok(snip) = infcx.tcx.sess.source_map().span_to_snippet(span)
+          {
+            Self::AnonSnippet { data: snip }
+          } else {
+            // Do not call `print_value_path` as if a parent of this anon const is an impl it will
+            // attempt to print out the impl trait ref i.e. `<T as Trait>::{constant#0}`. This would
+            // cause printing to enter an infinite recursion if the anon const is in the self type i.e.
+            // `impl<T: Default> Default for [T; 32 - 1 - 1 - 1] {`
+            // where we would try to print `<[T; /* print `constant#0` again */] as Default>::{constant#0}`
+            Self::AnonLocation {
+              krate: infcx.tcx.crate_name(def.krate),
+              path: path::BasicPathNoArgs::new(*def),
+            }
           }
         }
+        defkind => panic!("unexpected defkind {defkind:?} {value:?}"),
       }
-      defkind => panic!("unexpected defkind {defkind:?} {value:?}"),
-    }
+    })
   }
 
   pub fn serialize<S>(
@@ -237,56 +238,56 @@ pub enum ConstScalarIntDef {
 
 impl<'tcx> ConstScalarIntDef {
   pub fn new(int: ScalarInt, ty: Ty<'tcx>) -> Self {
-    let infcx = get_dynamic_ctx();
-    let tcx = infcx.tcx;
-
-    match ty.kind() {
-      Bool if int == ScalarInt::FALSE => Self::False,
-      Bool if int == ScalarInt::TRUE => Self::True,
-      Float(FloatTy::F32) => {
-        let val = Single::try_from(int).unwrap();
-        Self::Float {
-          data: format!("{val}"),
-          is_finite: val.is_finite(),
-        }
-      }
-      Float(FloatTy::F64) => {
-        let val = Double::try_from(int).unwrap();
-        Self::Float {
-          data: format!("{val}"),
-          is_finite: val.is_finite(),
-        }
-      }
-      Uint(_) | Int(_) => {
-        let int = ConstInt::new(
-          int,
-          matches!(ty.kind(), Int(_)),
-          ty.is_ptr_sized_integral(),
-        );
-        Self::Int {
-          data: format!("{int:?}"),
-        }
-      }
-      Char if char::try_from(int).is_ok() => Self::Char {
-        data: format!("{}", char::try_from(int).is_ok()),
-      },
-      Ref(..) | RawPtr(..) | FnPtr(_) => {
-        let data = int.assert_bits(tcx.data_layout.pointer_size);
-        Self::Misc {
-          data: format!("0x{data:x}"),
-        }
-      }
-      _ => {
-        if int.size() == Size::ZERO {
-          Self::Misc {
-            data: "transmute(())".to_string(),
-          }
-        } else {
-          Self::Misc {
-            data: format!("transmute(0x{int:x})"),
+    InferCtxt::access(|infcx| {
+      let tcx = infcx.tcx;
+      match ty.kind() {
+        Bool if int == ScalarInt::FALSE => Self::False,
+        Bool if int == ScalarInt::TRUE => Self::True,
+        Float(FloatTy::F32) => {
+          let val = Single::try_from(int).unwrap();
+          Self::Float {
+            data: format!("{val}"),
+            is_finite: val.is_finite(),
           }
         }
+        Float(FloatTy::F64) => {
+          let val = Double::try_from(int).unwrap();
+          Self::Float {
+            data: format!("{val}"),
+            is_finite: val.is_finite(),
+          }
+        }
+        Uint(_) | Int(_) => {
+          let int = ConstInt::new(
+            int,
+            matches!(ty.kind(), Int(_)),
+            ty.is_ptr_sized_integral(),
+          );
+          Self::Int {
+            data: format!("{int:?}"),
+          }
+        }
+        Char if char::try_from(int).is_ok() => Self::Char {
+          data: format!("{}", char::try_from(int).is_ok()),
+        },
+        Ref(..) | RawPtr(..) | FnPtr(_) => {
+          let data = int.assert_bits(tcx.data_layout.pointer_size);
+          Self::Misc {
+            data: format!("0x{data:x}"),
+          }
+        }
+        _ => {
+          if int.size() == Size::ZERO {
+            Self::Misc {
+              data: "transmute(())".to_string(),
+            }
+          } else {
+            Self::Misc {
+              data: format!("transmute(0x{int:x})"),
+            }
+          }
+        }
       }
-    }
+    })
   }
 }

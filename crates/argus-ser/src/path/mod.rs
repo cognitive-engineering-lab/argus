@@ -146,8 +146,7 @@ impl PathSegment<'_> {
   }
 }
 
-struct PathBuilder<'a, 'tcx: 'a> {
-  infcx: &'a InferCtxt<'tcx>,
+struct PathBuilder<'tcx> {
   empty_path: bool,
   in_value: bool,
   segments: Vec<PathSegment<'tcx>>,
@@ -161,17 +160,15 @@ pub enum CommaSeparatedKind {
   GenericArg,
 }
 
-impl<'tcx> From<PathBuilder<'_, 'tcx>> for DefinedPath<'tcx> {
-  fn from(builder: PathBuilder<'_, 'tcx>) -> Self {
+impl<'tcx> From<PathBuilder<'tcx>> for DefinedPath<'tcx> {
+  fn from(builder: PathBuilder<'tcx>) -> Self {
     DefinedPath(builder.segments)
   }
 }
 
-impl<'a, 'tcx: 'a> PathBuilder<'a, 'tcx> {
+impl<'a, 'tcx: 'a> PathBuilder<'tcx> {
   fn new() -> Self {
-    let infcx = super::get_dynamic_ctx();
     PathBuilder {
-      infcx,
       empty_path: true,
       in_value: false,
       segments: Vec::new(),
@@ -204,11 +201,12 @@ impl<'a, 'tcx: 'a> PathBuilder<'a, 'tcx> {
   }
 
   fn tcx(&self) -> TyCtxt<'tcx> {
-    self.infcx.tcx
+    let tyc = InferCtxt::access(|infcx| infcx.tcx);
+    tyc
   }
 
   fn should_print_verbose(&self) -> bool {
-    self.infcx.should_print_verbose()
+    InferCtxt::access(|infcx| infcx.should_print_verbose())
   }
 
   #[allow(dead_code)]

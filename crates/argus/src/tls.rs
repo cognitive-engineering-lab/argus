@@ -5,13 +5,18 @@ use argus_ext::{
   infer::InferCtxtExt,
   ty::{EvaluationResultExt, PredicateExt},
 };
+use argus_ser::{
+  self as ser,
+  interner::{TyIdx, TyInterner},
+};
 use index_vec::IndexVec;
 use rustc_data_structures::fx::FxIndexMap;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_span::Span;
 pub use unsafe_tls::{
-  store as unsafe_store_data, take as unsafe_take_data, FullObligationData,
-  UODIdx,
+  access_interner as unsafe_access_interner, store as unsafe_store_data,
+  take as unsafe_take_data, take_interned_values as take_interned_tys,
+  FullObligationData, UODIdx,
 };
 
 use crate::{
@@ -144,9 +149,11 @@ mod unsafe_tls {
   thread_local! {
     static OBLIGATION_DATA: RefCell<IndexVec<UODIdx, Option<FullObligationData<'static>>>> =
       RefCell::default();
+
+    static TY_INTERNER: TyInterner<'static> = TyInterner::default();
   }
 
-  crate::define_idx! {
+  ser::define_idx! {
     usize,
     UODIdx
   }
@@ -218,5 +225,19 @@ mod unsafe_tls {
         })
         .collect()
     })
+  }
+
+  pub fn access_interner<'tcx, T>(
+    f: impl for<'a> FnOnce(&'a TyInterner<'tcx>) -> T,
+  ) -> T {
+    TY_INTERNER.with(|interner: &TyInterner<'static>| {
+      let interner: &TyInterner<'tcx> =
+        unsafe { std::mem::transmute(&*interner) };
+      f(interner)
+    })
+  }
+
+  pub fn take_interned_values() -> IndexVec<TyIdx, serde_json::Value> {
+    TY_INTERNER.with(RefCell::take).consume()
   }
 }

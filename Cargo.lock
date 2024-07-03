@@ -85,6 +85,7 @@ dependencies = [
  "anyhow",
  "argus-ser",
  "fluid-let",
+ "index_vec",
  "log",
  "rustc_utils",
  "serde",

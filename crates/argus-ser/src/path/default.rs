@@ -30,7 +30,7 @@ pub trait PathBuilderDefault<'tcx> {
   );
 }
 
-impl<'a, 'tcx: 'a> PathBuilderDefault<'tcx> for PathBuilder<'a, 'tcx> {
+impl<'tcx> PathBuilderDefault<'tcx> for PathBuilder<'tcx> {
   fn default_print_def_path(
     &mut self,
     def_id: DefId,

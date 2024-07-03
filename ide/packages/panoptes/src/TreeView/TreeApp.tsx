@@ -1,6 +1,7 @@
 import TreeInfo from "@argus/common/TreeInfo";
 import type { SerializedTree } from "@argus/common/bindings";
 import { AppContext, TreeAppContext } from "@argus/common/context";
+import { TyCtxt } from "@argus/print/context";
 import {
   VSCodePanelTab,
   VSCodePanelView,
@@ -38,6 +39,7 @@ const TreeApp = ({
     return <ErrorMessage />;
   }
 
+  const internedTys = tree.tys;
   const treeInfo = TreeInfo.new(tree, showHidden);
   if (treeInfo === undefined) {
     console.error("Failed to create tree view");
@@ -57,22 +59,29 @@ const TreeApp = ({
     tabs.unshift(["Cycle Detected", () => <TreeCycle path={tree.cycle!} />]);
   }
 
+  const tyCtx = {
+    interner: internedTys,
+    projections: tree.projectionValues
+  };
+
   return (
     <TreeAppContext.TreeContext.Provider value={treeInfo}>
-      <div className="App">
-        <VSCodePanels>
-          {_.map(tabs, ([name, _], idx) => (
-            <VSCodePanelTab key={idx} id={`tab-${idx}`}>
-              {name}
-            </VSCodePanelTab>
-          ))}
-          {_.map(tabs, ([_, Component], idx) => (
-            <VSCodePanelView key={idx} id={`tab-${idx}`}>
-              <Component />
-            </VSCodePanelView>
-          ))}
-        </VSCodePanels>
-      </div>
+      <TyCtxt.Provider value={tyCtx}>
+        <div className="App">
+          <VSCodePanels>
+            {_.map(tabs, ([name, _], idx) => (
+              <VSCodePanelTab key={idx} id={`tab-${idx}`}>
+                {name}
+              </VSCodePanelTab>
+            ))}
+            {_.map(tabs, ([_, Component], idx) => (
+              <VSCodePanelView key={idx} id={`tab-${idx}`}>
+                <Component />
+              </VSCodePanelView>
+            ))}
+          </VSCodePanels>
+        </div>
+      </TyCtxt.Provider>
     </TreeAppContext.TreeContext.Provider>
   );
 };

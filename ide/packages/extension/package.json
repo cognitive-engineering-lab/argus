@@ -27,11 +27,31 @@
     "commands": [
       {
         "command": "argus.inspectWorkspace",
-        "title": "Argus: Inspect Current File"
+        "title": "Argus: Inspect current file"
       },
       {
         "command": "argus.cancelTasks",
-        "title": "Argus: Cancel Running Tasks"
+        "title": "Argus: Cancel running tasks"
+      },
+      {
+        "command": "argus.pinMBData",
+        "title": "Argus: Pin mini-buffer data"
+      },
+      {
+        "command": "argus.unpinMBData",
+        "title": "Argus: Unpin mini-buffer data"
+      }
+    ],
+    "keybindings": [
+      {
+          "command": "argus.pinMBData",
+          "key": "ctrl+alt+T",
+          "mac": "shift+cmd+t"
+      },
+      {
+          "command": "argus.unpinMBData",
+          "key": "ctrl+alt+U",
+          "mac": "shift+cmd+u"
       }
     ]
   },

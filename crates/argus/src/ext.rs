@@ -130,7 +130,9 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     let obl = &fdata.obligation;
     let range = obl.range(&self.tcx, body_id);
     let necessity = self.obligation_necessity(obl);
-    let obligation = ser::to_value_expect(self, &Wrapper(obl));
+    let obligation = crate::tls::unsafe_access_interner(|ty_intern| {
+      ser::to_value_expect(self, ty_intern, &Wrapper(obl))
+    });
 
     Obligation {
       obligation,

@@ -1,6 +1,7 @@
 import type { TreeInfo } from "@argus/common/TreeInfo";
 import type { ProofNodeIdx, SetHeuristic } from "@argus/common/bindings";
 import { TreeAppContext } from "@argus/common/context";
+import Indented from "@argus/print/Indented";
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import React, { useContext, useState } from "react";
@@ -75,10 +76,6 @@ function formOptions(
     onNo
   };
 }
-
-const Indented = ({ children }: { children: React.ReactNode }) => (
-  <div style={{ marginLeft: "0.5em" }}>{children}</div>
-);
 
 const Erotisi = () => {
   const tree = useContext(TreeAppContext.TreeContext)!;

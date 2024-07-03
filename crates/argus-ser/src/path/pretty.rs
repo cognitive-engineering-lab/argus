@@ -23,7 +23,7 @@ use super::{
   *,
 };
 
-impl<'a, 'tcx: 'a> PathBuilder<'a, 'tcx> {
+impl<'tcx> PathBuilder<'tcx> {
   pub fn print_def_path(
     &mut self,
     def_id: DefId,

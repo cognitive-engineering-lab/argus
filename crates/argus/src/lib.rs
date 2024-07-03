@@ -42,89 +42,34 @@ pub mod find_bodies; // TODO: remove when upstreamed to rustc-plugin
 mod proof_tree;
 #[cfg(feature = "testing")]
 pub mod test_utils;
-#[cfg(feature = "testing")]
-mod ts;
+mod tls;
 pub mod types;
 
-#[macro_export]
-macro_rules! impl_raw_cnv {
-  // FIXME: how can I match the type literally here?
-  // (usize, $($t:tt)*) => {
-  //   index_vec::define_index_type! {
-  //     $($t)*
-  //   }
-  // };
-  ($_ty:ty, $($t:tt)*) => {
-    index_vec::define_index_type! {
-      $($t)*
-      // IMPL_RAW_CONVERSION = true;
-    }
-  };
-}
+#[cfg(feature = "testing")]
+mod tests {
+  #[test]
+  fn export_bindings_indices() {
+    use crate::{proof_tree as pty, types as ty};
 
-#[macro_export]
-macro_rules! define_idx {
-  ($t:ident, $($ty:tt),*) => {
-      $($crate::impl_raw_cnv! {
-          $t,
-          pub struct $ty = $t;
-        })*
-      $crate::define_tsrs_alias!($($ty,)* => $t);
+    argus_ser::ts! {
+      ty::ExprIdx,
+      ty::ObligationIdx,
+
+      pty::ProofNodeIdx,
+      pty::GoalIdx,
+      pty::CandidateIdx,
+      pty::ResultIdx,
+    }
   }
-}
 
-#[macro_export]
-macro_rules! define_tsrs_alias {
-    ($($($ty:ty,)* => $l:ident),*) => {$($(
-        #[cfg(feature = "testing")]
-        impl ts_rs::TS for $ty {
-            const EXPORT_TO: Option<&'static str> =
-              Some(concat!("bindings/", stringify!($ty), ".ts"));
-            fn name() -> String {
-                stringify!($ty).to_owned()
-            }
-            fn name_with_type_args(args: Vec<String>) -> String {
-              assert!(
-                  args.is_empty(),
-                  "called name_with_type_args on {}",
-                  stringify!($ty)
-              );
-              <$l as ts_rs::TS>::name()
-            }
-            fn decl() -> String {
-              format!(
-                "type {}{} = {};",
-                stringify!($ty),
-                "",
-                <$l as ts_rs::TS>::name()
-              )
-            }
-            fn inline() -> String {
-              <$l as ts_rs::TS>::name()
-            }
-            fn dependencies() -> Vec<ts_rs::Dependency> {
-                vec![]
-            }
-            fn transparent() -> bool {
-                false
-            }
-        }
-    )*)*};
-}
+  #[test]
+  fn export_bindings_rustc_utils() {
+    use rustc_utils::source_map::{filename as fty, range as uty};
 
-#[macro_export]
-macro_rules! serialize_as_number {
-    (PATH ( $field_path:tt ){ $($name:ident,)* }) => {
-        $(
-            impl serde::Serialize for $name {
-                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where
-                    S: Serializer,
-                {
-                    let s = format!("{}", self.$field_path.as_usize());
-                    serializer.serialize_str(&s)
-                }
-            }
-        )*
+    argus_ser::ts! {
+      uty::CharPos,
+      uty::CharRange,
+      fty::FilenameIndex,
     }
+  }
 }

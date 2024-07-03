@@ -9,6 +9,7 @@ import type { Filename } from "@argus/common/lib";
 import ErrorDiv from "@argus/print/ErrorDiv";
 import MonoSpace from "@argus/print/MonoSpace";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
+import { TyCtxt } from "@argus/print/context";
 import { PrintBodyName } from "@argus/print/lib";
 import { VSCodeDivider } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
@@ -84,7 +85,14 @@ const File = ({
   const bodies = _.map(bodiesWithVisibleExprs, (bodyInfo, idx) => (
     <Fragment key={idx}>
       {idx > 0 ? <VSCodeDivider /> : null}
-      <ObligationBody bodyInfo={bodyInfo} />
+      <TyCtxt.Provider
+        value={{
+          interner: bodyInfo.tyInterner,
+          projections: {}
+        }}
+      >
+        <ObligationBody bodyInfo={bodyInfo} />
+      </TyCtxt.Provider>
     </Fragment>
   ));
 

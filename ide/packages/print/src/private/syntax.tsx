@@ -3,69 +3,43 @@ import React from "react";
 
 import "./syntax.css";
 
-// See https://doc.rust-lang.org/stable/nightly-rustc/rustc_span/symbol/kw/index.html
+// A "Discretionary Space", hopefully this allows the layout to break along
+// these elements rather than in the middle of text or random spaces.
+export const Dsp = ({ children }: React.PropsWithChildren) => (
+  <span style={{ display: "inline-block" }}>{children}</span>
+);
 
-// export const UnderscoreLifetime: Ident = { name: "'_" };
+export const Placeholder = ({ children }: React.PropsWithChildren) => (
+  <span className="placeholder">{children}</span>
+);
 
-// export const PathRoot: Ident = { name: "{{root}}" };
+export const Kw = ({ children }: React.PropsWithChildren) => (
+  <span className="kw">{children}</span>
+);
 
-export const Placeholder = ({ children }: React.PropsWithChildren) => {
-  return <span className="placeholder">{children}</span>;
-};
-
-export const Kw = ({ children }: React.PropsWithChildren) => {
-  return <span className="kw">{children}</span>;
-};
-
-export const Angled = ({ children }: React.PropsWithChildren) => {
-  return (
-    <span>
-      {"<"}
-      {children}
-      {">"}
-    </span>
+const makeWrapper =
+  (lhs: string, rhs: string) =>
+  ({ children }: React.PropsWithChildren) => (
+    <>
+      {lhs}
+      <Dsp>{children}</Dsp>
+      {rhs}
+    </>
   );
-};
 
-export const DBraced = ({ children }: React.PropsWithChildren) => {
-  return (
-    <span>
-      {"{{"}
-      {children}
-      {"}}"}
-    </span>
-  );
-};
+export const Angled = makeWrapper("<", ">");
+export const DBraced = makeWrapper("{{", "}}");
+export const CBraced = makeWrapper("{", "}");
+export const Parenthesized = makeWrapper("(", ")");
+export const SqBraced = makeWrapper("[", "]");
 
-export const CBraced = ({ children }: React.PropsWithChildren) => {
-  return (
-    <span>
-      {"{"}
-      {children}
-      {"}"}
-    </span>
-  );
-};
+export const CommaSeparated = ({ components }: { components: React.FC[] }) => (
+  <Interspersed components={components} sep=", " />
+);
 
-export const Parenthesized = ({ children }: React.PropsWithChildren) => {
-  return (
-    <span>
-      {"("}
-      {children}
-      {")"}
-    </span>
-  );
-};
-
-export const SqBraced = ({ children }: React.PropsWithChildren) => {
-  return (
-    <span>
-      {"["}
-      {children}
-      {"]"}
-    </span>
-  );
-};
+export const PlusSeparated = ({ components }: { components: React.FC[] }) => (
+  <Interspersed components={components} sep=" + " />
+);
 
 const Interspersed = ({
   components,
@@ -73,22 +47,14 @@ const Interspersed = ({
 }: {
   components: React.FC[];
   sep: string;
-}) => {
-  return _.map(components, (C, i) => {
-    const p = i === 0 ? "" : sep;
-    return (
-      <span key={i}>
-        {p}
+}) =>
+  _.map(components, (C, i) => (
+    // The inline-block span should help the layout to break on the elements
+    // and not in them. Still undecided if this actually does anything.
+    <React.Fragment key={i}>
+      {i === 0 ? "" : sep}
+      <span style={{ display: "inline-block" }}>
         <C />
       </span>
-    );
-  });
-};
-
-export const CommaSeparated = ({ components }: { components: React.FC[] }) => {
-  return <Interspersed components={components} sep=", " />;
-};
-
-export const PlusSeparated = ({ components }: { components: React.FC[] }) => {
-  return <Interspersed components={components} sep=" + " />;
-};
+    </React.Fragment>
+  ));

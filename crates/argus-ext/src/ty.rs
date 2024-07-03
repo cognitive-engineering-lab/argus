@@ -32,6 +32,8 @@ pub trait TyExt<'tcx> {
 
   fn is_local(&self) -> bool;
 
+  fn is_alias(&self) -> bool;
+
   fn base_ty(&self) -> ty::Ty<'tcx>;
 }
 

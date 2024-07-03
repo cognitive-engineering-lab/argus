@@ -5,8 +5,10 @@ mod interners;
 pub(super) mod serialize;
 pub mod topology;
 
+use std::collections::HashMap;
+
 use argus_ext::ty::PredicateExt;
-use argus_ser as ser;
+use argus_ser::{self as ser, interner::TyIdx};
 use index_vec::IndexVec;
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::ty;
@@ -16,14 +18,14 @@ pub use topology::*;
 use ts_rs::TS;
 
 use crate::{
-  aadebug,
+  aadebug, tls,
   types::{
     intermediate::{EvaluationResult, EvaluationResultDef},
     ObligationNecessity,
   },
 };
 
-crate::define_idx! {
+ser::define_idx! {
   u32,
   ProofNodeIdx,
   GoalIdx,
@@ -103,6 +105,11 @@ pub struct SerializedTree {
   #[cfg_attr(feature = "testing", ts(type = "ResultData[]"))]
   pub results: IndexVec<ResultIdx, ResultData>,
 
+  #[cfg_attr(feature = "testing", ts(type = "TyVal[]"))]
+  pub tys: IndexVec<TyIdx, serde_json::Value>,
+
+  pub projection_values: HashMap<TyIdx, TyIdx>,
+
   pub topology: TreeTopology,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub cycle: Option<ProofCycle>,
@@ -123,7 +130,10 @@ impl CandidateData {
     impl_: &ser::ImplHeader<'tcx>,
     is_user_visible: bool,
   ) -> Self {
-    let impl_ = ser::to_value_expect(infcx, impl_);
+    let impl_ = tls::unsafe_access_interner(|ty_interner| {
+      ser::to_value_expect(infcx, ty_interner, impl_)
+    });
+
     Self::Impl {
       hd: impl_,
       is_user_visible,

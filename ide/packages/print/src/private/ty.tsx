@@ -29,14 +29,18 @@ import type {
   Trait,
   Ty,
   TyKind,
+  TyVal,
   TypeAndMut,
   UintTy
 } from "@argus/common/bindings";
 import { anyElems, fnInputsAndOutput, tyIsUnit } from "@argus/common/func";
+import {} from "@floating-ui/react";
 import _, { isObject } from "lodash";
-import React from "react";
-
+import React, { useContext } from "react";
+import Comment from "../Comment";
+import Indented from "../Indented";
 import { Toggle } from "../Toggle";
+import { AllowPathTrim, AllowProjectionSubst, TyCtxt } from "../context";
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
 import {
@@ -61,6 +65,47 @@ export const PrintBinder = ({
 };
 
 export const PrintTy = ({ o }: { o: Ty }) => {
+  const tyCtx = useContext(TyCtxt);
+  if (tyCtx === undefined) {
+    throw new Error("Ty Interner not set");
+  }
+
+  const tyVal = tyCtx.interner[o];
+  const projectedId = tyCtx.projections[o];
+  const allowProjection = useContext(AllowProjectionSubst);
+  if (allowProjection && projectedId !== undefined) {
+    const projectedValue = tyCtx.interner[projectedId];
+    console.info("Printing alias instead!");
+    return <PrintTyProjected original={tyVal} projection={projectedValue} />;
+  }
+
+  return <PrintTyValue o={tyVal} />;
+};
+
+export const PrintTyProjected = ({
+  original,
+  projection
+}: { original: TyVal; projection: TyVal }) => {
+  const Content = (
+    <AllowPathTrim.Provider value={false}>
+      <AllowProjectionSubst.Provider value={false}>
+        <p> This type is from a projection:</p>
+        <p>Projected type:</p>
+        <Indented>
+          <PrintTyValue o={projection} />
+        </Indented>
+        <p>Full path:</p>
+        <Indented>
+          <PrintTyValue o={original} />
+        </Indented>
+      </AllowProjectionSubst.Provider>
+    </AllowPathTrim.Provider>
+  );
+
+  return <Comment Child={<PrintTyValue o={projection} />} Content={Content} />;
+};
+
+export const PrintTyValue = ({ o }: { o: TyVal }) => {
   return <PrintTyKind o={o} />;
 };
 
@@ -286,12 +331,14 @@ export const PrintPolyFnSig = ({ o }: { o: PolyFnSig }) => {
     output: Ty;
     cVariadic: boolean;
   }) => {
+    const tyCtx = useContext(TyCtxt)!;
     const inputComponents = _.map(inputs, ty => () => <PrintTy o={ty} />);
     const variadic = !cVariadic ? null : inputs.length === 0 ? "..." : ", ...";
-    const ret = tyIsUnit(output) ? null : (
+    const outVal = tyCtx.interner[output];
+    const ret = tyIsUnit(outVal) ? null : (
       <>
         {" "}
-        {"->"} <PrintTy o={output} />
+        {"->"} <PrintTyValue o={outVal} />
       </>
     );
     return (
@@ -345,7 +392,7 @@ export const PrintPolyFnSig = ({ o }: { o: PolyFnSig }) => {
     return (
       <>
         {unsafetyStr}
-        {abi}fn{" "}
+        {abi}fn
         <InnerSig inputs={inputs} output={output} cVariadic={o.c_variadic} />
       </>
     );

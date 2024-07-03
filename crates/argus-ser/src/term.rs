@@ -126,112 +126,118 @@ enum LeafKind {
 
 impl<'tcx> From<&ValTreeDef<'tcx>> for ValTreeKind<'tcx> {
   fn from(value: &ValTreeDef<'tcx>) -> Self {
-    let infcx = get_dynamic_ctx();
-    let tcx = &infcx.tcx;
-    let this = value;
+    InferCtxt::access(|infcx| {
+      let tcx = &infcx.tcx;
+      let this = value;
 
-    let u8_type = tcx.types.u8;
-    match (this.tree, this.ty.kind()) {
-      (ty::ValTree::Branch(_), ty::Ref(_, inner_ty, _)) => {
-        match inner_ty.kind() {
-          ty::Slice(t) if *t == u8_type => {
-            let bytes = this
+      let u8_type = tcx.types.u8;
+      match (this.tree, this.ty.kind()) {
+        (ty::ValTree::Branch(_), ty::Ref(_, inner_ty, _)) => {
+          match inner_ty.kind() {
+            ty::Slice(t) if *t == u8_type => {
+              let bytes = this
+                .tree
+                .try_to_raw_bytes(*tcx, this.ty)
+                .unwrap_or_else(|| {
+                  panic!("expected bytes from slice valtree");
+                });
+              ValTreeKind::String {
+                data: format!("b\"{}\"", bytes.escape_ascii()),
+                is_deref: false,
+              }
+            }
+            ty::Str => {
+              let bytes = this
+                .tree
+                .try_to_raw_bytes(*tcx, this.ty)
+                .unwrap_or_else(|| {
+                  panic!("expected bytes from slice valtree");
+                });
+              ValTreeKind::String {
+                data: String::from_utf8_lossy(bytes).to_string(),
+                is_deref: false,
+              }
+            }
+            _ => ValTreeKind::Ref {
+              inner: ValTreeDef::new(this.tree, *inner_ty),
+            },
+          }
+        }
+        (ty::ValTree::Branch(_), ty::Array(t, _)) if *t == u8_type => {
+          let bytes =
+            this
               .tree
               .try_to_raw_bytes(*tcx, this.ty)
               .unwrap_or_else(|| {
                 panic!("expected bytes from slice valtree");
               });
-            ValTreeKind::String {
-              data: format!("b\"{}\"", bytes.escape_ascii()),
-              is_deref: false,
-            }
+
+          ValTreeKind::String {
+            data: format!("b\"{}\"", bytes.escape_ascii()),
+            is_deref: true,
           }
-          ty::Str => {
-            let bytes = this
-              .tree
-              .try_to_raw_bytes(*tcx, this.ty)
-              .unwrap_or_else(|| {
-                panic!("expected bytes from slice valtree");
-              });
-            ValTreeKind::String {
-              data: String::from_utf8_lossy(bytes).to_string(),
-              is_deref: false,
-            }
-          }
-          _ => ValTreeKind::Ref {
-            inner: ValTreeDef::new(this.tree, *inner_ty),
-          },
         }
-      }
-      (ty::ValTree::Branch(_), ty::Array(t, _)) if *t == u8_type => {
-        let bytes =
-          this
-            .tree
-            .try_to_raw_bytes(*tcx, this.ty)
-            .unwrap_or_else(|| {
-              panic!("expected bytes from slice valtree");
-            });
 
-        ValTreeKind::String {
-          data: format!("b\"{}\"", bytes.escape_ascii()),
-          is_deref: true,
-        }
-      }
-
-      (ty::ValTree::Branch(_), ty::Array(..) | ty::Tuple(..) | ty::Adt(..)) => {
-        let contents =
-          tcx.destructure_const(ty::Const::new_value(*tcx, this.tree, this.ty));
-        let fields = contents.fields;
-        let kind = match this.ty.kind() {
-          ty::Array(..) => ValTreeAggregateKind::Array,
-          ty::Tuple(..) => ValTreeAggregateKind::Tuple,
-          ty::Adt(def, _) if def.variants().is_empty() => {
-            ValTreeAggregateKind::AdtNoVariants
-          }
-          ty::Adt(def, args) => {
-            let variant_idx = contents
-              .variant
-              .expect("destructed const of adt without variant idx");
-            let variant_def = &def.variant(variant_idx);
-            let value_path =
-              path::ValuePathWithArgs::new(variant_def.def_id, args);
-            let adt_kind = match variant_def.ctor_kind() {
-              Some(CtorKind::Const) => AdtAggregateKind::Const,
-              Some(CtorKind::Fn) => AdtAggregateKind::Fn,
-              _ => AdtAggregateKind::Misc {
-                names: variant_def
-                  .fields
-                  .iter()
-                  .map(|field_def| field_def.name)
-                  .collect::<Vec<_>>(),
-              },
-            };
-
-            ValTreeAggregateKind::Adt {
-              data: value_path,
-              kind: adt_kind,
+        (
+          ty::ValTree::Branch(_),
+          ty::Array(..) | ty::Tuple(..) | ty::Adt(..),
+        ) => {
+          let contents = tcx
+            .destructure_const(ty::Const::new_value(*tcx, this.tree, this.ty));
+          let fields = contents.fields;
+          let kind = match this.ty.kind() {
+            ty::Array(..) => ValTreeAggregateKind::Array,
+            ty::Tuple(..) => ValTreeAggregateKind::Tuple,
+            ty::Adt(def, _) if def.variants().is_empty() => {
+              ValTreeAggregateKind::AdtNoVariants
             }
+            ty::Adt(def, args) => {
+              let variant_idx = contents
+                .variant
+                .expect("destructed const of adt without variant idx");
+              let variant_def = &def.variant(variant_idx);
+              let value_path =
+                path::ValuePathWithArgs::new(variant_def.def_id, args);
+              let adt_kind = match variant_def.ctor_kind() {
+                Some(CtorKind::Const) => AdtAggregateKind::Const,
+                Some(CtorKind::Fn) => AdtAggregateKind::Fn,
+                _ => AdtAggregateKind::Misc {
+                  names: variant_def
+                    .fields
+                    .iter()
+                    .map(|field_def| field_def.name)
+                    .collect::<Vec<_>>(),
+                },
+              };
+
+              ValTreeAggregateKind::Adt {
+                data: value_path,
+                kind: adt_kind,
+              }
+            }
+            _ => unreachable!(),
+          };
+
+          ValTreeKind::Aggregate { fields, kind }
+        }
+
+        (ty::ValTree::Leaf(leaf), ty::Ref(_, inner_ty, _)) => {
+          ValTreeKind::Leaf {
+            data: ConstScalarIntDef::new(leaf, *inner_ty),
+            kind: LeafKind::Ref,
           }
-          _ => unreachable!(),
-        };
-
-        ValTreeKind::Aggregate { fields, kind }
+        }
+        (ty::ValTree::Leaf(leaf), _) => ValTreeKind::Leaf {
+          data: ConstScalarIntDef::new(leaf, this.ty),
+          kind: LeafKind::Scalar,
+        },
+        _ => ValTreeKind::String {
+          // TODO: I don't fully understand this fallback case, revisit it later!
+          data: "VALTREE".to_string(),
+          is_deref: false,
+        },
       }
-
-      (ty::ValTree::Leaf(leaf), ty::Ref(_, inner_ty, _)) => ValTreeKind::Leaf {
-        data: ConstScalarIntDef::new(leaf, *inner_ty),
-        kind: LeafKind::Ref,
-      },
-      (ty::ValTree::Leaf(leaf), _) => ValTreeKind::Leaf {
-        data: ConstScalarIntDef::new(leaf, this.ty),
-        kind: LeafKind::Scalar,
-      },
-      _ => ValTreeKind::String {
-        // TODO: I don't fully understand this fallback case, revisit it later!
-        data: "VALTREE".to_string(),
-        is_deref: false,
-      },
-    }
+    })
   }
 }
 

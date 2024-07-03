@@ -1,6 +1,5 @@
 pub(crate) mod entry;
 mod hir;
-mod tls;
 mod transform;
 
 use std::collections::HashMap;
@@ -10,7 +9,6 @@ use argus_ext::ty::TyCtxtExt;
 use fluid_let::fluid_let;
 use rustc_hir::BodyId;
 use rustc_middle::ty::TyCtxt;
-pub(crate) use tls::{FullObligationData, UODIdx};
 
 pub(crate) use crate::types::intermediate::{
   EvaluationResult, FulfillmentData,
@@ -31,8 +29,6 @@ fluid_let! {
 /// Generate the set of evaluated obligations within a single body.
 pub fn obligations(tcx: TyCtxt, body_id: BodyId) -> Result<ObligationsInBody> {
   fluid_let::fluid_set!(entry::BODY_ID, body_id);
-
-  log::trace!("obligations {body_id:?}");
 
   let typeck_results = tcx.inspect_typeck(body_id, entry::process_obligation);
 

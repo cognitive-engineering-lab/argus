@@ -62,6 +62,10 @@ impl<'tcx> TyExt<'tcx> for Ty<'tcx> {
     matches!(self.kind(), ty::TyKind::Error(..))
   }
 
+  fn is_alias(&self) -> bool {
+    matches!(self.kind(), ty::TyKind::Alias(..))
+  }
+
   fn is_local(&self) -> bool {
     match self.kind() {
       ty::TyKind::Ref(_, ty, _) | ty::TyKind::RawPtr(ty, ..) => ty.is_local(),

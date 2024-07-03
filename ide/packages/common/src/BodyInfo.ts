@@ -46,6 +46,9 @@ class BodyInfo {
     return this.range.end;
   }
 
+  get tyInterner() {
+    return this.oib.tys;
+  }
   notHidden(hash: ObligationIdx): boolean {
     const o = this.getObligation(hash);
     if (o === undefined) {

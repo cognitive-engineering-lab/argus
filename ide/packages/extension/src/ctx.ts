@@ -242,6 +242,14 @@ export class Ctx {
     this.view.getPanel.reveal();
   }
 
+  async pinMBData() {
+    this.view?.sendPinRequest();
+  }
+
+  async unpinMBData() {
+    this.view?.sendUnpinRequest();
+  }
+
   async openError(target: ErrorJumpTargetInfo) {
     await this.inspectAt(target);
     // XXX: If the view is not initialized after calling `inspectAt`

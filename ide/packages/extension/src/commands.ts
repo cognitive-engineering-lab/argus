@@ -16,6 +16,20 @@ export function inspect(ctx: Ctx): Cmd {
   };
 }
 
+export function pinMBData(ctx: Ctx): Cmd {
+  return async () => {
+    trace("pinMBData");
+    ctx.pinMBData();
+  };
+}
+
+export function unpinMBData(ctx: Ctx): Cmd {
+  return async () => {
+    trace("unpinMBData");
+    ctx.unpinMBData();
+  };
+}
+
 export function cancelTasks(ctx: Ctx): Cmd {
   return async () => {
     trace("cancelTasks");
