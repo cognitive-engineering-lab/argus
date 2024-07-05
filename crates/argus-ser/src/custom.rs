@@ -1,7 +1,10 @@
 //! Extensions to the type system for easier consumption.
+use argus_ext::ty::TyCtxtExt;
+use itertools::Itertools;
 use rustc_data_structures::fx::FxIndexMap;
 use rustc_hir::def_id::DefId;
-use rustc_middle::ty;
+use rustc_macros::TypeVisitable;
+use rustc_middle::ty::{self, Upcast};
 use serde::Serialize;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
@@ -31,17 +34,72 @@ pub struct ImplHeader<'tcx> {
   pub tys_without_default_bounds: Vec<ty::Ty<'tcx>>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Clone, TypeVisitable, Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct GroupedClauses<'tcx> {
-  pub grouped: Vec<ClauseWithBounds<'tcx>>,
+  #[serde(with = "Slice__PolyClauseWithBoundsDef")]
+  #[cfg_attr(feature = "testing", ts(type = "PolyClauseWithBounds[]"))]
+  pub grouped: Vec<PolyClauseWithBounds<'tcx>>,
+
   #[serde(with = "myty::Slice__ClauseDef")]
   #[cfg_attr(feature = "testing", ts(type = "Clause[]"))]
   pub other: Vec<ty::Clause<'tcx>>,
 }
 
+pub struct Slice__PolyClauseWithBoundsDef;
+impl Slice__PolyClauseWithBoundsDef {
+  pub fn serialize<S>(
+    value: &[PolyClauseWithBounds],
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    #[derive(Serialize)]
+    struct Wrapper<'a, 'tcx: 'a>(
+      #[serde(with = "Binder__ClauseWithBounds")]
+      &'a PolyClauseWithBounds<'tcx>,
+    );
+
+    crate::serialize_custom_seq! { Wrapper, s, value }
+  }
+}
+
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "PolyClauseWithBounds"))]
+pub struct Binder__ClauseWithBounds<'tcx> {
+  value: ClauseWithBounds<'tcx>,
+
+  #[serde(with = "myty::Slice__BoundVariableKindDef")]
+  #[cfg_attr(feature = "testing", ts(type = "BoundVariableKind[]"))]
+  bound_vars: &'tcx ty::List<ty::BoundVariableKind>,
+}
+
+impl<'tcx> Binder__ClauseWithBounds<'tcx> {
+  pub fn new(value: &PolyClauseWithBounds<'tcx>) -> Self {
+    Self {
+      bound_vars: value.bound_vars(),
+      value: value.clone().skip_binder(),
+    }
+  }
+
+  pub fn serialize<S>(
+    value: &PolyClauseWithBounds<'tcx>,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    Self::new(value).serialize(s)
+  }
+}
+
+type PolyClauseWithBounds<'tcx> = ty::Binder<'tcx, ClauseWithBounds<'tcx>>;
+
+#[derive(Debug, Clone, TypeVisitable, Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct ClauseWithBounds<'tcx> {
@@ -51,14 +109,24 @@ pub struct ClauseWithBounds<'tcx> {
   pub bounds: Vec<ClauseBound<'tcx>>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Copy, Clone, TypeVisitable, Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub enum ClauseBound<'tcx> {
   Trait(
     myty::Polarity,
+    #[serde(with = "myty::TraitRefPrintOnlyTraitPathDef")]
     #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
-    crate::TraitRefPrintOnlyTraitPathDef<'tcx>,
+    ty::TraitRef<'tcx>,
+  ),
+  FnTrait(
+    myty::Polarity,
+    #[serde(with = "myty::TraitRefPrintOnlyTraitPathDef")]
+    #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
+    ty::TraitRef<'tcx>,
+    #[serde(with = "myty::TyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+    ty::Ty<'tcx>,
   ),
   Region(
     #[serde(with = "myty::RegionDef")]
@@ -68,27 +136,44 @@ pub enum ClauseBound<'tcx> {
 }
 
 pub fn group_predicates_by_ty<'tcx>(
+  tcx: ty::TyCtxt<'tcx>,
   predicates: impl IntoIterator<Item = ty::Clause<'tcx>>,
 ) -> GroupedClauses<'tcx> {
   // ARGUS: ADDITION: group predicates together based on `self_ty`.
-  let mut grouped: FxIndexMap<_, Vec<_>> = FxIndexMap::default();
+  let mut grouped = FxIndexMap::<_, Vec<_>>::default();
   let mut other = vec![];
+
+  // TODO: this only looks at the output of an `FnOnce`, we probably also need
+  // to handle `AsyncFnOnce` and consider doing the same for the output of
+  // a `Future`. A further goal could be sugaring all associated type bounds
+  // back into the signature but that would require more work (not sure how much).
+  let fn_trait_output = tcx.lang_items().fn_once_output();
+  let mut fn_output_projections = vec![];
+
   for p in predicates {
-    // TODO: all this binder skipping is a HACK.
     if let Some(poly_trait_pred) = p.as_trait_clause() {
       let ty = poly_trait_pred.self_ty().skip_binder();
       let trait_ref =
         poly_trait_pred.map_bound(|tr| tr.trait_ref).skip_binder();
-      let bound = ClauseBound::Trait(
-        poly_trait_pred.polarity().into(),
-        crate::TraitRefPrintOnlyTraitPathDef(trait_ref),
-      );
-      grouped.entry(ty).or_default().push(bound);
+      let bound =
+        ClauseBound::Trait(poly_trait_pred.polarity().into(), trait_ref);
+      grouped
+        .entry(ty)
+        .or_default()
+        .push(poly_trait_pred.rebind(bound));
     } else if let Some(poly_ty_outl) = p.as_type_outlives_clause() {
       let ty = poly_ty_outl.map_bound(|t| t.0).skip_binder();
       let r = poly_ty_outl.map_bound(|t| t.1).skip_binder();
       let bound = ClauseBound::Region(r);
-      grouped.entry(ty).or_default().push(bound);
+      grouped
+        .entry(ty)
+        .or_default()
+        .push(poly_ty_outl.rebind(bound));
+    } else if let Some(poly_projection) = p.as_projection_clause()
+      && let Some(output_defid) = fn_trait_output
+      && poly_projection.projection_def_id() == output_defid
+    {
+      fn_output_projections.push(poly_projection);
     } else {
       other.push(p);
     }
@@ -96,8 +181,60 @@ pub fn group_predicates_by_ty<'tcx>(
 
   let grouped = grouped
     .into_iter()
-    .map(|(ty, bounds)| ClauseWithBounds { ty, bounds })
+    .map(|(ty, bounds)| {
+      // NOTE: we have to call unique to make a `List`
+      let all_bound_vars = bounds.iter().flat_map(|b| b.bound_vars()).unique();
+      let bound_vars = tcx.mk_bound_variable_kinds_from_iter(all_bound_vars);
+      let unbounds = bounds
+        .into_iter()
+        .map(|bclause| {
+          let clause = bclause.skip_binder();
+          if let ClauseBound::Trait(p, tref) = clause
+            && tcx.is_fn_trait(tref.def_id)
+            && let poly_tr = bclause.rebind(tref)
+            && let matching_projections = fn_output_projections
+              .extract_if(move |p| {
+                tcx.does_trait_ref_occur_in(
+                  poly_tr,
+                  p.map_bound(|p| {
+                    ty::PredicateKind::Clause(ty::ClauseKind::Projection(p))
+                  })
+                  .upcast(tcx),
+                )
+              })
+              .unique()
+              .collect::<smallvec::SmallVec<[_; 2]>>()
+            && !matching_projections.is_empty()
+          {
+            log::debug!(
+              "Matching projections for {bclause:?} {matching_projections:#?}"
+            );
+            let ret_ty = matching_projections[0]
+              .term()
+              .skip_binder()
+              .ty()
+              .expect("FnOnce::Output Ty");
+            debug_assert!(matching_projections.len() == 1);
+            ClauseBound::FnTrait(p, tref, ret_ty)
+          } else {
+            clause
+          }
+        })
+        .collect();
+      ty::Binder::bind_with_vars(
+        ClauseWithBounds {
+          ty,
+          bounds: unbounds,
+        },
+        bound_vars,
+      )
+    })
     .collect::<Vec<_>>();
+
+  assert!(
+    fn_output_projections.is_empty(),
+    "Remaining output projections {fn_output_projections:#?}"
+  );
 
   GroupedClauses { grouped, other }
 }
@@ -148,7 +285,7 @@ pub fn get_opt_impl_header(
   log::debug!("pretty predicates for impl header {:#?}", pretty_predicates);
 
   // Argus addition
-  let grouped_clauses = group_predicates_by_ty(pretty_predicates);
+  let grouped_clauses = group_predicates_by_ty(tcx, pretty_predicates);
 
   let tys_without_default_bounds =
     types_without_default_bounds.into_iter().collect::<Vec<_>>();
@@ -158,7 +295,6 @@ pub fn get_opt_impl_header(
     name,
     self_ty,
     predicates: grouped_clauses,
-    // predicates: pretty_predicates,
     tys_without_default_bounds,
   })
 }

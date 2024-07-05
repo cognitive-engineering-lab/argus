@@ -1,10 +1,10 @@
 import type { DefinedPath, PathSegment } from "@argus/common/bindings";
-import { takeRightUntil } from "@argus/common/func";
+import { isNamedGenericArg, takeRightUntil } from "@argus/common/func";
 import _ from "lodash";
 import React, { useContext } from "react";
 import { Toggle } from "../Toggle";
 import { AllowPathTrim, AllowToggle, DefPathRender, TyCtxt } from "../context";
-import { Angled, CommaSeparated, Kw } from "./syntax";
+import { Angled, CommaSeparated, Kw, nbsp } from "./syntax";
 import { PrintGenericArg, PrintTy } from "./ty";
 
 // Special case the printing for associated types. Things that look like
@@ -151,42 +151,55 @@ export const PrintPathSegment = ({ o }: { o: PathSegment }) => {
       // TODO: we should actually print something here (or send the file snippet).
       return <span>impl@{o.range.toString()}</span>;
     }
+    // General case of wrapping segments in angle brackets.
     case "GenericDelimiters": {
       // We don't want empty <> on the end of types
       if (o.inner.length === 0) {
         return null;
       }
-      // Use a metric of "type size" rather than inner lenght.
-      const useToggle = useContext(AllowToggle) && o.inner.length > 3;
+
       return (
-        // TODO: do we want to allow nested toggles?
-        <AllowToggle.Provider value={false}>
-          <Angled>
-            {useToggle ? (
-              <Toggle
-                summary=".."
-                Children={() => <PrintDefPathFull o={o.inner} />}
-              />
-            ) : (
-              <PrintDefPathFull o={o.inner} />
-            )}
-          </Angled>
-        </AllowToggle.Provider>
+        <PrintInToggleableEnvironment
+          bypassToggle={o.inner.length > 3}
+          Elem={() => <PrintDefPath o={o.inner} />}
+        />
       );
     }
-    case "CommaSeparated": {
-      const Mapper =
-        o.kind.type === "GenericArg"
-          ? PrintGenericArg
-          : ({ o }: { o: any }) => {
-              throw new Error("Unknown comma separated kind", o);
-            };
-      const components = _.map(o.entries, entry => () => <Mapper o={entry} />);
-      return <CommaSeparated components={components} />;
+    // Angle brackets used *specifically* for a list of generic arguments.
+    case "GenericArgumentList": {
+      const namedArgs = _.filter(o.entries, isNamedGenericArg);
+      if (namedArgs.length === 0) {
+        return null;
+      }
+
+      const components = _.map(namedArgs, (arg, i) => (
+        <PrintGenericArg o={arg} key={i} />
+      ));
+      return (
+        <PrintInToggleableEnvironment
+          bypassToggle={namedArgs.length > 3}
+          Elem={() => <CommaSeparated components={components} />}
+        />
+      );
     }
     default:
       throw new Error("Unknown path segment", o);
   }
+};
+
+// NOTE: used as a helper for the `GenericDelimiters` and `GenericArgumentList` segments.
+const PrintInToggleableEnvironment = ({
+  bypassToggle,
+  Elem
+}: { bypassToggle: boolean; Elem: React.FC }) => {
+  // Use a metric of "type size" rather than inner lenght.
+  const useToggle = useContext(AllowToggle) && bypassToggle;
+  return (
+    // TODO: do we want to allow nested toggles?
+    <Angled>
+      {useToggle ? <Toggle summary=".." Children={() => <Elem />} /> : <Elem />}
+    </Angled>
+  );
 };
 
 // <impl PATH for TY>
@@ -194,13 +207,16 @@ export const PrintImplFor = ({ path, ty }: { path?: DefinedPath; ty: any }) => {
   const p =
     path === undefined ? null : (
       <>
-        <PrintDefPathFull o={path} /> <Kw>for</Kw>{" "}
+        <PrintDefPath o={path} /> <Kw>for</Kw>
+        {nbsp}
       </>
     );
 
   return (
     <>
-      <Kw>impl</Kw> {p}
+      <Kw>impl</Kw>
+      {nbsp}
+      {p}
       <PrintTy o={ty} />
     </>
   );
@@ -211,8 +227,8 @@ export const PrintImplAs = ({ path, ty }: { path?: DefinedPath; ty: any }) => {
   const p =
     path === undefined ? null : (
       <>
-        {" "}
-        <Kw>as</Kw> <PrintDefPathFull o={path} />
+        {nbsp}
+        <Kw>as</Kw> <PrintDefPath o={path} />
       </>
     );
 

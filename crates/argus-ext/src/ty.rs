@@ -60,7 +60,7 @@ pub trait TyCtxtExt<'tcx> {
 
   fn does_trait_ref_occur_in(
     &self,
-    needle: ty::TraitRef<'tcx>,
+    needle: ty::PolyTraitRef<'tcx>,
     haystack: ty::Predicate<'tcx>,
   ) -> bool;
 
@@ -130,14 +130,18 @@ pub fn retain_error_sources<'tcx, T>(
 
   let is_implied_by_failing_bound = |other: &T| {
     trait_preds.iter().any(|bound| {
+      let poly_tp = get_predicate(bound).expect_trait_predicate();
       if let ty::TraitPredicate {
         trait_ref,
         polarity: ty::PredicatePolarity::Positive,
-      } = get_predicate(bound).expect_trait_predicate().skip_binder()
+      } = poly_tp.skip_binder()
       // Don't consider reflexive implication
         && !eq(bound, other)
       {
-        get_tcx(other).does_trait_ref_occur_in(trait_ref, get_predicate(other))
+        get_tcx(other).does_trait_ref_occur_in(
+          poly_tp.rebind(trait_ref),
+          get_predicate(other),
+        )
       } else {
         false
       }

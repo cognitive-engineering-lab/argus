@@ -1,6 +1,7 @@
 use rustc_data_structures::fx::FxIndexMap;
 use rustc_hir::{self as hir, def::DefKind, def_id::DefId, LangItem, Safety};
 use rustc_infer::traits::{ObligationCause, PredicateObligation};
+use rustc_macros::TypeVisitable;
 use rustc_middle::{traits::util::supertraits_for_pretty_printing, ty};
 use rustc_span::symbol::{kw, Symbol};
 use rustc_target::spec::abi::Abi;
@@ -591,6 +592,7 @@ impl PlaceholderTyDef {
 // Function signature definitions
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "PolyFnSig"))]
 pub struct Binder__FnSigDef<'tcx> {
@@ -788,9 +790,9 @@ impl BoundTyDef {
   }
 }
 
-// --------------------------------------------
-// --------------------------------------------
-// TODO: the DefId's here need to be dealt with
+// ==================================================
+// VV TODO: the DefId's here need to be dealt with VV
+// ==================================================
 
 #[derive(Serialize)]
 #[serde(remote = "ty::BoundVariableKind")]
@@ -799,7 +801,7 @@ impl BoundTyDef {
 pub enum BoundVariableKindDef {
   Ty(
     #[serde(with = "BoundTyKindDef")]
-    #[cfg_attr(feature = "testing", ts(type = "any"))]
+    #[cfg_attr(feature = "testing", ts(type = "BoundTyKind"))]
     ty::BoundTyKind,
   ),
   Region(
@@ -812,7 +814,7 @@ pub enum BoundVariableKindDef {
 
 pub struct Slice__BoundVariableKindDef;
 impl Slice__BoundVariableKindDef {
-  fn serialize<S>(
+  pub fn serialize<S>(
     value: &[ty::BoundVariableKind],
     s: S,
   ) -> Result<S::Ok, S::Error>
@@ -844,16 +846,21 @@ pub enum BoundRegionKindDef {
 
 #[derive(Serialize)]
 #[serde(remote = "ty::BoundTyKind")]
-// #[cfg_attr(feature = "testing", derive(TS))]
-// #[cfg_attr(feature = "testing", ts(export, rename = "BoundTyKind"))]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "BoundTyKind"))]
 pub enum BoundTyKindDef {
   Anon,
-  Param(#[serde(skip)] DefId, #[serde(skip)] Symbol),
+  Param(
+    #[serde(skip)] DefId,
+    #[serde(with = "SymbolDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
+    Symbol,
+  ),
 }
 
-// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+// ============================================================
+// ^^^^^^^^^ Above comment applies within this range ^^^^^^^^^^
+// ============================================================
 
 #[derive(Serialize)]
 #[serde(remote = "ty::IntTy")]
@@ -1167,7 +1174,11 @@ pub struct ParamEnvDef<'tcx>(crate::custom::GroupedClauses<'tcx>);
 
 impl<'tcx> ParamEnvDef<'tcx> {
   pub fn new(value: &ty::ParamEnv<'tcx>) -> Self {
-    Self(crate::custom::group_predicates_by_ty(value.caller_bounds()))
+    let tcx = InferCtxt::access(|cx| cx.tcx);
+    Self(crate::custom::group_predicates_by_ty(
+      tcx,
+      value.caller_bounds(),
+    ))
   }
 
   pub fn serialize<S>(
@@ -1203,6 +1214,7 @@ impl<'tcx> PredicateDef<'tcx> {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "PolyPredicateKind"))]
 pub struct Binder__PredicateKind<'tcx> {
@@ -1551,7 +1563,7 @@ impl<'tcx> TraitRefPrintOnlyTraitPathDef<'tcx> {
   }
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Copy, Clone, TypeVisitable, Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub enum Polarity {

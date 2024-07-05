@@ -16,12 +16,9 @@ use rustc_hir::{
 use rustc_middle::ty::{self, *};
 use rustc_span::symbol::Ident;
 use rustc_utils::source_map::range::CharRange;
-use serde::Serialize;
 
-use super::{
-  super::ty::{GenericArgDef, TraitRefPrintOnlyTraitPathDef},
-  *,
-};
+use super::*;
+use crate::ty::TraitRefPrintOnlyTraitPathDef;
 
 impl<'tcx> PathBuilder<'tcx> {
   pub fn print_def_path(
@@ -148,13 +145,16 @@ impl<'tcx> PathBuilder<'tcx> {
         // CHANGE: write!(self, "::")?;
         self.segments.push(PathSegment::Colons);
       }
-      self.generic_delimiters(|cx| {
-        #[derive(Serialize)]
-        struct Wrapper<'a, 'tcx: 'a>(
-          #[serde(with = "GenericArgDef")] &'a GenericArg<'tcx>,
-        );
-        cx.comma_sep(args.iter().map(Wrapper), CommaSeparatedKind::GenericArg);
-      });
+      self.segments.push(PathSegment::GenericArgumentList {
+        entries: args.iter().copied().collect(),
+      })
+      // self.generic_delimiters(|cx| {
+      //   #[derive(Serialize)]
+      //   struct Wrapper<'a, 'tcx: 'a>(
+      //     #[serde(with = "GenericArgDef")] &'a GenericArg<'tcx>,
+      //   );
+      //   cx.comma_sep(args.iter().map(Wrapper), CommaSeparatedKind::GenericArg);
+      // });
     }
   }
 
@@ -220,33 +220,35 @@ impl<'tcx> PathBuilder<'tcx> {
     // CHANGE: write!(self, ">")?;
   }
 
-  /// Prints comma-separated elements.
-  fn comma_sep<T>(
-    &mut self,
-    elems: impl Iterator<Item = T>,
-    kind: CommaSeparatedKind,
-  ) where
-    T: Serialize,
-    // T: Print<'tcx, Self>,
-  {
-    // CHANGE:
-    // if let Some(first) = elems.next() {
-    //     // first.print(self)?;
-    //     for elem in elems {
-    //         // self.write_str(", ")?;
-    //         // elem.print(self)?;
-    //     }
-    // }
-    self.segments.push(PathSegment::CommaSeparated {
-      entries: elems
-        .map(|e| {
-          serde_json::to_value(e)
-            .expect("failed to serialize comma separated value")
-        })
-        .collect::<Vec<_>>(),
-      kind,
-    });
-  }
+  // NOTE: this was only used for generic argument lists, for now it's been removed,
+  // in the future if we need a generic way of including commas you can bring it back.
+  // /// Prints comma-separated elements.
+  // fn comma_sep<T>(
+  //   &mut self,
+  //   elems: impl Iterator<Item = T>,
+  //   kind: CommaSeparatedKind,
+  // ) where
+  //   T: Serialize,
+  //   // T: Print<'tcx, Self>,
+  // {
+  //   // CHANGE:
+  //   // if let Some(first) = elems.next() {
+  //   //     // first.print(self)?;
+  //   //     for elem in elems {
+  //   //         // self.write_str(", ")?;
+  //   //         // elem.print(self)?;
+  //   //     }
+  //   // }
+  //   self.segments.push(PathSegment::CommaSeparated {
+  //     entries: elems
+  //       .map(|e| {
+  //         serde_json::to_value(e)
+  //           .expect("failed to serialize comma separated value")
+  //       })
+  //       .collect::<Vec<_>>(),
+  //     kind,
+  //   });
+  // }
 
   pub fn path_append_impl(
     &mut self,

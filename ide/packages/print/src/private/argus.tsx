@@ -5,22 +5,29 @@ import type {
   ImplHeader,
   Ty
 } from "@argus/common/bindings";
-import { anyElems } from "@argus/common/func";
+import { anyElems, isUnitTy } from "@argus/common/func";
 import _ from "lodash";
-import React from "react";
+import React, { useContext } from "react";
 
 import { Toggle } from "../Toggle";
-import { AllowProjectionSubst } from "../context";
+import { AllowProjectionSubst, TyCtxt } from "../context";
 import { PrintDefPath } from "./path";
 import { PrintClause } from "./predicate";
-import { Angled, CommaSeparated, Kw, PlusSeparated } from "./syntax";
-import { PrintGenericArg, PrintPolarity, PrintRegion, PrintTy } from "./ty";
+import { Angled, CommaSeparated, Kw, PlusSeparated, nbsp } from "./syntax";
+import {
+  PrintBinder,
+  PrintGenericArg,
+  PrintPolarity,
+  PrintRegion,
+  PrintTy,
+  PrintTyKind
+} from "./ty";
 
 // NOTE: it looks ugly, but we need to disable projection substitution for all parts
 // of the impl blocks.
 export const PrintImplHeader = ({ o }: { o: ImplHeader }) => {
   console.debug("Printing ImplHeader", o);
-  const genArgs = _.map(o.args, arg => () => (
+  const genArgs = _.map(o.args, arg => (
     <AllowProjectionSubst.Provider value={false}>
       <PrintGenericArg o={arg} />
     </AllowProjectionSubst.Provider>
@@ -40,7 +47,8 @@ export const PrintImplHeader = ({ o }: { o: ImplHeader }) => {
   return (
     <AllowProjectionSubst.Provider value={false}>
       <Kw>impl</Kw>
-      {argsWAngle} <PrintDefPath o={o.name} /> <Kw>for</Kw>{" "}
+      {argsWAngle} <PrintDefPath o={o.name} /> <Kw>for</Kw>
+      {nbsp}
       <PrintTy o={o.selfTy} />
       <PrintWhereClause
         predicates={o.predicates}
@@ -52,9 +60,12 @@ export const PrintImplHeader = ({ o }: { o: ImplHeader }) => {
 
 export const PrintGroupedClauses = ({ o }: { o: GroupedClauses }) => {
   console.debug("Printing GroupedClauses", o);
+  const Inner = ({ value }: { value: ClauseWithBounds }) => (
+    <PrintClauseWithBounds o={value} />
+  );
   const groupedClauses = _.map(o.grouped, (group, idx) => (
     <div className="WhereConstraint" key={idx}>
-      <PrintClauseWithBounds o={group} />
+      <PrintBinder binder={group} Child={Inner} />
     </div>
   ));
   const noGroupedClauses = _.map(o.other, (clause, idx) => (
@@ -95,17 +106,17 @@ export const PrintWhereClause = ({
   return (
     <>
       {" "}
-      <Kw>where</Kw> <Toggle summary={".."} Children={whereHoverContent} />
+      <Kw>where</Kw>
+      {nbsp}
+      <Toggle summary={".."} Children={whereHoverContent} />
     </>
   );
 };
 
 const PrintClauseWithBounds = ({ o }: { o: ClauseWithBounds }) => {
   const [traits, lifetimes] = _.partition(o.bounds, bound => "Trait" in bound);
-  const traitBounds = _.map(traits, bound => () => (
-    <PrintClauseBound o={bound} />
-  ));
-  const lifetimeBounds = _.map(lifetimes, bound => () => (
+  const traitBounds = _.map(traits, bound => <PrintClauseBound o={bound} />);
+  const lifetimeBounds = _.map(lifetimes, bound => (
     <PrintClauseBound o={bound} />
   ));
   const boundComponents = _.concat(traitBounds, lifetimeBounds);
@@ -118,7 +129,26 @@ const PrintClauseWithBounds = ({ o }: { o: ClauseWithBounds }) => {
 };
 
 const PrintClauseBound = ({ o }: { o: ClauseBound }) => {
-  if ("Trait" in o) {
+  const tyCtxt = useContext(TyCtxt)!;
+  if ("FnTrait" in o) {
+    const [polarity, path, res] = o.FnTrait;
+    const tyKind = tyCtxt.interner[res];
+    const arrow = isUnitTy(tyKind) ? null : (
+      <>
+        {nbsp}
+        {"->"}
+        {nbsp}
+        <PrintTyKind o={tyKind} />
+      </>
+    );
+    return (
+      <>
+        <PrintPolarity o={polarity} />
+        <PrintDefPath o={path} />
+        {arrow}
+      </>
+    );
+  } else if ("Trait" in o) {
     const [polarity, path] = o.Trait;
     return (
       <>
@@ -126,9 +156,9 @@ const PrintClauseBound = ({ o }: { o: ClauseBound }) => {
         <PrintDefPath o={path} />
       </>
     );
-  }
-  if ("Region" in o) {
+  } else if ("Region" in o) {
     return <PrintRegion o={o.Region} />;
   }
+
   throw new Error("Unknown clause bound", o);
 };
