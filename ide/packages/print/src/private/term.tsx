@@ -63,7 +63,7 @@ export const PrintExpr = ({ o }: { o: ExprDef }) => {
   }
   if ("FunctionCall" in o) {
     const [callable, args] = o.FunctionCall;
-    const argEs = _.map(args, arg => () => <PrintConst o={arg} />);
+    const argEs = _.map(args, arg => <PrintConst o={arg} />);
     return (
       <>
         <PrintConst o={callable} />(
@@ -212,7 +212,7 @@ export const PrintValueTree = ({ o }: { o: ValTree }) => {
 };
 
 const PrintAggregateArray = ({ fields }: { fields: Const[] }) => {
-  const components = _.map(fields, field => () => <PrintConst o={field} />);
+  const components = _.map(fields, field => <PrintConst o={field} />);
   return (
     <SqBraced>
       <CommaSeparated components={components} />
@@ -221,7 +221,7 @@ const PrintAggregateArray = ({ fields }: { fields: Const[] }) => {
 };
 
 const PrintAggregateTuple = ({ fields }: { fields: Const[] }) => {
-  const components = _.map(fields, field => () => <PrintConst o={field} />);
+  const components = _.map(fields, field => <PrintConst o={field} />);
   const trailingComma = fields.length === 1 ? "," : null;
   return (
     <Parenthesized>
@@ -248,7 +248,7 @@ const PrintAggregateAdt = ({
   switch (kind.type) {
     case "Fn": {
       const head = <PrintValuePath o={valuePath} />;
-      const components = _.map(fields, field => () => <PrintConst o={field} />);
+      const components = _.map(fields, field => <PrintConst o={field} />);
       return (
         <>
           {head}
@@ -263,15 +263,11 @@ const PrintAggregateAdt = ({
       return null;
     }
     case "Misc": {
-      const components = _.map(
-        _.zip(kind.names, fields),
-        ([name, field]) =>
-          () => (
-            <>
-              <PrintSymbol o={name!} />: <PrintConst o={field!} />
-            </>
-          )
-      );
+      const components = _.map(_.zip(kind.names, fields), ([name, field]) => (
+        <>
+          <PrintSymbol o={name!} />: <PrintConst o={field!} />
+        </>
+      ));
 
       return (
         <DBraced>

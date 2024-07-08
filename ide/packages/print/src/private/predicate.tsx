@@ -62,8 +62,10 @@ export const PrintParamEnv = ({ o }: { o: ParamEnv }) => {
 };
 
 export const PrintBinderPredicateKind = ({ o }: { o: PolyPredicateKind }) => {
-  const inner = (o: PredicateKind) => <PrintPredicateKind o={o} />;
-  return <PrintBinder binder={o} innerF={inner} />;
+  const Inner = ({ value }: { value: PredicateKind }) => (
+    <PrintPredicateKind o={value} />
+  );
+  return <PrintBinder binder={o} Child={Inner} />;
 };
 
 export const PrintPredicateKind = ({ o }: { o: PredicateKind }) => {
@@ -134,8 +136,10 @@ export const PrintAliasRelationDirection = ({
 };
 
 export const PrintClause = ({ o }: { o: Clause }) => {
-  const inner = (o: ClauseKind) => <PrintClauseKind o={o} />;
-  return <PrintBinder binder={o} innerF={inner} />;
+  const Inner = ({ value }: { value: ClauseKind }) => (
+    <PrintClauseKind o={value} />
+  );
+  return <PrintBinder binder={o} Child={Inner} />;
 };
 
 export const PrintClauseKind = ({ o }: { o: ClauseKind }) => {

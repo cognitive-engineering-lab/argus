@@ -2,22 +2,59 @@ import _ from "lodash";
 import React from "react";
 
 import "./syntax.css";
+import classNames from "classnames";
 
-// A "Discretionary Space", hopefully this allows the layout to break along
-// these elements rather than in the middle of text or random spaces.
-export const Dsp = ({ children }: React.PropsWithChildren) => (
-  <span style={{ display: "inline-block" }}>{children}</span>
-);
+export const nbsp = "\u00A0";
 
+// A "Discretionary Space", the `inline-block` style helps format around these elements
+// and breaks less between them and in random spaces.
+export const Dsp = (
+  props: React.PropsWithChildren & React.HTMLAttributes<HTMLElement>
+) => {
+  const kids = props.children;
+  const htmlAttrs: React.HTMLAttributes<HTMLElement> = {
+    ...props,
+    children: undefined
+  };
+  return (
+    <span style={{ display: "inline-block" }} {...htmlAttrs}>
+      {kids}
+    </span>
+  );
+};
+
+/**
+ * Highlight the children as placeholders, this means they aren't concrete types.
+ *
+ * For Argus, this usually means changing the foreground to something softer.
+ */
 export const Placeholder = ({ children }: React.PropsWithChildren) => (
   <span className="placeholder">{children}</span>
 );
 
+/**
+ * Highlight the children as Rust keywords
+ */
 export const Kw = ({ children }: React.PropsWithChildren) => (
   <span className="kw">{children}</span>
 );
 
-const makeWrapper =
+/**
+ * Create a wrapper around the children using a `stx-wrapper` class and the
+ * additional class `c`. This makes a wrapper that breakes around the wrapped
+ * elements.
+ */
+const makeCSSWrapper =
+  (c: string) =>
+  ({ children }: React.PropsWithChildren) => (
+    <Dsp className={classNames("stx-wrapper", c)}>{children}</Dsp>
+  );
+
+/**
+ * Create a wrapper that breaks around the children, but allows the `LHS` and `RHS`
+ * wrapping elements to split from their children.
+ */
+const makeBreakingWrapper =
   (lhs: string, rhs: string) =>
   ({ children }: React.PropsWithChildren) => (
     <>
@@ -27,34 +64,47 @@ const makeWrapper =
     </>
   );
 
-export const Angled = makeWrapper("<", ">");
-export const DBraced = makeWrapper("{{", "}}");
-export const CBraced = makeWrapper("{", "}");
-export const Parenthesized = makeWrapper("(", ")");
-export const SqBraced = makeWrapper("[", "]");
+// We want content to break around parens and angle brackets.
+// E.g., `fn foo<A,B>(a: A, b: B) -> B` could be formatted as:
+// ```
+// fn foo<
+//   A, B
+// >(
+//   a: A,
+//   b: B
+// ) -> B
+// ```
+export const Angled = makeBreakingWrapper("<", ">");
+export const Parenthesized = makeBreakingWrapper("(", ")");
 
-export const CommaSeparated = ({ components }: { components: React.FC[] }) => (
-  <Interspersed components={components} sep=", " />
+export const DBraced = makeCSSWrapper("dbracket");
+export const CBraced = makeCSSWrapper("bracket");
+export const SqBraced = makeCSSWrapper("sqbracket");
+
+export const CommaSeparated = ({
+  components
+}: { components: React.ReactElement[] }) => (
+  <Interspersed components={components} sep="comma" />
 );
 
-export const PlusSeparated = ({ components }: { components: React.FC[] }) => (
-  <Interspersed components={components} sep=" + " />
+export const PlusSeparated = ({
+  components
+}: { components: React.ReactElement[] }) => (
+  <Interspersed components={components} sep="plus" />
 );
 
 const Interspersed = ({
   components,
   sep
 }: {
-  components: React.FC[];
+  components: React.ReactElement[];
   sep: string;
-}) =>
-  _.map(components, (C, i) => (
-    // The inline-block span should help the layout to break on the elements
-    // and not in them. Still undecided if this actually does anything.
-    <React.Fragment key={i}>
-      {i === 0 ? "" : sep}
-      <span style={{ display: "inline-block" }}>
-        <C />
-      </span>
-    </React.Fragment>
-  ));
+}) => (
+  <span className="interspersed-list">
+    {_.map(components, (C, i) => (
+      <Dsp key={i} className={sep}>
+        {C}
+      </Dsp>
+    ))}
+  </span>
+);

@@ -3,8 +3,8 @@ use bevy::prelude::*;
 #[derive(Resource)]
 struct Timer(usize);
 
-fn startup_system(_: Timer) {}
+fn run_timer(_: Timer) {}
 
 fn main() {
-  App::new().add_startup_system(startup_system).run();
+  App::new().add_systems(Update, run_timer).run();
 }

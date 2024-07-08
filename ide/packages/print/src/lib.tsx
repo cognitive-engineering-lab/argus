@@ -4,7 +4,8 @@ import type {
   GoalData,
   ImplHeader,
   Obligation,
-  Ty
+  Ty,
+  TyVal
 } from "@argus/common/bindings";
 import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -23,7 +24,10 @@ import {
   PrintGoalPredicate as UnsafePrintGoalPredicate,
   PrintPredicateObligation as UnsafePrintPredicateObligation
 } from "./private/predicate";
-import { PrintTy as UnsafePrintTy } from "./private/ty";
+import {
+  PrintTy as UnsafePrintTy,
+  PrintTyValue as UnsafePrintTyValue
+} from "./private/ty";
 
 // NOTE: please Please PLEASE wrap all printing components in this
 // `PrintWithFallback`. Pretty printing is still a fragile process and
@@ -76,11 +80,9 @@ export const PrintWithFallback = ({
   );
 };
 
-export const PrintTy = ({ ty }: { ty: Ty }) => {
-  return (
-    <PrintWithFallback object={ty} Content={() => <UnsafePrintTy o={ty} />} />
-  );
-};
+export const PrintTy = ({ ty }: { ty: Ty }) => (
+  <PrintWithFallback object={ty} Content={() => <UnsafePrintTy o={ty} />} />
+);
 
 export const PrintObligation = ({ obligation }: { obligation: Obligation }) => {
   const InnerContent = () => (
@@ -91,16 +93,14 @@ export const PrintObligation = ({ obligation }: { obligation: Obligation }) => {
   return <PrintWithFallback object={obligation} Content={InnerContent} />;
 };
 
-export const PrintImplHeader = ({ impl }: { impl: ImplHeader }) => {
-  return (
-    <AllowToggle.Provider value={true}>
-      <PrintWithFallback
-        object={impl}
-        Content={() => <UnsafePrintImplHeader o={impl} />}
-      />
-    </AllowToggle.Provider>
-  );
-};
+export const PrintImplHeader = ({ impl }: { impl: ImplHeader }) => (
+  <AllowToggle.Provider value={true}>
+    <PrintWithFallback
+      object={impl}
+      Content={() => <UnsafePrintImplHeader o={impl} />}
+    />
+  </AllowToggle.Provider>
+);
 
 export const PrintGoal = ({ o }: { o: GoalData }) => {
   const debugString =
@@ -135,21 +135,23 @@ export const PrintExtensionCandidate = ({
   );
 };
 
-export const PrintBodyName = ({ defPath }: { defPath: DefinedPath }) => {
-  return (
-    <PrintWithFallback
-      object={defPath}
-      // Content={() => <UnsafePrintDefPathFull o={defPath} />}
-      Content={() => <UnsafePrintDefPath o={defPath} />}
-    />
-  );
-};
+export const PrintBodyName = ({ defPath }: { defPath: DefinedPath }) => (
+  <PrintWithFallback
+    object={defPath}
+    Content={() => <UnsafePrintDefPath o={defPath} />}
+  />
+);
 
-export const PrintDefPathFull = ({ defPath }: { defPath: DefinedPath }) => {
-  return (
-    <PrintWithFallback
-      object={defPath}
-      Content={() => <UnsafePrintDefPathFull o={defPath} />}
-    />
-  );
-};
+export const PrintDefPathFull = ({ defPath }: { defPath: DefinedPath }) => (
+  <PrintWithFallback
+    object={defPath}
+    Content={() => <UnsafePrintDefPathFull o={defPath} />}
+  />
+);
+
+export const PrintTyValue = ({ ty }: { ty: TyVal }) => (
+  <PrintWithFallback
+    object={ty}
+    Content={() => <UnsafePrintTyValue o={ty} />}
+  />
+);

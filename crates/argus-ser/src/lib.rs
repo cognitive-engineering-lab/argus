@@ -28,13 +28,16 @@
   let_chains,
   if_let_guard,
   decl_macro,
+  extract_if,
   associated_type_defaults
 )]
 #![allow(non_camel_case_types, non_snake_case)]
 extern crate rustc_apfloat;
+extern crate rustc_ast_ir;
 extern crate rustc_data_structures;
 extern crate rustc_hir;
 extern crate rustc_infer;
+extern crate rustc_macros;
 extern crate rustc_middle;
 extern crate rustc_span;
 extern crate rustc_target;
@@ -98,18 +101,17 @@ impl<'tcx> InferCtxtSerializeExt for InferCtxt<'tcx> {
   }
 }
 
+#[macro_export]
 macro_rules! serialize_custom_seq {
   ($wrap:ident, $serializer:expr, $value:expr) => {{
     use serde::ser::SerializeSeq;
     let mut seq = $serializer.serialize_seq(Some($value.len()))?;
-    for e in $value.iter() {
+    for e in $value.into_iter() {
       seq.serialize_element(&$wrap(e))?;
     }
     seq.end()
   }};
 }
-
-pub(crate) use serialize_custom_seq;
 
 // ----------------------------------------
 // Parameters

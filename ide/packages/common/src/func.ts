@@ -1,9 +1,14 @@
 import _ from "lodash";
 
 import type {
+  BoundRegionKind,
+  BoundTyKind,
+  BoundVariableKind,
   CharRange,
+  GenericArg,
   ObligationHash,
   Predicate,
+  Region,
   Ty,
   TyVal
 } from "./bindings";
@@ -125,7 +130,7 @@ export function takeRightUntil<T>(arr: T[], pred: (t: T) => boolean) {
 
 export type Unit = { Tuple: Ty[] };
 
-export function tyIsUnit(o: TyVal): o is Unit {
+export function isUnitTy(o: TyVal): o is Unit {
   return isObject(o) && "Tuple" in o && o.Tuple.length === 0;
 }
 
@@ -150,4 +155,28 @@ export function fnInputsAndOutput<T>(args: T[]): [T[], T] {
   let inputs = _.slice(args, 0, args.length - 1);
   let output = _.last(args)!;
   return [inputs, output];
+}
+
+export const isNamedRegion = (r: Region) => r.type === "Named";
+
+export function isNamedGenericArg(ga: GenericArg) {
+  return "Lifetime" in ga ? isNamedRegion(ga.Lifetime) : true;
+}
+
+export const isNamedBoundRegion = (br: BoundRegionKind) =>
+  isObject(br) && "BrNamed" in br && br.BrNamed[0] !== "'_";
+
+export const isNamedBoundTy = (bt: BoundTyKind) =>
+  isObject(bt) && "Param" in bt;
+
+export function isNamedBoundVariable(bv: BoundVariableKind) {
+  if (isObject(bv)) {
+    if ("Region" in bv) {
+      return isNamedBoundRegion(bv.Region);
+    } else if ("Ty" in bv) {
+      return isNamedBoundTy(bv.Ty);
+    }
+  }
+
+  return false;
 }

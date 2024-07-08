@@ -4,8 +4,11 @@ import type {
   AliasTy,
   AliasTyKind,
   AssocItem,
+  BoundRegionKind,
   BoundTy,
+  BoundTyKind,
   BoundVariable,
+  BoundVariableKind,
   CoroutineClosureTyKind,
   CoroutineTyKind,
   CoroutineWitnessTyKind,
@@ -33,14 +36,17 @@ import type {
   TypeAndMut,
   UintTy
 } from "@argus/common/bindings";
-import { anyElems, fnInputsAndOutput, tyIsUnit } from "@argus/common/func";
+import {
+  anyElems,
+  fnInputsAndOutput,
+  isNamedBoundVariable,
+  isUnitTy
+} from "@argus/common/func";
 import {} from "@floating-ui/react";
 import _, { isObject } from "lodash";
 import React, { useContext } from "react";
-import Comment from "../Comment";
-import Indented from "../Indented";
 import { Toggle } from "../Toggle";
-import { AllowPathTrim, AllowProjectionSubst, TyCtxt } from "../context";
+import { AllowProjectionSubst, ProjectionPathRender, TyCtxt } from "../context";
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
 import {
@@ -50,18 +56,45 @@ import {
   Parenthesized,
   Placeholder,
   PlusSeparated,
-  SqBraced
+  SqBraced,
+  nbsp
 } from "./syntax";
 import { PrintTerm } from "./term";
 
-export const PrintBinder = ({
+interface Binding<T> {
+  value: T;
+  boundVars: BoundVariableKind[];
+}
+
+export const PrintBinder = <T,>({
   binder,
-  innerF
+  Child
 }: {
-  binder: any;
-  innerF: any;
+  binder: Binding<T>;
+  // FIXME: shouldn't this just be `React.FC<T>`?? Doesn't typecheck though...
+  Child: React.FC<{ value: T }>;
 }) => {
-  return innerF(binder.value);
+  const components = _.map(
+    _.filter(binder.boundVars, isNamedBoundVariable),
+    v => <PrintBoundVariableKind o={v} />
+  );
+
+  const b =
+    components.length === 0 ? null : (
+      <>
+        for
+        <Angled>
+          <CommaSeparated components={components} />
+        </Angled>
+        {nbsp}
+      </>
+    );
+  return (
+    <>
+      {b}
+      <Child value={binder.value} />
+    </>
+  );
 };
 
 export const PrintTy = ({ o }: { o: Ty }) => {
@@ -86,23 +119,15 @@ export const PrintTyProjected = ({
   original,
   projection
 }: { original: TyVal; projection: TyVal }) => {
-  const Content = (
-    <AllowPathTrim.Provider value={false}>
-      <AllowProjectionSubst.Provider value={false}>
-        <p> This type is from a projection:</p>
-        <p>Projected type:</p>
-        <Indented>
-          <PrintTyValue o={projection} />
-        </Indented>
-        <p>Full path:</p>
-        <Indented>
-          <PrintTyValue o={original} />
-        </Indented>
-      </AllowProjectionSubst.Provider>
-    </AllowPathTrim.Provider>
+  const PrintCustomProjection = useContext(ProjectionPathRender);
+  const tyCtx = useContext(TyCtxt)!;
+  return (
+    <PrintCustomProjection
+      ctx={tyCtx}
+      original={original}
+      projection={projection}
+    />
   );
-
-  return <Comment Child={<PrintTyValue o={projection} />} Content={Content} />;
 };
 
 export const PrintTyValue = ({ o }: { o: TyVal }) => {
@@ -183,7 +208,7 @@ export const PrintTyKind = ({ o }: { o: TyKind }) => {
     return <PrintPolyFnSig o={o.FnPtr} />;
   }
   if ("Tuple" in o) {
-    const components = _.map(o.Tuple, t => () => <PrintTy o={t} />);
+    const components = _.map(o.Tuple, t => <PrintTy o={t} />);
     return (
       <Parenthesized>
         <CommaSeparated components={components} />
@@ -269,7 +294,7 @@ export const PrintPolyExistentialPredicates = ({
   o: PolyExistentialPredicates;
 }) => {
   const head = o.data === undefined ? null : <PrintDefPath o={o.data} />;
-  const components = _.map(o.autoTraits, t => () => <PrintDefPath o={t} />);
+  const components = _.map(o.autoTraits, t => <PrintDefPath o={t} />);
   return (
     <>
       {head}
@@ -332,13 +357,15 @@ export const PrintPolyFnSig = ({ o }: { o: PolyFnSig }) => {
     cVariadic: boolean;
   }) => {
     const tyCtx = useContext(TyCtxt)!;
-    const inputComponents = _.map(inputs, ty => () => <PrintTy o={ty} />);
+    const inputComponents = _.map(inputs, ty => <PrintTy o={ty} />);
     const variadic = !cVariadic ? null : inputs.length === 0 ? "..." : ", ...";
     const outVal = tyCtx.interner[output];
-    const ret = tyIsUnit(outVal) ? null : (
+    const ret = isUnitTy(outVal) ? null : (
       <>
-        {" "}
-        {"->"} <PrintTyValue o={outVal} />
+        {nbsp}
+        {"->"}
+        {nbsp}
+        <PrintTyValue o={outVal} />
       </>
     );
     return (
@@ -385,20 +412,24 @@ export const PrintPolyFnSig = ({ o }: { o: PolyFnSig }) => {
     }
   };
 
-  const inner = (o: FnSig) => {
-    const unsafetyStr = o.safety === "Unsafe" ? "unsafe " : null;
-    const abi = <PrintAbi abi={o.abi} />;
-    const [inputs, output] = fnInputsAndOutput(o.inputs_and_output);
+  const Inner = ({ value }: { value: FnSig }) => {
+    const unsafetyStr = value.safety === "Unsafe" ? "unsafe " : null;
+    const abi = <PrintAbi abi={value.abi} />;
+    const [inputs, output] = fnInputsAndOutput(value.inputs_and_output);
     return (
       <>
         {unsafetyStr}
         {abi}fn
-        <InnerSig inputs={inputs} output={output} cVariadic={o.c_variadic} />
+        <InnerSig
+          inputs={inputs}
+          output={output}
+          cVariadic={value.c_variadic}
+        />
       </>
     );
   };
 
-  return <PrintBinder binder={o} innerF={inner} />;
+  return <PrintBinder binder={o} Child={Inner} />;
 };
 
 export const PrintFnDef = ({ o }: { o: FnDef }) => {
@@ -501,7 +532,8 @@ export const PrintRegion = ({ o }: { o: Region }) => {
     }
     case "Anonymous": {
       // TODO: maybe we don't want to print anonymous lifetimes?
-      return "'_";
+      // return "'_";
+      return null;
     }
     default: {
       throw new Error("Unknown region type", o);
@@ -531,6 +563,43 @@ export const PrintBoundVariable = ({ o }: { o: BoundVariable }) => {
   throw new Error("Unknown bound variable", o);
 };
 
+export const PrintBoundTyKind = ({ o }: { o: BoundTyKind }) => {
+  if ("Anon" === o) {
+    return null;
+  } else if ("Param" in o) {
+    const [name] = o.Param;
+    return <PrintSymbol o={name} />;
+  }
+
+  throw new Error("Unknown bound ty kind", o);
+};
+
+export const PrintBoundVariableKind = ({ o }: { o: BoundVariableKind }) => {
+  if ("Const" === o) {
+    // TODO: not sure what to do with boudn "consts", we don't have data for them.
+    return null;
+  } else if ("Ty" in o) {
+    return <PrintBoundTyKind o={o.Ty} />;
+  } else if ("Region" in o) {
+    return <PrintBoundRegionKind o={o.Region} />;
+  }
+
+  throw new Error("Unknown bound variable kind", o);
+};
+
+export const PrintBoundRegionKind = ({ o }: { o: BoundRegionKind }) => {
+  // TODO: what do we do in these cases?
+  if ("BrAnon" === o) {
+    return null;
+  } else if ("BrEnv" === o) {
+    return null;
+  }
+  if ("BrNamed" in o && o.BrNamed[0] !== "'_") {
+    const [name] = o.BrNamed;
+    return <PrintSymbol o={name} />;
+  }
+};
+
 export const PrintPolarity = ({ o }: { o: Polarity }) => {
   return o === "Negative" ? "!" : o === "Maybe" ? "?" : null;
 };
@@ -539,7 +608,7 @@ export const PrintOpaqueImplType = ({ o }: { o: OpaqueImpl }) => {
   console.debug("Printing OpaqueImplType", o);
 
   const PrintFnTrait = ({ o }: { o: FnTrait }) => {
-    const args = _.map(o.params, param => () => <PrintTy o={param} />);
+    const args = _.map(o.params, param => <PrintTy o={param} />);
     const ret =
       o.retTy !== undefined ? (
         <>
@@ -571,10 +640,8 @@ export const PrintOpaqueImplType = ({ o }: { o: OpaqueImpl }) => {
     console.debug("Printing Trait", o);
     const prefix = <PrintPolarity o={o.polarity} />;
     const name = <PrintDefPath o={o.traitName} />;
-    const ownArgs = _.map(o.ownArgs, arg => () => <PrintGenericArg o={arg} />);
-    const assocArgs = _.map(o.assocArgs, arg => () => (
-      <PrintAssocItem o={arg} />
-    ));
+    const ownArgs = _.map(o.ownArgs, arg => <PrintGenericArg o={arg} />);
+    const assocArgs = _.map(o.assocArgs, arg => <PrintAssocItem o={arg} />);
     const argComponents = [...ownArgs, ...assocArgs];
     const list =
       argComponents.length === 0 ? null : (
@@ -591,9 +658,9 @@ export const PrintOpaqueImplType = ({ o }: { o: OpaqueImpl }) => {
     );
   };
 
-  const fnTraits = _.map(o.fnTraits, trait => () => <PrintFnTrait o={trait} />);
-  const traits = _.map(o.traits, trait => () => <PrintTrait o={trait} />);
-  const lifetimes = _.map(o.lifetimes, lifetime => () => (
+  const fnTraits = _.map(o.fnTraits, trait => <PrintFnTrait o={trait} />);
+  const traits = _.map(o.traits, trait => <PrintTrait o={trait} />);
+  const lifetimes = _.map(o.lifetimes, lifetime => (
     <PrintRegion o={lifetime} />
   ));
   const implComponents = _.concat(fnTraits, traits, lifetimes);

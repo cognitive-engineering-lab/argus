@@ -1,4 +1,4 @@
-import type { DefinedPath } from "@argus/common/bindings";
+import type { DefinedPath, TyVal } from "@argus/common/bindings";
 import type { ErrorJumpTargetInfo } from "@argus/common/lib";
 import type { TypeContext } from "@argus/print/context";
 import { action, makeObservable, observable } from "mobx";
@@ -27,12 +27,19 @@ class HighlightTargetStore {
 export const highlightedObligation = new HighlightTargetStore();
 
 export type BufferDataKind = {
+  pinned?: boolean;
   ctx: TypeContext;
-  pinned: boolean;
-} & {
-  kind: "path";
-  path: DefinedPath;
-};
+} & (
+  | {
+      kind: "path";
+      path: DefinedPath;
+    }
+  | {
+      kind: "projection";
+      original: TyVal;
+      projection: TyVal;
+    }
+);
 
 class MiniBufferData {
   data?: BufferDataKind;
@@ -59,10 +66,10 @@ class MiniBufferData {
     }
   }
 
-  set(data: Omit<BufferDataKind, "pinned">) {
+  set(data: BufferDataKind) {
     // Don't override data that is pinned.
     if (this.data === undefined || !this.data.pinned) {
-      this.data = { pinned: false, ...data };
+      this.data = { ...data, pinned: false } as BufferDataKind;
     }
   }
 

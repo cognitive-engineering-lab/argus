@@ -5,3 +5,49 @@ span.kw {
 span.placeholder {
   color: var(--vscode-input-placeholderForeground);
 }
+
+span.stx-wrapper.angles::before {
+  content: "<";
+}
+span.stx-wrapper.angles::after {
+  content: ">";
+}
+
+span.stx-wrapper.parens::before {
+  content: "(";
+}
+span.stx-wrapper.parens::after {
+  content: ")";
+}
+
+
+span.stx-wrapper.dbracket::before {
+  content: "{{";
+}
+span.stx-wrapper.dbracket::after {
+  content: "}}";
+}
+
+
+span.stx-wrapper.bracket::before {
+  content: "{";
+}
+span.stx-wrapper.bracket::after {
+  content: "}";
+}
+
+span.stx-wrapper.sqbracket::before {
+  content: "[";
+}
+span.stx-wrapper.sqbracket::after {
+  content: "]";
+}
+
+.interspersed-list > span.comma:not(:last-child, :empty):after {
+  content: ',\00a0';
+}
+
+.interspersed-list > span.plus:not(:first-child, :empty):before {
+  /* Use NBSP for second space, to keep this aligned with the subsequent element */
+  content: '\00a0+\00a0';
+}

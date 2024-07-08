@@ -1,4 +1,4 @@
-import type { DefinedPath } from "@argus/common/bindings";
+import type { DefinedPath, TyVal } from "@argus/common/bindings";
 import {
   createClosedMessageSystem,
   vscodeMessageSystem
@@ -16,7 +16,12 @@ import {
   isSysMsgPin,
   isSysMsgUnpin
 } from "@argus/common/lib";
-import { DefPathRender } from "@argus/print/context";
+import { IcoComment } from "@argus/print/Icons";
+import {
+  DefPathRender,
+  ProjectionPathRender,
+  TyCtxt
+} from "@argus/print/context";
 import { VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import { observer } from "mobx-react";
@@ -24,6 +29,7 @@ import React, { useEffect, useState } from "react";
 
 import "./App.css";
 import type { TypeContext } from "@argus/print/context";
+import { PrintTyValue } from "@argus/print/lib";
 import MiniBuffer from "./MiniBuffer";
 import Workspace from "./Workspace";
 import { MiniBufferDataStore, highlightedObligation } from "./signals";
@@ -120,6 +126,41 @@ const CustomPathRenderer = observer(
   }
 );
 
+const CustomProjectionRender = observer(
+  ({
+    ctx,
+    original,
+    projection
+  }: {
+    ctx: TypeContext;
+    original: TyVal;
+    projection: TyVal;
+  }) => {
+    const setStore = () =>
+      MiniBufferDataStore.set({
+        kind: "projection",
+        original,
+        projection,
+        ctx
+      });
+    const resetStore = () => MiniBufferDataStore.reset();
+    return (
+      <>
+        <TyCtxt.Provider value={ctx}>
+          <PrintTyValue ty={projection} />
+        </TyCtxt.Provider>
+        <span
+          onMouseEnter={setStore}
+          onMouseLeave={resetStore}
+          style={{ verticalAlign: "super", fontSize: "0.25rem" }}
+        >
+          <IcoComment />
+        </span>
+      </>
+    );
+  }
+);
+
 const App = observer(({ config }: { config: PanoptesConfig }) => {
   const [openFiles, setOpenFiles] = useState(buildInitialData(config));
   const [showHidden, setShowHidden] = useState(false);
@@ -172,7 +213,9 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
         <AppContext.MessageSystemContext.Provider value={messageSystem}>
           <AppContext.ShowHiddenObligationsContext.Provider value={showHidden}>
             <DefPathRender.Provider value={CustomPathRenderer}>
-              <Workspace files={openFiles} reset={resetState} />
+              <ProjectionPathRender.Provider value={CustomProjectionRender}>
+                <Workspace files={openFiles} reset={resetState} />
+              </ProjectionPathRender.Provider>
             </DefPathRender.Provider>
           </AppContext.ShowHiddenObligationsContext.Provider>
         </AppContext.MessageSystemContext.Provider>

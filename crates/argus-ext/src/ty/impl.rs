@@ -155,11 +155,11 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
 
   fn does_trait_ref_occur_in(
     &self,
-    needle: ty::TraitRef<'tcx>,
+    needle: ty::PolyTraitRef<'tcx>,
     haystack: ty::Predicate<'tcx>,
   ) -> bool {
     struct TraitRefVisitor<'tcx> {
-      tr: ty::TraitRef<'tcx>,
+      tr: ty::PolyTraitRef<'tcx>,
       tcx: TyCtxt<'tcx>,
       found: bool,
     }
@@ -171,7 +171,7 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
         def_id: DefId,
       ) -> bool {
         let my_ty = self.tr.self_ty();
-        let my_id = self.tr.def_id;
+        let my_id = self.tr.def_id();
 
         if args.is_empty() {
           return false;
@@ -179,7 +179,8 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
 
         // FIXME: is it always the first type in the args list?
         let proj_ty = args.type_at(0);
-        proj_ty == my_ty && self.tcx.is_descendant_of(def_id, my_id)
+        proj_ty == my_ty.skip_binder()
+          && self.tcx.is_descendant_of(def_id, my_id)
       }
     }
 
@@ -200,13 +201,43 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
         log::debug!("*  [{predicate:#?}]");
 
         if let ty::PredicateKind::Clause(ty::ClauseKind::Projection(
-          ty::ProjectionPredicate {
+          pp @ ty::ProjectionPredicate {
             projection_term, ..
           },
         )) = predicate.kind().skip_binder()
         {
-          self.found |= self
+          use rustc_infer::traits::util::supertraits;
+
+          // Check whether the `TraitRef`, or any implied supertrait
+          // appear in the projection. This can happen for example if we have
+          // a trait predicate `F: Fn(i32) -> i32`, the projection of the `Output`
+          // would be `<F as FnOnce(i32)>::Output == i32`.
+
+          let simple_check = self
             .occurs_in_projection(projection_term.args, projection_term.def_id);
+          let deep_check = || {
+            let prj_ply_trait_ref = predicate.kind().rebind(pp);
+            let poly_supertrait_ref =
+              prj_ply_trait_ref.required_poly_trait_ref(self.tcx);
+            // Check whether `poly_supertrait_ref` is a supertrait of `self.tr`.
+            // HACK FIXME: this is too simplistic, it's unsound to check
+            // *just* that the `self_ty`s are equivalent and that the `def_id` is
+            // a super trait...
+            log::debug!(
+              "deep_check:\n  {:?}\n  to super\n  {:?}",
+              self.tr,
+              poly_supertrait_ref
+            );
+            for super_ptr in supertraits(self.tcx, self.tr) {
+              log::debug!("* against {super_ptr:?}");
+              if super_ptr == poly_supertrait_ref {
+                return true;
+              }
+            }
+            false
+          };
+
+          self.found |= simple_check || deep_check();
         }
 
         predicate.super_visit_with(self);
