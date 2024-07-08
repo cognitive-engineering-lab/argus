@@ -45,10 +45,8 @@ import {
 import {} from "@floating-ui/react";
 import _, { isObject } from "lodash";
 import React, { useContext } from "react";
-import Comment from "../Comment";
-import Indented from "../Indented";
 import { Toggle } from "../Toggle";
-import { AllowPathTrim, AllowProjectionSubst, TyCtxt } from "../context";
+import { AllowProjectionSubst, ProjectionPathRender, TyCtxt } from "../context";
 import { PrintConst } from "./const";
 import { PrintDefPath } from "./path";
 import {
@@ -121,23 +119,32 @@ export const PrintTyProjected = ({
   original,
   projection
 }: { original: TyVal; projection: TyVal }) => {
-  const Content = (
-    <AllowPathTrim.Provider value={false}>
-      <AllowProjectionSubst.Provider value={false}>
-        <p> This type is from a projection:</p>
-        <p>Projected type:</p>
-        <Indented>
-          <PrintTyValue o={projection} />
-        </Indented>
-        <p>Full path:</p>
-        <Indented>
-          <PrintTyValue o={original} />
-        </Indented>
-      </AllowProjectionSubst.Provider>
-    </AllowPathTrim.Provider>
+  const RenderProjection = useContext(ProjectionPathRender);
+  const tyCtx = useContext(TyCtxt)!;
+  return (
+    <RenderProjection
+      original={<PrintTyValue o={original} />}
+      projection={<PrintTyValue o={projection} />}
+      ctx={tyCtx}
+    />
   );
+  // const Content = (
+  //   <AllowPathTrim.Provider value={false}>
+  //     <AllowProjectionSubst.Provider value={false}>
+  //       <p> This type is from a projection:</p>
+  //       <p>Projected type:</p>
+  //       <Indented>
+  //         <PrintTyValue o={projection} />
+  //       </Indented>
+  //       <p>Full path:</p>
+  //       <Indented>
+  //         <PrintTyValue o={original} />
+  //       </Indented>
+  //     </AllowProjectionSubst.Provider>
+  //   </AllowPathTrim.Provider>
+  // );
 
-  return <Comment Child={<PrintTyValue o={projection} />} Content={Content} />;
+  // return <Comment Child={<PrintTyValue o={projection} />} Content={Content} />;
 };
 
 export const PrintTyValue = ({ o }: { o: TyVal }) => {

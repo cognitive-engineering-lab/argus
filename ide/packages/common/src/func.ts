@@ -160,7 +160,7 @@ export function fnInputsAndOutput<T>(args: T[]): [T[], T] {
 export const isNamedRegion = (r: Region) => r.type === "Named";
 
 export function isNamedGenericArg(ga: GenericArg) {
-  return ("Lifetime" in ga) ? isNamedRegion(ga.Lifetime) : true;
+  return "Lifetime" in ga ? isNamedRegion(ga.Lifetime) : true;
 }
 
 export const isNamedBoundRegion = (br: BoundRegionKind) =>

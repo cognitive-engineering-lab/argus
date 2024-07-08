@@ -32,3 +32,15 @@ export const DefPathRender = createContext(
     </>
   )
 );
+
+export const ProjectionPathRender = createContext(
+  ({
+    original,
+    projection: _prj,
+    ctx: _ctx
+  }: {
+    original: ReactElement;
+    projection: ReactElement;
+    ctx: TypeContext;
+  }) => original
+);

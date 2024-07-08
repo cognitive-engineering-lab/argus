@@ -16,7 +16,13 @@ import {
   isSysMsgPin,
   isSysMsgUnpin
 } from "@argus/common/lib";
-import { DefPathRender } from "@argus/print/context";
+import { IcoComment } from "@argus/print/Icons";
+import Indented from "@argus/print/Indented";
+import {
+  AllowPathTrim,
+  AllowProjectionSubst,
+  DefPathRender
+} from "@argus/print/context";
 import { VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import { observer } from "mobx-react";
@@ -119,6 +125,43 @@ const CustomPathRenderer = observer(
     );
   }
 );
+
+const CustomProjectionRender = ({
+  original,
+  projection,
+  ctx
+}: {
+  original: React.ReactElement;
+  projection: React.ReactElement;
+  ctx: TypeContext;
+}) => {
+  const content = (
+    <AllowPathTrim.Provider value={false}>
+      <AllowProjectionSubst.Provider value={false}>
+        <p> This type is from a projection:</p>
+        <p>Projected type:</p>
+        <Indented>{projection}</Indented>
+        <p>Full path:</p>
+        <Indented>{original}</Indented>
+      </AllowProjectionSubst.Provider>
+    </AllowPathTrim.Provider>
+  );
+  const setStore = () =>
+    MiniBufferDataStore.set({ kind: "projection", content, ctx });
+  const resetStore = () => MiniBufferDataStore.reset();
+  return (
+    <>
+      {projection}
+      <span
+        onMouseEnter={setStore}
+        onMouseLeave={resetStore}
+        style={{ verticalAlign: "super", fontSize: "0.25rem" }}
+      >
+        <IcoComment />
+      </span>
+    </>
+  );
+};
 
 const App = observer(({ config }: { config: PanoptesConfig }) => {
   const [openFiles, setOpenFiles] = useState(buildInitialData(config));

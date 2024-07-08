@@ -25,7 +25,7 @@ export const Dsp = (
 
 /**
  * Highlight the children as placeholders, this means they aren't concrete types.
- * 
+ *
  * For Argus, this usually means changing the foreground to something softer.
  */
 export const Placeholder = ({ children }: React.PropsWithChildren) => (
@@ -33,7 +33,7 @@ export const Placeholder = ({ children }: React.PropsWithChildren) => (
 );
 
 /**
- * Highlight the children as Rust keywords 
+ * Highlight the children as Rust keywords
  */
 export const Kw = ({ children }: React.PropsWithChildren) => (
   <span className="kw">{children}</span>
