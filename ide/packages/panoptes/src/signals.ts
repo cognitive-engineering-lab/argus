@@ -1,4 +1,4 @@
-import type { DefinedPath } from "@argus/common/bindings";
+import type { DefinedPath, TyVal } from "@argus/common/bindings";
 import type { ErrorJumpTargetInfo } from "@argus/common/lib";
 import type { TypeContext } from "@argus/print/context";
 import { action, makeObservable, observable } from "mobx";
@@ -36,7 +36,8 @@ export type BufferDataKind = {
     }
   | {
       kind: "projection";
-      content: React.ReactElement;
+      original: TyVal;
+      projection: TyVal;
     }
 );
 

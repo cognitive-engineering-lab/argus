@@ -119,32 +119,15 @@ export const PrintTyProjected = ({
   original,
   projection
 }: { original: TyVal; projection: TyVal }) => {
-  const RenderProjection = useContext(ProjectionPathRender);
+  const PrintCustomProjection = useContext(ProjectionPathRender);
   const tyCtx = useContext(TyCtxt)!;
   return (
-    <RenderProjection
-      original={<PrintTyValue o={original} />}
-      projection={<PrintTyValue o={projection} />}
+    <PrintCustomProjection
       ctx={tyCtx}
+      original={original}
+      projection={projection}
     />
   );
-  // const Content = (
-  //   <AllowPathTrim.Provider value={false}>
-  //     <AllowProjectionSubst.Provider value={false}>
-  //       <p> This type is from a projection:</p>
-  //       <p>Projected type:</p>
-  //       <Indented>
-  //         <PrintTyValue o={projection} />
-  //       </Indented>
-  //       <p>Full path:</p>
-  //       <Indented>
-  //         <PrintTyValue o={original} />
-  //       </Indented>
-  //     </AllowProjectionSubst.Provider>
-  //   </AllowPathTrim.Provider>
-  // );
-
-  // return <Comment Child={<PrintTyValue o={projection} />} Content={Content} />;
 };
 
 export const PrintTyValue = ({ o }: { o: TyVal }) => {

@@ -1,9 +1,14 @@
-import { TyCtxt } from "@argus/print/context";
-import { PrintDefPathFull } from "@argus/print/lib";
+import {
+  AllowPathTrim,
+  AllowProjectionSubst,
+  TyCtxt
+} from "@argus/print/context";
+import { PrintDefPathFull, PrintTyValue } from "@argus/print/lib";
 import { observer } from "mobx-react";
 import React from "react";
 
 import { IcoPinned } from "@argus/print/Icons";
+import Indented from "@argus/print/Indented";
 import { MiniBufferDataStore } from "./signals";
 import "./MiniBuffer.css";
 
@@ -21,11 +26,20 @@ const MiniBuffer = observer(() => {
       <h2>Type Projection</h2>
     ) : null;
   const pinned = data.pinned ? <IcoPinned onClick={unpinClick} /> : null;
-  const Content =
+  const Content = () =>
     data.kind === "path" ? (
       <PrintDefPathFull defPath={data.path} />
     ) : data.kind === "projection" ? (
-      data.content
+      <>
+        <p>The projected type:</p>
+        <Indented>
+          <PrintTyValue ty={data.projection} />
+        </Indented>
+        <p>comes from the definition path:</p>
+        <Indented>
+          <PrintTyValue ty={data.original} />
+        </Indented>
+      </>
     ) : null;
 
   return (
@@ -33,9 +47,15 @@ const MiniBuffer = observer(() => {
       <div id="MiniBuffer">
         {pinned}
         {heading}
-        <div className="Data">
-          <TyCtxt.Provider value={data.ctx}>{Content}</TyCtxt.Provider>
-        </div>
+        <AllowPathTrim.Provider value={false}>
+          <AllowProjectionSubst.Provider value={false}>
+            <TyCtxt.Provider value={data.ctx}>
+              <div className="Data">
+                <Content />
+              </div>
+            </TyCtxt.Provider>
+          </AllowProjectionSubst.Provider>
+        </AllowPathTrim.Provider>
       </div>
       <div className="spacer">{"\u00A0"}</div>
     </>

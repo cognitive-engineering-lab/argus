@@ -1,6 +1,7 @@
 import type { DefinedPath, Ty, TyVal } from "@argus/common/bindings";
 import { createContext } from "react";
 import React, { type ReactElement } from "react";
+import { PrintTyValue } from "./private/ty";
 
 // Change this to true if we want to by default toggle type parameter lists
 export const AllowToggle = createContext(false);
@@ -21,8 +22,8 @@ export const DefPathRender = createContext(
     Head,
     Rest
   }: {
-    fullPath: DefinedPath;
     ctx: TypeContext;
+    fullPath: DefinedPath;
     Head: ReactElement;
     Rest: ReactElement;
   }) => (
@@ -39,8 +40,8 @@ export const ProjectionPathRender = createContext(
     projection: _prj,
     ctx: _ctx
   }: {
-    original: ReactElement;
-    projection: ReactElement;
     ctx: TypeContext;
-  }) => original
+    original: TyVal;
+    projection: TyVal;
+  }) => <PrintTyValue o={original} />
 );

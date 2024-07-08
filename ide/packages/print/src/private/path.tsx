@@ -60,8 +60,8 @@ export const PrintDefPath = ({ o }: { o: DefinedPath }) => {
   }) => {
     return (
       <PrintCustomDefPath
-        fullPath={o}
         ctx={tyCtxt}
+        fullPath={o}
         Head={<Prefix />}
         Rest={<Rest />}
       />
