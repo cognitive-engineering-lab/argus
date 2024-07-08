@@ -1,6 +1,6 @@
 [package]
 name = "argus-ser"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 authors = ["Gavin Gray <gavinleroy6@gmail.com>"]
 repository = "https://github.com/cognitive-engineering-lab/argus"
@@ -28,7 +28,7 @@ smallvec = "1.11.2"
 itertools = "0.12.0"
 ts-rs = { version = "7.1.1", features = ["indexmap-impl"], optional = true }
 index_vec = { version = "0.1.3", features = ["serde"] }
-argus-ext = { version = "0.1.6", path = "../argus-ext" }
+argus-ext = { version = "0.1.7", path = "../argus-ext" }
 
 [dev-dependencies]
 argus-ser = { path = ".", features = ["testing"] }
