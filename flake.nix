@@ -25,9 +25,7 @@
         toolchain
       ] ++ lib.optional stdenv.isDarwin libiconv; 
 
-      # FIXME: this is darwin specific vvv but the flake should work for all systems
       RUSTC_LINKER = "${pkgs.llvmPackages.clangUseLLVM}/bin/clang";
-      RUSTFLAGS = "-Clink-arg=-fuse-ld=${pkgs.mold}/bin/mold";
     };
   });
 }

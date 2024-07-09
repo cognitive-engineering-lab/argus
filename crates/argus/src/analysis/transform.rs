@@ -99,7 +99,13 @@ pub fn transform<'a, 'tcx: 'a>(
 
   let hir = tcx.hir();
   let source_map = tcx.sess.source_map();
-  let body_span = hir.body(body_id).value.span;
+
+  let mut visible_body_span = hir.body(body_id).value.span;
+  while visible_body_span.from_expansion() {
+    visible_body_span = visible_body_span.source_callsite();
+  }
+
+  let body_span = tcx.to_local(body_id, visible_body_span);
   let body_range = CharRange::from_span(body_span, source_map)
     .expect("Couldn't get body range");
 

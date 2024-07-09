@@ -58,9 +58,9 @@ enum Location {
 enum GoalKind {
   Trait { _self: Location, _trait: Location },
   TyChange,
-  FnToTrait { _trait: Location },
+  FnToTrait { _trait: Location, arity: usize },
   TyAsCallable { arity: usize },
-  FnParamDel { d: usize },
+  DeleteFnParams { delta: usize },
   Misc,
 }
 
@@ -77,31 +77,24 @@ impl GoalKind {
       GK::Trait {
         _self: L,
         _trait: E,
-      } => 1,
-
-      // NOTE: if the failed predicate is fn(..): Trait then treat the
-      // function as an `External` type, because you can't implement traits
-      // for functions, that has to be done via blanket impls using Fn traits.
-      GK::Trait {
+      }
+      | GK::Trait {
         _self: E,
         _trait: L,
       }
-      // You can't implement a trait for function, they have to be
-      // done by the crate exporting the trait.
-      | GK::FnToTrait { _trait: L } => 2,
+      | GK::FnToTrait { _trait: L, .. } => 1,
 
       GK::Trait {
         _self: E,
         _trait: E,
-      } => 3,
+      } => 2,
 
-      GK::FnToTrait { _trait: E }
-      | GK::TyChange => 4,
-      GK::FnParamDel { d } => 4 * d,
-
+      GK::TyChange => 4,
+      GK::DeleteFnParams { delta } => 4 * delta,
+      GK::FnToTrait { _trait: E, arity }
       // You could implement the unstable Fn traits for a type,
       // we could thens suggest this if there's nothing else better.
-      GK::TyAsCallable { arity } => 10 + arity,
+      | GK::TyAsCallable { arity } => 4 + 4 * arity,
       GK::Misc => 20,
     }
   }
@@ -280,8 +273,8 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
         log::debug!("{} v {}", fn_arity, trait_arity);
 
         if fn_arity > trait_arity {
-          GoalKind::FnParamDel {
-            d: fn_arity - trait_arity,
+          GoalKind::DeleteFnParams {
+            delta: fn_arity - trait_arity,
           }
         } else {
           GoalKind::Misc
@@ -300,7 +293,7 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
       // Self type is a function type but the trait isn't
       ty::PredicateKind::Clause(ty::ClauseKind::Trait(t))
         if t.polarity == ty::PredicatePolarity::Positive
-          && let Some(_) = tcx.function_arity(t.self_ty()) =>
+          && let Some(fn_arity) = tcx.function_arity(t.self_ty()) =>
       {
         let def_id = t.def_id();
         let location = if def_id.is_local() {
@@ -308,7 +301,10 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
         } else {
           Location::External
         };
-        GoalKind::FnToTrait { _trait: location }
+        GoalKind::FnToTrait {
+          _trait: location,
+          arity: fn_arity,
+        }
       }
 
       ty::PredicateKind::Clause(ty::ClauseKind::Trait(t))
