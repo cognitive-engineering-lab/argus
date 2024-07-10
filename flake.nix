@@ -17,6 +17,11 @@
     depotjs = pkgs.rustPlatform.buildRustPackage rec {
       pname = "depot";
       version = "0.2.17";
+
+      # Depot tests require lots of external toolchains, node, typedoc, biome, ...
+      # so we'll just skip all tests for now and figure this out later.
+      doCheck = false;
+
       src = pkgs.fetchFromGitHub {
         owner = "cognitive-engineering-lab";
         repo = pname;
@@ -25,26 +30,13 @@
       };
 
       cargoHash = "sha256-m9sG//vBUqGLwWHkyq+sJ8rkQOeaif56l394dgPU1uQ=";
-
-      # Depot tests require lots of external toolchains, node, typedoc, biome, ...
-      # so we'll just skip all tests for now and figure this out later.
-      doCheck = false;
-
-      nativeBuildInputs = with pkgs; [ pkg-config ];
-
-      buildInputs = with pkgs; [
-        bzip2
-        openssl
-      ] ++ lib.optionals stdenv.isDarwin [
+      buildInputs = with pkgs; lib.optionals stdenv.isDarwin [
         darwin.apple_sdk.frameworks.SystemConfiguration
       ];    
     };
   in {
     devShell = with pkgs; mkShell { 
       buildInputs = [ 
-        llvmPackages_latest.llvm
-        llvmPackages_latest.lld
-
         guile
         nodejs_22
         nodePackages.pnpm
@@ -52,9 +44,9 @@
         cargo-make
         cargo-watch
         toolchain
-      ] ++ lib.optional stdenv.isDarwin libiconv; 
-
-      RUSTC_LINKER = "${pkgs.llvmPackages.clangUseLLVM}/bin/clang";
+      ] ++ lib.optionals stdenv.isDarwin [
+        darwin.apple_sdk.frameworks.SystemConfiguration
+      ];    
     };
   });
 }
