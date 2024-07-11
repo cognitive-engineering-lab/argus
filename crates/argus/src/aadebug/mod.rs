@@ -1,3 +1,4 @@
+mod dnf;
 mod tree;
 mod ty;
 
@@ -8,7 +9,7 @@ use argus_ext::ty::EvaluationResultExt;
 use index_vec::IndexVec;
 use rustc_infer::traits::solve::GoalSource;
 use rustc_trait_selection::solve::inspect::{InspectCandidate, InspectGoal};
-use rustc_utils::timer::elapsed;
+use rustc_utils::timer;
 use serde::Serialize;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
@@ -119,11 +120,11 @@ impl<'tcx> Storage<'tcx> {
       tree
         .iter_correction_sets()
         .fold(Vec::new(), |mut sets, conjunct| {
-          sets.push(conjunct.weight(tree));
+          sets.push(tree.weight(&conjunct));
           sets
         });
 
-    elapsed("aadeg::into_results", tree_start);
+    timer::elapsed("aadeg::into_results", tree_start);
 
     AnalysisResults {
       problematic_sets: sets,

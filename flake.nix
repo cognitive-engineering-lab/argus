@@ -42,12 +42,16 @@
 
         llvmPackages_latest.llvm
         llvmPackages_latest.lld
+
         guile
         depotjs
         nodejs_22
         nodePackages.pnpm
+
         cargo-make
         cargo-watch
+        rust-analyzer
+
         toolchain
       ] ++ lib.optionals stdenv.isDarwin [
         darwin.apple_sdk.frameworks.SystemConfiguration
