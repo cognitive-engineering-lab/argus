@@ -19,7 +19,8 @@ import _ from "lodash";
 import open from "open";
 import vscode from "vscode";
 
-import type { Ctx } from "./ctx";
+import type { CtxInit } from "./ctx";
+import { ARGUS_ERR_LOG_KEY } from "./errors";
 import { log } from "./logging";
 import { isStatusBarState } from "./statusbar";
 
@@ -29,7 +30,7 @@ declare const TOOLCHAIN: {
   components: string[];
 };
 
-let CTX: Ctx | undefined;
+let CTX: CtxInit | undefined;
 
 // TODO: all of the calls to `showInformationMessage` should be replaced
 // with some automatic message on the statusBar indicator.
@@ -190,7 +191,7 @@ const checkVersionAndInstall = async (
   return true;
 };
 
-export async function setup(context: Ctx): Promise<CallArgus | null> {
+export async function setup(context: CtxInit): Promise<CallArgus | null> {
   // FIXME: this is a hack to give the `context` dynamic scope in this file.
   CTX = context;
 
@@ -257,6 +258,10 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
         if ("Err" in outputTyped) {
           log("Argus failed with `Err`", outputTyped.Err);
           context.statusBar.setState("error", "Analysis failed");
+          context.extCtx.workspaceState.update(
+            ARGUS_ERR_LOG_KEY,
+            outputTyped.Err
+          );
           return outputTyped.Err;
         }
 
@@ -268,7 +273,7 @@ export async function setup(context: Ctx): Promise<CallArgus | null> {
       })
       .catch(e => {
         context.statusBar.setState("error", "Build failure");
-        log("Argus failed with error", e.toString());
+        context.extCtx.workspaceState.update(ARGUS_ERR_LOG_KEY, e);
         return {
           type: "build-error",
           error: e.toString()

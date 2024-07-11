@@ -56,7 +56,10 @@
     ]
   },
   "files": [
-    "dist"
+    "dist", 
+    "argus-logo-128.png", 
+    "LICENSE", 
+    "README.md"
   ],
   "main": "./dist/argus.js",
   "exports": {

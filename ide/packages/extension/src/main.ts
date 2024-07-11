@@ -2,8 +2,9 @@ import type vscode from "vscode";
 
 import * as commands from "./commands";
 import { type CommandFactory, Ctx, fetchWorkspace } from "./ctx";
-import { showErrorDialog } from "./errors";
+import { CtxInit } from "./ctx";
 import { log } from "./logging";
+import { setup } from "./setup";
 
 export let globals: {
   ctx: Ctx;
@@ -19,12 +20,14 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // TODO: anything that needs to get registered on the window should be done here.
   // Initialize backend API for the workspace.
-  const ctx = new Ctx(context, createCommands(), wksp);
-  await ctx.setupBackend().catch(err => {
-    showErrorDialog(`Cannot activate Argus extension: ${err.message}`);
-    throw err;
-  });
+  const initialCtxt = new CtxInit(context, wksp);
+  log("setting up Argus backend");
+  const backend = await setup(initialCtxt);
+  if (backend == null) {
+    return;
+  }
 
+  const ctx = await Ctx.make(initialCtxt, backend, createCommands());
   log("Argus activated successfully");
   context.subscriptions.push(ctx);
   globals = {

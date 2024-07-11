@@ -34,6 +34,8 @@ export const showErrorDialog = async (err: string) => {
   }
 };
 
+export const ARGUS_ERR_LOG_KEY = "argus_err_log";
+
 export const showError = async (error: ArgusError) => {
   if (error.type === "build-error") {
     // TODO: is this how we want to show build errors?
@@ -46,6 +48,6 @@ export const showError = async (error: ArgusError) => {
 };
 
 export async function lastError(context: vscode.ExtensionContext) {
-  const error = context.workspaceState.get("err_log") as string;
+  const error = context.workspaceState.get(ARGUS_ERR_LOG_KEY) as string;
   await showError({ type: "build-error", error });
 }

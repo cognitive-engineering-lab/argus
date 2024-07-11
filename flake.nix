@@ -12,7 +12,6 @@
     pkgs = import nixpkgs {
       inherit system overlays;
     };
-
     toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
     depotjs = pkgs.rustPlatform.buildRustPackage rec {
       pname = "depot";
@@ -37,16 +36,24 @@
   in {
     devShell = with pkgs; mkShell { 
       buildInputs = [ 
+        # Deployment only
+        vsce
+        cargo-workspaces
+
+        llvmPackages_latest.llvm
+        llvmPackages_latest.lld
         guile
+        depotjs
         nodejs_22
         nodePackages.pnpm
-        depotjs
         cargo-make
         cargo-watch
         toolchain
       ] ++ lib.optionals stdenv.isDarwin [
         darwin.apple_sdk.frameworks.SystemConfiguration
       ];    
+
+      RUSTC_LINKER = "${pkgs.llvmPackages.clangUseLLVM}/bin/clang";
     };
   });
 }

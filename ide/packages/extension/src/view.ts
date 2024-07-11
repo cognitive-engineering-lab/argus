@@ -60,12 +60,12 @@ export class View {
       enableScripts: true,
       retainContextWhenHidden: true,
       enableFindWidget: true,
-      localResourceRoots: [this.ctx.extCtx.extensionUri]
+      localResourceRoots: [this.ctx.ictxt.extCtx.extensionUri]
     });
 
     // Set the webview's initial html content
     panel.webview.html = getHtmlForWebview(
-      this.ctx.extCtx.extensionUri,
+      this.ctx.ictxt.extCtx.extensionUri,
       panel,
       initialData,
       target
