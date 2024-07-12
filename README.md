@@ -61,4 +61,4 @@ Argus or Argos Panoptes (Ancient Greek: Ἄργος Πανόπτης, "All-seein
 
 ## Having trouble? (or providing feedback!)
 
-If you want to use Argus but are having trouble finding the relevant information, please leave an issue or email us at <gavin.gray@inf.ethz.ch> and <wcrichto@brown.edu>. Feedback and comments are always welcome as we iterate in the design and development of Argus!
+If you want to use Argus but are having trouble finding the relevant information, please leave an issue or email us at <gavinleroy@brown.edu> and <wcrichto@brown.edu>. Feedback and comments are always welcome as we iterate in the design and development of Argus!
