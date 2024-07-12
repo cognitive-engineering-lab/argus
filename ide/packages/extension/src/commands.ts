@@ -57,6 +57,6 @@ export function openError(ctx: Ctx): Cmd {
 export function lastError(ctx: Ctx): Cmd {
   return async () => {
     trace("lastError");
-    return errors.lastError(ctx.extCtx);
+    return errors.lastError(ctx.ictxt.extCtx);
   };
 }

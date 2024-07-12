@@ -99,7 +99,7 @@ pub fn transform<'a, 'tcx: 'a>(
 
   let hir = tcx.hir();
   let source_map = tcx.sess.source_map();
-  let body_span = hir.body(body_id).value.span;
+  let body_span = tcx.to_local(body_id, hir.body(body_id).value.span);
   let body_range = CharRange::from_span(body_span, source_map)
     .expect("Couldn't get body range");
 

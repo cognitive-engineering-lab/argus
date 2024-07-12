@@ -5,7 +5,7 @@
   "description": "A trait debugger for Rust",
   "license": "MIT",
   "icon": "argus-logo-128.png",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "engines": {
     "vscode": "^1.79.0"
   },
@@ -56,7 +56,10 @@
     ]
   },
   "files": [
-    "dist"
+    "dist", 
+    "argus-logo-128.png", 
+    "LICENSE", 
+    "README.md"
   ],
   "main": "./dist/argus.js",
   "exports": {

@@ -8,20 +8,18 @@ use rustc_middle::{
   ty::{self, TyCtxt},
 };
 use rustc_trait_selection::solve::inspect::ProbeKind;
-use rustc_utils::timer::elapsed;
+use rustc_utils::timer;
 use serde::Serialize;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
+use super::dnf::{And, Dnf};
 use crate::{
   analysis::EvaluationResult,
   proof_tree::{topology::TreeTopology, ProofNodeIdx},
 };
 
 pub type I = ProofNodeIdx;
-
-pub struct And(Vec<I>);
-pub struct Dnf(Vec<And>);
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -58,9 +56,9 @@ enum Location {
 enum GoalKind {
   Trait { _self: Location, _trait: Location },
   TyChange,
-  FnToTrait { _trait: Location },
+  FnToTrait { _trait: Location, arity: usize },
   TyAsCallable { arity: usize },
-  FnParamDel { d: usize },
+  DeleteFnParams { delta: usize },
   Misc,
 }
 
@@ -77,123 +75,26 @@ impl GoalKind {
       GK::Trait {
         _self: L,
         _trait: E,
-      } => 1,
-
-      // NOTE: if the failed predicate is fn(..): Trait then treat the
-      // function as an `External` type, because you can't implement traits
-      // for functions, that has to be done via blanket impls using Fn traits.
-      GK::Trait {
+      }
+      | GK::Trait {
         _self: E,
         _trait: L,
       }
-      // You can't implement a trait for function, they have to be
-      // done by the crate exporting the trait.
-      | GK::FnToTrait { _trait: L } => 2,
+      | GK::FnToTrait { _trait: L, .. } => 1,
 
       GK::Trait {
         _self: E,
         _trait: E,
-      } => 3,
+      } => 2,
 
-      GK::FnToTrait { _trait: E }
-      | GK::TyChange => 4,
-      GK::FnParamDel { d } => 4 * d,
-
+      GK::TyChange => 4,
+      GK::DeleteFnParams { delta } => 4 * delta,
+      GK::FnToTrait { _trait: E, arity }
       // You could implement the unstable Fn traits for a type,
       // we could thens suggest this if there's nothing else better.
-      GK::TyAsCallable { arity } => 10 + arity,
+      | GK::TyAsCallable { arity } => 4 + 4 * arity,
       GK::Misc => 20,
     }
-  }
-}
-
-impl And {
-  fn distribute(&self, rhs: &Dnf) -> Dnf {
-    Dnf(
-      rhs
-        .0
-        .iter()
-        .map(|And(rhs)| {
-          And(self.0.iter().copied().chain(rhs.iter().copied()).collect())
-        })
-        .collect(),
-    )
-  }
-
-  /// Failed predicates are weighted as follows.
-  ///
-  /// Each predicate is marked as local / external, local predicates are
-  /// trusted less, while external predicates are assumed correct.
-  ///
-  /// Trait predicates `T: C`, are weighted by how much they could change.
-  /// A type `T` that is local is non-rigid while external types are considered
-  /// rigid, meaning they cannot be changed.
-  ///
-  /// Non-intrusive changes:
-  ///
-  /// A local type failing to implement a trait (local/external).
-  /// NOTE that `T: C` where `T` is an external type is considered impossible
-  /// to change, if this is the only option a relaxed rule might suggest
-  /// creating a wapper for the type.
-  ///
-  /// Intrusive changes
-  ///
-  /// Changing types. That could either be changing a type to match an
-  /// alias-relate, deleting function parameters or tuple elements.
-  pub fn weight(self, tree: &T) -> SetHeuristic {
-    let goals = self
-      .0
-      .iter()
-      .map(|&idx| tree.goal(idx).expect("goal").analyze())
-      .collect::<Vec<_>>();
-
-    let momentum = goals.iter().fold(0, |acc, g| acc + g.kind.weight());
-    let velocity = self
-      .0
-      .iter()
-      .map(|&idx| tree.topology.depth(idx))
-      .max()
-      .unwrap_or(0);
-
-    SetHeuristic {
-      momentum,
-      velocity,
-      goals,
-    }
-  }
-}
-
-impl Dnf {
-  pub fn into_iter_conjuncts(self) -> impl Iterator<Item = And> {
-    self.0.into_iter()
-  }
-
-  fn or(vs: impl Iterator<Item = Self>) -> Option<Self> {
-    let vs = vs.flat_map(|Self(v)| v).collect::<Vec<_>>();
-    if vs.is_empty() {
-      None
-    } else {
-      Some(Self(vs))
-    }
-  }
-
-  #[allow(clippy::needless_pass_by_value)]
-  fn distribute(self, other: Self) -> Self {
-    Self::or(
-      self
-        .0
-        .into_iter()
-        .map(|conjunct| conjunct.distribute(&other)),
-    )
-    .expect("non-empty")
-  }
-
-  fn and(vs: impl Iterator<Item = Self>) -> Option<Self> {
-    vs.reduce(Self::distribute)
-  }
-
-  fn single(i: I) -> Self {
-    Self(vec![And(vec![i])])
   }
 }
 
@@ -280,8 +181,8 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
         log::debug!("{} v {}", fn_arity, trait_arity);
 
         if fn_arity > trait_arity {
-          GoalKind::FnParamDel {
-            d: fn_arity - trait_arity,
+          GoalKind::DeleteFnParams {
+            delta: fn_arity - trait_arity,
           }
         } else {
           GoalKind::Misc
@@ -300,7 +201,7 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
       // Self type is a function type but the trait isn't
       ty::PredicateKind::Clause(ty::ClauseKind::Trait(t))
         if t.polarity == ty::PredicatePolarity::Positive
-          && let Some(_) = tcx.function_arity(t.self_ty()) =>
+          && let Some(fn_arity) = tcx.function_arity(t.self_ty()) =>
       {
         let def_id = t.def_id();
         let location = if def_id.is_local() {
@@ -308,7 +209,10 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
         } else {
           Location::External
         };
-        GoalKind::FnToTrait { _trait: location }
+        GoalKind::FnToTrait {
+          _trait: location,
+          arity: fn_arity,
+        }
       }
 
       ty::PredicateKind::Clause(ty::ClauseKind::Trait(t))
@@ -455,8 +359,8 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
     }
   }
 
-  pub fn dnf(&self) -> Dnf {
-    fn _goal(this: &T, goal: &Goal) -> Option<Dnf> {
+  pub fn dnf(&self) -> Dnf<I> {
+    fn _goal(this: &T, goal: &Goal) -> Option<Dnf<I>> {
       if !((this.maybe_ambiguous && goal.result.is_maybe())
         || goal.result.is_no())
       {
@@ -475,30 +379,69 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
       Dnf::or(nested.into_iter())
     }
 
-    fn _candidate(this: &T, candidate: &Candidate) -> Option<Dnf> {
+    fn _candidate(this: &T, candidate: &Candidate) -> Option<Dnf<I>> {
       if candidate.result.is_yes() {
         return None;
       }
 
       let goals = candidate.source_subgoals();
-      let nested = goals.filter_map(|g| _goal(this, &g)).collect::<Vec<_>>();
-
-      if nested.is_empty() {
-        return None;
-      }
-
-      Dnf::and(nested.into_iter())
+      Dnf::and(goals.filter_map(|g| _goal(this, &g)))
     }
 
+    let dnf_report_msg =
+      format!("Normalizing to DNF from {} nodes", self.ns.len());
+    let dnf_start = Instant::now();
+
     let root = self.goal(self.root).expect("invalid root");
-    _goal(self, &root).unwrap_or_else(|| Dnf(vec![]))
+    let dnf = _goal(self, &root).unwrap_or_else(Dnf::default);
+    timer::elapsed(&dnf_report_msg, dnf_start);
+
+    dnf
   }
 
-  pub fn iter_correction_sets(&self) -> impl Iterator<Item = And> {
-    let tree_start = Instant::now();
-    let iter = self.dnf().into_iter_conjuncts();
-    elapsed("tree::dnf", tree_start);
-    iter
+  /// Failed predicates are weighted as follows.
+  ///
+  /// Each predicate is marked as local / external, local predicates are
+  /// trusted less, while external predicates are assumed correct.
+  ///
+  /// Trait predicates `T: C`, are weighted by how much they could change.
+  /// A type `T` that is local is non-rigid while external types are considered
+  /// rigid, meaning they cannot be changed.
+  ///
+  /// Non-intrusive changes:
+  ///
+  /// A local type failing to implement a trait (local/external).
+  /// NOTE that `T: C` where `T` is an external type is considered impossible
+  /// to change, if this is the only option a relaxed rule might suggest
+  /// creating a wapper for the type.
+  ///
+  /// Intrusive changes
+  ///
+  /// Changing types. That could either be changing a type to match an
+  /// alias-relate, deleting function parameters or tuple elements.
+  pub fn weight(&self, and: &And<I>) -> SetHeuristic {
+    let goals = and
+      .iter()
+      .map(|&idx| self.goal(idx).expect("goal").analyze())
+      .collect::<Vec<_>>();
+
+    let momentum = goals.iter().fold(0, |acc, g| acc + g.kind.weight());
+    let velocity = and
+      .iter()
+      .map(|&idx| self.topology.depth(idx))
+      .max()
+      .unwrap_or(0);
+
+    SetHeuristic {
+      momentum,
+      velocity,
+      goals,
+    }
+  }
+
+  #[inline]
+  pub fn iter_correction_sets(&self) -> impl Iterator<Item = And<I>> {
+    self.dnf().into_iter_conjuncts()
   }
 }
 

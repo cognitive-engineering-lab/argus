@@ -26,6 +26,7 @@ import { VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import { observer } from "mobx-react";
 import React, { useEffect, useState } from "react";
+import FillScreen, { Spacer } from "./FillScreen";
 
 import "./App.css";
 import type { TypeContext } from "@argus/print/context";
@@ -201,7 +202,7 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
           Show hidden information
         </VSCodeCheckbox>
       </div>
-      <div className="spacer">{"\u00A0"}</div>
+      <Spacer />
     </>
   );
 
@@ -215,6 +216,7 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
             <DefPathRender.Provider value={CustomPathRenderer}>
               <ProjectionPathRender.Provider value={CustomProjectionRender}>
                 <Workspace files={openFiles} reset={resetState} />
+                <FillScreen />
               </ProjectionPathRender.Provider>
             </DefPathRender.Provider>
           </AppContext.ShowHiddenObligationsContext.Provider>

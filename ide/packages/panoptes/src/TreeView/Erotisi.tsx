@@ -1,7 +1,9 @@
 import type { TreeInfo } from "@argus/common/TreeInfo";
 import type { ProofNodeIdx, SetHeuristic } from "@argus/common/bindings";
 import { TreeAppContext } from "@argus/common/context";
+import ErrorDiv from "@argus/print/ErrorDiv";
 import Indented from "@argus/print/Indented";
+import ReportBugUrl from "@argus/print/ReportBugUrl";
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import React, { useContext, useState } from "react";
@@ -80,9 +82,19 @@ function formOptions(
 const Erotisi = () => {
   const tree = useContext(TreeAppContext.TreeContext)!;
   const sets = sortedSubsets(tree.failedSets);
-  // If there's only one error we don't need to present questions...
-  if (sets.length <= 1) {
-    return null;
+  if (sets.length === 0) {
+    return (
+      <ErrorDiv>
+        <p>
+          Argus didn’t find any root errors in this tree. If you’re seeing this,
+          it’s likely a bug. Please click below to report it!
+        </p>
+        <ReportBugUrl
+          error={"No error sets found for tree"}
+          logText={JSON.stringify(tree)}
+        />
+      </ErrorDiv>
+    );
   }
 
   const firstForm = formOptions(tree, sets, []);

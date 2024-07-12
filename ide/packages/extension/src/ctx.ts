@@ -13,14 +13,13 @@ import type {
   FileInfo,
   Filename
 } from "@argus/common/lib";
-import { CancelablePromise as CPromise } from "cancelable-promise";
+import type { CancelablePromise as CPromise } from "cancelable-promise";
 import _ from "lodash";
 import * as vscode from "vscode";
 
 import { rangeHighlight } from "./decorate";
 import { showErrorDialog } from "./errors";
 import { log } from "./logging";
-import { setup } from "./setup";
 import { StatusBar } from "./statusbar";
 import {
   type RustEditor,
@@ -71,109 +70,84 @@ export interface Disposable {
 export type Cmd = (...args: any[]) => unknown;
 
 export type CommandFactory = {
-  enabled: (ctx: CtxInit) => Cmd;
+  enabled: (ctx: Ctx) => Cmd;
   // disabled?: (ctx: Ctx) => Cmd;
 };
 
-// We can modify this if the initializations state changes.
-export type CtxInit = Ctx;
-
-export class Ctx {
-  // Ranges used for highlighting code in the current Rust Editor.
-  private highlightRanges: CharRange[] = [];
-  private commandDisposables: Disposable[];
-  private disposables: Disposable[];
-  private diagnosticCollection;
-  private cache: BackendCache;
-  private view: View | undefined;
-  public statusBar: StatusBar;
+/**
+ * Extension context before a system backend has been set.
+ */
+export class CtxInit {
+  readonly statusBar: StatusBar;
 
   constructor(
     readonly extCtx: vscode.ExtensionContext,
-    readonly commandFactories: Record<string, CommandFactory>,
     readonly workspace: Workspace & { kind: "workspace-folder" }
   ) {
-    this.commandDisposables = [];
-    this.disposables = [];
-    this.diagnosticCollection =
-      vscode.languages.createDiagnosticCollection("rust");
     this.statusBar = new StatusBar(extCtx);
-
-    this.cache = new BackendCache(
-      this.statusBar,
-      () =>
-        new CPromise(() => {
-          showErrorDialog("Argus backend left uninitialized.");
-          return {
-            type: "analysis-error",
-            error: "Argus uninitialized."
-          };
-        })
-    );
   }
 
   dispose() {
-    this.cache.havoc();
-    this.view?.cleanup();
     this.statusBar.dispose();
-    _.forEach(this.commandDisposables, d => d.dispose());
-    _.forEach(this.disposables, d => d.dispose());
-    this.commandDisposables = [];
-    this.disposables = [];
   }
+}
 
-  get activeRustEditor(): RustEditor | undefined {
-    const editor = vscode.window.activeTextEditor;
-    return editor && isRustEditor(editor) ? editor : undefined;
-  }
+export class Ctx {
+  private view?: View;
+  private highlightRanges: CharRange[] = [];
+  private commandDisposables: Disposable[] = [];
+  private disposables: Disposable[] = [];
 
-  get extensionPath(): string {
-    return this.extCtx.extensionPath;
-  }
+  private constructor(
+    readonly ictxt: CtxInit,
+    readonly cache: BackendCache,
+    readonly commandFactories: Record<string, CommandFactory>,
 
-  get visibleEditors(): RustEditor[] {
-    return _.filter(vscode.window.visibleTextEditors, isRustEditor);
-  }
+    // Ranges used for highlighting code in the current Rust Editor.
+    readonly diagnosticCollection: vscode.DiagnosticCollection
+  ) {}
 
-  // NOTE: callbacks that register events in this function should invoke
-  // actions on the `globals.ctx` instead of `this` to avoid issues with
-  // setup. Previously the setup failed but callbacks were still registered
-  // with `this` which caused the editor to be out of sync.
-  // FIXME: this probably demonstrates a flaw in the design anyways...
-  async setupBackend() {
-    log("setting up Argus backend");
-    const b = await setup(this);
-    if (b == null) {
-      throw new Error("Failed to setup Argus");
-    }
-
+  static async make(
+    initial: CtxInit,
+    backend: CallArgus,
+    commandFactories: Record<string, CommandFactory>
+  ) {
     vscode.window.showInformationMessage(
       "Loading Argus, this may take several minutes."
     );
 
-    await b(
+    await backend(
       ["preload"],
       true, // Don't expect output
       true // Ignore a failing exit code
     );
-    this.cache = new BackendCache(this.statusBar, b);
 
-    log("Argus backend preloaded");
+    const self = new Ctx(
+      initial,
+      new BackendCache(initial.statusBar, backend),
+      commandFactories,
+      vscode.languages.createDiagnosticCollection("rust")
+    );
 
     // Preload information for visible editors.
-    if (this.activeRustEditor) {
-      this.visibleEditors.forEach(e => this.openEditor(e));
+    if (self.activeRustEditor) {
+      self.visibleEditors.forEach(e => self.openEditor(e));
     }
 
     log("Caching open editor information");
 
     // Register the commands with VSCode after the backend is setup.
     // NOTE: nothing should be registered before the commands...
-    this.updateCommands();
+    self.updateCommands();
 
     log("Updated commands");
+    self.registerSubscriptionsAndDisposables();
 
-    this.extCtx.subscriptions.push(this.diagnosticCollection);
+    return self;
+  }
+
+  private registerSubscriptionsAndDisposables() {
+    this.ictxt.extCtx.subscriptions.push(this.diagnosticCollection!);
     this.disposables.push(
       vscode.languages.registerHoverProvider("rust", {
         provideHover: async (doc, pos, tok) => this.provideHover(doc, pos, tok)
@@ -190,7 +164,7 @@ export class Ctx {
           event.document === editor.document &&
           editor.document.isDirty
         ) {
-          this.statusBar.setState("unsaved");
+          this.ictxt.statusBar.setState("unsaved");
         }
       })
     );
@@ -227,6 +201,38 @@ export class Ctx {
     );
 
     log("Argus backend setup complete");
+  }
+
+  dispose() {
+    this.cache.havoc();
+    this.view?.cleanup();
+    this.ictxt.dispose();
+    _.forEach(this.commandDisposables, d => d.dispose());
+    _.forEach(this.disposables, d => d.dispose());
+    this.commandDisposables = [];
+    this.disposables = [];
+  }
+
+  get activeRustEditor(): RustEditor | undefined {
+    const editor = vscode.window.activeTextEditor;
+    return editor && isRustEditor(editor) ? editor : undefined;
+  }
+
+  get extensionPath(): string {
+    return this.ictxt.extCtx.extensionPath;
+  }
+
+  get visibleEditors(): RustEditor[] {
+    return _.filter(vscode.window.visibleTextEditors, isRustEditor);
+  }
+
+  // NOTE: callbacks that register events in this function should invoke
+  // actions on the `globals.ctx` instead of `this` to avoid issues with
+  // setup. Previously the setup failed but callbacks were still registered
+  // with `this` which caused the editor to be out of sync.
+  // FIXME: this probably demonstrates a flaw in the design anyways...
+  async setupBackend() {
+    log("Argus backend preloaded");
   }
 
   async inspectAt(target?: ErrorJumpTargetInfo) {
@@ -516,7 +522,12 @@ class BackendCache {
       res => {
         if (res.type !== "output") {
           this.statusBar.setState("error");
-          showErrorDialog(res.error);
+          // NOTE: we probably should, but don't, report this as a bug
+          // to the user and open an error dialog box. The reason for this
+          // is a malformed `Cargo.toml` can cause errors within `rustc_plugin`.
+          // This in turn causes Argus to fail but it isn't really a "failure"
+          // on Argus' part.
+          log(res.error);
           return;
         }
         return res.value;

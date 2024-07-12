@@ -40,6 +40,7 @@ import {
   anyElems,
   fnInputsAndOutput,
   isNamedBoundVariable,
+  isNamedRegion,
   isUnitTy
 } from "@argus/common/func";
 import {} from "@floating-ui/react";
@@ -137,117 +138,101 @@ export const PrintTyValue = ({ o }: { o: TyVal }) => {
 export const PrintTyKind = ({ o }: { o: TyKind }) => {
   if ("Bool" === o) {
     return "bool";
-  }
-  if ("Char" === o) {
+  } else if ("Char" === o) {
     return "char";
-  }
-  if ("Str" === o) {
+  } else if ("Str" === o) {
     return "str";
-  }
-  if ("Never" === o) {
+  } else if ("Never" === o) {
     return "!";
-  }
-  if ("Error" === o) {
+  } else if ("Error" === o) {
     return "{error}";
-  }
-  if ("Int" in o) {
+  } else if ("Int" in o) {
     return <PrintIntTy o={o.Int} />;
-  }
-  if ("Uint" in o) {
+  } else if ("Uint" in o) {
     return <PrintUintTy o={o.Uint} />;
-  }
-  if ("Float" in o) {
+  } else if ("Float" in o) {
     return <PrintFloatTy o={o.Float} />;
-  }
-  if ("Pat" in o) {
+  } else if ("Pat" in o) {
     const [ty] = o.Pat;
     return <PrintTy o={ty} />;
-  }
-  if ("Adt" in o) {
+  } else if ("Adt" in o) {
     return <PrintDefPath o={o.Adt} />;
-  }
-  if ("Array" in o) {
+  } else if ("Array" in o) {
     const [ty, sz] = o.Array;
     return (
       <SqBraced>
         <PrintTy o={ty} />; <PrintConst o={sz} />
       </SqBraced>
     );
-  }
-  if ("Slice" in o) {
+  } else if ("Slice" in o) {
     return (
       <SqBraced>
         <PrintTy o={o.Slice} />
       </SqBraced>
     );
-  }
-  if ("RawPtr" in o) {
+  } else if ("RawPtr" in o) {
     const m = o.RawPtr.mutbl === "Not" ? "const" : "mut";
     return (
       <>
         *{m} <PrintTy o={o.RawPtr.ty} />
       </>
     );
-  }
-  if ("Ref" in o) {
+  } else if ("Ref" in o) {
     const [r, ty, mtbl] = o.Ref;
     const tyAndMut = {
       ty: ty,
       mutbl: mtbl
     };
+
+    if (!isNamedRegion(r) && mtbl === "Not") {
+      return (
+        <>
+          &<PrintTy o={ty} />
+        </>
+      );
+    }
+
     return (
       <>
-        &<PrintRegion o={r} /> <PrintTypeAndMut o={tyAndMut} />
+        &<PrintRegion o={r} forceAnonymous={true} />{" "}
+        <PrintTypeAndMut o={tyAndMut} />
       </>
     );
-  }
-  if ("FnDef" in o) {
+  } else if ("FnDef" in o) {
     return <PrintFnDef o={o.FnDef} />;
-  }
-  if ("FnPtr" in o) {
+  } else if ("FnPtr" in o) {
     return <PrintPolyFnSig o={o.FnPtr} />;
-  }
-  if ("Tuple" in o) {
+  } else if ("Tuple" in o) {
     const components = _.map(o.Tuple, t => <PrintTy o={t} />);
     return (
       <Parenthesized>
         <CommaSeparated components={components} />
       </Parenthesized>
     );
-  }
-  if ("Placeholder" in o) {
+  } else if ("Placeholder" in o) {
     return <PrintPlaceholderTy o={o.Placeholder} />;
-  }
-  if ("Infer" in o) {
+  } else if ("Infer" in o) {
     return <PrintInferTy o={o.Infer} />;
-  }
-  if ("Foreign" in o) {
+  } else if ("Foreign" in o) {
     return <PrintDefPath o={o.Foreign} />;
-  }
-  if ("Closure" in o) {
+  } else if ("Closure" in o) {
     return <PrintDefPath o={o.Closure} />;
-  }
-  if ("CoroutineClosure" in o) {
+  } else if ("CoroutineClosure" in o) {
     return <PrintCoroutineClosureTy o={o.CoroutineClosure} />;
-  }
-  if ("Param" in o) {
+  } else if ("Param" in o) {
     return <PrintParamTy o={o.Param} />;
-  }
-  if ("Bound" in o) {
+  } else if ("Bound" in o) {
     return <PrintBoundTy o={o.Bound} />;
-  }
-  if ("Alias" in o) {
+  } else if ("Alias" in o) {
     return <PrintAliasTyKind o={o.Alias} />;
-  }
-  if ("Dynamic" in o) {
+  } else if ("Dynamic" in o) {
     return <PrintDynamicTy o={o.Dynamic} />;
-  }
-  if ("Coroutine" in o) {
+  } else if ("Coroutine" in o) {
     return <PrintCoroutineTy o={o.Coroutine} />;
-  }
-  if ("CoroutineWitness" in o) {
+  } else if ("CoroutineWitness" in o) {
     return <PrintCoroutineWitnessTy o={o.CoroutineWitness} />;
   }
+
   throw new Error("Unknown ty kind", o);
 };
 
@@ -522,7 +507,10 @@ export const PrintGenericArg = ({ o }: { o: GenericArg }) => {
   throw new Error("Unknown generic arg", o);
 };
 
-export const PrintRegion = ({ o }: { o: Region }) => {
+export const PrintRegion = ({
+  o,
+  forceAnonymous = false
+}: { o: Region; forceAnonymous?: boolean }) => {
   switch (o.type) {
     case "Static": {
       return "'static";
@@ -531,8 +519,13 @@ export const PrintRegion = ({ o }: { o: Region }) => {
       return <PrintSymbol o={o.data} />;
     }
     case "Anonymous": {
-      // TODO: maybe we don't want to print anonymous lifetimes?
-      // return "'_";
+      // NOTE: by default we don't print anonymous lifetimes. There are times
+      // when it looks better, e.g., when the region is `mut`. One gotcha right now
+      // is that we don't rename them, which makes reasoning about anonymouse lifetimes
+      // tricky.
+      if (forceAnonymous) {
+        return "'_";
+      }
       return null;
     }
     default: {

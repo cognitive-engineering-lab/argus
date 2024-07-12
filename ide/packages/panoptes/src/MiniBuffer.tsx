@@ -57,7 +57,7 @@ const MiniBuffer = observer(() => {
           </AllowProjectionSubst.Provider>
         </AllowPathTrim.Provider>
       </div>
-      <div className="spacer">{"\u00A0"}</div>
+      {/* <div className="spacer">{"\u00A0"}</div> */}
     </>
   );
 });
