@@ -19,8 +19,3 @@
     /* Some breathing room. Make sure the `spacer` has the same value. */
     margin-bottom: 0.25em;
 }
-
-.spacer {
-    width: 100%;
-    margin-bottom: 0.25em;
-}
