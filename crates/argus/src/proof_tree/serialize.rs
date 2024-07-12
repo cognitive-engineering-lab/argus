@@ -6,7 +6,9 @@ use rustc_infer::infer::InferCtxt;
 use rustc_middle::ty::Predicate;
 use rustc_span::Span;
 use rustc_trait_selection::{
-  solve::inspect::{InspectGoal, ProofTreeInferCtxtExt, ProofTreeVisitor},
+  solve::inspect::{
+    InspectCandidate, InspectGoal, ProofTreeInferCtxtExt, ProofTreeVisitor,
+  },
   traits::solve,
 };
 
@@ -219,7 +221,9 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
 
       self.topology.add(here_idx, candidate_idx);
       self.previous = Some(candidate_idx);
-      c.visit_nested_in_probe(self);
+
+      c.visit_nested_roots(self);
+
       // FIXME: is this necessary now that we store all nodes?
       add_result_if_empty(self, candidate_idx);
     }
@@ -243,4 +247,52 @@ pub fn try_serialize<'tcx>(
     infcx.visit_proof_tree(goal, &mut visitor);
     visitor.into_tree()
   })
+}
+
+trait InspectCandidateExt<'tcx> {
+  fn visit_nested_roots<V: ProofTreeVisitor<'tcx>>(
+    &self,
+    visitor: &mut V,
+  ) -> V::Result;
+}
+
+impl<'tcx> InspectCandidateExt<'tcx> for InspectCandidate<'_, 'tcx> {
+  fn visit_nested_roots<V: ProofTreeVisitor<'tcx>>(
+    &self,
+    visitor: &mut V,
+  ) -> V::Result {
+    self.visit_nested_in_probe(visitor)
+    // TODO: if we can lobby lcnr to make `visit_with` public then we don't have to visit
+    // all subgoals, only those that cause errors. This means that if `F: Fn()` fails, we
+    // don't need to check the bound `<F as FnOnce>::Output: ResBound`.
+    //
+    // If this gets used we no longer have to check this in the `aadebug` module.
+    //
+    // // TODO: add rustc_ast_ir to extern crates.
+    // use rustc_ast_ir::visit::VisitorResult;
+    // use rustc_ast_ir::try_visit;
+    //
+    // self.goal().infcx().probe(|_| {
+    //   let mut all_sub_goals = self.instantiate_nested_goals(visitor.span());
+    //   // Put all successful subgoals at the front of the list.
+    //   let err_start_idx = itertools::partition(&mut all_sub_goals, |g| g.result().is_yes());
+    //   let (successful_subgoals, failed_subgoals) = all_sub_goals.split_at_mut(err_start_idx);
+    //   // TODO: make a version of `retain_error_sources` that iterates over
+    //   // a slice and picks out the errors by index, then we can avoid the clone.
+    //   let mut failed_subgoals_vec = failed_subgoals.to_vec();
+    //   argus_ext::ty::retain_error_sources(
+    //     &mut failed_subgoals_vec,
+    //     |g| g.result(),
+    //     |g| g.goal().predicate,
+    //     |g| g.infcx().tcx,
+    //     |a, b| a.goal().predicate == b.goal().predicate,
+    //   );
+    //
+    //   for goal in failed_subgoals_vec.iter().chain(successful_subgoals.iter()) {
+    //     try_visit!(goal.visit_with(visitor));
+    //   }
+    //
+    //   V::Result::output()
+    // })
+  }
 }

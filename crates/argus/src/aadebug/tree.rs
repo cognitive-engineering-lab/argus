@@ -393,7 +393,7 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
     let dnf_start = Instant::now();
 
     let root = self.goal(self.root).expect("invalid root");
-    let dnf = _goal(self, &root).unwrap_or_else(|| Dnf::default());
+    let dnf = _goal(self, &root).unwrap_or_else(Dnf::default);
     timer::elapsed(&dnf_report_msg, dnf_start);
 
     dnf

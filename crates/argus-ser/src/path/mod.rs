@@ -206,8 +206,7 @@ impl<'a, 'tcx: 'a> PathBuilder<'tcx> {
   }
 
   fn tcx(&self) -> TyCtxt<'tcx> {
-    let tyc = InferCtxt::access(|infcx| infcx.tcx);
-    tyc
+    InferCtxt::access(|infcx| infcx.tcx)
   }
 
   fn should_print_verbose(&self) -> bool {

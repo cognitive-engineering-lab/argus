@@ -146,7 +146,7 @@ impl<'tcx> PathBuilder<'tcx> {
         self.segments.push(PathSegment::Colons);
       }
       self.segments.push(PathSegment::GenericArgumentList {
-        entries: args.iter().copied().collect(),
+        entries: args.to_vec(),
       })
       // self.generic_delimiters(|cx| {
       //   #[derive(Serialize)]

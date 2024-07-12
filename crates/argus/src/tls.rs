@@ -232,7 +232,7 @@ mod unsafe_tls {
   ) -> T {
     TY_INTERNER.with(|interner: &TyInterner<'static>| {
       let interner: &TyInterner<'tcx> =
-        unsafe { std::mem::transmute(&*interner) };
+        unsafe { std::mem::transmute(interner) };
       f(interner)
     })
   }
