@@ -88,12 +88,12 @@ impl GoalKind {
       } => 2,
 
       GK::TyChange => 4,
-      GK::DeleteFnParams { delta } => 4 * delta,
+      GK::DeleteFnParams { delta } => 5 * delta,
       GK::FnToTrait { _trait: E, arity }
       // You could implement the unstable Fn traits for a type,
       // we could thens suggest this if there's nothing else better.
-      | GK::TyAsCallable { arity } => 4 + 4 * arity,
-      GK::Misc => 20,
+      | GK::TyAsCallable { arity } => 4 + 5 * arity,
+      GK::Misc => 50,
     }
   }
 }

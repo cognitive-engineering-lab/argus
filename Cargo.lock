@@ -25,7 +25,7 @@ checksum = "080e9890a082662b09c1ad45f567faeeb47f22b5fb23895fbe1e651e718e25ca"
 
 [[package]]
 name = "argus-cli"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "anyhow",
  "argus-ext",
@@ -42,7 +42,7 @@ dependencies = [
 
 [[package]]
 name = "argus-ext"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "anyhow",
  "fluid-let",
@@ -55,7 +55,7 @@ dependencies = [
 
 [[package]]
 name = "argus-lib"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "anyhow",
  "argus-ext",
@@ -80,7 +80,7 @@ dependencies = [
 
 [[package]]
 name = "argus-ser"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "anyhow",
  "argus-ext",

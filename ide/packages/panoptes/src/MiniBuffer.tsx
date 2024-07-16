@@ -18,12 +18,16 @@ const MiniBuffer = observer(() => {
     return null;
   }
 
+  const ctx = data.kind === "argus-note" ? undefined : data.ctx;
+
   const unpinClick = () => MiniBufferDataStore.unpin();
   const heading =
     data.kind === "path" ? (
       <h2>Definition Path</h2>
     ) : data.kind === "projection" ? (
       <h2>Type Projection</h2>
+    ) : data.kind === "argus-note" ? (
+      <h2>Note from Argus</h2>
     ) : null;
   const pinned = data.pinned ? <IcoPinned onClick={unpinClick} /> : null;
   const Content = () =>
@@ -40,6 +44,8 @@ const MiniBuffer = observer(() => {
           <PrintTyValue ty={data.original} />
         </Indented>
       </>
+    ) : data.kind === "argus-note" ? (
+      data.data
     ) : null;
 
   return (
@@ -49,7 +55,7 @@ const MiniBuffer = observer(() => {
         {heading}
         <AllowPathTrim.Provider value={false}>
           <AllowProjectionSubst.Provider value={false}>
-            <TyCtxt.Provider value={data.ctx}>
+            <TyCtxt.Provider value={ctx}>
               <div className="Data">
                 <Content />
               </div>
