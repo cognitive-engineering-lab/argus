@@ -12,7 +12,7 @@ import { createRoot } from "react-dom/client";
 import "./BottomUp.css";
 import { CollapsibleElement, DirRecursive } from "./Directory";
 
-type TreeViewWithRoot = TreeView & { root: ProofNodeIdx };
+export type TreeViewWithRoot = TreeView & { root: ProofNodeIdx };
 
 class TopologyBuilder {
   private topo: TreeTopology;
@@ -161,6 +161,17 @@ const RenderEvaluationViews = ({
   );
 };
 
+export const BottomUpRenderParams: TreeRenderParams = {
+  Wrapper: ({
+    n: _n,
+    Child
+  }: {
+    n: ProofNodeIdx;
+    Child: React.ReactElement;
+  }) => Child,
+  styleEdges: false
+};
+
 /**
  * The actual entry point for rendering the bottom up view. All others are used in testing or evaluation.
  */
@@ -188,19 +199,8 @@ export const RenderBottomUpViews = ({
       />
     );
 
-  const renderParams: TreeRenderParams = {
-    Wrapper: ({
-      n: _n,
-      Child
-    }: {
-      n: ProofNodeIdx;
-      Child: React.ReactElement;
-    }) => Child,
-    styleEdges: false
-  };
-
   return (
-    <TreeAppContext.TreeRenderContext.Provider value={renderParams}>
+    <TreeAppContext.TreeRenderContext.Provider value={BottomUpRenderParams}>
       <div id="recommended-failure-list">{argusViews}</div>
       {fallbacks}
     </TreeAppContext.TreeRenderContext.Provider>

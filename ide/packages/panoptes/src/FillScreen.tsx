@@ -33,6 +33,8 @@ export const Spacer = () => <div className="spacer">{"\u00A0"}</div>;
 const FillScreen = () => {
   const { height } = useWindowDimensions();
   // FIXME: this assumes that nobody is using a `font-size` smaller than 14.
+  // A better approach would be to make the height of the spacing div 80% of
+  // the screen height and then width 100%. Probably easier than the loop anyways.
   const fontSize = 14;
   return _.map(_.range(height / fontSize), i => <Spacer key={i} />);
 };

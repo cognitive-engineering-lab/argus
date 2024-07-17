@@ -1,35 +1,153 @@
-import type { SetHeuristic } from "@argus/common/bindings";
+import type { ProofNodeIdx, SetHeuristic } from "@argus/common/bindings";
 import { AppContext, TreeAppContext } from "@argus/common/context";
+import classNames from "classnames";
 import _ from "lodash";
-import React, { useContext } from "react";
+import { observer } from "mobx-react";
+import React, { useContext, useState } from "react";
+import { MiniBufferDataStore } from "../signals";
 
-import { BottomUpImpersonator, invertViewWithRoots } from "./BottomUp";
+import type { TreeView } from "@argus/common/TreeInfo";
+import {
+  BottomUpImpersonator,
+  BottomUpRenderParams,
+  type TreeViewWithRoot,
+  invertViewWithRoots
+} from "./BottomUp";
+import { CollapsibleElement, DirRecursive } from "./Directory";
+import "./Subsets.css";
+import { IcoComment } from "@argus/print/Icons";
 
-export function sortedSubsets(sets: SetHeuristic[]) {
-  return _.sortBy(sets, sets => sets.momentum / sets.velocity);
-}
+/**
+ * Define the heuristic used for inertia in the system. Previously we were
+ * using `momentum / velocity` but this proved too sporatic. Some proof trees
+ * were deep, needlessely, and this threw a wrench in the order.
+ */
+const setInertia = (set: SetHeuristic) => set.momentum;
+export const sortedSubsets = (sets: SetHeuristic[]) =>
+  _.sortBy(sets, setInertia);
 
-// FIXME: we need to present the sets together in a conjunct, instead of the flat list.
-// The flat list is currently the best way to get evaluation metrics.
+export const RenderBottomUpSets = ({
+  views
+}: {
+  views: {
+    tree: TreeViewWithRoot[];
+    inertia: number;
+    velocity: number;
+    momentum: number;
+  }[];
+}) => {
+  const mkGetChildren = (view: TreeView) => (idx: ProofNodeIdx) =>
+    view.topology.children[idx] ?? [];
+
+  const MkLevel = observer(
+    (views: {
+      tree: TreeViewWithRoot[];
+      inertia: number;
+      momentum: number;
+      velocity: number;
+    }) => {
+      if (views.tree.length === 0) {
+        return null;
+      }
+
+      // If there is only a single predicate, no need to provide all the
+      // extra information around "grouped predicate sets".
+      if (views.tree.length === 1) {
+        return (
+          <DirRecursive
+            level={[views.tree[0].root]}
+            getNext={mkGetChildren(views.tree[0])}
+          />
+        );
+      }
+
+      const [hovered, setHovered] = useState(false);
+      const onHover = () => {
+        MiniBufferDataStore.set({
+          kind: "argus-note",
+          data: (
+            <p>
+              The outlined obligations must be resolved <b>together</b>
+            </p>
+          )
+        });
+        setHovered(true);
+      };
+
+      const onNoHover = () => {
+        MiniBufferDataStore.reset();
+        setHovered(false);
+      };
+
+      return (
+        <div className={classNames("FailingSet", { "is-hovered": hovered })}>
+          <IcoComment onMouseEnter={onHover} onMouseLeave={onNoHover} />
+          {_.map(views.tree, (leaf, i) => (
+            <DirRecursive
+              key={i}
+              level={[leaf.root]}
+              getNext={mkGetChildren(leaf)}
+            />
+          ))}
+        </div>
+      );
+    }
+  );
+
+  const tail = _.slice(views, 3);
+  const argusViews = _.map(_.slice(views, 0, 3), (v, i) => (
+    <MkLevel {...v} key={i} />
+  ));
+  const fallbacks =
+    tail.length === 0 ? null : (
+      <CollapsibleElement
+        info={<span id="hidden-failure-list">Other failures ...</span>}
+        Children={() => _.map(tail, (v, i) => <MkLevel {...v} key={i} />)}
+      />
+    );
+
+  return (
+    <TreeAppContext.TreeRenderContext.Provider value={BottomUpRenderParams}>
+      <div id="recommended-failure-list">{argusViews}</div>
+      {fallbacks}
+    </TreeAppContext.TreeRenderContext.Provider>
+  );
+};
+
 const FailedSubsets = () => {
   const tree = useContext(TreeAppContext.TreeContext)!;
   const evaluationMode =
     useContext(AppContext.ConfigurationContext)?.evalMode ?? "release";
+  const sets = sortedSubsets(tree.failedSets);
 
-  const flattenSets = (sets: SetHeuristic[]) =>
-    _.flatten(
-      _.map(sets, h =>
-        invertViewWithRoots(
+  const makeSets = (sets: SetHeuristic[]) =>
+    _.map(sets, h => {
+      return {
+        tree: invertViewWithRoots(
           _.map(h.goals, g => g.idx),
           tree
-        )
+        ),
+        inertia: setInertia(h),
+        velocity: h.velocity,
+        momentum: h.momentum
+      };
+    });
+
+  if (evaluationMode === "release") {
+    return <RenderBottomUpSets views={makeSets(sets)} />;
+  }
+
+  const flattenSets = (sets: SetHeuristic[]) =>
+    _.flatMap(sets, h =>
+      invertViewWithRoots(
+        _.map(h.goals, g => g.idx),
+        tree
       )
     );
 
-  const sets = sortedSubsets(tree.failedSets);
+  // Flatten all the sets and return them as a list.
   const suggestedPredicates = flattenSets(_.slice(sets, 0, 3));
   const others = flattenSets(_.slice(sets, 3));
-
   return (
     <BottomUpImpersonator
       recommended={suggestedPredicates}

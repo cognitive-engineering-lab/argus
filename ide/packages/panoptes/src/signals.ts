@@ -2,6 +2,7 @@ import type { DefinedPath, TyVal } from "@argus/common/bindings";
 import type { ErrorJumpTargetInfo } from "@argus/common/lib";
 import type { TypeContext } from "@argus/print/context";
 import { action, makeObservable, observable } from "mobx";
+import type { ReactElement } from "react";
 
 class HighlightTargetStore {
   value?: ErrorJumpTargetInfo;
@@ -26,10 +27,14 @@ class HighlightTargetStore {
 
 export const highlightedObligation = new HighlightTargetStore();
 
-export type BufferDataKind = {
-  pinned?: boolean;
-  ctx: TypeContext;
-} & (
+// MiniBuffer data that should *not* rely on type context
+type DataNoCtx = {
+  kind: "argus-note";
+  data: ReactElement;
+};
+
+// MiniBuffer data that *must* provide type context
+type DataWithCtx = { ctx: TypeContext } & (
   | {
       kind: "path";
       path: DefinedPath;
@@ -40,6 +45,8 @@ export type BufferDataKind = {
       projection: TyVal;
     }
 );
+
+export type BufferDataKind = { pinned?: boolean } & (DataWithCtx | DataNoCtx);
 
 class MiniBufferData {
   data?: BufferDataKind;
