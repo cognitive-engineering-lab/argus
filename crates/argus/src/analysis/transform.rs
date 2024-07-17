@@ -232,14 +232,13 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       // Filter down the set of obligations as much as possible.
       //
       // 1. Remove obligations that shouldn't have been checked. (I.e., a failed
-      // precondition dissalows it from succeeding.) Hopefully, in the future these
+      // precondition dissallows it from succeeding.) Hopefully, in the future these
       // aren't even solved for.
       retain_error_sources(
         &mut obligations,
         |&i| gfdata(i).result,
         |&i| gfdata(i).obligation.predicate,
         |_| self.tcx,
-        |&a, &b| a == b,
       );
 
       retain_method_calls(
@@ -247,7 +246,6 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         |&i| gfdata(i).result,
         |&i| gfdata(i).obligation.predicate,
         |_| self.tcx,
-        |&a, &b| a == b,
       );
 
       let obligations = obligations

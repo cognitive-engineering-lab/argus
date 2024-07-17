@@ -8,6 +8,7 @@ use rustc_middle::ty::{self, Predicate, TyCtxt, TypeVisitable, TypeckResults};
 use rustc_span::{FileName, Span};
 use rustc_trait_selection::solve::inspect::InspectCandidate;
 use rustc_utils::source_map::range::CharRange;
+use smallvec::SmallVec;
 
 use crate::EvaluationResult;
 
@@ -101,6 +102,56 @@ pub trait VarCounterExt<'tcx>: TypeVisitable<TyCtxt<'tcx>> {
   fn count_vars(self, tcx: TyCtxt<'tcx>) -> usize;
 }
 
+fn make_failing_bound_implicationp<'a, 'tcx, T>(
+  items: &'a [(usize, &T)],
+  get_predicate: impl Fn(&T) -> Predicate<'tcx> + 'a,
+  get_tcx: impl Fn(&T) -> TyCtxt<'tcx> + 'a,
+) -> impl Fn((usize, &T)) -> bool + 'a {
+  move |(i, other): (usize, &T)| {
+    items.iter().any(|&(j, bound)| {
+      let poly_tp = get_predicate(bound).expect_trait_predicate();
+      if i != j // Don't consider reflexive implication
+        && let ty::TraitPredicate {
+          trait_ref,
+          polarity: ty::PredicatePolarity::Positive,
+        } = poly_tp.skip_binder()
+      {
+        get_tcx(other).does_trait_ref_occur_in(
+          poly_tp.rebind(trait_ref),
+          get_predicate(other),
+        )
+      } else {
+        false
+      }
+    })
+  }
+}
+
+/// If possible, use `retain_error_sources` which sorts and filters in place.
+pub fn identify_error_sources<'tcx, T>(
+  all_items: &[T],
+  get_result: impl Fn(&T) -> EvaluationResult,
+  get_predicate: impl Fn(&T) -> Predicate<'tcx>,
+  get_tcx: impl Fn(&T) -> TyCtxt<'tcx>,
+) -> impl Iterator<Item = usize> + '_ {
+  let (trait_preds, _): (Vec<(usize, &T)>, _) =
+    all_items.iter().enumerate().partition(|(_, t)| {
+      !get_result(t).is_yes() && get_predicate(t).is_trait_predicate()
+    });
+
+  let is_implied_by_failing_bound =
+    make_failing_bound_implicationp(&trait_preds, get_predicate, get_tcx);
+
+  let mut to_keep = SmallVec::<[_; 8]>::default();
+  for t in all_items.iter().enumerate() {
+    if !is_implied_by_failing_bound(t) {
+      to_keep.push(t.0);
+    }
+  }
+
+  to_keep.into_iter()
+}
+
 /// Select only the items that are not implied by another failing bound.
 ///
 /// ## Example:
@@ -116,7 +167,6 @@ pub fn retain_error_sources<'tcx, T>(
   get_result: impl Fn(&T) -> EvaluationResult,
   get_predicate: impl Fn(&T) -> Predicate<'tcx>,
   get_tcx: impl Fn(&T) -> TyCtxt<'tcx>,
-  eq: impl Fn(&T, &T) -> bool,
 ) {
   if all_items.is_empty() {
     return;
@@ -127,33 +177,24 @@ pub fn retain_error_sources<'tcx, T>(
   });
 
   let (trait_preds, _) = all_items.split_at(idx);
+  let trait_preds_enumerated =
+    trait_preds.iter().enumerate().collect::<SmallVec<[_; 8]>>();
 
-  let is_implied_by_failing_bound = |other: &T| {
-    trait_preds.iter().any(|bound| {
-      let poly_tp = get_predicate(bound).expect_trait_predicate();
-      if let ty::TraitPredicate {
-        trait_ref,
-        polarity: ty::PredicatePolarity::Positive,
-      } = poly_tp.skip_binder()
-      // Don't consider reflexive implication
-        && !eq(bound, other)
-      {
-        get_tcx(other).does_trait_ref_occur_in(
-          poly_tp.rebind(trait_ref),
-          get_predicate(other),
-        )
-      } else {
-        false
-      }
-    })
-  };
+  let is_implied_by_failing_bound = make_failing_bound_implicationp(
+    &trait_preds_enumerated,
+    get_predicate,
+    get_tcx,
+  );
 
   let to_remove = &mut vec![];
-  for (i, here) in all_items.iter().enumerate() {
-    if is_implied_by_failing_bound(here) {
-      to_remove.push(i);
+  for t in all_items.iter().enumerate() {
+    if is_implied_by_failing_bound(t) {
+      to_remove.push(t.0);
     }
   }
+
+  drop(is_implied_by_failing_bound);
+  drop(trait_preds_enumerated);
 
   for i in to_remove.iter().rev() {
     all_items.remove(*i);
@@ -165,7 +206,6 @@ pub fn retain_method_calls<'tcx, T>(
   _get_result: impl Fn(&T) -> EvaluationResult,
   get_predicate: impl Fn(&T) -> Predicate<'tcx>,
   get_tcx: impl Fn(&T) -> TyCtxt<'tcx>,
-  _eq: impl Fn(&T, &T) -> bool,
 ) {
   if all_items.is_empty() {
     return;

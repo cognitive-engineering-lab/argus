@@ -297,7 +297,6 @@ impl<'a, 'tcx> Candidate<'a, 'tcx> {
       |g| g.result,
       |g| g.goal.predicate,
       |g| g.infcx.tcx,
-      |a, b| a.idx == b.idx,
     );
 
     all_goals.into_iter()
