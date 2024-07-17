@@ -17,7 +17,7 @@ jobs:
           use-tool-cache: true
       - name: Setup
         uses: ./.github/workflows/setup
-      - run: cargo ws publish --from-git --publish-as-is --yes --token ${{ secrets.CRATES_IO }}
+      - run: cargo ws publish skip --from-git --yes --token ${{ secrets.CRATES_IO }}
 
   publish-ide:
     runs-on: ubuntu-latest
