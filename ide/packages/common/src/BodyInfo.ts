@@ -26,10 +26,6 @@ class BodyInfo {
     return this.oib.ambiguityErrors.length + this.oib.traitErrors.length;
   }
 
-  get exprs(): ExprIdx[] {
-    return _.map(this.oib.exprs, (_, idx) => idx);
-  }
-
   get name() {
     return this.oib.name;
   }
@@ -49,6 +45,7 @@ class BodyInfo {
   get tyInterner() {
     return this.oib.tys;
   }
+
   notHidden(hash: ObligationIdx): boolean {
     const o = this.getObligation(hash);
     if (o === undefined) {
@@ -57,8 +54,12 @@ class BodyInfo {
     return this.showHidden || isHiddenObl(o);
   }
 
+  exprs(): ExprIdx[] {
+    return _.map(this.oib.exprs, (_, idx) => idx);
+  }
+
   hasVisibleExprs() {
-    return _.some(this.exprs, idx => this.hasVisibleObligations(idx));
+    return _.some(this.exprs(), idx => this.hasVisibleObligations(idx));
   }
 
   hasVisibleObligations(idx: ExprIdx) {

@@ -49,8 +49,11 @@ const TreeApp = ({
   const tabs: [string, React.FC][] = [["Top Down", TopDown]];
 
   if (treeInfo.errorLeaves().length > 0) {
-    tabs.unshift(["Help Me", Erotisi]);
+    // Unshift to place this first
     tabs.unshift(["Bottom Up", FailedSubsets]);
+
+    // Push to place this last
+    tabs.push(["Help Me", Erotisi]);
   }
 
   // HACK: we shouldn't test for eval mode here but Playwright is off on the button click.

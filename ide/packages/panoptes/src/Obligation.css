@@ -1,3 +1,11 @@
 .ObligationCard > vscode-text-area {
     display: block;
 }
+
+.TreeAppObligationWrapper {
+    background-color: var(--vscode-editor-selectionHighlightBackground);
+    border-radius: 3px;
+    padding: 0.15em;
+
+    margin-bottom: 0.5em;
+}

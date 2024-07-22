@@ -667,7 +667,7 @@ export const PrintOpaqueImplType = ({ o }: { o: OpaqueImpl }) => {
       : null;
 
   const start =
-    implComponents.length === 0 && sized === "" ? "{opaque}" : "impl ";
+    implComponents.length === 0 && sized === "" ? "{opaque}" : `impl${nbsp}`;
 
   return (
     <>
