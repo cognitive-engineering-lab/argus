@@ -50,18 +50,22 @@ export const RenderBottomUpSets = ({
         return null;
       }
 
+      const [hovered, setHovered] = useState(false);
+      const cn = classNames("FailingSet", { "is-hovered": hovered });
+
       // If there is only a single predicate, no need to provide all the
       // extra information around "grouped predicate sets".
       if (views.tree.length === 1) {
         return (
-          <DirRecursive
-            level={[views.tree[0].root]}
-            getNext={mkGetChildren(views.tree[0])}
-          />
+          <div className={cn}>
+            <DirRecursive
+              level={[views.tree[0].root]}
+              getNext={mkGetChildren(views.tree[0])}
+            />
+          </div>
         );
       }
 
-      const [hovered, setHovered] = useState(false);
       const onHover = () => {
         MiniBufferDataStore.set({
           kind: "argus-note",
@@ -80,7 +84,7 @@ export const RenderBottomUpSets = ({
       };
 
       return (
-        <div className={classNames("FailingSet", { "is-hovered": hovered })}>
+        <div className={cn}>
           <IcoComment onMouseEnter={onHover} onMouseLeave={onNoHover} />
           {_.map(views.tree, (leaf, i) => (
             <DirRecursive
@@ -94,21 +98,25 @@ export const RenderBottomUpSets = ({
     }
   );
 
-  const tail = _.slice(views, 3);
-  const argusViews = _.map(_.slice(views, 0, 3), (v, i) => (
-    <MkLevel {...v} key={i} />
-  ));
+  const argusRecommends = <MkLevel {..._.head(views)!} />;
+  const tail = _.tail(views);
+
+  const otherLabel = "Other failures";
   const fallbacks =
     tail.length === 0 ? null : (
       <CollapsibleElement
-        info={<span id="hidden-failure-list">Other failures ...</span>}
+        info={<span id="hidden-failure-list">{otherLabel} ...</span>}
         Children={() => _.map(tail, (v, i) => <MkLevel {...v} key={i} />)}
       />
     );
 
   return (
     <TreeAppContext.TreeRenderContext.Provider value={BottomUpRenderParams}>
-      <div id="recommended-failure-list">{argusViews}</div>
+      <p>
+        Argus recommends investigating these failed oblgiations. Click on ’
+        {otherLabel}‘ below to see other failed obligations.
+      </p>
+      <div id="recommended-failure-list">{argusRecommends}</div>
       {fallbacks}
     </TreeAppContext.TreeRenderContext.Provider>
   );

@@ -59,7 +59,7 @@ const ObligationBody = observer(({ bodyInfo }: { bodyInfo: BodyInfo }) => {
         info={header}
         startOpen={openChildren}
         Children={() =>
-          _.map(bodyInfo.exprs, (i, idx) => <Expr idx={i} key={idx} />)
+          _.map(bodyInfo.exprs(), (i, idx) => <Expr idx={i} key={idx} />)
         }
       />
     </BodyInfoContext.Provider>

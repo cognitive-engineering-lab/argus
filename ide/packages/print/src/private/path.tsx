@@ -79,11 +79,11 @@ export const PrintDefPath = ({ o }: { o: DefinedPath }) => {
           <Angled>
             <Toggle
               summary=".."
-              Children={() => <PrintPathSegment o={o[0]} />}
+              Children={() => <PrintDefPath o={o[0].inner} />}
             />
           </Angled>
         )}
-        Rest={() => <PrintSegments o={_.slice(o, 1)} />}
+        Rest={() => <PrintSegments o={_.tail(o)} />}
       />
     );
   };
@@ -192,7 +192,7 @@ const PrintInToggleableEnvironment = ({
   bypassToggle,
   Elem
 }: { bypassToggle: boolean; Elem: React.FC }) => {
-  // Use a metric of "type size" rather than inner lenght.
+  // Use a metric of "type size" rather than inner length.
   const useToggle = useContext(AllowToggle) && bypassToggle;
   return (
     // TODO: do we want to allow nested toggles?
