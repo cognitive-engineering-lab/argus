@@ -1,6 +1,5 @@
 import type { BodyHash, ExprIdx, ObligationHash } from "@argus/common/bindings";
 import type { Filename } from "@argus/common/lib";
-import type * as lc from "vscode-languageclient/node";
 
 import type { Cmd, Ctx } from "./ctx";
 import * as errors from "./errors";
@@ -15,11 +14,6 @@ export function inspect(ctx: Ctx): Cmd {
     trace("inspect");
     ctx.inspectAt();
   };
-}
-
-interface RustAnalyzerExtensionApi {
-  // FIXME: this should be non-optional
-  readonly client?: lc.LanguageClient;
 }
 
 export function pinMBData(ctx: Ctx): Cmd {
