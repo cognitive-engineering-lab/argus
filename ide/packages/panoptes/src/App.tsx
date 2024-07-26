@@ -19,7 +19,8 @@ import {
 import { IcoComment } from "@argus/print/Icons";
 import {
   DefPathRender,
-  DefinitionAction,
+  LocationActionable,
+  type LocationActionableProps,
   ProjectionPathRender,
   TyCtxt
 } from "@argus/print/context";
@@ -30,12 +31,12 @@ import React, { useEffect, useState } from "react";
 import FillScreen, { Spacer } from "./FillScreen";
 
 import "./App.css";
-import type { DefinedPath } from "@argus/common/bindings";
 import type {
   DefPathRenderProps,
   ProjectPathRenderProps
 } from "@argus/print/context";
 import { PrintTyValue } from "@argus/print/lib";
+import classNames from "classnames";
 import MiniBuffer from "./MiniBuffer";
 import Workspace from "./Workspace";
 import { MiniBufferDataStore, highlightedObligation } from "./signals";
@@ -103,17 +104,91 @@ function listener(
   }
 }
 
+interface EventWithKeys {
+  ctrlKey: boolean;
+  metaKey: boolean;
+}
+
 /**
- * Path renderer that puts full path definitions into the mini-buffer.
+ * Check if the Ctrl or Meta key is pressed, used for jump to definition.
+ */
+const selectKeys = ({ ctrlKey, metaKey }: EventWithKeys) => ctrlKey || metaKey;
+
+const mkLocationActionable =
+  (system: MessageSystem) =>
+  ({ children, location }: LocationActionableProps) => {
+    const [hovered, setHovered] = useState(false);
+    const [metaPressed, setMetaPressed] = useState(false);
+
+    // FIXME: this doesn't seem like the best way to catch key presses for jump to definition.
+    useEffect(() => {
+      const keyDownListener = (ev: KeyboardEvent) =>
+        setMetaPressed(selectKeys(ev));
+      const keyUpListener = (ev: KeyboardEvent) =>
+        setMetaPressed(selectKeys(ev));
+
+      window.addEventListener("keydown", keyDownListener);
+      window.addEventListener("keyup", keyUpListener);
+
+      return () => {
+        window.removeEventListener("keydown", keyDownListener);
+        window.removeEventListener("keyup", keyUpListener);
+      };
+    }, []);
+
+    // Hover actions for the entire path that allow jump to definition.
+    const setHover = (ev: React.MouseEvent) => {
+      // If the meta key was pressed outside of the window, we can catch it here as well.
+      setMetaPressed(selectKeys(ev));
+      setHovered(true);
+    };
+    const resetHover = () => setHovered(false);
+
+    const click = (event: React.MouseEvent) => {
+      if (selectKeys(event)) {
+        event.preventDefault();
+        event.stopPropagation();
+        system.postData({
+          type: "FROM_WEBVIEW",
+          command: "jump-to-def",
+          location
+        });
+      }
+    };
+
+    // Only allow the extra classes if there's not a location to jump to
+    const cn = classNames("DefinitionWrapper", {
+      hovered: location !== undefined && hovered,
+      "meta-pressed": location !== undefined && metaPressed
+    });
+
+    return (
+      // biome-ignore lint/a11y/useKeyWithClickEvents: TODO
+      <span
+        className={cn}
+        onClick={click}
+        onMouseEnter={setHover}
+        onMouseLeave={resetHover}
+      >
+        {children}
+      </span>
+    );
+  };
+
+/**
+ * Create a path renderer that puts full path definitions into the mini-buffer.
  */
 const CustomPathRenderer = observer(
   ({ fullPath, ctx, Head, Rest }: DefPathRenderProps) => {
-    const setStore = () =>
+    // Hover actions for the Head symbol that show the full definition in the minibuffer.
+    const setMB = () =>
       MiniBufferDataStore.set({ kind: "path", path: fullPath, ctx });
-    const resetStore = () => MiniBufferDataStore.reset();
+    const resetMB = () => MiniBufferDataStore.reset();
+    // The click even and styling applying to the entire path, but the Symbol definition
+    // in the MiniBuffer only applies to the Head segment.
     return (
       <>
-        <span onMouseEnter={setStore} onMouseLeave={resetStore}>
+        <span onMouseEnter={setMB} onMouseLeave={resetMB}>
           {Head}
         </span>
         {Rest}
@@ -148,24 +223,6 @@ const CustomProjectionRender = observer(
     );
   }
 );
-
-const mkOnDefinitionClick = (system: MessageSystem) => (def: DefinedPath) => {
-  if (def.l === undefined) {
-    return () => {};
-  }
-  const location = def.l;
-  return (event: React.MouseEvent) => {
-    if (event.ctrlKey || event.metaKey) {
-      event.preventDefault();
-      event.stopPropagation();
-      system.postData({
-        type: "FROM_WEBVIEW",
-        command: "jump-to-def",
-        location
-      });
-    }
-  };
-};
 
 const App = observer(({ config }: { config: PanoptesConfig }) => {
   const [openFiles, setOpenFiles] = useState(buildInitialData(config));
@@ -218,16 +275,16 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
       <AppContext.SystemSpecContext.Provider value={systemSpec}>
         <AppContext.MessageSystemContext.Provider value={messageSystem}>
           <AppContext.ShowHiddenObligationsContext.Provider value={showHidden}>
-            <DefinitionAction.Provider
-              value={mkOnDefinitionClick(messageSystem)}
-            >
-              <DefPathRender.Provider value={CustomPathRenderer}>
-                <ProjectionPathRender.Provider value={CustomProjectionRender}>
+            <DefPathRender.Provider value={CustomPathRenderer}>
+              <ProjectionPathRender.Provider value={CustomProjectionRender}>
+                <LocationActionable.Provider
+                  value={mkLocationActionable(messageSystem)}
+                >
                   <Workspace files={openFiles} reset={resetState} />
                   <FillScreen />
-                </ProjectionPathRender.Provider>
-              </DefPathRender.Provider>
-            </DefinitionAction.Provider>
+                </LocationActionable.Provider>
+              </ProjectionPathRender.Provider>
+            </DefPathRender.Provider>
           </AppContext.ShowHiddenObligationsContext.Provider>
         </AppContext.MessageSystemContext.Provider>
       </AppContext.SystemSpecContext.Provider>

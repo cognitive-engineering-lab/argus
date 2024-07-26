@@ -1,4 +1,9 @@
-import type { DefinedPath, Ty, TyVal } from "@argus/common/bindings";
+import type {
+  DefLocation,
+  DefinedPath,
+  Ty,
+  TyVal
+} from "@argus/common/bindings";
 import { createContext } from "react";
 import React, { type ReactElement } from "react";
 import { PrintTyValue } from "./private/ty";
@@ -15,12 +20,16 @@ export interface TypeContext {
 
 export const TyCtxt = createContext<TypeContext | undefined>(undefined);
 
-// -----------------------------------------
-// Definition item options
+// -------------------------------
+// Location actionable by the user
 
-export const DefinitionAction = createContext<
-  (defId: DefinedPath) => React.MouseEventHandler
->(_d => () => null);
+export type LocationActionableProps = React.PropsWithChildren<{
+  location: DefLocation;
+}>;
+
+export const LocationActionable = createContext<
+  React.FC<LocationActionableProps>
+>(({ children }) => children);
 
 // -----------------------------------------
 // Render options for a definition path

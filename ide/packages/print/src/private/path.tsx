@@ -7,7 +7,7 @@ import {
   AllowPathTrim,
   AllowToggle,
   DefPathRender,
-  DefinitionAction,
+  LocationActionable,
   TyCtxt
 } from "../context";
 import { Angled, CommaSeparated, Kw, nbsp } from "./syntax";
@@ -42,20 +42,6 @@ function pruneToShortPath(o: DefPath): [DefPath, DefPath] {
   return [[prefix[0]], _.slice(prefix, 1)];
 }
 
-export const PrintDefinitionPath = ({ o }: { o: DefinedPath }) => {
-  if (o.path.length === 0) {
-    return null;
-  }
-
-  const action = useContext(DefinitionAction)(o);
-  return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: it is what it is
-    <span onClick={action}>
-      <PrintDefPath o={o.path} />
-    </span>
-  );
-};
-
 export const PrintValuePath = ({ o }: { o: DefinedPath }) => {
   return <PrintDefinitionPath o={o} />;
 };
@@ -63,18 +49,26 @@ export const PrintValuePath = ({ o }: { o: DefinedPath }) => {
 // NOTE: when we aren't hovering over the path, we just
 // want to show the last segment. On hover, it should be the fully
 // qualified path. (At least that's the current idea.)
-const PrintDefPath = ({ o }: { o: DefPath }) => {
-  if (o.length === 0) {
+export const PrintDefinitionPath = ({ o }: { o: DefinedPath }) => {
+  if (o.path.length === 0) {
     return null;
   }
 
   const tyCtxt = useContext(TyCtxt)!;
   const toggle = useContext(AllowPathTrim);
   if (!toggle) {
-    return <PrintDefPathFull o={o} />;
+    return <PrintDefPathFull o={o.path} />;
   }
 
   const PrintCustomDefPath = useContext(DefPathRender);
+  const LocationAction = useContext(LocationActionable);
+  const location = o.l;
+  const LocationWrapper =
+    location === undefined
+      ? React.Fragment
+      : ({ children }: React.PropsWithChildren) => (
+          <LocationAction location={location}>{children}</LocationAction>
+        );
 
   const PrintAsGenericPath = ({
     Prefix,
@@ -84,12 +78,14 @@ const PrintDefPath = ({ o }: { o: DefPath }) => {
     Rest: React.FC;
   }) => {
     return (
-      <PrintCustomDefPath
-        ctx={tyCtxt}
-        fullPath={{ path: o }}
-        Head={<Prefix />}
-        Rest={<Rest />}
-      />
+      <LocationWrapper>
+        <PrintCustomDefPath
+          ctx={tyCtxt}
+          fullPath={o}
+          Head={<Prefix />}
+          Rest={<Rest />}
+        />
+      </LocationWrapper>
     );
   };
 
@@ -104,7 +100,7 @@ const PrintDefPath = ({ o }: { o: DefPath }) => {
           <Angled>
             <Toggle
               summary=".."
-              Children={() => <PrintDefPath o={o[0].inner} />}
+              Children={() => <PrintDefinitionPath o={{ path: o[0].inner }} />}
             />
           </Angled>
         )}
@@ -113,11 +109,11 @@ const PrintDefPath = ({ o }: { o: DefPath }) => {
     );
   };
 
-  return isAssociatedType(o) ? (
-    <PrintAsAssociatedType o={o} />
+  return isAssociatedType(o.path) ? (
+    <PrintAsAssociatedType o={o.path} />
   ) : (
     (() => {
-      const [prefix, rest] = pruneToShortPath(o);
+      const [prefix, rest] = pruneToShortPath(o.path);
       return (
         <PrintAsGenericPath
           Prefix={() => <PrintSegments o={prefix} />}
@@ -185,7 +181,7 @@ export const PrintPathSegment = ({ o }: { o: PathSegment }) => {
       return (
         <PrintInToggleableEnvironment
           bypassToggle={o.inner.length > 3}
-          Elem={() => <PrintDefPath o={o.inner} />}
+          Elem={() => <PrintDefinitionPath o={{ path: o.inner }} />}
         />
       );
     }

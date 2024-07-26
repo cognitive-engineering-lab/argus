@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use rustc_hir::{
   def_id::DefId,
   definitions::{DefPathDataName, DisambiguatedDefPathData},
@@ -73,36 +71,6 @@ pub struct BasicPathNoArgs<'tcx>(DefinedPath<'tcx>);
 impl<'tcx> BasicPathNoArgs<'tcx> {
   pub fn new(def_id: DefId) -> Self {
     Self(PathBuilder::compile_value_path(def_id, &[]))
-  }
-}
-
-#[derive(Serialize)]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-/// A `DefLocation` definition equivalent to that provided by VSCode's LSP.
-struct DefLocation {
-  r: CharRange,
-  f: PathBuf,
-}
-
-impl DefLocation {
-  fn from_span(span: rustc_span::Span) -> Option<Self> {
-    use rustc_span::{FileName, RealFileName};
-    InferCtxt::access(|infcx| {
-      let tcx = infcx.tcx;
-      let source_map = tcx.sess.source_map();
-      let r = CharRange::from_span(span, source_map).ok()?;
-      let f = match &source_map.lookup_source_file(span.lo()).name {
-        FileName::Real(RealFileName::LocalPath(filename))
-        | FileName::Real(RealFileName::Remapped {
-          local_path: Some(filename),
-          ..
-        }) => filename.clone(),
-        _ => return None,
-      };
-
-      Some(Self { r, f })
-    })
   }
 }
 
@@ -204,13 +172,11 @@ pub enum CommaSeparatedKind {
 
 impl<'tcx> From<PathBuilder<'tcx>> for DefinedPath<'tcx> {
   fn from(builder: PathBuilder<'tcx>) -> Self {
-    InferCtxt::access(|infcx| {
-      let l = DefLocation::from_span(infcx.tcx.def_span(builder.def_id));
-      DefinedPath {
-        path: builder.segments,
-        l,
-      }
-    })
+    let l = DefLocation::from_def_id(builder.def_id);
+    DefinedPath {
+      path: builder.segments,
+      l,
+    }
   }
 }
 

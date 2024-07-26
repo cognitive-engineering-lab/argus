@@ -182,7 +182,7 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
     &mut self,
     tcx: ty::TyCtxt<'tcx>,
     candidate_idx: ProofNodeIdx,
-    candidate: InspectCandidate<'_, 'tcx>,
+    candidate: &InspectCandidate<'_, 'tcx>,
   ) -> <Self as ProofTreeVisitor<'tcx>>::Result {
     use crate::aadebug::tree as dgb_tree;
 
@@ -202,7 +202,7 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
     let get_result: &dyn for<'a> Fn(&'a ProofNodeIdx) -> EvaluationResult =
       &|&idx| match self.aadebug.ns[idx] {
         dgb_tree::N::R { result, .. } => result,
-        _ => unreachable!(),
+        dgb_tree::N::C { .. } => unreachable!(),
       };
 
     let error_sources = argus_ext::ty::identify_error_sources(
@@ -210,7 +210,7 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
       get_result,
       |&idx| match self.aadebug.ns[idx] {
         dgb_tree::N::R { goal, .. } => goal.predicate,
-        _ => unreachable!(),
+        dgb_tree::N::C { .. } => unreachable!(),
       },
       move |_| tcx,
     )
@@ -218,11 +218,10 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
 
     for (i, subgoal) in subgoals.into_iter().enumerate() {
       if get_result(&subgoal).is_no() && !error_sources.contains(&i) {
-        self
-          .topology
-          .children
-          .get_mut(&candidate_idx)
-          .map(|v| v.retain(|&n| n != subgoal));
+        if let Some(v) = self.topology.children.get_mut(&candidate_idx) {
+          v.retain(|&n| n != subgoal);
+        }
+
         self.topology.parent.remove(&subgoal);
       }
     }
@@ -280,7 +279,7 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
       self.topology.add(here_idx, candidate_idx);
       self.previous = Some(candidate_idx);
 
-      self.visit_nested_roots(goal.infcx().tcx, candidate_idx, c);
+      self.visit_nested_roots(goal.infcx().tcx, candidate_idx, &c);
 
       // FIXME: is this necessary now that we store all nodes?
       add_result_if_empty(self, candidate_idx);
