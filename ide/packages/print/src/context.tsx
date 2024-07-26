@@ -15,18 +15,27 @@ export interface TypeContext {
 
 export const TyCtxt = createContext<TypeContext | undefined>(undefined);
 
-export const DefPathRender = createContext(
-  ({
-    fullPath: _fp,
-    ctx: _ctx,
-    Head,
-    Rest
-  }: {
-    ctx: TypeContext;
-    fullPath: DefinedPath;
-    Head: ReactElement;
-    Rest: ReactElement;
-  }) => (
+// -----------------------------------------
+// Definition item options
+
+export const DefinitionAction = createContext<
+  (defId: DefinedPath) => React.MouseEventHandler
+>(_d => () => null);
+
+// -----------------------------------------
+// Render options for a definition path
+
+export type DefPathRenderProps = {
+  ctx: TypeContext;
+  fullPath: DefinedPath;
+  Head: ReactElement;
+  Rest: ReactElement;
+};
+
+export type DefPathRenderPropsKind = React.FC<DefPathRenderProps>;
+
+export const DefPathRender = createContext<React.FC<DefPathRenderProps>>(
+  ({ Head, Rest }) => (
     <>
       {Head}
       {Rest}
@@ -34,14 +43,15 @@ export const DefPathRender = createContext(
   )
 );
 
-export const ProjectionPathRender = createContext(
-  ({
-    original,
-    projection: _prj,
-    ctx: _ctx
-  }: {
-    ctx: TypeContext;
-    original: TyVal;
-    projection: TyVal;
-  }) => <PrintTyValue o={original} />
-);
+// -----------------------------------------
+// Render options for a type projection path
+
+export type ProjectPathRenderProps = {
+  ctx: TypeContext;
+  original: TyVal;
+  projection: TyVal;
+};
+
+export const ProjectionPathRender = createContext<
+  React.FC<ProjectPathRenderProps>
+>(({ original }) => <PrintTyValue o={original} />);

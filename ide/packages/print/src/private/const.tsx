@@ -7,7 +7,7 @@ import type {
 } from "@argus/common/bindings";
 import React from "react";
 
-import { PrintDefPath, PrintValuePath } from "./path";
+import { PrintDefinitionPath, PrintValuePath } from "./path";
 import { DBraced, Placeholder } from "./syntax";
 import { PrintExpr, PrintValueTree } from "./term";
 import { PrintBoundVariable, PrintSymbol } from "./ty";
@@ -60,7 +60,7 @@ const PrintUnevaluatedConst = ({ o }: { o: UnevaluatedConst }) => {
         <>
           <PrintSymbol o={o.krate} />
           ::
-          <PrintDefPath o={o.path} />
+          <PrintDefinitionPath o={o.path} />
         </>
       );
     }

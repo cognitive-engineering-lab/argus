@@ -3,20 +3,31 @@ import { isNamedGenericArg, takeRightUntil } from "@argus/common/func";
 import _ from "lodash";
 import React, { useContext } from "react";
 import { Toggle } from "../Toggle";
-import { AllowPathTrim, AllowToggle, DefPathRender, TyCtxt } from "../context";
+import {
+  AllowPathTrim,
+  AllowToggle,
+  DefPathRender,
+  DefinitionAction,
+  TyCtxt
+} from "../context";
 import { Angled, CommaSeparated, Kw, nbsp } from "./syntax";
 import { PrintGenericArg, PrintTy } from "./ty";
+
+// A `DefinedPath` includes extra information about the definition location.
+// In some of the printing functions they only care about the path itself, and
+// these other things are added on at the *top-level*.
+type DefPath = PathSegment[];
 
 // Special case the printing for associated types. Things that look like
 // `<Type as Trait>::AssocType`, we want to print this as `<...>::AssocType` so that
 // people can visually see that this is an associated type.
 function isAssociatedType(
-  o: DefinedPath
-): o is [PathSegment & { type: "GenericDelimiters" }, ...DefinedPath] {
+  o: DefPath
+): o is [PathSegment & { type: "GenericDelimiters" }, ...DefPath] {
   return o.length > 1 && o[0].type === "GenericDelimiters";
 }
 
-function pruneToShortPath(o: DefinedPath): [DefinedPath, DefinedPath] {
+function pruneToShortPath(o: DefPath): [DefPath, DefPath] {
   // Take the rightmost segments that form a full "path".
   const prefix = takeRightUntil(
     o,
@@ -31,14 +42,28 @@ function pruneToShortPath(o: DefinedPath): [DefinedPath, DefinedPath] {
   return [[prefix[0]], _.slice(prefix, 1)];
 }
 
+export const PrintDefinitionPath = ({ o }: { o: DefinedPath }) => {
+  if (o.path.length === 0) {
+    return null;
+  }
+
+  const action = useContext(DefinitionAction)(o);
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: it is what it is
+    <span onClick={action}>
+      <PrintDefPath o={o.path} />
+    </span>
+  );
+};
+
 export const PrintValuePath = ({ o }: { o: DefinedPath }) => {
-  return <PrintDefPath o={o} />;
+  return <PrintDefinitionPath o={o} />;
 };
 
 // NOTE: when we aren't hovering over the path, we just
 // want to show the last segment. On hover, it should be the fully
 // qualified path. (At least that's the current idea.)
-export const PrintDefPath = ({ o }: { o: DefinedPath }) => {
+const PrintDefPath = ({ o }: { o: DefPath }) => {
   if (o.length === 0) {
     return null;
   }
@@ -61,7 +86,7 @@ export const PrintDefPath = ({ o }: { o: DefinedPath }) => {
     return (
       <PrintCustomDefPath
         ctx={tyCtxt}
-        fullPath={o}
+        fullPath={{ path: o }}
         Head={<Prefix />}
         Rest={<Rest />}
       />
@@ -71,7 +96,7 @@ export const PrintDefPath = ({ o }: { o: DefinedPath }) => {
   const PrintAsAssociatedType = ({
     o
   }: {
-    o: [PathSegment & { type: "GenericDelimiters" }, ...DefinedPath];
+    o: [PathSegment & { type: "GenericDelimiters" }, ...DefPath];
   }) => {
     return (
       <PrintAsGenericPath
@@ -103,13 +128,12 @@ export const PrintDefPath = ({ o }: { o: DefinedPath }) => {
   );
 };
 
-export const PrintDefPathFull = ({ o }: { o: DefinedPath }) => {
-  return <PrintSegments o={o} />;
-};
+export const PrintDefPathFull = ({ o }: { o: DefPath }) => (
+  <PrintSegments o={o} />
+);
 
-const PrintSegments = ({ o }: { o: PathSegment[] }) => {
-  return _.map(o, (segment, i) => <PrintPathSegment o={segment} key={i} />);
-};
+const PrintSegments = ({ o }: { o: PathSegment[] }) =>
+  _.map(o, (segment, i) => <PrintPathSegment o={segment} key={i} />);
 
 export const PrintPathSegment = ({ o }: { o: PathSegment }) => {
   switch (o.type) {
@@ -207,7 +231,7 @@ export const PrintImplFor = ({ path, ty }: { path?: DefinedPath; ty: any }) => {
   const p =
     path === undefined ? null : (
       <>
-        <PrintDefPath o={path} /> <Kw>for</Kw>
+        <PrintDefinitionPath o={path} /> <Kw>for</Kw>
         {nbsp}
       </>
     );
@@ -228,7 +252,7 @@ export const PrintImplAs = ({ path, ty }: { path?: DefinedPath; ty: any }) => {
     path === undefined ? null : (
       <>
         {nbsp}
-        <Kw>as</Kw> <PrintDefPath o={path} />
+        <Kw>as</Kw> <PrintDefinitionPath o={path} />
       </>
     );
 

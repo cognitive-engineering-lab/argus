@@ -1,5 +1,5 @@
-import type { DefinedPath, TyVal } from "@argus/common/bindings";
 import {
+  type MessageSystem,
   createClosedMessageSystem,
   vscodeMessageSystem
 } from "@argus/common/communication";
@@ -19,6 +19,7 @@ import {
 import { IcoComment } from "@argus/print/Icons";
 import {
   DefPathRender,
+  DefinitionAction,
   ProjectionPathRender,
   TyCtxt
 } from "@argus/print/context";
@@ -29,7 +30,11 @@ import React, { useEffect, useState } from "react";
 import FillScreen, { Spacer } from "./FillScreen";
 
 import "./App.css";
-import type { TypeContext } from "@argus/print/context";
+import type { DefinedPath } from "@argus/common/bindings";
+import type {
+  DefPathRenderProps,
+  ProjectPathRenderProps
+} from "@argus/print/context";
 import { PrintTyValue } from "@argus/print/lib";
 import MiniBuffer from "./MiniBuffer";
 import Workspace from "./Workspace";
@@ -102,17 +107,7 @@ function listener(
  * Path renderer that puts full path definitions into the mini-buffer.
  */
 const CustomPathRenderer = observer(
-  ({
-    fullPath,
-    ctx,
-    Head,
-    Rest
-  }: {
-    fullPath: DefinedPath;
-    ctx: TypeContext;
-    Head: React.ReactElement;
-    Rest: React.ReactElement;
-  }) => {
+  ({ fullPath, ctx, Head, Rest }: DefPathRenderProps) => {
     const setStore = () =>
       MiniBufferDataStore.set({ kind: "path", path: fullPath, ctx });
     const resetStore = () => MiniBufferDataStore.reset();
@@ -128,15 +123,7 @@ const CustomPathRenderer = observer(
 );
 
 const CustomProjectionRender = observer(
-  ({
-    ctx,
-    original,
-    projection
-  }: {
-    ctx: TypeContext;
-    original: TyVal;
-    projection: TyVal;
-  }) => {
+  ({ ctx, original, projection }: ProjectPathRenderProps) => {
     const setStore = () =>
       MiniBufferDataStore.set({
         kind: "projection",
@@ -161,6 +148,24 @@ const CustomProjectionRender = observer(
     );
   }
 );
+
+const mkOnDefinitionClick = (system: MessageSystem) => (def: DefinedPath) => {
+  if (def.l === undefined) {
+    return () => {};
+  }
+  const location = def.l;
+  return (event: React.MouseEvent) => {
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      system.postData({
+        type: "FROM_WEBVIEW",
+        command: "jump-to-def",
+        location
+      });
+    }
+  };
+};
 
 const App = observer(({ config }: { config: PanoptesConfig }) => {
   const [openFiles, setOpenFiles] = useState(buildInitialData(config));
@@ -213,12 +218,16 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
       <AppContext.SystemSpecContext.Provider value={systemSpec}>
         <AppContext.MessageSystemContext.Provider value={messageSystem}>
           <AppContext.ShowHiddenObligationsContext.Provider value={showHidden}>
-            <DefPathRender.Provider value={CustomPathRenderer}>
-              <ProjectionPathRender.Provider value={CustomProjectionRender}>
-                <Workspace files={openFiles} reset={resetState} />
-                <FillScreen />
-              </ProjectionPathRender.Provider>
-            </DefPathRender.Provider>
+            <DefinitionAction.Provider
+              value={mkOnDefinitionClick(messageSystem)}
+            >
+              <DefPathRender.Provider value={CustomPathRenderer}>
+                <ProjectionPathRender.Provider value={CustomProjectionRender}>
+                  <Workspace files={openFiles} reset={resetState} />
+                  <FillScreen />
+                </ProjectionPathRender.Provider>
+              </DefPathRender.Provider>
+            </DefinitionAction.Provider>
           </AppContext.ShowHiddenObligationsContext.Provider>
         </AppContext.MessageSystemContext.Provider>
       </AppContext.SystemSpecContext.Provider>

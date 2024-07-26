@@ -17,7 +17,7 @@ import { HoverInfo } from "../HoverInfo";
 import { IcoNote } from "../Icons";
 import { PrintGroupedClauses } from "./argus";
 import { PrintConst } from "./const";
-import { PrintDefPath } from "./path";
+import { PrintDefinitionPath } from "./path";
 import { PrintTerm } from "./term";
 import {
   PrintAliasTerm,
@@ -76,7 +76,7 @@ export const PrintPredicateKind = ({ o }: { o: PredicateKind }) => {
   } else if ("ObjectSafe" in o) {
     return (
       <>
-        The trait <PrintDefPath o={o.ObjectSafe} /> is object-safe
+        The trait <PrintDefinitionPath o={o.ObjectSafe} /> is object-safe
       </>
     );
   } else if ("Subtype" in o) {
@@ -203,7 +203,7 @@ export const PrintTraitPredicate = ({ o }: { o: TraitPredicate }) => {
     <>
       <PrintTy o={o.self_ty} />: <PrintBoundConstness o={o.constness} />
       <PrintPolarity o={o.polarity} />
-      <PrintDefPath o={o.trait_ref} />
+      <PrintDefinitionPath o={o.trait_ref} />
     </>
   );
 };

@@ -1,6 +1,7 @@
 import type {
   BodyHash,
   CharRange,
+  DefLocation,
   ExprIdx,
   Obligation,
   ObligationHash,
@@ -451,6 +452,24 @@ export class Ctx {
       );
       await this.refreshHighlights(editor);
     }
+  }
+
+  async jumpToDef(location: DefLocation) {
+    console.error("Jumping to definition", location);
+    const uri = vscode.Uri.parse(location.f);
+    const range = rustRangeToVscodeRange(location.r);
+
+    // Open the document at the URI
+    const document = await vscode.workspace.openTextDocument(uri);
+
+    // Show the document and move the cursor to the position
+    const editor = await vscode.window.showTextDocument(document, {
+      // TODO: this is always the first, but what if Argus is in the first.
+      // ideally it doesn't cover up argus.
+      viewColumn: vscode.ViewColumn.One
+    });
+    editor.selection = new vscode.Selection(range.start, range.end);
+    editor.revealRange(range);
   }
 
   private async refreshHighlights(editor: RustEditor) {

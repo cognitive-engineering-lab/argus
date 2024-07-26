@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use rustc_hir::{
   def_id::DefId,
   definitions::{DefPathDataName, DisambiguatedDefPathData},
@@ -77,7 +79,41 @@ impl<'tcx> BasicPathNoArgs<'tcx> {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-struct DefinedPath<'tcx>(Vec<PathSegment<'tcx>>);
+/// A `DefLocation` definition equivalent to that provided by VSCode's LSP.
+struct DefLocation {
+  r: CharRange,
+  f: PathBuf,
+}
+
+impl DefLocation {
+  fn from_span(span: rustc_span::Span) -> Option<Self> {
+    use rustc_span::{FileName, RealFileName};
+    InferCtxt::access(|infcx| {
+      let tcx = infcx.tcx;
+      let source_map = tcx.sess.source_map();
+      let r = CharRange::from_span(span, source_map).ok()?;
+      let f = match &source_map.lookup_source_file(span.lo()).name {
+        FileName::Real(RealFileName::LocalPath(filename))
+        | FileName::Real(RealFileName::Remapped {
+          local_path: Some(filename),
+          ..
+        }) => filename.clone(),
+        _ => return None,
+      };
+
+      Some(Self { r, f })
+    })
+  }
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+struct DefinedPath<'tcx> {
+  path: Vec<PathSegment<'tcx>>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  l: Option<DefLocation>,
+}
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
@@ -152,6 +188,7 @@ impl PathSegment<'_> {
 }
 
 struct PathBuilder<'tcx> {
+  def_id: DefId,
   empty_path: bool,
   in_value: bool,
   segments: Vec<PathSegment<'tcx>>,
@@ -167,13 +204,20 @@ pub enum CommaSeparatedKind {
 
 impl<'tcx> From<PathBuilder<'tcx>> for DefinedPath<'tcx> {
   fn from(builder: PathBuilder<'tcx>) -> Self {
-    DefinedPath(builder.segments)
+    InferCtxt::access(|infcx| {
+      let l = DefLocation::from_span(infcx.tcx.def_span(builder.def_id));
+      DefinedPath {
+        path: builder.segments,
+        l,
+      }
+    })
   }
 }
 
 impl<'a, 'tcx: 'a> PathBuilder<'tcx> {
-  fn new() -> Self {
+  fn new(def_id: DefId) -> Self {
     PathBuilder {
+      def_id,
       empty_path: true,
       in_value: false,
       segments: Vec::new(),
@@ -192,7 +236,7 @@ impl<'a, 'tcx: 'a> PathBuilder<'tcx> {
     def_id: DefId,
     args: &'tcx [ty::GenericArg<'tcx>],
   ) -> DefinedPath<'tcx> {
-    let mut builder = Self::new();
+    let mut builder = Self::new(def_id);
     builder.print_def_path(def_id, args);
     builder.into()
   }
@@ -200,7 +244,7 @@ impl<'a, 'tcx: 'a> PathBuilder<'tcx> {
   pub fn compile_inherent_projection(
     alias_ty: &ty::AliasTy<'tcx>,
   ) -> DefinedPath<'tcx> {
-    let mut builder = Self::new();
+    let mut builder = Self::new(alias_ty.def_id);
     builder.pretty_print_inherent_projection(alias_ty);
     builder.into()
   }

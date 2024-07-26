@@ -16,6 +16,7 @@ import {
   type SystemToPanoptesMsg,
   configToString,
   isPanoMsgAddHighlight,
+  isPanoMsgJumpToDef,
   isPanoMsgRemoveHighlight,
   isPanoMsgTree
 } from "@argus/common/lib";
@@ -137,6 +138,8 @@ export class View {
 
   private async handleMessage(message: BlessedMessage<PanoptesToSystemCmds>) {
     const { requestId, payload } = message;
+    console.debug("Received message from webview", payload);
+
     if (isPanoMsgTree(payload)) {
       return this.getTree(
         requestId,
@@ -148,6 +151,8 @@ export class View {
       return this.ctx.addHighlightRange(payload.file, payload.range);
     } else if (isPanoMsgRemoveHighlight(payload)) {
       return this.ctx.removeHighlightRange(payload.file, payload.range);
+    } else if (isPanoMsgJumpToDef(payload)) {
+      return this.ctx.jumpToDef(payload.location);
     }
   }
 

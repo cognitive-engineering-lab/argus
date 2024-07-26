@@ -11,7 +11,7 @@ import React, { useContext } from "react";
 
 import { Toggle } from "../Toggle";
 import { AllowProjectionSubst, TyCtxt } from "../context";
-import { PrintDefPath } from "./path";
+import { PrintDefinitionPath } from "./path";
 import { PrintClause } from "./predicate";
 import { Angled, CommaSeparated, Kw, PlusSeparated, nbsp } from "./syntax";
 import {
@@ -47,7 +47,7 @@ export const PrintImplHeader = ({ o }: { o: ImplHeader }) => {
   return (
     <AllowProjectionSubst.Provider value={false}>
       <Kw>impl</Kw>
-      {argsWAngle} <PrintDefPath o={o.name} /> <Kw>for</Kw>
+      {argsWAngle} <PrintDefinitionPath o={o.name} /> <Kw>for</Kw>
       {nbsp}
       <PrintTy o={o.selfTy} />
       <PrintWhereClause
@@ -144,7 +144,7 @@ const PrintClauseBound = ({ o }: { o: ClauseBound }) => {
     return (
       <>
         <PrintPolarity o={polarity} />
-        <PrintDefPath o={path} />
+        <PrintDefinitionPath o={path} />
         {arrow}
       </>
     );
@@ -153,7 +153,7 @@ const PrintClauseBound = ({ o }: { o: ClauseBound }) => {
     return (
       <>
         <PrintPolarity o={polarity} />
-        <PrintDefPath o={path} />
+        <PrintDefinitionPath o={path} />
       </>
     );
   } else if ("Region" in o) {

@@ -44,20 +44,20 @@
     ],
     "keybindings": [
       {
-          "command": "argus.pinMBData",
-          "key": "ctrl+alt+T",
-          "mac": "shift+cmd+t"
+        "command": "argus.pinMBData",
+        "key": "ctrl+alt+T",
+        "mac": "shift+cmd+t"
       },
       {
-          "command": "argus.unpinMBData",
-          "key": "ctrl+alt+U",
-          "mac": "shift+cmd+u"
+        "command": "argus.unpinMBData",
+        "key": "ctrl+alt+U",
+        "mac": "shift+cmd+u"
       }
     ]
   },
   "files": [
-    "dist", 
-    "argus-logo-128.png", 
+    "dist",
+    "argus-logo-128.png",
     "LICENSE",
     "README.md"
   ],
@@ -105,6 +105,7 @@
     "toml": "^3.0.0",
     "typescript": "^5.1.3",
     "vite": "^4.4.9",
-    "vite-plugin-static-copy": "^1.0.1"
+    "vite-plugin-static-copy": "^1.0.1",
+    "vscode-languageclient": "^9.0.1"
   }
 }
