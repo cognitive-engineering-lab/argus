@@ -1,4 +1,9 @@
-import type { DefinedPath, Ty, TyVal } from "@argus/common/bindings";
+import type {
+  DefLocation,
+  DefinedPath,
+  Ty,
+  TyVal
+} from "@argus/common/bindings";
 import { createContext } from "react";
 import React, { type ReactElement } from "react";
 import { PrintTyValue } from "./private/ty";
@@ -15,18 +20,31 @@ export interface TypeContext {
 
 export const TyCtxt = createContext<TypeContext | undefined>(undefined);
 
-export const DefPathRender = createContext(
-  ({
-    fullPath: _fp,
-    ctx: _ctx,
-    Head,
-    Rest
-  }: {
-    ctx: TypeContext;
-    fullPath: DefinedPath;
-    Head: ReactElement;
-    Rest: ReactElement;
-  }) => (
+// -------------------------------
+// Location actionable by the user
+
+export type LocationActionableProps = React.PropsWithChildren<{
+  location: DefLocation;
+}>;
+
+export const LocationActionable = createContext<
+  React.FC<LocationActionableProps>
+>(({ children }) => children);
+
+// -----------------------------------------
+// Render options for a definition path
+
+export type DefPathRenderProps = {
+  ctx: TypeContext;
+  fullPath: DefinedPath;
+  Head: ReactElement;
+  Rest: ReactElement;
+};
+
+export type DefPathRenderPropsKind = React.FC<DefPathRenderProps>;
+
+export const DefPathRender = createContext<React.FC<DefPathRenderProps>>(
+  ({ Head, Rest }) => (
     <>
       {Head}
       {Rest}
@@ -34,14 +52,15 @@ export const DefPathRender = createContext(
   )
 );
 
-export const ProjectionPathRender = createContext(
-  ({
-    original,
-    projection: _prj,
-    ctx: _ctx
-  }: {
-    ctx: TypeContext;
-    original: TyVal;
-    projection: TyVal;
-  }) => <PrintTyValue o={original} />
-);
+// -----------------------------------------
+// Render options for a type projection path
+
+export type ProjectPathRenderProps = {
+  ctx: TypeContext;
+  original: TyVal;
+  projection: TyVal;
+};
+
+export const ProjectionPathRender = createContext<
+  React.FC<ProjectPathRenderProps>
+>(({ original }) => <PrintTyValue o={original} />);

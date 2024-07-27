@@ -1,9 +1,6 @@
-import {
-  AllowPathTrim,
-  AllowProjectionSubst,
-  TyCtxt
-} from "@argus/print/context";
-import { PrintDefPathFull, PrintTyValue } from "@argus/print/lib";
+import { AllowProjectionSubst, TyCtxt } from "@argus/print/context";
+import { AllowPathTrim } from "@argus/print/context";
+import { PrintDefPath, PrintTyValue } from "@argus/print/lib";
 import { observer } from "mobx-react";
 import React from "react";
 
@@ -32,7 +29,9 @@ const MiniBuffer = observer(() => {
   const pinned = data.pinned ? <IcoPinned onClick={unpinClick} /> : null;
   const Content = () =>
     data.kind === "path" ? (
-      <PrintDefPathFull defPath={data.path} />
+      <AllowPathTrim.Provider value={false}>
+        <PrintDefPath defPath={data.path} />
+      </AllowPathTrim.Provider>
     ) : data.kind === "projection" ? (
       <>
         <p>The projected type:</p>

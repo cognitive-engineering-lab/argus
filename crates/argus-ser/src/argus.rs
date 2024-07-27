@@ -1,10 +1,13 @@
 //! Extensions to the type system for easier consumption.
+use std::path::PathBuf;
+
 use argus_ext::ty::TyCtxtExt;
 use itertools::Itertools;
 use rustc_data_structures::fx::FxIndexMap;
 use rustc_hir::def_id::DefId;
 use rustc_macros::TypeVisitable;
 use rustc_middle::ty::{self, Upcast};
+use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
@@ -12,10 +15,55 @@ use ts_rs::TS;
 use crate::ty as myty;
 
 #[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+/// A `DefLocation` definition equivalent to that provided by VSCode's LSP.
+pub struct DefLocation {
+  r: CharRange,
+  f: PathBuf,
+}
+
+impl DefLocation {
+  pub fn from_def_id_tcx(def_id: DefId, tcx: ty::TyCtxt) -> Option<Self> {
+    use rustc_span::{FileName, RealFileName};
+
+    let span = tcx.def_span(def_id);
+    let source_map = tcx.sess.source_map();
+    let r = CharRange::from_span(span, source_map).ok()?;
+    let f = match &source_map.lookup_source_file(span.lo()).name {
+      FileName::Real(RealFileName::LocalPath(filename))
+      | FileName::Real(RealFileName::Remapped {
+        local_path: Some(filename),
+        ..
+      }) => filename.clone(),
+      _ => return None,
+    };
+
+    Some(Self { r, f })
+  }
+
+  /// NOTE: this must be called within the dynamic context of
+  /// the `argus-ser` crate, do not call this directly.
+  pub(crate) fn from_def_id(def_id: DefId) -> Option<Self> {
+    use rustc_infer::infer::InferCtxt;
+
+    use super::DynCtxt;
+
+    InferCtxt::access(|infcx| {
+      let tcx = infcx.tcx;
+      Self::from_def_id_tcx(def_id, tcx)
+    })
+  }
+}
+
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct ImplHeader<'tcx> {
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub l: Option<DefLocation>,
+
   #[serde(with = "myty::Slice__GenericArgDef")]
   #[cfg_attr(feature = "testing", ts(type = "GenericArg[]"))]
   pub args: Vec<ty::GenericArg<'tcx>>,
@@ -290,7 +338,12 @@ pub fn get_opt_impl_header(
   let tys_without_default_bounds =
     types_without_default_bounds.into_iter().collect::<Vec<_>>();
 
+  // XXX: This function is not in the dynamic context, we have to
+  // pass the `TyCtxt` explicitly.
+  let l = DefLocation::from_def_id_tcx(impl_def_id, tcx);
+
   Some(ImplHeader {
+    l,
     args: arg_names,
     name,
     self_ty,

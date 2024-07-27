@@ -1170,12 +1170,12 @@ impl<'tcx> Goal__PredicateDef<'tcx> {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "ParamEnv"))]
-pub struct ParamEnvDef<'tcx>(crate::custom::GroupedClauses<'tcx>);
+pub struct ParamEnvDef<'tcx>(crate::argus::GroupedClauses<'tcx>);
 
 impl<'tcx> ParamEnvDef<'tcx> {
   pub fn new(value: &ty::ParamEnv<'tcx>) -> Self {
     let tcx = InferCtxt::access(|cx| cx.tcx);
-    Self(crate::custom::group_predicates_by_ty(
+    Self(crate::argus::group_predicates_by_ty(
       tcx,
       value.caller_bounds(),
     ))

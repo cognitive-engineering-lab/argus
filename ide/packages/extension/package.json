@@ -44,20 +44,20 @@
     ],
     "keybindings": [
       {
-          "command": "argus.pinMBData",
-          "key": "ctrl+alt+T",
-          "mac": "shift+cmd+t"
+        "command": "argus.pinMBData",
+        "key": "ctrl+alt+T",
+        "mac": "shift+cmd+t"
       },
       {
-          "command": "argus.unpinMBData",
-          "key": "ctrl+alt+U",
-          "mac": "shift+cmd+u"
+        "command": "argus.unpinMBData",
+        "key": "ctrl+alt+U",
+        "mac": "shift+cmd+u"
       }
     ]
   },
   "files": [
-    "dist", 
-    "argus-logo-128.png", 
+    "dist",
+    "argus-logo-128.png",
     "LICENSE",
     "README.md"
   ],

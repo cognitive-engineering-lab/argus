@@ -19,3 +19,8 @@
     /* Some breathing room. Make sure the `spacer` has the same value. */
     margin-bottom: 0.25em;
 }
+
+.DefinitionWrapper.hovered.meta-pressed {
+    color: var(--vscode-editorLink-activeForeground);
+    text-decoration: underline;
+}

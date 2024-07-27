@@ -77,7 +77,11 @@ impl<'tcx> BasicPathNoArgs<'tcx> {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-struct DefinedPath<'tcx>(Vec<PathSegment<'tcx>>);
+struct DefinedPath<'tcx> {
+  path: Vec<PathSegment<'tcx>>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  l: Option<DefLocation>,
+}
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
@@ -152,6 +156,7 @@ impl PathSegment<'_> {
 }
 
 struct PathBuilder<'tcx> {
+  def_id: DefId,
   empty_path: bool,
   in_value: bool,
   segments: Vec<PathSegment<'tcx>>,
@@ -167,13 +172,18 @@ pub enum CommaSeparatedKind {
 
 impl<'tcx> From<PathBuilder<'tcx>> for DefinedPath<'tcx> {
   fn from(builder: PathBuilder<'tcx>) -> Self {
-    DefinedPath(builder.segments)
+    let l = DefLocation::from_def_id(builder.def_id);
+    DefinedPath {
+      path: builder.segments,
+      l,
+    }
   }
 }
 
 impl<'a, 'tcx: 'a> PathBuilder<'tcx> {
-  fn new() -> Self {
+  fn new(def_id: DefId) -> Self {
     PathBuilder {
+      def_id,
       empty_path: true,
       in_value: false,
       segments: Vec::new(),
@@ -192,7 +202,7 @@ impl<'a, 'tcx: 'a> PathBuilder<'tcx> {
     def_id: DefId,
     args: &'tcx [ty::GenericArg<'tcx>],
   ) -> DefinedPath<'tcx> {
-    let mut builder = Self::new();
+    let mut builder = Self::new(def_id);
     builder.print_def_path(def_id, args);
     builder.into()
   }
@@ -200,7 +210,7 @@ impl<'a, 'tcx: 'a> PathBuilder<'tcx> {
   pub fn compile_inherent_projection(
     alias_ty: &ty::AliasTy<'tcx>,
   ) -> DefinedPath<'tcx> {
-    let mut builder = Self::new();
+    let mut builder = Self::new(alias_ty.def_id);
     builder.pretty_print_inherent_projection(alias_ty);
     builder.into()
   }

@@ -5,6 +5,7 @@ import type {
   BodyBundle,
   BodyHash,
   CharRange,
+  DefLocation,
   ExprIdx,
   Obligation,
   ObligationHash,
@@ -134,21 +135,26 @@ export type PanoptesToSystemCmds =
   | "obligations"
   // Request the proof tree for the given obligation
   | "tree"
+  // Jump to the definition of the item
+  | "jump-to-def"
   // Add a highlight to the current file
   | "add-highlight"
   // Remove a highlight from the current file
   | "remove-highlight";
 
-export type PanoptesToSystemMsg<T extends PanoptesToSystemCmds> = CommonData & {
+export type PanoptesToSystemMsg<T extends PanoptesToSystemCmds> = {
   command: T;
   type: FROM_WV;
-} & (T extends "obligations"
-    ? {}
-    : T extends "tree"
-      ? { predicate: Obligation; range: CharRange }
-      : T extends "add-highlight" | "remove-highlight"
-        ? { range: CharRange }
-        : never);
+} & (T extends "jump-to-def" // Does not require the common data
+  ? { location: DefLocation }
+  : CommonData &
+      (T extends "obligations"
+        ? {}
+        : T extends "tree"
+          ? { predicate: Obligation; range: CharRange }
+          : T extends "add-highlight" | "remove-highlight"
+            ? { range: CharRange }
+            : never));
 
 // ------------------------------------------------------
 // Interface between the system and rustc plugin
@@ -233,6 +239,7 @@ export const isPanoMsgTree = makePanoMsgPredicateF("tree");
 export const isPanoMsgAddHighlight = makePanoMsgPredicateF("add-highlight");
 export const isPanoMsgRemoveHighlight =
   makePanoMsgPredicateF("remove-highlight");
+export const isPanoMsgJumpToDef = makePanoMsgPredicateF("jump-to-def");
 
 export interface IssueOptions {
   osPlatform: string;

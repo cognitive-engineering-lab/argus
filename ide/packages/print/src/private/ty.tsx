@@ -49,7 +49,7 @@ import React, { useContext } from "react";
 import { Toggle } from "../Toggle";
 import { AllowProjectionSubst, ProjectionPathRender, TyCtxt } from "../context";
 import { PrintConst } from "./const";
-import { PrintDefPath } from "./path";
+import { PrintDefinitionPath } from "./path";
 import {
   Angled,
   CommaSeparated,
@@ -156,7 +156,7 @@ export const PrintTyKind = ({ o }: { o: TyKind }) => {
     const [ty] = o.Pat;
     return <PrintTy o={ty} />;
   } else if ("Adt" in o) {
-    return <PrintDefPath o={o.Adt} />;
+    return <PrintDefinitionPath o={o.Adt} />;
   } else if ("Array" in o) {
     const [ty, sz] = o.Array;
     return (
@@ -214,9 +214,9 @@ export const PrintTyKind = ({ o }: { o: TyKind }) => {
   } else if ("Infer" in o) {
     return <PrintInferTy o={o.Infer} />;
   } else if ("Foreign" in o) {
-    return <PrintDefPath o={o.Foreign} />;
+    return <PrintDefinitionPath o={o.Foreign} />;
   } else if ("Closure" in o) {
-    return <PrintDefPath o={o.Closure} />;
+    return <PrintDefinitionPath o={o.Closure} />;
   } else if ("CoroutineClosure" in o) {
     return <PrintCoroutineClosureTy o={o.CoroutineClosure} />;
   } else if ("Param" in o) {
@@ -239,7 +239,7 @@ export const PrintTyKind = ({ o }: { o: TyKind }) => {
 export const PrintCoroutineTy = ({ o }: { o: CoroutineTyKind }) => {
   const movability =
     o.shouldPrintMovability && o.movability === "Static" ? "static " : null;
-  const pathDef = <PrintDefPath o={o.path} />;
+  const pathDef = <PrintDefinitionPath o={o.path} />;
   // NOTE: the upvars are tupled together into a single type.
   const upvars = <PrintTy o={o.upvarTys} />;
   const witness = <PrintTy o={o.witness} />;
@@ -258,7 +258,7 @@ export const PrintCoroutineClosureTy = ({
   o: CoroutineClosureTyKind;
 }) => {
   // TODO: we can print other things known to the closure, like kind, signature, upvars, etc.
-  return <PrintDefPath o={o.path} />;
+  return <PrintDefinitionPath o={o.path} />;
 };
 
 export const PrintCoroutineWitnessTy = ({
@@ -268,7 +268,7 @@ export const PrintCoroutineWitnessTy = ({
 }) => {
   return (
     <DBraced>
-      <PrintDefPath o={o} />
+      <PrintDefinitionPath o={o} />
     </DBraced>
   );
 };
@@ -278,8 +278,8 @@ export const PrintPolyExistentialPredicates = ({
 }: {
   o: PolyExistentialPredicates;
 }) => {
-  const head = o.data === undefined ? null : <PrintDefPath o={o.data} />;
-  const components = _.map(o.autoTraits, t => <PrintDefPath o={t} />);
+  const head = o.data === undefined ? null : <PrintDefinitionPath o={o.data} />;
+  const components = _.map(o.autoTraits, t => <PrintDefinitionPath o={t} />);
   return (
     <>
       {head}
@@ -308,7 +308,7 @@ export const PrintAliasTyKind = ({ o }: { o: AliasTyKind }) => {
       return <PrintAliasTy o={o.data} />;
     }
     case "DefPath": {
-      return <PrintDefPath o={o.data} />;
+      return <PrintDefinitionPath o={o.data} />;
     }
     default: {
       throw new Error("Unknown alias ty kind", o);
@@ -317,15 +317,15 @@ export const PrintAliasTyKind = ({ o }: { o: AliasTyKind }) => {
 };
 
 export const PrintAliasTerm = ({ o }: { o: AliasTerm }) => {
-  return <PrintDefPath o={o} />;
+  return <PrintDefinitionPath o={o} />;
 };
 
 export const PrintAliasTy = ({ o }: { o: AliasTy }) => {
   switch (o.type) {
     case "PathDef":
-      return <PrintDefPath o={o.data} />;
+      return <PrintDefinitionPath o={o.data} />;
     case "Inherent":
-      return <PrintDefPath o={o.data} />;
+      return <PrintDefinitionPath o={o.data} />;
     default:
       throw new Error("Unknown alias ty kind", o);
   }
@@ -422,7 +422,7 @@ export const PrintFnDef = ({ o }: { o: FnDef }) => {
   // We should show both (somehow), not sure what's the best way to present it.
   return (
     <>
-      <PrintDefPath o={o.path} />{" "}
+      <PrintDefinitionPath o={o.path} />{" "}
       <Toggle summary=".." Children={() => <PrintPolyFnSig o={o.sig} />} />
     </>
   );
@@ -471,7 +471,7 @@ export const PrintInferTy = ({ o }: { o: InferTy }) => {
         : o === "Unresolved"
           ? () => "_"
           : "Unnamed" in o
-            ? () => <PrintDefPath o={o.Unnamed} />
+            ? () => <PrintDefinitionPath o={o.Unnamed} />
             : "SourceInfo" in o
               ? () => <code>{o.SourceInfo}</code>
               : () => {
@@ -632,7 +632,7 @@ export const PrintOpaqueImplType = ({ o }: { o: OpaqueImpl }) => {
   const PrintTrait = ({ o }: { o: Trait }) => {
     console.debug("Printing Trait", o);
     const prefix = <PrintPolarity o={o.polarity} />;
-    const name = <PrintDefPath o={o.traitName} />;
+    const name = <PrintDefinitionPath o={o.traitName} />;
     const ownArgs = _.map(o.ownArgs, arg => <PrintGenericArg o={arg} />);
     const assocArgs = _.map(o.assocArgs, arg => <PrintAssocItem o={arg} />);
     const argComponents = [...ownArgs, ...assocArgs];

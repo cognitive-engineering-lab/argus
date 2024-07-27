@@ -44,8 +44,8 @@ extern crate rustc_target;
 extern crate rustc_trait_selection;
 
 // Make these public to expose the `XXX_Def` wrappers.
+pub mod argus;
 pub mod r#const;
-pub mod custom;
 mod r#dyn;
 mod path;
 mod safe;
@@ -54,7 +54,7 @@ pub mod ty;
 use std::cell::Cell;
 pub mod interner;
 
-pub use custom::*;
+pub use argus::*;
 pub(crate) use r#dyn::DynCtxt;
 use rustc_infer::infer::InferCtxt;
 use rustc_trait_selection::traits::solve::Goal;

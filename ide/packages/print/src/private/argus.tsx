@@ -7,11 +7,11 @@ import type {
 } from "@argus/common/bindings";
 import { anyElems, isUnitTy } from "@argus/common/func";
 import _ from "lodash";
-import React, { useContext } from "react";
+import React, { type PropsWithChildren, useContext } from "react";
 
 import { Toggle } from "../Toggle";
-import { AllowProjectionSubst, TyCtxt } from "../context";
-import { PrintDefPath } from "./path";
+import { AllowProjectionSubst, LocationActionable, TyCtxt } from "../context";
+import { PrintDefinitionPath } from "./path";
 import { PrintClause } from "./predicate";
 import { Angled, CommaSeparated, Kw, PlusSeparated, nbsp } from "./syntax";
 import {
@@ -44,10 +44,21 @@ export const PrintImplHeader = ({ o }: { o: ImplHeader }) => {
       </AllowProjectionSubst.Provider>
     );
 
+  const location = o.l;
+  const LocationAction = useContext(LocationActionable);
+  const LocationWrapper =
+    location === undefined
+      ? React.Fragment
+      : ({ children }: PropsWithChildren) => (
+          <LocationAction location={location}>{children}</LocationAction>
+        );
+
   return (
     <AllowProjectionSubst.Provider value={false}>
-      <Kw>impl</Kw>
-      {argsWAngle} <PrintDefPath o={o.name} /> <Kw>for</Kw>
+      <LocationWrapper>
+        <Kw>impl</Kw>
+      </LocationWrapper>
+      {argsWAngle} <PrintDefinitionPath o={o.name} /> <Kw>for</Kw>
       {nbsp}
       <PrintTy o={o.selfTy} />
       <PrintWhereClause
@@ -144,7 +155,7 @@ const PrintClauseBound = ({ o }: { o: ClauseBound }) => {
     return (
       <>
         <PrintPolarity o={polarity} />
-        <PrintDefPath o={path} />
+        <PrintDefinitionPath o={path} />
         {arrow}
       </>
     );
@@ -153,7 +164,7 @@ const PrintClauseBound = ({ o }: { o: ClauseBound }) => {
     return (
       <>
         <PrintPolarity o={polarity} />
-        <PrintDefPath o={path} />
+        <PrintDefinitionPath o={path} />
       </>
     );
   } else if ("Region" in o) {

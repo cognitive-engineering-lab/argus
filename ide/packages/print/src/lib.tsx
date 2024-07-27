@@ -16,10 +16,7 @@ import ReportBugUrl from "./ReportBugUrl";
 import "./lib.css";
 import { AllowToggle } from "./context";
 import { PrintImplHeader as UnsafePrintImplHeader } from "./private/argus";
-import {
-  PrintDefPath as UnsafePrintDefPath,
-  PrintDefPathFull as UnsafePrintDefPathFull
-} from "./private/path";
+import { PrintDefinitionPath as UnsafePrintDefPath } from "./private/path";
 import {
   PrintGoalPredicate as UnsafePrintGoalPredicate,
   PrintPredicateObligation as UnsafePrintPredicateObligation
@@ -80,6 +77,13 @@ export const PrintWithFallback = ({
   );
 };
 
+export const PrintDefPath = ({ defPath }: { defPath: DefinedPath }) => (
+  <PrintWithFallback
+    object={defPath}
+    Content={() => <UnsafePrintDefPath o={defPath} />}
+  />
+);
+
 export const PrintTy = ({ ty }: { ty: Ty }) => (
   <PrintWithFallback object={ty} Content={() => <UnsafePrintTy o={ty} />} />
 );
@@ -139,13 +143,6 @@ export const PrintBodyName = ({ defPath }: { defPath: DefinedPath }) => (
   <PrintWithFallback
     object={defPath}
     Content={() => <UnsafePrintDefPath o={defPath} />}
-  />
-);
-
-export const PrintDefPathFull = ({ defPath }: { defPath: DefinedPath }) => (
-  <PrintWithFallback
-    object={defPath}
-    Content={() => <UnsafePrintDefPathFull o={defPath} />}
   />
 );
 
