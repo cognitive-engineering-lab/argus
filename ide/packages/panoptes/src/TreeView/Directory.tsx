@@ -13,6 +13,7 @@ import React, { useContext, useEffect, useState } from "react";
 
 import "./Directory.css";
 import { Node } from "./Node";
+import { WrapNode } from "./Wrappers";
 
 export type ElementPair = [React.ReactElement, React.ReactElement];
 
@@ -37,20 +38,30 @@ export const CollapsibleElement = ({
   const config = useContext(AppContext.ConfigurationContext)!;
   const openByDefault = startOpen || config.evalMode !== "release";
 
-  const [isOpen, setIsOpen] = useState(openByDefault);
   const [openIco, closedIco] = icons;
-  let [children, setChildren] = useState<React.ReactElement | undefined>(
+  const [isOpen, setIsOpen] = useState(openByDefault);
+  const [children, setChildren] = useState<React.ReactElement | undefined>(
     undefined
   );
+
   useEffect(() => {
     if (children === undefined && Children !== null && isOpen) {
       setChildren(<Children />);
     }
   }, [isOpen]);
 
+  // FIXME: this should NOT be necessary. However, after mounting the component
+  // sets `isOpen` to false, even if `startOpen` was true, without dispatching on
+  // the event. TODO: minimize and investigate
   useEffect(() => {
-    setIsOpen(startOpen || isOpen);
-  }, [startOpen, isOpen]);
+    setIsOpen(openByDefault || isOpen);
+  }, [openByDefault, isOpen]);
+
+  // useEffect(() => {
+  //   if (startOpen && !isOpen) {
+  //     throw Error("How the hell does this happen?");
+  //   }
+  // }, []);
 
   const toggleCollapse = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
@@ -85,14 +96,31 @@ export const DirNode = ({
   Children: React.FC | null;
 }) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
-  const { Wrapper } = useContext(TreeAppContext.TreeRenderContext);
+  const { Wrappers, startOpenP } = useContext(TreeAppContext.TreeRenderContext);
   const node = tree.node(idx);
 
   const arrows: ElementPair = [<IcoTriangleDown />, <IcoTriangleRight />];
   const dots: ElementPair = [<IcoDot />, <IcoDot />];
   const icons = "Result" in node ? dots : arrows;
-  const infoChild = <Node node={node} />;
-  const info = Wrapper ? <Wrapper n={idx} Child={infoChild} /> : infoChild;
+  const infoChild = (
+    <span className={`proof-node-${idx}`}>
+      <Node node={node} />
+    </span>
+  );
+
+  const info =
+    Wrappers === undefined ? (
+      infoChild
+    ) : (
+      <WrapNode wrappers={Wrappers} n={idx}>
+        {infoChild}
+      </WrapNode>
+    );
+  const startOpen = startOpenP ? startOpenP(idx) : false;
+
+  if (idx === 0) {
+    console.warn("StartOpen", startOpen);
+  }
 
   return (
     <CollapsibleElement
@@ -100,6 +128,7 @@ export const DirNode = ({
       icons={icons}
       indentChildren={true}
       Children={Children}
+      startOpen={startOpen}
     />
   );
 };
@@ -112,13 +141,17 @@ export const DirRecursive = ({
   getNext: (idx: ProofNodeIdx) => ProofNodeIdx[];
 }) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
-  const { styleEdges } = useContext(TreeAppContext.TreeRenderContext);
+  const { styleEdges, onMount } = useContext(TreeAppContext.TreeRenderContext);
   const node = tree.node(level[0]);
   const className = classNames("DirRecursive", {
     "is-candidate": styleEdges && "Candidate" in node,
     "is-subgoal": styleEdges && "Goal" in node,
     "generic-edge": !styleEdges
   });
+
+  useEffect(() => {
+    onMount ? onMount() : {};
+  }, []);
 
   return (
     <div className={className}>

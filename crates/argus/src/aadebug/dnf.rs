@@ -1,10 +1,16 @@
+use smallvec::{smallvec, SmallVec};
+
+const MAX_CONJUNCTS: usize = 4;
+
 // TODO: this is a very naive implementation, we can certainly make it more efficient.
-pub struct And<I: Copy>(Vec<I>);
+#[derive(Clone)]
+pub struct And<I: Copy>(SmallVec<[I; MAX_CONJUNCTS]>);
+
 pub struct Dnf<I: Copy>(Vec<And<I>>);
 
 impl<I: Copy> IntoIterator for And<I> {
   type Item = I;
-  type IntoIter = std::vec::IntoIter<I>;
+  type IntoIter = smallvec::IntoIter<[I; MAX_CONJUNCTS]>;
 
   fn into_iter(self) -> Self::IntoIter {
     self.0.into_iter()
@@ -31,8 +37,8 @@ impl<I: Copy> And<I> {
 }
 
 impl<I: Copy> Dnf<I> {
-  pub fn into_iter_conjuncts(self) -> impl Iterator<Item = And<I>> {
-    self.0.into_iter()
+  pub fn iter_conjuncts(&self) -> impl Iterator<Item = &And<I>> {
+    self.0.iter()
   }
 
   pub fn and(vs: impl Iterator<Item = Self>) -> Option<Self> {
@@ -63,7 +69,7 @@ impl<I: Copy> Dnf<I> {
 
   #[inline]
   pub fn single(i: I) -> Self {
-    Self(vec![And(vec![i])])
+    Self(vec![And(smallvec![i])])
   }
 
   #[inline]

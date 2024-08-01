@@ -12,6 +12,8 @@ import classNames from "classnames";
 import React, { useState } from "react";
 import { IcoComment } from "./Icons";
 
+import "./Wrappers.css";
+
 const Comment = ({
   Child,
   Content

@@ -1,19 +1,11 @@
 import type { FileInfo } from "@argus/common/lib";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
-import {
-  VSCodePanelTab,
-  VSCodePanelView,
-  VSCodePanels
-} from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
-import React, { useState } from "react";
+import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import File from "./File";
-import "./Workspace.css";
-
-// TODO: the workspace should manage a set of files. Currently the App is doing
-// that, but the App should just launch the current workspace.
+import Panels, { type PanelDescription } from "./TreeView/Panels";
 
 function basename(path: string) {
   return path.split("/").reverse()[0];
@@ -37,35 +29,31 @@ const Workspace = ({
   files: FileInfo[];
   reset: () => void;
 }) => {
-  const [active, setActive] = useState(0);
-
-  const mkActiveSet = (idx: number) => () => setActive(idx);
-  const tabName = (idx: number) => `tab-${idx}`;
-
-  const tabs = _.map(files, ({ fn }, idx) => (
-    <VSCodePanelTab key={idx} id={tabName(idx)} onClick={mkActiveSet(idx)}>
-      {basename(fn)}
-    </VSCodePanelTab>
-  ));
-
-  const fileComponents = _.map(files, ({ fn, data }, idx) => (
-    <VSCodePanelView key={idx} style={{ paddingLeft: 0, paddingRight: 0 }}>
-      <ErrorBoundary
-        key={idx}
-        FallbackComponent={FatalErrorPanel}
-        onReset={reset}
-      >
-        <File file={fn} osibs={data} />
-      </ErrorBoundary>
-    </VSCodePanelView>
-  ));
+  const viewProps = {
+    style: {
+      paddingLeft: 0,
+      paddingRight: 0
+    }
+  };
+  const tabs: PanelDescription[] = _.map(files, ({ fn, data }, idx) => {
+    return {
+      viewProps,
+      title: basename(fn),
+      Content: (
+        <ErrorBoundary
+          key={idx}
+          FallbackComponent={FatalErrorPanel}
+          onReset={reset}
+        >
+          <File file={fn} osibs={data} />
+        </ErrorBoundary>
+      )
+    };
+  });
 
   return (
     <div className="workspace-area">
-      <VSCodePanels activeid={tabName(active)}>
-        {tabs}
-        {fileComponents}
-      </VSCodePanels>
+      <Panels description={tabs} />
     </div>
   );
 };

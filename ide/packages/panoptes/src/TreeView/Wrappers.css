@@ -14,3 +14,22 @@
     overflow-x: hidden;
     width: 90%;
 }
+
+.ImplCandidatesPanel {
+    padding: 0.5em;
+}
+
+.ImplCandidatesPanel > div {
+    margin-bottom: 1em;
+}
+
+.WrapperBox {
+    display: inline-flex;
+    flex-direction: row;
+    gap: 0.25em;
+}
+
+.WrapperBox i:hover {
+    cursor: pointer;
+    color: var(--vscode-input-placeholderForeground);
+}

@@ -5,21 +5,66 @@ import type {
   CandidateIdx,
   EvaluationResult,
   GoalIdx,
+  ImplHeader,
   ProofNodeIdx,
   ResultIdx,
   SerializedTree,
+  SetHeuristic,
   TreeTopology
 } from "./bindings";
+
+export type TreeViewWithRoot = TreeView & { root: ProofNodeIdx };
+
+export interface TreeView {
+  topology: TreeTopology;
+  underlying?: TreeView;
+}
 
 type MultiRecord<K extends number, T> = Record<K, T[]>;
 
 type Direction = "to-root" | "from-root";
 
-interface Path<T, D extends Direction> {
-  from: T;
-  to: T;
-  path: T[];
-  d: D;
+type Reverse<T extends Direction> = T extends "to-root"
+  ? "from-root"
+  : "to-root";
+
+function reverseDirection<D extends Direction>(d: Direction): Reverse<D> {
+  // HACK: ugh, get rid of the `any` here.
+  return d === "to-root" ? "from-root" : ("to-root" as any);
+}
+
+class Path<T, D extends Direction> {
+  constructor(
+    private readonly from: T,
+    private readonly to: T,
+    private readonly path: T[],
+    private readonly d: D
+  ) {
+    if (_.first(path) !== from) {
+      throw new Error("Path does not start from the `from` node");
+    }
+
+    if (_.last(path) !== to) {
+      throw new Error("Path does not end at the `to` node");
+    }
+  }
+
+  get pathInclusive() {
+    return this.path;
+  }
+
+  get length() {
+    return this.path.length;
+  }
+
+  reverse(): Path<T, Reverse<D>> {
+    return new Path(
+      this.to,
+      this.from,
+      _.reverse(this.path),
+      reverseDirection(this.d)
+    );
+  }
 }
 
 function makeTreeView(
@@ -70,12 +115,108 @@ function makeTreeView(
   }
 }
 
-export interface TreeView {
-  topology: TreeTopology;
-  underlying?: TreeView;
+type ControlFlow = "keep" | "remove-tree" | "remove-node";
+
+class TopologyBuilder {
+  private topo: TreeTopology;
+  constructor(
+    readonly root: ProofNodeIdx,
+    readonly tree: TreeInfo
+  ) {
+    this.topo = { children: {}, parent: {} };
+  }
+
+  public toView(): TreeViewWithRoot {
+    return { topology: this.topo, root: this.root };
+  }
+
+  get topology() {
+    return this.topo;
+  }
+
+  add(from: ProofNodeIdx, to: ProofNodeIdx) {
+    if (this.topo.children[from] === undefined) {
+      this.topo.children[from] = [];
+    }
+    this.topo.children[from].push(to);
+    this.topo.parent[to] = from;
+  }
+
+  /**
+   *
+   * @param root the root node from where this path should start.
+   * @param path a path to be added uniquely to the tree.
+   */
+  public addPathFromRoot(path: ProofNodeIdx[]) {
+    const thisRoot = _.head(path);
+    if (
+      thisRoot === undefined ||
+      !_.isEqual(this.tree.node(thisRoot), this.tree.node(this.root))
+    ) {
+      throw new Error("Path does not start from the root");
+    }
+
+    let previous = this.root;
+    _.forEach(_.tail(path), node => {
+      // We want to add a node from `previous` to `node` only if an
+      // equivalent connection does not already exist. Equivalent is
+      // defined by the `Node` the `ProofNodeIdx` points to.
+      const currKids = this.topo.children[previous] ?? [];
+      const myNode = this.tree.node(node);
+      const hasEquivalent = _.find(
+        currKids,
+        kid => this.tree.node(kid) === myNode
+      );
+      if (hasEquivalent === undefined) {
+        this.add(previous, node);
+        previous = node;
+      } else {
+        previous = hasEquivalent;
+      }
+    });
+  }
 }
 
-type ControlFlow = "keep" | "remove-tree" | "remove-node";
+/**
+ * Invert the current `TreeView` on the `TreeInfo`, using `leaves` as the roots.
+ * For the purpose of inverting a tree anchored at failed goals, some of these goals will
+ * be 'distinct' nodes, but their inner `GoalIdx` will be the same. We want to root all of
+ * these together.
+ */
+export function invertViewWithRoots(
+  leaves: ProofNodeIdx[],
+  tree: TreeInfo
+): TreeViewWithRoot[] {
+  const groups: ProofNodeIdx[][] = _.values(
+    _.groupBy(leaves, leaf => {
+      const node = tree.node(leaf);
+      if ("Goal" in node) {
+        return node.Goal;
+      }
+      throw new Error("Leaves must be goals");
+    })
+  );
+
+  return _.map(groups, group => {
+    // Each element of the group is equivalent, so just take the first
+    const builder = new TopologyBuilder(group[0], tree);
+
+    // Get the paths to the root from all leaves, filter paths that
+    // contain successful nodes.
+    const pathsToRoot = _.map(
+      group,
+      parent => tree.pathToRoot(parent).pathInclusive
+    );
+
+    _.forEach(pathsToRoot, path => {
+      // No need to take the tail, `addPathFromRoot` checks that the
+      // roots are equal and then skips the first element.
+      builder.addPathFromRoot(path);
+    });
+
+    return builder.toView();
+  });
+}
 
 export class TreeInfo {
   private _maxHeight: Map<ProofNodeIdx, number>;
@@ -130,12 +271,16 @@ export class TreeInfo {
     return this.tree.root;
   }
 
+  get failedSets() {
+    return this.tree.analysis.problematicSets;
+  }
+
   public node(n: ProofNodeIdx) {
     return this.tree.nodes[n];
   }
 
   public depth(n: ProofNodeIdx) {
-    return this.pathToRoot(n).path.length;
+    return this.pathToRoot(n).length;
   }
 
   public goalOfNode(n: ProofNodeIdx) {
@@ -190,22 +335,11 @@ export class TreeInfo {
       current = parent;
     }
 
-    return {
-      from,
-      to: this.root,
-      path,
-      d: "to-root"
-    };
+    return new Path(from, this.root, path, "to-root");
   }
 
   public pathFromRoot(from: ProofNodeIdx): Path<ProofNodeIdx, "from-root"> {
-    let { from: f, to, path } = this.pathToRoot(from);
-    return {
-      from: to,
-      to: f,
-      path: _.reverse(path),
-      d: "from-root"
-    };
+    return this.pathToRoot(from).reverse();
   }
 
   public errorLeaves(): ProofNodeIdx[] {
@@ -259,8 +393,27 @@ export class TreeInfo {
     return height;
   }
 
-  get failedSets() {
-    return this.tree.analysis.problematicSets;
+  /**
+   * Define the heuristic used for inertia in the system. Previously we were
+   * using `momentum / velocity` but this proved too sporatic. Some proof trees
+   * were deep, needlessely, and this threw a wrench in the order.
+   */
+  public static setInertia = (set: SetHeuristic) => {
+    return set.momentum;
+  };
+
+  public minInertiaOnPath(n: ProofNodeIdx): number {
+    const hs = _.filter(this.failedSets, h =>
+      _.some(h.goals, g => _.includes(this.pathToRoot(g.idx).pathInclusive, n))
+    );
+
+    // HACK: the high default is a hack to get rid of undefined,
+    // but it should never be undefined.
+    return _.min(_.map(hs, TreeInfo.setInertia)) ?? 10_000;
+  }
+
+  public implCandidates(idx: ProofNodeIdx): ImplHeader[] | undefined {
+    return this.tree.analysis.implCandidates[idx];
   }
 }
 

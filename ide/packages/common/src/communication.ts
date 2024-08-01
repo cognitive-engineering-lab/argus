@@ -10,13 +10,18 @@ import {
   isPanoMsgTree
 } from "./lib";
 
-export type InfoWrapper = React.FC<{
+export type InfoWrapperProps = {
   n: ProofNodeIdx;
-  Child: React.ReactElement;
-}>;
+  reportActive: (b: boolean) => void;
+};
+
+export type InfoWrapper = React.FC<InfoWrapperProps>;
+
 export interface TreeRenderParams {
-  Wrapper?: InfoWrapper;
+  Wrappers?: InfoWrapper[];
   styleEdges?: boolean;
+  startOpenP?: (n: ProofNodeIdx) => boolean;
+  onMount?: () => void;
 }
 
 export interface MessageSystem {

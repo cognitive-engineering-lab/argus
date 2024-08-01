@@ -8,6 +8,7 @@ import type {
   ObligationsInBody,
   SerializedTree
 } from "@argus/common/bindings";
+import { makeid } from "@argus/common/func";
 import type {
   CallArgus,
   ErrorJumpTargetInfo,
@@ -27,7 +28,6 @@ import {
   isDocumentInWorkspace,
   isRustDocument,
   isRustEditor,
-  makeid,
   rustRangeToVscodeRange
 } from "./utils";
 import { View } from "./view";
