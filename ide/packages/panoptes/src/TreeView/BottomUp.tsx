@@ -240,7 +240,7 @@ export const RenderBottomUpSets = ({
   return (
     <TreeAppContext.TreeRenderContext.Provider value={SubsetRenderParams}>
       <p>
-        Argus recommends investigating these failed oblgiations. Click on ’
+        Argus recommends investigating these failed obligations. Click on ’
         {otherLabel}‘ below to see other failed obligations.
       </p>
       <div id="recommended-failure-list">{argusRecommends}</div>
