@@ -1,10 +1,12 @@
+import { TextEmphasis } from "@argus/print/Attention";
 import {
   VSCodePanelTab,
   VSCodePanelView,
-  VSCodePanels
+  VSCodePanels,
+  VSCodeProgressRing
 } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
-import React, { useState, type ReactElement } from "react";
+import React, { Suspense, useState } from "react";
 
 import "./Panels.css";
 
@@ -14,7 +16,7 @@ export type PanelsProps = React.ComponentPropsWithRef<typeof VSCodePanels>;
 
 export interface PanelDescription {
   title: string;
-  Content: ReactElement;
+  Content: React.FC;
   tabProps?: TabProps;
   viewProps?: ViewProps;
 }
@@ -23,10 +25,10 @@ const Panels = ({
   manager,
   description
 }: {
-  manager?: [number, (n: number) => void];
+  manager?: [number, (n: number) => void, boolean?];
   description: PanelDescription[];
 }) => {
-  const [active, setActive] = manager || useState(0);
+  const [active, setActive, programaticSwitch] = manager || useState(0);
 
   const tabId = (n: number) => `tab-${n}`;
   console.warn("Starting panels on", active);
@@ -39,14 +41,20 @@ const Panels = ({
 
   return (
     <VSCodePanels activeid={tabId(active)}>
-      {_.map(withExtra, ({ id, title, onClick, tabProps }, idx) => (
-        <VSCodePanelTab {...tabProps} key={idx} id={id} onClick={onClick}>
-          {title}
-        </VSCodePanelTab>
-      ))}
+      {_.map(withExtra, ({ id, title, onClick, tabProps }, idx) => {
+        const Wrapper =
+          programaticSwitch && active === idx ? TextEmphasis : React.Fragment;
+        return (
+          <VSCodePanelTab {...tabProps} key={idx} id={id} onClick={onClick}>
+            <Wrapper>{title}</Wrapper>
+          </VSCodePanelTab>
+        );
+      })}
       {_.map(withExtra, ({ Content, viewProps }, idx) => (
         <VSCodePanelView {...viewProps} key={idx}>
-          {Content}
+          <Suspense fallback={<VSCodeProgressRing />}>
+            <Content />
+          </Suspense>
         </VSCodePanelView>
       ))}
     </VSCodePanels>

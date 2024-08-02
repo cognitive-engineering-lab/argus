@@ -5,6 +5,7 @@ import type {
   CandidateIdx,
   EvaluationResult,
   GoalIdx,
+  GoalKind,
   ImplHeader,
   ProofNodeIdx,
   ResultIdx,
@@ -218,6 +219,14 @@ export function invertViewWithRoots(
   });
 }
 
+function isBadUnification(kind: GoalKind) {
+  return (
+    kind.type === "DeleteFnParams" ||
+    kind.type === "AddFnParams" ||
+    kind.type === "IncorrectParams"
+  );
+}
+
 export class TreeInfo {
   private _maxHeight: Map<ProofNodeIdx, number>;
   private numInferVars: Map<ProofNodeIdx, number>;
@@ -236,7 +245,7 @@ export class TreeInfo {
         const goalData = tree.goals[node.Goal];
         const result = tree.results[goalData.result];
         return "keep";
-        // FIXME: I think this logic is correct...but when enabled argus crashes.
+        // FIXME: I belive that this logic is correct, but argus crashes when enabled
         // return isHiddenObl({ necessity: goalData.necessity, result })
         //   ? "remove-tree"
         //   : "remove-node";
@@ -254,7 +263,7 @@ export class TreeInfo {
     }
   }
 
-  constructor(
+  private constructor(
     private readonly tree: SerializedTree,
     readonly showHidden: boolean,
     readonly view: TreeView
@@ -271,8 +280,46 @@ export class TreeInfo {
     return this.tree.root;
   }
 
-  get failedSets() {
-    return this.tree.analysis.problematicSets;
+  public failedSets() {
+    if (this.showHidden) return this.tree.analysis.problematicSets;
+
+    // If all the problematic sets involve a bad unification, then we
+    // have to live with them, don't filter.
+    if (
+      _.every(this.tree.analysis.problematicSets, s =>
+        _.some(s.goals, g => isBadUnification(g.kind))
+      )
+    )
+      return this.tree.analysis.problematicSets;
+
+    // Keep only the sets that don't have a bad unification
+    return _.filter(this.tree.analysis.problematicSets, s =>
+      _.every(s.goals, g => !isBadUnification(g.kind))
+    );
+  }
+
+  private unificationFailures(): ProofNodeIdx[] {
+    const goals = _.flatMap(this.tree.analysis.problematicSets, s => s.goals);
+    return _.map(
+      _.filter(goals, g => isBadUnification(g.kind)),
+      g => g.idx
+    );
+  }
+
+  private nodesInUnificationFailurePath(): ProofNodeIdx[] {
+    if (this.showHidden) return [];
+
+    const nonUnificationFailures = _.flatMap(
+      _.flatMap(this.failedSets(), s => _.map(s.goals, g => g.idx)),
+      n => this.pathToRoot(n).pathInclusive
+    );
+
+    const uFs = _.flatMap(
+      this.unificationFailures(),
+      n => this.pathToRoot(n).pathInclusive
+    );
+
+    return _.difference(uFs, nonUnificationFailures);
   }
 
   public node(n: ProofNodeIdx) {
@@ -301,7 +348,16 @@ export class TreeInfo {
   }
 
   public children(n: ProofNodeIdx): ProofNodeIdx[] {
-    return this.view.topology.children[n] ?? [];
+    const nodesToUnifyFailures = this.nodesInUnificationFailurePath();
+
+    // if (_.includes(nodesToUnifyFailures, 6222)) {
+    //   throw new Error("NODE NOT THERE");
+    // } else {
+    //   console.debug("Nodes to unify failures includes 6222");
+    // }
+
+    const children = this.view.topology.children[n] ?? [];
+    return _.difference(children, nodesToUnifyFailures);
   }
 
   public result(n: ResultIdx): EvaluationResult {
@@ -342,31 +398,6 @@ export class TreeInfo {
     return this.pathToRoot(from).reverse();
   }
 
-  public errorLeaves(): ProofNodeIdx[] {
-    if (this.nodeResult(this.root) === "yes") {
-      return [];
-    }
-
-    let errorLeaves = [];
-    let stack = [this.root];
-    while (stack.length > 0) {
-      const current = stack.pop()!;
-      const children = this.children(current);
-      if (children.length === 0 && this.nodeResult(current) !== "yes") {
-        const node = this.node(current);
-        if ("Result" in node) {
-          errorLeaves.push(current);
-        } else {
-          console.error("Node has no children but isn't a leaf", node);
-        }
-      } else {
-        const errorKids = _.filter(children, n => this.nodeResult(n) !== "yes");
-        stack.push(...errorKids);
-      }
-    }
-    return errorLeaves;
-  }
-
   public inferVars(n: ProofNodeIdx): number {
     const current = this.numInferVars.get(n);
     if (current !== undefined) {
@@ -403,7 +434,7 @@ export class TreeInfo {
   };
 
   public minInertiaOnPath(n: ProofNodeIdx): number {
-    const hs = _.filter(this.failedSets, h =>
+    const hs = _.filter(this.failedSets(), h =>
       _.some(h.goals, g => _.includes(this.pathToRoot(g.idx).pathInclusive, n))
     );
 

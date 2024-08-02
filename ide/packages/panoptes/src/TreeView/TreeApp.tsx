@@ -52,39 +52,32 @@ const TreeApp = ({
   const [state, setState] = useState<{
     activePanel: number;
     node?: ProofNodeIdx;
+    programatic?: boolean;
   }>({ activePanel: 0 });
 
   // Callback passed to the BottomUp panel to jump to the TopDown panel.
   const jumpBottomUpToTopDown = (n: ProofNodeIdx) =>
-    setState({ activePanel: 1, node: n });
-
-  console.debug("Current state", state);
-
-  const BottomUpContent = <BottomUp jumpToTopDown={jumpBottomUpToTopDown} />;
-  const TopDownContent = <TopDown start={state?.node} />;
-  const ErotisiContent = <Erotisi />;
+    setState({ activePanel: 1, node: n, programatic: true });
 
   const tabs: PanelDescription[] = [
     {
-      title: "Bottom Up",
-      Content: BottomUpContent
-    },
-    {
       title: "Top Down",
-      Content: TopDownContent
-    },
-    { title: "Help Me", Content: ErotisiContent }
+      Content: () => <TopDown start={state?.node} />
+    }
   ];
 
-  // if (treeInfo.errorLeaves().length > 0) {
-  //   // Unshift to place this first
-  //   // NOTE: the passing the TopDown panel ID is important, make sure it's always correct.
-  //   // FIXME: we probably shouldn't hard-code that value here...
-  //   tabs.unshift();
+  if (treeInfo.failedSets().length > 0) {
+    // Unshift to place this first
+    // NOTE: the passing the TopDown panel ID is important, make sure it's always correct.
+    // FIXME: we probably shouldn't hard-code that value here...
+    tabs.unshift({
+      title: "Bottom Up",
+      Content: () => <BottomUp jumpToTopDown={jumpBottomUpToTopDown} />
+    });
 
-  //   // Push to place this last
-  //   tabs.push();
-  // }
+    // Push to place this last
+    tabs.push({ title: "Help Me", Content: Erotisi });
+  }
 
   // HACK: we shouldn't test for eval mode here but Playwright is off on the button click.
   // if (tree.cycle !== undefined && evalMode === "release") {
@@ -102,7 +95,8 @@ const TreeApp = ({
           <Panels
             manager={[
               state.activePanel,
-              (n: number) => setState({ activePanel: n })
+              (n: number) => setState({ activePanel: n }),
+              state.programatic
             ]}
             description={tabs}
           />

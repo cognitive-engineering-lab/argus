@@ -83,7 +83,7 @@ function formOptions(
 
 const Erotisi = () => {
   const tree = useContext(TreeAppContext.TreeContext)!;
-  const sets = sortedSubsets(tree.failedSets);
+  const sets = sortedSubsets(tree.failedSets());
   if (sets.length === 0) {
     return (
       <ErrorDiv>

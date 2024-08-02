@@ -5,7 +5,6 @@ import {
 } from "@argus/common/communication";
 import { AppContext } from "@argus/common/context";
 import {
-  type ErrorJumpTargetInfo,
   type EvaluationMode,
   type FileInfo,
   type PanoptesConfig,
@@ -40,12 +39,6 @@ import classNames from "classnames";
 import MiniBuffer from "./MiniBuffer";
 import Workspace from "./Workspace";
 import { MiniBufferDataStore, highlightedObligation } from "./signals";
-
-function blingObserver(info: ErrorJumpTargetInfo) {
-  console.debug(`Highlighting obligation ${info}`);
-  highlightedObligation.set(info);
-  return setTimeout(() => highlightedObligation.reset(), 1500);
-}
 
 const webSysSpec: SystemSpec = {
   osPlatform: "web-bundle",
@@ -84,7 +77,7 @@ function listener(
   console.debug("Received message from system", payload);
 
   if (isSysMsgOpenError(payload)) {
-    return blingObserver(payload);
+    return highlightedObligation.set(payload);
   } else if (isSysMsgOpenFile(payload)) {
     return setOpenFiles(currFiles => {
       const newEntry = {
@@ -249,7 +242,7 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
       );
     window.addEventListener("message", listen);
     if (config.target !== undefined) {
-      blingObserver(config.target);
+      highlightedObligation.set(config.target);
     }
     return () => window.removeEventListener("message", listen);
   }, []);

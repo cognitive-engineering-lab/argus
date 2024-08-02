@@ -260,6 +260,9 @@ class Heuristic implements HeuristicI {
   }
 
   errorLeavesInSimpleRecommendedOrder() {
-    return this.rank(this.tree.errorLeaves(), _.identity);
+    const errorLeaves = _.flatMap(this.tree.failedSets(), g =>
+      _.map(g.goals, g => g.idx)
+    );
+    return this.rank(errorLeaves, _.identity);
   }
 }

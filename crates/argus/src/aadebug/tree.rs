@@ -1,11 +1,10 @@
 use std::{cell::RefCell, ops::Deref, time::Instant};
 
 use argus_ext::{
-  rustc::{ImplCandidate, InferCtxtExt},
+  rustc::InferCtxtExt,
   ty::{EvaluationResultExt, PredicateExt, TyCtxtExt, TyExt},
 };
 use argus_ser as ser;
-use argus_ser::interner::Interner;
 use index_vec::IndexVec;
 use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_infer::infer::InferCtxt;
@@ -13,7 +12,6 @@ use rustc_middle::{
   traits::solve::{CandidateSource, Goal as RGoal},
   ty::{self, TyCtxt},
 };
-use rustc_span::def_id::DefId;
 use rustc_trait_selection::solve::inspect::ProbeKind;
 use rustc_utils::timer;
 use serde::Serialize;
@@ -76,6 +74,12 @@ enum GoalKind {
   FnToTrait { _trait: Location, arity: usize },
   TyAsCallable { arity: usize },
   DeleteFnParams { delta: usize },
+  AddFnParams { delta: usize },
+  // Represents a function with the correct number of parameters,
+  // but the parameters trait bounds or types are unsatisifed.
+  // TODO if it's worth the extra effort, we could figure out which
+  // parameters are incorrect and highlight them to the user.
+  IncorrectParams { arity: usize },
   Misc,
 }
 
@@ -105,7 +109,9 @@ impl GoalKind {
       } => 2,
 
       GK::TyChange => 4,
-      GK::DeleteFnParams { delta } => 5 * delta,
+      GK::IncorrectParams { arity: delta }
+      | GK::AddFnParams { delta }
+      | GK::DeleteFnParams { delta } => 5 * delta,
       GK::FnToTrait { _trait: E, arity }
       // You could implement the unstable Fn traits for a type,
       // we could thens suggest this if there's nothing else better.
@@ -201,8 +207,12 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
           GoalKind::DeleteFnParams {
             delta: fn_arity - trait_arity,
           }
+        } else if fn_arity < trait_arity {
+          GoalKind::AddFnParams {
+            delta: trait_arity - fn_arity,
+          }
         } else {
-          GoalKind::Misc
+          GoalKind::IncorrectParams { arity: fn_arity }
         }
       }
 
@@ -264,7 +274,7 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
       }
 
       ty::PredicateKind::Clause(ty::ClauseKind::Trait(t)) => {
-        log::debug!("Trait Self Ty {:?}", t.self_ty());
+        log::warn!("Trait Self Ty {:?} didn't match", t.self_ty());
         GoalKind::Misc
       }
 

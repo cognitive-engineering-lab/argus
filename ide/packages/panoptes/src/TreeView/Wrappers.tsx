@@ -7,8 +7,10 @@ import { TreeAppContext } from "@argus/common/context";
 import { IcoListUL, IcoTreeDown } from "@argus/print/Icons";
 import { PrintImplHeader } from "@argus/print/lib";
 import {
+  FloatingArrow,
   FloatingFocusManager,
   FloatingPortal,
+  arrow,
   offset,
   shift,
   useClick,
@@ -18,7 +20,7 @@ import {
 } from "@floating-ui/react";
 import classNames from "classnames";
 import _ from "lodash";
-import React, { useContext, useState } from "react";
+import React, { type ReactElement, useState, useContext, useRef } from "react";
 import Graph from "./Graph";
 
 import "./Wrappers.css";
@@ -32,7 +34,6 @@ export const WrapNode = ({
   const [actives, setActives] = _.unzip(
     _.map(wrappers, _w => useState(false))
   ) as [boolean[], React.Dispatch<React.SetStateAction<boolean>>[]];
-
   const active = _.some(actives);
 
   return (
@@ -57,15 +58,31 @@ const composeEvents =
   (t: T) =>
     _.forEach(es, e => e(t));
 
-export const WrapTreeIco = ({ n, reportActive }: InfoWrapperProps) => {
+const DetailsPortal = ({
+  children,
+  info,
+  reportActive
+}: React.PropsWithChildren<
+  Omit<InfoWrapperProps, "n"> & { info: ReactElement }
+>) => {
   const [isOpen, setIsOpen] = useState(false);
   const openCallback = composeEvents(setIsOpen, reportActive);
+  const arrowRef = useRef(null);
+
+  const ARROW_HEIGHT = 10;
+  const GAP = 5;
 
   const { refs, floatingStyles, context } = useFloating({
     open: isOpen,
     onOpenChange: openCallback,
     placement: "bottom",
-    middleware: [offset(() => 5), shift()]
+    middleware: [
+      offset(ARROW_HEIGHT + GAP),
+      shift(),
+      arrow({
+        element: arrowRef
+      })
+    ]
   });
 
   const click = useClick(context);
@@ -82,7 +99,7 @@ export const WrapTreeIco = ({ n, reportActive }: InfoWrapperProps) => {
         ref={refs.setReference}
         {...getReferenceProps()}
       >
-        <IcoTreeDown />
+        {info}
       </span>
       {isOpen && (
         <FloatingPortal>
@@ -93,7 +110,14 @@ export const WrapTreeIco = ({ n, reportActive }: InfoWrapperProps) => {
               style={floatingStyles}
               {...getFloatingProps()}
             >
-              <Graph root={n} />
+              <FloatingArrow
+                ref={arrowRef}
+                context={context}
+                height={ARROW_HEIGHT}
+                tipRadius={3}
+                stroke="2"
+              />
+              {children}
             </div>
           </FloatingFocusManager>
         </FloatingPortal>
@@ -101,6 +125,12 @@ export const WrapTreeIco = ({ n, reportActive }: InfoWrapperProps) => {
     </>
   );
 };
+
+export const WrapTreeIco = ({ n, reportActive }: InfoWrapperProps) => (
+  <DetailsPortal reportActive={reportActive} info={<IcoTreeDown />}>
+    <Graph root={n} />
+  </DetailsPortal>
+);
 
 export const WrapImplCandidates = ({ n, reportActive }: InfoWrapperProps) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
@@ -110,56 +140,17 @@ export const WrapImplCandidates = ({ n, reportActive }: InfoWrapperProps) => {
     return null;
   }
 
-  const [isOpen, setIsOpen] = useState(false);
-  const openCallback = composeEvents(setIsOpen, reportActive);
-
-  const { refs, floatingStyles, context } = useFloating({
-    open: isOpen,
-    onOpenChange: openCallback,
-    placement: "bottom",
-    middleware: [offset(() => 5), shift()]
-  });
-
-  const click = useClick(context);
-  const dismiss = useDismiss(context);
-  const { getReferenceProps, getFloatingProps } = useInteractions([
-    click,
-    dismiss
-  ]);
-
   return (
-    <>
-      <span
-        className="tree-toggle"
-        ref={refs.setReference}
-        {...getReferenceProps()}
-      >
-        <IcoListUL />
-      </span>
-      {isOpen && (
-        <FloatingPortal>
-          <FloatingFocusManager context={context}>
-            <div
-              className={classNames("floating", "floating-graph")}
-              ref={refs.setFloating}
-              style={floatingStyles}
-              {...getFloatingProps()}
-            >
-              <p>
-                The following {candidates.length} implementations are available:
-              </p>
-              <div className="ImplCandidatesPanel">
-                {_.map(candidates, (c, i) => (
-                  <div key={i}>
-                    <PrintImplHeader impl={c} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </FloatingFocusManager>
-        </FloatingPortal>
-      )}
-    </>
+    <DetailsPortal reportActive={reportActive} info={<IcoListUL />}>
+      <p>The following {candidates.length} implementations are available:</p>
+      <div className="ImplCandidatesPanel">
+        {_.map(candidates, (c, i) => (
+          <div key={i}>
+            <PrintImplHeader impl={c} />
+          </div>
+        ))}
+      </div>
+    </DetailsPortal>
   );
 };
 

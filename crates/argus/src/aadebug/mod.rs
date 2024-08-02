@@ -119,8 +119,6 @@ impl<'tcx> Storage<'tcx> {
     let tree_start = Instant::now();
 
     let mut sets = vec![];
-    let mut impl_candidates = tree.reportable_impl_candidates();
-
     tree.for_correction_set(|conjunct| {
       sets.push(tree.weight(&conjunct));
     });
@@ -129,7 +127,7 @@ impl<'tcx> Storage<'tcx> {
 
     AnalysisResults {
       problematic_sets: sets,
-      impl_candidates,
+      impl_candidates: tree.reportable_impl_candidates(),
     }
   }
 }

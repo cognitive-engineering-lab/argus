@@ -10,7 +10,6 @@ import { makeHighlightPosters, obligationCardId } from "@argus/common/func";
 import ErrorDiv from "@argus/print/ErrorDiv";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
 import { PrintObligation } from "@argus/print/lib";
-import classNames from "classnames";
 import { observer } from "mobx-react";
 import React, {
   useContext,
@@ -120,9 +119,6 @@ const Obligation = observer(
 
     const isTargetObligation =
       highlightedObligation.value?.hash === obligation.hash;
-    const className = classNames("ObligationCard", {
-      bling: isTargetObligation
-    });
 
     useLayoutEffect(() => {
       if (highlightedObligation.value?.hash === obligation.hash) {
@@ -133,7 +129,7 @@ const Obligation = observer(
     const header = (
       <div
         id={id}
-        className={className}
+        className="ObligationCard"
         ref={ref}
         onMouseEnter={addHighlight}
         onMouseLeave={removeHighlight}

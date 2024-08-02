@@ -1,0 +1,43 @@
+@keyframes attention-highlight {
+    0% {
+        background-color: transparent;
+        border-width: 100%;
+    }
+    50% {
+        background-color: var(--vscode-editor-findMatchBackground);
+        border-color: var(--vscode-focusBorder);
+        border-width: 150%;
+    }
+    100% {
+        background-color: transparent;
+        border-width: 100%;
+    }
+}
+
+@keyframes attention-text {
+    0% {
+        font-size: 100%;
+        font-weight: normal;
+    }
+
+    50% {
+        font-size: 115%;
+        font-weight: bold;
+    }
+
+    100% {
+        font-size: 100%;
+        font-weight: normal;
+    }
+}
+
+
+span.Attention {
+    display: inline-block;
+    animation: attention-highlight 1.25s ease-out;
+}
+
+span.AttentionText {
+    display: inline-block;
+    animation: attention-text 2s ease-in-out;
+}

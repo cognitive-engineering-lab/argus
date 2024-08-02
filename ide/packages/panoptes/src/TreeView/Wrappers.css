@@ -26,6 +26,7 @@
 .WrapperBox {
     display: inline-flex;
     flex-direction: row;
+    justify-content: space-evenly;
     gap: 0.25em;
 }
 

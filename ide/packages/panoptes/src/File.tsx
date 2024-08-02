@@ -51,6 +51,9 @@ const ObligationBody = observer(({ bodyInfo }: { bodyInfo: BodyInfo }) => {
     </>
   );
 
+  const Kids = () =>
+    _.map(bodyInfo.exprs(), (i, idx) => <Expr idx={i} key={idx} />);
+
   const openChildren = bodyInfo.hash === highlightedObligation.value?.bodyIdx;
 
   return (
@@ -58,9 +61,7 @@ const ObligationBody = observer(({ bodyInfo }: { bodyInfo: BodyInfo }) => {
       <CollapsibleElement
         info={header}
         startOpen={openChildren}
-        Children={() =>
-          _.map(bodyInfo.exprs(), (i, idx) => <Expr idx={i} key={idx} />)
-        }
+        Children={Kids}
       />
     </BodyInfoContext.Provider>
   );

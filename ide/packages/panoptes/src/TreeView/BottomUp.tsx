@@ -255,7 +255,7 @@ const BottomUp = ({
   const tree = useContext(TreeAppContext.TreeContext)!;
   const evaluationMode =
     useContext(AppContext.ConfigurationContext)?.evalMode ?? "release";
-  const sets = sortedSubsets(tree.failedSets);
+  const sets = sortedSubsets(tree.failedSets());
 
   const makeSets = (sets: SetHeuristic[]) =>
     _.map(sets, h => {

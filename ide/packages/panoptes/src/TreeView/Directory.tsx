@@ -12,6 +12,7 @@ import _ from "lodash";
 import React, { useContext, useEffect, useState } from "react";
 
 import "./Directory.css";
+import Attention from "@argus/print/Attention";
 import { Node } from "./Node";
 import { WrapNode } from "./Wrappers";
 
@@ -50,19 +51,6 @@ export const CollapsibleElement = ({
     }
   }, [isOpen]);
 
-  // FIXME: this should NOT be necessary. However, after mounting the component
-  // sets `isOpen` to false, even if `startOpen` was true, without dispatching on
-  // the event. TODO: minimize and investigate
-  useEffect(() => {
-    setIsOpen(openByDefault || isOpen);
-  }, [openByDefault, isOpen]);
-
-  // useEffect(() => {
-  //   if (startOpen && !isOpen) {
-  //     throw Error("How the hell does this happen?");
-  //   }
-  // }, []);
-
   const toggleCollapse = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -74,6 +62,8 @@ export const CollapsibleElement = ({
     collapsed: !isOpen
   });
 
+  const LabelWrapper = startOpen ? Attention : React.Fragment;
+
   return (
     <div className="DirNode">
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: TODO */}
@@ -81,7 +71,9 @@ export const CollapsibleElement = ({
         <div className="toggle">
           {Children !== null ? (isOpen ? openIco : closedIco) : null}
         </div>
-        <div className="label">{info}</div>
+        <div className="label">
+          <LabelWrapper>{info}</LabelWrapper>
+        </div>
       </div>
       <div className={collapseCN}>{children}</div>
     </div>

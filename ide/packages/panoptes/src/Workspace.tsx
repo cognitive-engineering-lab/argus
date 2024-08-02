@@ -39,7 +39,7 @@ const Workspace = ({
     return {
       viewProps,
       title: basename(fn),
-      Content: (
+      Content: () => (
         <ErrorBoundary
           key={idx}
           FallbackComponent={FatalErrorPanel}
@@ -50,6 +50,9 @@ const Workspace = ({
       )
     };
   });
+
+  // TODO this component needs to manage it's own state for which tab is active. It should observe
+  // the highlightedObligation signal and switch to the correct tab when it changes.
 
   return (
     <div className="workspace-area">

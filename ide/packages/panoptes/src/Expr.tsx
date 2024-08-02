@@ -5,7 +5,6 @@ import {
   FileContext
 } from "@argus/common/context";
 import { makeHighlightPosters } from "@argus/common/func";
-import classNames from "classnames";
 import _ from "lodash";
 import { observer } from "mobx-react";
 import React, { useContext } from "react";
@@ -50,18 +49,9 @@ const Expr = observer(({ idx }: { idx: ExprIdx }) => {
   const header = <Code code={expr.snippet} />;
 
   const openChildren = idx === highlightedObligation.value?.exprIdx;
-  // If there is no targeted obligation then we want to highlight
-  // the expression level div.
-  const className = classNames({
-    bling: highlightedObligation.value && !highlightedObligation.value.hash
-  });
 
   return (
-    <div
-      className={className}
-      onMouseEnter={addHighlight}
-      onMouseLeave={removeHighlight}
-    >
+    <div onMouseEnter={addHighlight} onMouseLeave={removeHighlight}>
       <CollapsibleElement
         info={header}
         startOpen={openChildren}
