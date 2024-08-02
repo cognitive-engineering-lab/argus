@@ -44,19 +44,17 @@ export function makeHighlightPosters(
   file: Filename
 ) {
   const addHighlight = () => {
-    messageSystem.postData({
+    messageSystem.postData("add-highlight", {
       type: "FROM_WEBVIEW",
       file,
-      command: "add-highlight",
       range
     });
   };
 
   const removeHighlight = () => {
-    messageSystem.postData({
+    messageSystem.postData("remove-highlight", {
       type: "FROM_WEBVIEW",
       file,
-      command: "remove-highlight",
       range
     });
   };

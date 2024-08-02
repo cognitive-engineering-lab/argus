@@ -25,34 +25,55 @@ export interface TreeRenderParams {
 }
 
 export interface MessageSystem {
-  postData<T extends PanoptesToSystemCmds>(body: PanoptesToSystemMsg<T>): void;
+  postData<T extends PanoptesToSystemCmds>(
+    command: T,
+    body: Omit<PanoptesToSystemMsg<T>, "command">
+  ): void;
 
   requestData<T extends PanoptesToSystemCmds>(
-    body: PanoptesToSystemMsg<T>
+    command: T,
+    body: Omit<PanoptesToSystemMsg<T>, "command">
   ): Promise<SystemReturn<T>>;
 }
 
 export const vscodeMessageSystem: MessageSystem = {
-  postData<T extends PanoptesToSystemCmds>(body: PanoptesToSystemMsg<T>) {
-    return messageHandler.send(body.command, body);
+  postData<T extends PanoptesToSystemCmds>(
+    command: T,
+    body: Omit<PanoptesToSystemMsg<T>, "command">
+  ) {
+    return messageHandler.send(command, { command, ...body });
   },
 
-  requestData<T extends PanoptesToSystemCmds>(body: PanoptesToSystemMsg<T>) {
-    return messageHandler.request<SystemReturn<T>>(body.command, body);
+  requestData<T extends PanoptesToSystemCmds>(
+    command: T,
+    body: Omit<PanoptesToSystemMsg<T>, "command">
+  ): Promise<SystemReturn<T>> {
+    return messageHandler.request<SystemReturn<T>>(command, {
+      command,
+      ...body
+    });
   }
 };
 
 export function createClosedMessageSystem(bodies: BodyBundle[]): MessageSystem {
   const systemMap = _.groupBy(bodies, bundle => bundle.filename);
   return {
-    postData<T extends PanoptesToSystemCmds>(_body: PanoptesToSystemMsg<T>) {
+    postData<T extends PanoptesToSystemCmds>(
+      _command: T,
+      _body: Omit<PanoptesToSystemMsg<T>, "command">
+    ) {
       // Intentionally blank, no system to post to.
     },
 
-    requestData<T extends PanoptesToSystemCmds>(body: PanoptesToSystemMsg<T>) {
+    requestData<T extends PanoptesToSystemCmds>(
+      command: T,
+      bodyOmit: Omit<PanoptesToSystemMsg<T>, "command">
+    ) {
       return new Promise<SystemReturn<T>>((resolve, reject) => {
+        const body = { command, ...bodyOmit };
+
         if (!isPanoMsgTree(body)) {
-          return reject(new Error(`"Invalid message type" ${body.command}`));
+          return reject(new Error(`"Invalid message type" ${command}`));
         }
 
         const rangesInFile = systemMap[body.file];

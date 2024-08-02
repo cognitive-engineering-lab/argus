@@ -4,7 +4,7 @@ import type { TypeContext } from "@argus/print/context";
 import { action, makeObservable, observable } from "mobx";
 import type { ReactElement } from "react";
 
-class HighlightTargetStore {
+class HighlightTarget {
   value?: ErrorJumpTargetInfo;
 
   constructor() {
@@ -17,6 +17,7 @@ class HighlightTargetStore {
   }
 
   set(info: ErrorJumpTargetInfo) {
+    console.debug("Setting highlight target", info);
     this.value = info;
   }
 
@@ -25,7 +26,7 @@ class HighlightTargetStore {
   }
 }
 
-export const highlightedObligation = new HighlightTargetStore();
+export const HighlightTargetStore = new HighlightTarget();
 
 // MiniBuffer data that should *not* rely on type context
 type DataNoCtx = {
@@ -55,6 +56,7 @@ class MiniBufferData {
     makeObservable(this, {
       data: observable,
       set: action,
+      reset: action,
       pin: action,
       unpin: action
     });

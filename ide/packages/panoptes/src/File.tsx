@@ -19,7 +19,7 @@ import React, { Fragment, useContext } from "react";
 import Expr from "./Expr";
 import "./File.css";
 import { CollapsibleElement } from "./TreeView/Directory";
-import { highlightedObligation } from "./signals";
+import { HighlightTargetStore } from "./signals";
 
 const FnIndicator = () => <em>ƒ</em>;
 
@@ -54,7 +54,7 @@ const ObligationBody = observer(({ bodyInfo }: { bodyInfo: BodyInfo }) => {
   const Kids = () =>
     _.map(bodyInfo.exprs(), (i, idx) => <Expr idx={i} key={idx} />);
 
-  const openChildren = bodyInfo.hash === highlightedObligation.value?.bodyIdx;
+  const openChildren = bodyInfo.hash === HighlightTargetStore.value?.bodyIdx;
 
   return (
     <BodyInfoContext.Provider value={bodyInfo}>

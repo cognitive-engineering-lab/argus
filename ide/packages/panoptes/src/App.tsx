@@ -38,7 +38,7 @@ import { PrintTyValue } from "@argus/print/lib";
 import classNames from "classnames";
 import MiniBuffer from "./MiniBuffer";
 import Workspace from "./Workspace";
-import { MiniBufferDataStore, highlightedObligation } from "./signals";
+import { HighlightTargetStore, MiniBufferDataStore } from "./signals";
 
 const webSysSpec: SystemSpec = {
   osPlatform: "web-bundle",
@@ -77,7 +77,7 @@ function listener(
   console.debug("Received message from system", payload);
 
   if (isSysMsgOpenError(payload)) {
-    return highlightedObligation.set(payload);
+    return HighlightTargetStore.set(payload);
   } else if (isSysMsgOpenFile(payload)) {
     return setOpenFiles(currFiles => {
       const newEntry = {
@@ -141,9 +141,8 @@ const mkLocationActionable =
       if (selectKeys(event)) {
         event.preventDefault();
         event.stopPropagation();
-        system.postData({
+        system.postData("jump-to-def", {
           type: "FROM_WEBVIEW",
-          command: "jump-to-def",
           location
         });
       }
@@ -240,12 +239,18 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
         () => MiniBufferDataStore.pin(),
         () => MiniBufferDataStore.unpin()
       );
+
     window.addEventListener("message", listen);
-    if (config.target !== undefined) {
-      highlightedObligation.set(config.target);
-    }
     return () => window.removeEventListener("message", listen);
   }, []);
+
+  useEffect(() => {
+    if (config.target !== undefined) {
+      HighlightTargetStore.set(config.target);
+    }
+
+    return () => HighlightTargetStore.reset();
+  }, [config.target]);
 
   const Navbar = (
     <>
@@ -273,7 +278,11 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
                 <LocationActionable.Provider
                   value={mkLocationActionable(messageSystem)}
                 >
-                  <Workspace files={openFiles} reset={resetState} />
+                  <Workspace
+                    key={HighlightTargetStore.value?.hash ?? 0}
+                    files={openFiles}
+                    reset={resetState}
+                  />
                   <FillScreen />
                 </LocationActionable.Provider>
               </ProjectionPathRender.Provider>

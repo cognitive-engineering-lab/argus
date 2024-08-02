@@ -24,7 +24,7 @@ import { CollapsibleElement } from "./TreeView/Directory";
 import { ResultRaw } from "./TreeView/Node";
 import TreeApp from "./TreeView/TreeApp";
 import { WaitingOn } from "./WaitingOn";
-import { highlightedObligation } from "./signals";
+import { HighlightTargetStore } from "./signals";
 
 export const ObligationFromIdx = ({ idx }: { idx: ObligationIdx }) => {
   const bodyInfo = useContext(BodyInfoContext)!;
@@ -78,10 +78,9 @@ const ProofTreeWrapper = ({
 
   useEffect(() => {
     const getData = async () => {
-      const tree = await messageSystem.requestData<"tree">({
+      const tree = await messageSystem.requestData("tree", {
         type: "FROM_WEBVIEW",
         file: file,
-        command: "tree",
         predicate: obligation,
         range: range
       });
@@ -118,13 +117,13 @@ const Obligation = observer(
     );
 
     const isTargetObligation =
-      highlightedObligation.value?.hash === obligation.hash;
+      HighlightTargetStore.value?.hash === obligation.hash;
 
     useLayoutEffect(() => {
-      if (highlightedObligation.value?.hash === obligation.hash) {
+      if (isTargetObligation) {
         ref.current?.scrollIntoView({ behavior: "smooth" });
       }
-    }, []);
+    }, [isTargetObligation]);
 
     const header = (
       <div

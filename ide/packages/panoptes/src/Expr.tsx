@@ -8,16 +8,11 @@ import { makeHighlightPosters } from "@argus/common/func";
 import _ from "lodash";
 import { observer } from "mobx-react";
 import React, { useContext } from "react";
-
 import Code from "./Code";
 import { ObligationFromIdx } from "./Obligation";
 import { CollapsibleElement } from "./TreeView/Directory";
-import { highlightedObligation } from "./signals";
+import { HighlightTargetStore } from "./signals";
 
-/**
- * Expression-level obligations within a `File`. Expects that
- * the `BodyInfoContext` is available.
- */
 const Expr = observer(({ idx }: { idx: ExprIdx }) => {
   const bodyInfo = useContext(BodyInfoContext)!;
   const file = useContext(FileContext)!;
@@ -43,12 +38,10 @@ const Expr = observer(({ idx }: { idx: ExprIdx }) => {
       <ObligationFromIdx idx={oi} key={i} />
     ));
 
-  // TODO: we should limit the length of the expression snippet.
-  // or at the very least syntax highlight it in some way...
-  // I think there should be a better way to represent this information than a blank expr.
-  const header = <Code code={expr.snippet} />;
+  const openChildren = idx === HighlightTargetStore.value?.exprIdx;
 
-  const openChildren = idx === highlightedObligation.value?.exprIdx;
+  // TODO: we should limit the length of the expression snippet or collapse large blocks in some way.
+  const header = <Code code={expr.snippet} />;
 
   return (
     <div onMouseEnter={addHighlight} onMouseLeave={removeHighlight}>

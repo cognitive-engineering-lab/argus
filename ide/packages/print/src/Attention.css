@@ -1,16 +1,19 @@
 @keyframes attention-highlight {
     0% {
+        display: inline-block;
         background-color: transparent;
-        border-width: 100%;
     }
+
     50% {
+        display: inline-block;
         background-color: var(--vscode-editor-findMatchBackground);
-        border-color: var(--vscode-focusBorder);
-        border-width: 150%;
+        border: 2px solid var(--vscode-editor-findMatchBorder);
+        border-radius: 2px;
     }
+
     100% {
+        display: inline-block;
         background-color: transparent;
-        border-width: 100%;
     }
 }
 
@@ -21,7 +24,7 @@
     }
 
     50% {
-        font-size: 115%;
+        font-size: 110%;
         font-weight: bold;
     }
 
@@ -39,5 +42,6 @@ span.Attention {
 
 span.AttentionText {
     display: inline-block;
+    background-color: transparent;
     animation: attention-text 2s ease-in-out;
 }
