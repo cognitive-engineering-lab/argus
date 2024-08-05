@@ -4,6 +4,7 @@ import type {
   InfoWrapperProps
 } from "@argus/common/communication";
 import { TreeAppContext } from "@argus/common/context";
+import { arrUpdate } from "@argus/common/func";
 import { IcoListUL, IcoTreeDown } from "@argus/print/Icons";
 import { PrintImplHeader } from "@argus/print/lib";
 import {
@@ -31,9 +32,7 @@ export const WrapNode = ({
   n
 }: React.PropsWithChildren<{ wrappers: InfoWrapper[]; n: ProofNodeIdx }>) => {
   const [hovered, setHovered] = useState(false);
-  const [actives, setActives] = _.unzip(
-    _.map(wrappers, _w => useState(false))
-  ) as [boolean[], React.Dispatch<React.SetStateAction<boolean>>[]];
+  const [actives, setActives] = useState(Array(wrappers.length).fill(false));
   const active = _.some(actives);
 
   return (
@@ -45,7 +44,11 @@ export const WrapNode = ({
       {(hovered || active) && (
         <span className="WrapperBox">
           {_.map(wrappers, (W, i) => (
-            <W key={i} n={n} reportActive={setActives[i]} />
+            <W
+              key={i}
+              n={n}
+              reportActive={b => setActives(a => arrUpdate(a, i, b))}
+            />
           ))}
         </span>
       )}

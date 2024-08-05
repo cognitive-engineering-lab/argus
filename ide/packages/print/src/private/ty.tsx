@@ -109,7 +109,6 @@ export const PrintTy = ({ o }: { o: Ty }) => {
   const allowProjection = useContext(AllowProjectionSubst);
   if (allowProjection && projectedId !== undefined) {
     const projectedValue = tyCtx.interner[projectedId];
-    console.info("Printing alias instead!");
     return <PrintTyProjected original={tyVal} projection={projectedValue} />;
   }
 

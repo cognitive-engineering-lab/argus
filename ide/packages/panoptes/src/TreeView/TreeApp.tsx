@@ -1,12 +1,12 @@
 import TreeInfo from "@argus/common/TreeInfo";
-import type { ProofNodeIdx, SerializedTree } from "@argus/common/bindings";
+import type { SerializedTree } from "@argus/common/bindings";
 import { TreeAppContext } from "@argus/common/context";
 import { TyCtxt } from "@argus/print/context";
-import React, { useState } from "react";
+import React from "react";
 
 import BottomUp from "./BottomUp";
 import Erotisi from "./Erotisi";
-import Panels, { type PanelDescription } from "./Panels";
+import Panels, { type PanelDescription, usePanelState } from "./Panels";
 import TopDown from "./TopDown";
 import "./TreeApp.css";
 
@@ -27,8 +27,6 @@ const TreeApp = ({
   tree: SerializedTree | undefined;
   showHidden?: boolean;
 }) => {
-  console.warn("MOUNTING TREE APP");
-
   if (tree === undefined) {
     console.error("Returned tree `undefined`");
     return <ErrorMessage />;
@@ -49,15 +47,7 @@ const TreeApp = ({
   // --------------------------------------
   // State dependent data for tab switching
 
-  const [state, setState] = useState<{
-    activePanel: number;
-    node?: ProofNodeIdx;
-    programatic?: boolean;
-  }>({ activePanel: 0 });
-
-  // Callback passed to the BottomUp panel to jump to the TopDown panel.
-  const jumpBottomUpToTopDown = (n: ProofNodeIdx) =>
-    setState({ activePanel: 1, node: n, programatic: true });
+  const [state, setState] = usePanelState();
 
   const tabs: PanelDescription[] = [
     {
@@ -72,7 +62,14 @@ const TreeApp = ({
     // FIXME: we probably shouldn't hard-code that value here...
     tabs.unshift({
       title: "Bottom Up",
-      Content: () => <BottomUp jumpToTopDown={jumpBottomUpToTopDown} />
+      Content: () => (
+        <BottomUp
+          jumpToTopDown={n =>
+            // Callback passed to the BottomUp panel to jump to the TopDown panel.
+            setState({ activePanel: 1, node: n, programatic: true })
+          }
+        />
+      )
     });
 
     // Push to place this last
@@ -95,7 +92,7 @@ const TreeApp = ({
           <Panels
             manager={[
               state.activePanel,
-              (n: number) => setState({ activePanel: n }),
+              n => setState({ activePanel: n }),
               state.programatic
             ]}
             description={tabs}

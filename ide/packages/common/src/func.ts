@@ -15,6 +15,9 @@ import type {
 import type { MessageSystem } from "./communication";
 import type { Filename } from "./lib";
 
+export const arrUpdate = <T>(arr: T[], idx: number, val: T) =>
+  _.map(arr, (v, i) => (i !== idx ? v : val));
+
 export function isObject(x: any): x is object {
   return typeof x === "object" && x !== null;
 }

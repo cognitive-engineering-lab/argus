@@ -248,8 +248,6 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
     if (config.target !== undefined) {
       HighlightTargetStore.set(config.target);
     }
-
-    return () => HighlightTargetStore.reset();
   }, [config.target]);
 
   const Navbar = (
@@ -278,11 +276,7 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
                 <LocationActionable.Provider
                   value={mkLocationActionable(messageSystem)}
                 >
-                  <Workspace
-                    key={HighlightTargetStore.value?.hash ?? 0}
-                    files={openFiles}
-                    reset={resetState}
-                  />
+                  <Workspace files={openFiles} reset={resetState} />
                   <FillScreen />
                 </LocationActionable.Provider>
               </ProjectionPathRender.Provider>

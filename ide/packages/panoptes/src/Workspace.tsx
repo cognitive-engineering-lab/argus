@@ -1,11 +1,16 @@
 import type { FileInfo } from "@argus/common/lib";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
 import _ from "lodash";
-import React from "react";
+import React, { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
+import { observer } from "mobx-react";
 import File from "./File";
-import Panels, { type PanelDescription } from "./TreeView/Panels";
+import Panels, {
+  type PanelDescription,
+  usePanelState
+} from "./TreeView/Panels";
+import { HighlightTargetStore } from "./signals";
 
 function basename(path: string) {
   return path.split("/").reverse()[0];
@@ -22,43 +27,64 @@ const FatalErrorPanel = ({ error, resetErrorBoundary }: any) => (
   </div>
 );
 
-const Workspace = ({
-  files,
-  reset
-}: {
-  files: FileInfo[];
-  reset: () => void;
-}) => {
-  const viewProps = {
-    style: {
-      paddingLeft: 0,
-      paddingRight: 0
-    }
-  };
-  const tabs: PanelDescription[] = _.map(files, ({ fn, data }, idx) => {
-    return {
-      viewProps,
-      title: basename(fn),
-      Content: () => (
-        <ErrorBoundary
-          key={idx}
-          FallbackComponent={FatalErrorPanel}
-          onReset={reset}
-        >
-          <File file={fn} osibs={data} />
-        </ErrorBoundary>
-      )
+const Workspace = observer(
+  ({
+    files,
+    reset
+  }: {
+    files: FileInfo[];
+    reset: () => void;
+  }) => {
+    const [state, setState] = usePanelState();
+
+    useEffect(() => {
+      if (HighlightTargetStore.value?.file === undefined) return;
+
+      const idx = _.findIndex(
+        files,
+        ({ fn }) => fn === HighlightTargetStore.value?.file
+      );
+      if (0 <= idx && idx !== state.activePanel)
+        setState({ activePanel: idx, programatic: true });
+    }, [HighlightTargetStore.value?.file]);
+
+    const viewProps = {
+      style: {
+        paddingLeft: 0,
+        paddingRight: 0
+      }
     };
-  });
 
-  // TODO this component needs to manage it's own state for which tab is active. It should observe
-  // the highlightedObligation signal and switch to the correct tab when it changes.
+    const tabs: PanelDescription[] = _.map(files, ({ fn, data }, idx) => {
+      return {
+        fn,
+        viewProps,
+        title: basename(fn),
+        Content: () => (
+          <ErrorBoundary
+            key={idx}
+            FallbackComponent={FatalErrorPanel}
+            onReset={reset}
+          >
+            <File file={fn} osibs={data} />
+          </ErrorBoundary>
+        )
+      };
+    });
 
-  return (
-    <div className="workspace-area">
-      <Panels description={tabs} />
-    </div>
-  );
-};
+    return (
+      <div className="workspace-area">
+        <Panels
+          description={tabs}
+          manager={[
+            state.activePanel,
+            n => setState({ activePanel: n }),
+            state.programatic
+          ]}
+        />
+      </div>
+    );
+  }
+);
 
 export default Workspace;

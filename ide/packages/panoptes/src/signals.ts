@@ -5,6 +5,8 @@ import { action, makeObservable, observable } from "mobx";
 import type { ReactElement } from "react";
 
 class HighlightTarget {
+  private static DURATION = 1000;
+
   value?: ErrorJumpTargetInfo;
 
   constructor() {
@@ -19,6 +21,9 @@ class HighlightTarget {
   set(info: ErrorJumpTargetInfo) {
     console.debug("Setting highlight target", info);
     this.value = info;
+
+    // The target value for a highlight should only last for a short time.
+    window.setTimeout(() => this.reset(), HighlightTarget.DURATION);
   }
 
   reset() {

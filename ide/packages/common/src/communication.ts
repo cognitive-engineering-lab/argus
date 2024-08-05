@@ -97,7 +97,12 @@ export function createClosedMessageSystem(bodies: BodyBundle[]): MessageSystem {
           )
         );
         if (tree === undefined) {
-          console.error("Body", foundBodies, "hash", body.predicate.hash);
+          console.error(
+            "Tree not found in bodies",
+            foundBodies,
+            "hash",
+            body.predicate.hash
+          );
           return reject(new Error("Obligation hash not found in maps"));
         }
 

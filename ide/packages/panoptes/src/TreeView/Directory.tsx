@@ -110,10 +110,6 @@ export const DirNode = ({
     );
   const startOpen = startOpenP ? startOpenP(idx) : false;
 
-  if (idx === 0) {
-    console.warn("StartOpen", startOpen);
-  }
-
   return (
     <CollapsibleElement
       info={info}
