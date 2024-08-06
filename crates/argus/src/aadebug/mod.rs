@@ -1,6 +1,5 @@
 mod dnf;
 pub(crate) mod tree;
-mod ty;
 
 use std::time::Instant;
 
