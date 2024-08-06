@@ -1,0 +1,47 @@
+@keyframes attention-highlight {
+    0% {
+        display: inline-block;
+        background-color: transparent;
+    }
+
+    50% {
+        display: inline-block;
+        background-color: var(--vscode-editor-findMatchBackground);
+        border: 2px solid var(--vscode-editor-findMatchBorder);
+        border-radius: 2px;
+    }
+
+    100% {
+        display: inline-block;
+        background-color: transparent;
+    }
+}
+
+@keyframes attention-text {
+    0% {
+        font-size: 100%;
+        font-weight: normal;
+    }
+
+    50% {
+        font-size: 110%;
+        font-weight: bold;
+    }
+
+    100% {
+        font-size: 100%;
+        font-weight: normal;
+    }
+}
+
+
+span.Attention {
+    display: inline-block;
+    animation: attention-highlight 1.25s ease-out;
+}
+
+span.AttentionText {
+    display: inline-block;
+    background-color: transparent;
+    animation: attention-text 2s ease-in-out;
+}

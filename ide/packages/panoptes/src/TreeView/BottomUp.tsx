@@ -1,116 +1,28 @@
-import type { TreeInfo, TreeView } from "@argus/common/TreeInfo";
-import type { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
-import type { TreeRenderParams } from "@argus/common/communication";
-import { TreeAppContext } from "@argus/common/context";
 import type { EvaluationMode } from "@argus/common/lib";
 import { PrintGoal } from "@argus/print/lib";
-import _ from "lodash";
-import React, { useContext } from "react";
+import React, { useContext, useState } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import "./BottomUp.css";
+import type { ProofNodeIdx, SetHeuristic } from "@argus/common/bindings";
+import type { TreeRenderParams } from "@argus/common/communication";
+import { AppContext, TreeAppContext } from "@argus/common/context";
+import classNames from "classnames";
+import _ from "lodash";
+import { observer } from "mobx-react";
+import { MiniBufferDataStore } from "../signals";
+
+import {
+  TreeInfo,
+  type TreeView,
+  type TreeViewWithRoot,
+  invertViewWithRoots
+} from "@argus/common/TreeInfo";
+import { IcoComment } from "@argus/print/Icons";
+import { WrapImplCandidates, mkJumpToTopDownWrapper } from "./Wrappers";
+
 import { CollapsibleElement, DirRecursive } from "./Directory";
-
-export type TreeViewWithRoot = TreeView & { root: ProofNodeIdx };
-
-class TopologyBuilder {
-  private topo: TreeTopology;
-  constructor(
-    readonly root: ProofNodeIdx,
-    readonly tree: TreeInfo
-  ) {
-    this.topo = { children: {}, parent: {} };
-  }
-
-  public toView(): TreeViewWithRoot {
-    return { topology: this.topo, root: this.root };
-  }
-
-  get topology() {
-    return this.topo;
-  }
-
-  add(from: ProofNodeIdx, to: ProofNodeIdx) {
-    if (this.topo.children[from] === undefined) {
-      this.topo.children[from] = [];
-    }
-    this.topo.children[from].push(to);
-    this.topo.parent[to] = from;
-  }
-
-  /**
-   *
-   * @param root the root node from where this path should start.
-   * @param path a path to be added uniquely to the tree.
-   */
-  public addPathFromRoot(path: ProofNodeIdx[]) {
-    const thisRoot = _.head(path);
-    if (
-      thisRoot === undefined ||
-      !_.isEqual(this.tree.node(thisRoot), this.tree.node(this.root))
-    ) {
-      throw new Error("Path does not start from the root");
-    }
-
-    let previous = this.root;
-    _.forEach(_.tail(path), node => {
-      // We want to add a node from `previous` to `node` only if an
-      // equivalent connection does not already exist. Equivalent is
-      // defined by the `Node` the `ProofNodeIdx` points to.
-      const currKids = this.topo.children[previous] ?? [];
-      const myNode = this.tree.node(node);
-      const hasEquivalent = _.find(
-        currKids,
-        kid => this.tree.node(kid) === myNode
-      );
-      if (hasEquivalent === undefined) {
-        this.add(previous, node);
-        previous = node;
-      } else {
-        previous = hasEquivalent;
-      }
-    });
-  }
-}
-
-/**
- * Invert the current `TreeView` on the `TreeInfo`, using `leaves` as the roots.
- * For the purpose of inverting a tree anchored at failed goals, some of these goals will
- * be 'distinct' nodes, but their inner `GoalIdx` will be the same. We want to root all of
- * these together.
- */
-export function invertViewWithRoots(
-  leaves: ProofNodeIdx[],
-  tree: TreeInfo
-): TreeViewWithRoot[] {
-  const groups: ProofNodeIdx[][] = _.values(
-    _.groupBy(leaves, leaf => {
-      const node = tree.node(leaf);
-      if ("Goal" in node) {
-        return node.Goal;
-      }
-      throw new Error("Leaves must be goals");
-    })
-  );
-
-  return _.map(groups, group => {
-    // Each element of the group is equivalent, so just take the first
-    const builder = new TopologyBuilder(group[0], tree);
-
-    // Get the paths to the root from all leaves, filter paths that
-    // contain successful nodes.
-    const pathsToRoot = _.map(group, parent => tree.pathToRoot(parent).path);
-
-    _.forEach(pathsToRoot, path => {
-      // No need to take the tail, `addPathFromRoot` checks that the
-      // roots are equal and then skips the first element.
-      builder.addPathFromRoot(path);
-    });
-
-    return builder.toView();
-  });
-}
+import "./BottomUp.css";
 
 const RenderEvaluationViews = ({
   recommended,
@@ -161,17 +73,6 @@ const RenderEvaluationViews = ({
   );
 };
 
-export const BottomUpRenderParams: TreeRenderParams = {
-  Wrapper: ({
-    n: _n,
-    Child
-  }: {
-    n: ProofNodeIdx;
-    Child: React.ReactElement;
-  }) => Child,
-  styleEdges: false
-};
-
 /**
  * The actual entry point for rendering the bottom up view. All others are used in testing or evaluation.
  */
@@ -200,10 +101,10 @@ export const RenderBottomUpViews = ({
     );
 
   return (
-    <TreeAppContext.TreeRenderContext.Provider value={BottomUpRenderParams}>
+    <>
       <div id="recommended-failure-list">{argusViews}</div>
       {fallbacks}
-    </TreeAppContext.TreeRenderContext.Provider>
+    </>
   );
 };
 
@@ -239,3 +140,158 @@ export const BottomUpImpersonator = ({
     />
   );
 };
+
+export const sortedSubsets = (sets: SetHeuristic[]) =>
+  _.sortBy(sets, TreeInfo.setInertia);
+
+const mkGetChildren = (view: TreeView) => (idx: ProofNodeIdx) =>
+  view.topology.children[idx] ?? [];
+
+const GroupedFailures = observer(
+  (views: {
+    tree: TreeViewWithRoot[];
+    inertia: number;
+    momentum: number;
+    velocity: number;
+  }) => {
+    if (views.tree.length === 0) {
+      return null;
+    }
+
+    const [hovered, setHovered] = useState(false);
+    const cn = classNames("FailingSet", { "is-hovered": hovered });
+
+    // If there is only a single predicate, no need to provide all the
+    // extra information around "grouped predicate sets".
+    if (views.tree.length === 1) {
+      return (
+        <div className={cn}>
+          <DirRecursive
+            level={[views.tree[0].root]}
+            getNext={mkGetChildren(views.tree[0])}
+          />
+        </div>
+      );
+    }
+
+    const onHover = () => {
+      MiniBufferDataStore.set({
+        kind: "argus-note",
+        data: (
+          <p>
+            The outlined obligations must be resolved <b>together</b>
+          </p>
+        )
+      });
+      setHovered(true);
+    };
+
+    const onNoHover = () => {
+      MiniBufferDataStore.reset();
+      setHovered(false);
+    };
+
+    return (
+      <div className={cn}>
+        <IcoComment onMouseEnter={onHover} onMouseLeave={onNoHover} />
+        {_.map(views.tree, (leaf, i) => (
+          <DirRecursive
+            key={i}
+            level={[leaf.root]}
+            getNext={mkGetChildren(leaf)}
+          />
+        ))}
+      </div>
+    );
+  }
+);
+
+export const RenderBottomUpSets = ({
+  views,
+  jumpTo
+}: {
+  jumpTo: (n: ProofNodeIdx) => void;
+  views: {
+    tree: TreeViewWithRoot[];
+    inertia: number;
+    velocity: number;
+    momentum: number;
+  }[];
+}) => {
+  const argusRecommends = <GroupedFailures {..._.head(views)!} />;
+  const tail = _.tail(views);
+
+  const otherLabel = "Other failures";
+  const fallbacks =
+    tail.length === 0 ? null : (
+      <CollapsibleElement
+        info={<span id="hidden-failure-list">{otherLabel} ...</span>}
+        Children={() =>
+          _.map(tail, (v, i) => <GroupedFailures {...v} key={i} />)
+        }
+      />
+    );
+
+  const SubsetRenderParams: TreeRenderParams = {
+    Wrappers: [WrapImplCandidates, mkJumpToTopDownWrapper(jumpTo)],
+    styleEdges: false
+  };
+
+  return (
+    <TreeAppContext.TreeRenderContext.Provider value={SubsetRenderParams}>
+      <p>
+        Argus recommends investigating these failed obligations. Click on ’
+        {otherLabel}‘ below to see other failed obligations.
+      </p>
+      <div id="recommended-failure-list">{argusRecommends}</div>
+      {fallbacks}
+    </TreeAppContext.TreeRenderContext.Provider>
+  );
+};
+
+const BottomUp = ({
+  jumpToTopDown
+}: { jumpToTopDown: (n: ProofNodeIdx) => void }) => {
+  const tree = useContext(TreeAppContext.TreeContext)!;
+  const evaluationMode =
+    useContext(AppContext.ConfigurationContext)?.evalMode ?? "release";
+  const sets = sortedSubsets(tree.failedSets());
+
+  const makeSets = (sets: SetHeuristic[]) =>
+    _.map(sets, h => {
+      return {
+        tree: invertViewWithRoots(
+          _.map(h.goals, g => g.idx),
+          tree
+        ),
+        inertia: TreeInfo.setInertia(h),
+        velocity: h.velocity,
+        momentum: h.momentum
+      };
+    });
+
+  if (evaluationMode === "release") {
+    return <RenderBottomUpSets jumpTo={jumpToTopDown} views={makeSets(sets)} />;
+  }
+
+  const flattenSets = (sets: SetHeuristic[]) =>
+    _.flatMap(sets, h =>
+      invertViewWithRoots(
+        _.map(h.goals, g => g.idx),
+        tree
+      )
+    );
+
+  // Flatten all the sets and return them as a list.
+  const suggestedPredicates = flattenSets(_.slice(sets, 0, 3));
+  const others = flattenSets(_.slice(sets, 3));
+  return (
+    <BottomUpImpersonator
+      recommended={suggestedPredicates}
+      others={others}
+      mode={evaluationMode}
+    />
+  );
+};
+
+export default BottomUp;

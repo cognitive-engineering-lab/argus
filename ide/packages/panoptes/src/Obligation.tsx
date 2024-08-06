@@ -10,7 +10,6 @@ import { makeHighlightPosters, obligationCardId } from "@argus/common/func";
 import ErrorDiv from "@argus/print/ErrorDiv";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
 import { PrintObligation } from "@argus/print/lib";
-import classNames from "classnames";
 import { observer } from "mobx-react";
 import React, {
   useContext,
@@ -25,7 +24,7 @@ import { CollapsibleElement } from "./TreeView/Directory";
 import { ResultRaw } from "./TreeView/Node";
 import TreeApp from "./TreeView/TreeApp";
 import { WaitingOn } from "./WaitingOn";
-import { highlightedObligation } from "./signals";
+import { HighlightTargetStore } from "./signals";
 
 export const ObligationFromIdx = ({ idx }: { idx: ObligationIdx }) => {
   const bodyInfo = useContext(BodyInfoContext)!;
@@ -79,10 +78,9 @@ const ProofTreeWrapper = ({
 
   useEffect(() => {
     const getData = async () => {
-      const tree = await messageSystem.requestData<"tree">({
+      const tree = await messageSystem.requestData("tree", {
         type: "FROM_WEBVIEW",
         file: file,
-        command: "tree",
         predicate: obligation,
         range: range
       });
@@ -119,21 +117,18 @@ const Obligation = observer(
     );
 
     const isTargetObligation =
-      highlightedObligation.value?.hash === obligation.hash;
-    const className = classNames("ObligationCard", {
-      bling: isTargetObligation
-    });
+      HighlightTargetStore.value?.hash === obligation.hash;
 
     useLayoutEffect(() => {
-      if (highlightedObligation.value?.hash === obligation.hash) {
+      if (isTargetObligation) {
         ref.current?.scrollIntoView({ behavior: "smooth" });
       }
-    }, []);
+    }, [isTargetObligation]);
 
     const header = (
       <div
         id={id}
-        className={className}
+        className="ObligationCard"
         ref={ref}
         onMouseEnter={addHighlight}
         onMouseLeave={removeHighlight}

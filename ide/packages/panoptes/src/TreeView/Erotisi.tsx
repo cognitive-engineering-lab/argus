@@ -8,8 +8,8 @@ import { VSCodeButton } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import React, { useContext, useState } from "react";
 
+import { sortedSubsets } from "./BottomUp";
 import { Node } from "./Node";
-import { sortedSubsets } from "./Subsets";
 
 type Target =
   | { kind: "candidate"; node: ProofNodeIdx }
@@ -37,7 +37,7 @@ function formOptions(
     return (
       parent !== undefined &&
       (parent === child ||
-        _.includes(cansOnly(tree.pathToRoot(child).path), parent))
+        _.includes(cansOnly(tree.pathToRoot(child).pathInclusive), parent))
     );
   };
 
@@ -47,7 +47,9 @@ function formOptions(
   }
 
   const highestNode = _.maxBy(target.goals, g => tree.depth(g.idx))!;
-  const pathOnlyCandidates = cansOnly(tree.pathFromRoot(highestNode.idx).path);
+  const pathOnlyCandidates = cansOnly(
+    tree.pathFromRoot(highestNode.idx).pathInclusive
+  );
   // Remove the candidates that are parents of (or equal to) a decided root.
   const path = _.dropWhile(pathOnlyCandidates, n =>
     _.some(roots, r => isParentOf(n, r))
@@ -81,7 +83,7 @@ function formOptions(
 
 const Erotisi = () => {
   const tree = useContext(TreeAppContext.TreeContext)!;
-  const sets = sortedSubsets(tree.failedSets);
+  const sets = sortedSubsets(tree.failedSets());
   if (sets.length === 0) {
     return (
       <ErrorDiv>

@@ -1,6 +1,7 @@
 import React from "react";
 
 import "./Icons.css";
+import classNames from "classnames";
 
 type ButtonProps = {
   onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
@@ -9,7 +10,10 @@ type ButtonProps = {
 const makeCodicon =
   (name: string) =>
   (props: React.HTMLAttributes<HTMLElement> & ButtonProps) => (
-    <i className={`codicon codicon-${name}`} {...props} />
+    <i
+      {...props}
+      className={classNames("codicon", `codicon-${name}`, props.className)}
+    />
   );
 
 // NOTE: not an exhaustive list of call vscode codicons, just add them when necessary.
@@ -37,3 +41,4 @@ export const IcoEyeClosed = makeCodicon("eye-closed");
 export const IcoLock = makeCodicon("lock");
 export const IcoTreeDown = makeCodicon("type-hierarchy-sub");
 export const IcoPinned = makeCodicon("pinned");
+export const IcoListUL = makeCodicon("list-unordered");

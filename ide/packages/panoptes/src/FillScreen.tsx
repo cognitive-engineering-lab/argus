@@ -1,4 +1,3 @@
-import _ from "lodash";
 import React, { useState, useEffect } from "react";
 
 import "./FillScreen.css";
@@ -32,11 +31,9 @@ export const Spacer = () => <div className="spacer">{"\u00A0"}</div>;
 
 const FillScreen = () => {
   const { height } = useWindowDimensions();
-  // FIXME: this assumes that nobody is using a `font-size` smaller than 14.
-  // A better approach would be to make the height of the spacing div 80% of
-  // the screen height and then width 100%. Probably easier than the loop anyways.
-  const fontSize = 14;
-  return _.map(_.range(height / fontSize), i => <Spacer key={i} />);
+  // 75% of the screen height means there is always *something* visible,
+  // and the user can almost scroll the contents to the top of the view.
+  return <div style={{ height: height * 0.75, width: "100%" }} />;
 };
 
 export default FillScreen;

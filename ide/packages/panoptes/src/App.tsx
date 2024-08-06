@@ -5,7 +5,6 @@ import {
 } from "@argus/common/communication";
 import { AppContext } from "@argus/common/context";
 import {
-  type ErrorJumpTargetInfo,
   type EvaluationMode,
   type FileInfo,
   type PanoptesConfig,
@@ -39,13 +38,7 @@ import { PrintTyValue } from "@argus/print/lib";
 import classNames from "classnames";
 import MiniBuffer from "./MiniBuffer";
 import Workspace from "./Workspace";
-import { MiniBufferDataStore, highlightedObligation } from "./signals";
-
-function blingObserver(info: ErrorJumpTargetInfo) {
-  console.debug(`Highlighting obligation ${info}`);
-  highlightedObligation.set(info);
-  return setTimeout(() => highlightedObligation.reset(), 1500);
-}
+import { HighlightTargetStore, MiniBufferDataStore } from "./signals";
 
 const webSysSpec: SystemSpec = {
   osPlatform: "web-bundle",
@@ -84,7 +77,7 @@ function listener(
   console.debug("Received message from system", payload);
 
   if (isSysMsgOpenError(payload)) {
-    return blingObserver(payload);
+    return HighlightTargetStore.set(payload);
   } else if (isSysMsgOpenFile(payload)) {
     return setOpenFiles(currFiles => {
       const newEntry = {
@@ -148,9 +141,8 @@ const mkLocationActionable =
       if (selectKeys(event)) {
         event.preventDefault();
         event.stopPropagation();
-        system.postData({
+        system.postData("jump-to-def", {
           type: "FROM_WEBVIEW",
-          command: "jump-to-def",
           location
         });
       }
@@ -247,12 +239,16 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
         () => MiniBufferDataStore.pin(),
         () => MiniBufferDataStore.unpin()
       );
+
     window.addEventListener("message", listen);
-    if (config.target !== undefined) {
-      blingObserver(config.target);
-    }
     return () => window.removeEventListener("message", listen);
   }, []);
+
+  useEffect(() => {
+    if (config.target !== undefined) {
+      HighlightTargetStore.set(config.target);
+    }
+  }, [config.target]);
 
   const Navbar = (
     <>

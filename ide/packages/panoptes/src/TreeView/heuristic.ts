@@ -228,9 +228,9 @@ class Heuristic implements HeuristicI {
     const sortWeightPaths = (t: T) => {
       const leaf = f(t);
       const pathToRoot = this.tree.pathToRoot(leaf);
-      const len = pathToRoot.path.length;
+      const len = pathToRoot.length;
       const numVars = _.reduce(
-        pathToRoot.path,
+        pathToRoot.pathInclusive,
         (sum, k) => sum + this.tree.inferVars(k),
         0
       );
@@ -260,6 +260,9 @@ class Heuristic implements HeuristicI {
   }
 
   errorLeavesInSimpleRecommendedOrder() {
-    return this.rank(this.tree.errorLeaves(), _.identity);
+    const errorLeaves = _.flatMap(this.tree.failedSets(), g =>
+      _.map(g.goals, g => g.idx)
+    );
+    return this.rank(errorLeaves, _.identity);
   }
 }

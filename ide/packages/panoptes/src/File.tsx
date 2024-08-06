@@ -19,9 +19,9 @@ import React, { Fragment, useContext } from "react";
 import Expr from "./Expr";
 import "./File.css";
 import { CollapsibleElement } from "./TreeView/Directory";
-import { highlightedObligation } from "./signals";
+import { HighlightTargetStore } from "./signals";
 
-const FnIndicator = () => <em>ƒ</em>;
+const fnIndicator = <em>ƒ</em>;
 
 const ObligationBody = observer(({ bodyInfo }: { bodyInfo: BodyInfo }) => {
   if (!bodyInfo.hasVisibleExprs()) {
@@ -43,7 +43,7 @@ const ObligationBody = observer(({ bodyInfo }: { bodyInfo: BodyInfo }) => {
   const header = (
     <>
       <MonoSpace>
-        <FnIndicator />
+        {fnIndicator}
         {"\u00A0"}
         {bodyName}
       </MonoSpace>
@@ -51,50 +51,33 @@ const ObligationBody = observer(({ bodyInfo }: { bodyInfo: BodyInfo }) => {
     </>
   );
 
-  const openChildren = bodyInfo.hash === highlightedObligation.value?.bodyIdx;
+  const Kids = () =>
+    _.map(bodyInfo.exprs(), (i, idx) => <Expr idx={i} key={idx} />);
+
+  const openChildren = bodyInfo.hash === HighlightTargetStore.value?.bodyIdx;
 
   return (
     <BodyInfoContext.Provider value={bodyInfo}>
       <CollapsibleElement
         info={header}
         startOpen={openChildren}
-        Children={() =>
-          _.map(bodyInfo.exprs(), (i, idx) => <Expr idx={i} key={idx} />)
-        }
+        Children={Kids}
       />
     </BodyInfoContext.Provider>
   );
 });
 
-const File = ({
-  file,
-  osibs
-}: {
+export interface FileProps {
   file: Filename;
   osibs: ObligationsInBody[];
-}) => {
+}
+
+const File = ({ file, osibs }: FileProps) => {
   const showHidden = useContext(AppContext.ShowHiddenObligationsContext);
   const bodyInfos = _.map(
     osibs,
     (osib, idx) => new BodyInfo(osib, idx, showHidden)
   );
-  const bodiesWithVisibleExprs = _.filter(bodyInfos, bi =>
-    bi.hasVisibleExprs()
-  );
-
-  const bodies = _.map(bodiesWithVisibleExprs, (bodyInfo, idx) => (
-    <Fragment key={idx}>
-      {idx > 0 ? <VSCodeDivider /> : null}
-      <TyCtxt.Provider
-        value={{
-          interner: bodyInfo.tyInterner,
-          projections: {}
-        }}
-      >
-        <ObligationBody bodyInfo={bodyInfo} />
-      </TyCtxt.Provider>
-    </Fragment>
-  ));
 
   const noBodiesFound = (
     <ErrorDiv>
@@ -109,9 +92,29 @@ const File = ({
     </ErrorDiv>
   );
 
+  const bodiesWithVisibleExprs = _.filter(bodyInfos, bi =>
+    bi.hasVisibleExprs()
+  );
+
+  if (bodiesWithVisibleExprs.length === 0) {
+    return noBodiesFound;
+  }
+
   return (
     <FileContext.Provider value={file}>
-      {bodies.length > 0 ? bodies : noBodiesFound}
+      {_.map(bodiesWithVisibleExprs, (bodyInfo, idx) => (
+        <Fragment key={idx}>
+          {idx > 0 ? <VSCodeDivider /> : null}
+          <TyCtxt.Provider
+            value={{
+              interner: bodyInfo.tyInterner,
+              projections: {}
+            }}
+          >
+            <ObligationBody bodyInfo={bodyInfo} />
+          </TyCtxt.Provider>
+        </Fragment>
+      ))}
     </FileContext.Provider>
   );
 };

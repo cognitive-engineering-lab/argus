@@ -1,16 +1,17 @@
 mod dnf;
 pub(crate) mod tree;
-mod ty;
 
 use std::time::Instant;
 
 use anyhow::Result;
 use argus_ext::ty::EvaluationResultExt;
 use index_vec::IndexVec;
+use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_infer::traits::solve::GoalSource;
 use rustc_trait_selection::solve::inspect::{InspectCandidate, InspectGoal};
 use rustc_utils::timer;
 use serde::Serialize;
+use serde_json as json;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
@@ -26,7 +27,13 @@ pub struct Storage<'tcx> {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct AnalysisResults {
-  problematic_sets: Vec<tree::SetHeuristic>,
+  pub problematic_sets: Vec<tree::SetHeuristic>,
+
+  #[cfg_attr(
+    feature = "testing",
+    ts(type = "Record<ProofNodeIdx, ImplHeader[]>")
+  )]
+  pub impl_candidates: HashMap<ProofNodeIdx, Vec<json::Value>>,
 }
 
 impl<'tcx> Storage<'tcx> {
@@ -107,27 +114,19 @@ impl<'tcx> Storage<'tcx> {
     root: ProofNodeIdx,
     topo: &TreeTopology,
   ) -> AnalysisResults {
-    let tree = &tree::T {
-      root,
-      ns: &self.ns,
-      topology: topo,
-      maybe_ambiguous: false,
-    };
-
+    let tree = &tree::T::new(root, &self.ns, topo, false);
     let tree_start = Instant::now();
 
-    let sets =
-      tree
-        .iter_correction_sets()
-        .fold(Vec::new(), |mut sets, conjunct| {
-          sets.push(tree.weight(&conjunct));
-          sets
-        });
+    let mut sets = vec![];
+    tree.for_correction_set(|conjunct| {
+      sets.push(tree.weight(&conjunct));
+    });
 
     timer::elapsed("aadeg::into_results", tree_start);
 
     AnalysisResults {
       problematic_sets: sets,
+      impl_candidates: tree.reportable_impl_candidates(),
     }
   }
 }

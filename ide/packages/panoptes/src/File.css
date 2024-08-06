@@ -8,9 +8,3 @@ span.ErrorCount {
     overflow-y: scroll;
     padding: 1em;
 }
-
-.bling {
-    background-color: var(--vscode-inputValidation-errorBackground);
-    color: var(--vscode-inputValidation-errorForeground);
-    border: 2px solid var(--vscode-inputValidation-errorBorder);
-}

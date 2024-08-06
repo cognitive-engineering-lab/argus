@@ -12,7 +12,9 @@ import _ from "lodash";
 import React, { useContext, useEffect, useState } from "react";
 
 import "./Directory.css";
+import Attention from "@argus/print/Attention";
 import { Node } from "./Node";
+import { WrapNode } from "./Wrappers";
 
 export type ElementPair = [React.ReactElement, React.ReactElement];
 
@@ -37,20 +39,17 @@ export const CollapsibleElement = ({
   const config = useContext(AppContext.ConfigurationContext)!;
   const openByDefault = startOpen || config.evalMode !== "release";
 
-  const [isOpen, setIsOpen] = useState(openByDefault);
   const [openIco, closedIco] = icons;
-  let [children, setChildren] = useState<React.ReactElement | undefined>(
+  const [isOpen, setIsOpen] = useState(openByDefault);
+  const [children, setChildren] = useState<React.ReactElement | undefined>(
     undefined
   );
+
   useEffect(() => {
     if (children === undefined && Children !== null && isOpen) {
       setChildren(<Children />);
     }
   }, [isOpen]);
-
-  useEffect(() => {
-    setIsOpen(startOpen || isOpen);
-  }, [startOpen, isOpen]);
 
   const toggleCollapse = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
@@ -63,6 +62,8 @@ export const CollapsibleElement = ({
     collapsed: !isOpen
   });
 
+  const LabelWrapper = startOpen ? Attention : React.Fragment;
+
   return (
     <div className="DirNode">
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: TODO */}
@@ -70,7 +71,9 @@ export const CollapsibleElement = ({
         <div className="toggle">
           {Children !== null ? (isOpen ? openIco : closedIco) : null}
         </div>
-        <div className="label">{info}</div>
+        <div className="label">
+          <LabelWrapper>{info}</LabelWrapper>
+        </div>
       </div>
       <div className={collapseCN}>{children}</div>
     </div>
@@ -85,14 +88,27 @@ export const DirNode = ({
   Children: React.FC | null;
 }) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
-  const { Wrapper } = useContext(TreeAppContext.TreeRenderContext);
+  const { Wrappers, startOpenP } = useContext(TreeAppContext.TreeRenderContext);
   const node = tree.node(idx);
 
   const arrows: ElementPair = [<IcoTriangleDown />, <IcoTriangleRight />];
   const dots: ElementPair = [<IcoDot />, <IcoDot />];
   const icons = "Result" in node ? dots : arrows;
-  const infoChild = <Node node={node} />;
-  const info = Wrapper ? <Wrapper n={idx} Child={infoChild} /> : infoChild;
+  const infoChild = (
+    <span className={`proof-node-${idx}`}>
+      <Node node={node} />
+    </span>
+  );
+
+  const info =
+    Wrappers === undefined ? (
+      infoChild
+    ) : (
+      <WrapNode wrappers={Wrappers} n={idx}>
+        {infoChild}
+      </WrapNode>
+    );
+  const startOpen = startOpenP ? startOpenP(idx) : false;
 
   return (
     <CollapsibleElement
@@ -100,6 +116,7 @@ export const DirNode = ({
       icons={icons}
       indentChildren={true}
       Children={Children}
+      startOpen={startOpen}
     />
   );
 };
@@ -112,13 +129,17 @@ export const DirRecursive = ({
   getNext: (idx: ProofNodeIdx) => ProofNodeIdx[];
 }) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
-  const { styleEdges } = useContext(TreeAppContext.TreeRenderContext);
+  const { styleEdges, onMount } = useContext(TreeAppContext.TreeRenderContext);
   const node = tree.node(level[0]);
   const className = classNames("DirRecursive", {
     "is-candidate": styleEdges && "Candidate" in node,
     "is-subgoal": styleEdges && "Goal" in node,
     "generic-edge": !styleEdges
   });
+
+  useEffect(() => {
+    onMount ? onMount() : {};
+  }, []);
 
   return (
     <div className={className}>

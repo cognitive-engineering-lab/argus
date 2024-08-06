@@ -1,19 +1,16 @@
 import type { FileInfo } from "@argus/common/lib";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
-import {
-  VSCodePanelTab,
-  VSCodePanelView,
-  VSCodePanels
-} from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
+import { observer } from "mobx-react";
 import File from "./File";
-import "./Workspace.css";
-
-// TODO: the workspace should manage a set of files. Currently the App is doing
-// that, but the App should just launch the current workspace.
+import Panels, {
+  type PanelDescription,
+  usePanelState
+} from "./TreeView/Panels";
+import { HighlightTargetStore } from "./signals";
 
 function basename(path: string) {
   return path.split("/").reverse()[0];
@@ -30,44 +27,64 @@ const FatalErrorPanel = ({ error, resetErrorBoundary }: any) => (
   </div>
 );
 
-const Workspace = ({
-  files,
-  reset
-}: {
-  files: FileInfo[];
-  reset: () => void;
-}) => {
-  const [active, setActive] = useState(0);
+const Workspace = observer(
+  ({
+    files,
+    reset
+  }: {
+    files: FileInfo[];
+    reset: () => void;
+  }) => {
+    const [state, setState] = usePanelState();
 
-  const mkActiveSet = (idx: number) => () => setActive(idx);
-  const tabName = (idx: number) => `tab-${idx}`;
+    useEffect(() => {
+      if (HighlightTargetStore.value?.file === undefined) return;
 
-  const tabs = _.map(files, ({ fn }, idx) => (
-    <VSCodePanelTab key={idx} id={tabName(idx)} onClick={mkActiveSet(idx)}>
-      {basename(fn)}
-    </VSCodePanelTab>
-  ));
+      const idx = _.findIndex(
+        files,
+        ({ fn }) => fn === HighlightTargetStore.value?.file
+      );
+      if (0 <= idx && idx !== state.activePanel)
+        setState({ activePanel: idx, programatic: true });
+    }, [HighlightTargetStore.value?.file]);
 
-  const fileComponents = _.map(files, ({ fn, data }, idx) => (
-    <VSCodePanelView key={idx} style={{ paddingLeft: 0, paddingRight: 0 }}>
-      <ErrorBoundary
-        key={idx}
-        FallbackComponent={FatalErrorPanel}
-        onReset={reset}
-      >
-        <File file={fn} osibs={data} />
-      </ErrorBoundary>
-    </VSCodePanelView>
-  ));
+    const viewProps = {
+      style: {
+        paddingLeft: 0,
+        paddingRight: 0
+      }
+    };
 
-  return (
-    <div className="workspace-area">
-      <VSCodePanels activeid={tabName(active)}>
-        {tabs}
-        {fileComponents}
-      </VSCodePanels>
-    </div>
-  );
-};
+    const tabs: PanelDescription[] = _.map(files, ({ fn, data }, idx) => {
+      return {
+        fn,
+        viewProps,
+        title: basename(fn),
+        Content: () => (
+          <ErrorBoundary
+            key={idx}
+            FallbackComponent={FatalErrorPanel}
+            onReset={reset}
+          >
+            <File file={fn} osibs={data} />
+          </ErrorBoundary>
+        )
+      };
+    });
+
+    return (
+      <div className="workspace-area">
+        <Panels
+          description={tabs}
+          manager={[
+            state.activePanel,
+            n => setState({ activePanel: n }),
+            state.programatic
+          ]}
+        />
+      </div>
+    );
+  }
+);
 
 export default Workspace;

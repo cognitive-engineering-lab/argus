@@ -1,106 +1,29 @@
 import type { ProofNodeIdx } from "@argus/common/bindings";
 import type { TreeRenderParams } from "@argus/common/communication";
 import { TreeAppContext } from "@argus/common/context";
-import { IcoTreeDown } from "@argus/print/Icons";
-import {
-  FloatingFocusManager,
-  FloatingPortal,
-  offset,
-  shift,
-  useClick,
-  useDismiss,
-  useFloating,
-  useInteractions
-} from "@floating-ui/react";
-import classNames from "classnames";
+import {} from "@floating-ui/react";
 import _ from "lodash";
-import React, { useContext, useState } from "react";
+import React, { useContext } from "react";
 
 import { DirRecursive } from "./Directory";
-import Graph from "./Graph";
-import "./TopDown.css";
 
-export const WrapTreeIco = ({
-  n,
-  Child
-}: {
-  n: ProofNodeIdx;
-  Child: React.ReactElement;
-}) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
-  const { refs, floatingStyles, context } = useFloating({
-    open: isOpen,
-    onOpenChange: setIsOpen,
-    placement: "bottom",
-    middleware: [offset(() => 5), shift()]
-  });
-
-  const click = useClick(context);
-  const dismiss = useDismiss(context);
-  const { getReferenceProps, getFloatingProps } = useInteractions([
-    click,
-    dismiss
-  ]);
-
-  return (
-    <span
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {Child}
-      <span
-        className="tree-toggle"
-        ref={refs.setReference}
-        {...getReferenceProps()}
-      >
-        <IcoTreeDown
-          style={{ visibility: isHovered || isOpen ? "visible" : "hidden" }}
-        />
-      </span>
-      {isOpen && (
-        <FloatingPortal>
-          <FloatingFocusManager context={context}>
-            <div
-              className={classNames("floating", "floating-graph")}
-              ref={refs.setFloating}
-              style={floatingStyles}
-              {...getFloatingProps()}
-            >
-              <Graph root={n} />
-            </div>
-          </FloatingFocusManager>
-        </FloatingPortal>
-      )}
-    </span>
-  );
-};
-
-const TopDown = () => {
+const TopDown = ({ start }: { start?: ProofNodeIdx }) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
-
-  // Sort the candidates by the #infer vars / height of the tree
   const getGoalChildren = (kids: ProofNodeIdx[]) =>
-    _.sortBy(kids, [k => -tree.maxHeight(k)]);
+    _.sortBy(kids, [k => tree.minInertiaOnPath(k)]);
 
   const getCandidateChildren = (kids: ProofNodeIdx[]) =>
     _.sortBy(_.uniq(kids), [
-      // k => {
-      //   const node = tree.node(k);
-      //   return "Goal" in node && tree.goal(node.Goal).isMainTv ? 1 : 0;
-      // },
       k => {
         switch (tree.nodeResult(k)) {
           case "no":
-            return 0;
+            return tree.minInertiaOnPath(k);
           case "maybe-overflow":
-            return 1;
+            return tree.minInertiaOnPath(k) + 10_000;
           case "maybe-ambiguity":
-            return 2;
-          case "yes":
-            return 3;
+            return tree.minInertiaOnPath(k) + 100_000;
           default:
-            return 4;
+            return 1_000_000;
         }
       }
     ]);
@@ -117,9 +40,32 @@ const TopDown = () => {
     }
   };
 
+  const ops =
+    start === undefined
+      ? undefined
+      : (() => {
+          const pathToRootFromStart = tree.pathToRoot(start);
+          const startOpenP = (idx: ProofNodeIdx) =>
+            _.includes(pathToRootFromStart.pathInclusive, idx);
+          const onMount = () => {
+            const element = document.querySelector<HTMLSpanElement>(
+              `.proof-node-${start}`
+            );
+            element?.scrollIntoView({
+              block: "start",
+              inline: "nearest",
+              behavior: "smooth"
+            });
+          };
+          return {
+            startOpenP,
+            onMount
+          };
+        })();
+
   const renderParams: TreeRenderParams = {
-    Wrapper: WrapTreeIco,
-    styleEdges: true
+    styleEdges: true,
+    ...ops
   };
 
   return (

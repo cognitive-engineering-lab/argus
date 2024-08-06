@@ -1,7 +1,12 @@
-use std::time::Instant;
+use std::{cell::RefCell, ops::Deref, time::Instant};
 
-use argus_ext::ty::{EvaluationResultExt, TyCtxtExt, TyExt};
+use argus_ext::{
+  rustc::InferCtxtExt,
+  ty::{EvaluationResultExt, PredicateExt, TyCtxtExt, TyExt},
+};
+use argus_ser as ser;
 use index_vec::IndexVec;
+use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::{
   traits::solve::{CandidateSource, Goal as RGoal},
@@ -17,6 +22,7 @@ use super::dnf::{And, Dnf};
 use crate::{
   analysis::EvaluationResult,
   proof_tree::{topology::TreeTopology, ProofNodeIdx},
+  tls,
 };
 
 pub type I = ProofNodeIdx;
@@ -59,6 +65,12 @@ enum GoalKind {
   FnToTrait { _trait: Location, arity: usize },
   TyAsCallable { arity: usize },
   DeleteFnParams { delta: usize },
+  AddFnParams { delta: usize },
+  // Represents a function with the correct number of parameters,
+  // but the parameters trait bounds or types are unsatisifed.
+  // TODO if it's worth the extra effort, we could figure out which
+  // parameters are incorrect and highlight them to the user.
+  IncorrectParams { arity: usize },
   Misc,
 }
 
@@ -88,7 +100,9 @@ impl GoalKind {
       } => 2,
 
       GK::TyChange => 4,
-      GK::DeleteFnParams { delta } => 5 * delta,
+      GK::IncorrectParams { arity: delta }
+      | GK::AddFnParams { delta }
+      | GK::DeleteFnParams { delta } => 5 * delta,
       GK::FnToTrait { _trait: E, arity }
       // You could implement the unstable Fn traits for a type,
       // we could thens suggest this if there's nothing else better.
@@ -184,8 +198,12 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
           GoalKind::DeleteFnParams {
             delta: fn_arity - trait_arity,
           }
+        } else if fn_arity < trait_arity {
+          GoalKind::AddFnParams {
+            delta: trait_arity - fn_arity,
+          }
         } else {
-          GoalKind::Misc
+          GoalKind::IncorrectParams { arity: fn_arity }
         }
       }
 
@@ -247,7 +265,7 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
       }
 
       ty::PredicateKind::Clause(ty::ClauseKind::Trait(t)) => {
-        log::debug!("Trait Self Ty {:?}", t.self_ty());
+        log::warn!("Trait Self Ty {:?} didn't match", t.self_ty());
         GoalKind::Misc
       }
 
@@ -321,9 +339,31 @@ pub struct T<'a, 'tcx: 'a> {
   pub ns: &'a IndexVec<I, N<'tcx>>,
   pub topology: &'a TreeTopology,
   pub maybe_ambiguous: bool,
+  dnf: RefCell<Option<Dnf<I>>>,
 }
 
 impl<'a, 'tcx: 'a> T<'a, 'tcx> {
+  pub fn new(
+    root: I,
+    ns: &'a IndexVec<I, N<'tcx>>,
+    topology: &'a TreeTopology,
+    maybe_ambiguous: bool,
+  ) -> Self {
+    Self {
+      root,
+      ns,
+      topology,
+      maybe_ambiguous,
+      dnf: RefCell::new(None),
+    }
+  }
+
+  pub fn for_correction_set(&self, mut f: impl FnMut(&And<I>)) {
+    for and in self.dnf().iter_conjuncts() {
+      f(and);
+    }
+  }
+
   pub fn goal(&self, i: I) -> Option<Goal<'_, 'tcx>> {
     match &self.ns[i] {
       N::R {
@@ -358,7 +398,16 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
     }
   }
 
-  pub fn dnf(&self) -> Dnf<I> {
+  fn expect_dnf(&self) -> impl Deref<Target = Dnf<I>> + '_ {
+    use std::cell::Ref;
+    Ref::map(self.dnf.borrow(), |o| o.as_ref().expect("dnf"))
+  }
+
+  pub fn dnf(&self) -> impl Deref<Target = Dnf<I>> + '_ {
+    if self.dnf.borrow().is_some() {
+      return self.expect_dnf();
+    }
+
     fn _goal(this: &T, goal: &Goal) -> Option<Dnf<I>> {
       if !((this.maybe_ambiguous && goal.result.is_maybe())
         || goal.result.is_no())
@@ -395,7 +444,8 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
     let dnf = _goal(self, &root).unwrap_or_else(Dnf::default);
     timer::elapsed(&dnf_report_msg, dnf_start);
 
-    dnf
+    self.dnf.replace(Some(dnf));
+    self.expect_dnf()
   }
 
   /// Failed predicates are weighted as follows.
@@ -438,9 +488,41 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
     }
   }
 
-  #[inline]
-  pub fn iter_correction_sets(&self) -> impl Iterator<Item = And<I>> {
-    self.dnf().into_iter_conjuncts()
+  pub fn reportable_impl_candidates(
+    &self,
+  ) -> HashMap<I, Vec<serde_json::Value>> {
+    let mut indices = Vec::default();
+    self.for_correction_set(|and| indices.extend(and.iter().copied()));
+
+    let goals_only = indices.iter().filter_map(|&idx| self.goal(idx));
+
+    let trait_goals = goals_only.filter(|g| {
+      matches!(
+        g.analyze().kind,
+        GoalKind::Trait { .. } | GoalKind::FnToTrait { .. }
+      )
+    });
+
+    trait_goals
+      .filter_map(|g| {
+        g.predicate().as_trait_predicate().map(|tp| {
+          let candidates = g
+            .infcx
+            .find_similar_impl_candidates(tp)
+            .into_iter()
+            .filter_map(|can| {
+              let header =
+                ser::argus::get_opt_impl_header(g.infcx.tcx, can.impl_def_id)?;
+              Some(tls::unsafe_access_interner(|ty_interner| {
+                ser::to_value_expect(g.infcx, ty_interner, &header)
+              }))
+            })
+            .collect();
+
+          (g.idx, candidates)
+        })
+      })
+      .collect()
   }
 }
 

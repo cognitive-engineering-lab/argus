@@ -1,4 +1,3 @@
-import classNames from "classnames";
 import React, { useState } from "react";
 
 import "./Toggle.css";
@@ -13,14 +12,17 @@ export const Toggle = ({
   const [expanded, setExpanded] = useState(false);
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: TODO
-    <div
-      className={classNames("toggle-box", { expanded })}
+    <details
+      className="toggle-box"
+      open={expanded}
       onClick={e => {
+        e.preventDefault();
         e.stopPropagation();
-        setExpanded(!expanded);
+        setExpanded(e => !e);
       }}
     >
-      {expanded ? <Children /> : <span className="summary">{summary}</span>}
-    </div>
+      <summary>{summary}</summary>
+      <Children />
+    </details>
   );
 };

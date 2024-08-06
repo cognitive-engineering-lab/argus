@@ -15,6 +15,9 @@ import type {
 import type { MessageSystem } from "./communication";
 import type { Filename } from "./lib";
 
+export const arrUpdate = <T>(arr: T[], idx: number, val: T) =>
+  _.map(arr, (v, i) => (i !== idx ? v : val));
+
 export function isObject(x: any): x is object {
   return typeof x === "object" && x !== null;
 }
@@ -44,19 +47,17 @@ export function makeHighlightPosters(
   file: Filename
 ) {
   const addHighlight = () => {
-    messageSystem.postData({
+    messageSystem.postData("add-highlight", {
       type: "FROM_WEBVIEW",
       file,
-      command: "add-highlight",
       range
     });
   };
 
   const removeHighlight = () => {
-    messageSystem.postData({
+    messageSystem.postData("remove-highlight", {
       type: "FROM_WEBVIEW",
       file,
-      command: "remove-highlight",
       range
     });
   };
@@ -179,4 +180,17 @@ export function isNamedBoundVariable(bv: BoundVariableKind) {
   }
 
   return false;
+}
+
+export function makeid(length = 16) {
+  let result = "";
+  const characters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const charactersLength = characters.length;
+  let counter = 0;
+  while (counter < length) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    counter += 1;
+  }
+  return result;
 }
