@@ -27,15 +27,6 @@ use crate::{
 
 pub type I = ProofNodeIdx;
 
-#[derive(Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
-pub struct CandidateImplementors {
-  // TODO
-  implementors: Vec<()>,
-}
-
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "testing", derive(TS))]
