@@ -23,4 +23,5 @@
 .DefinitionWrapper.hovered.meta-pressed {
     color: var(--vscode-editorLink-activeForeground);
     text-decoration: underline;
+    cursor: pointer;
 }

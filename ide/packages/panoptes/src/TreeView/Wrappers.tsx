@@ -33,7 +33,11 @@ export const WrapNode = ({
 }: React.PropsWithChildren<{ wrappers: InfoWrapper[]; n: ProofNodeIdx }>) => {
   const [hovered, setHovered] = useState(false);
   const [actives, setActives] = useState(Array(wrappers.length).fill(false));
+
   const active = _.some(actives);
+  const className = classNames("WrapperBox", {
+    "is-hovered": hovered || active
+  });
 
   return (
     <span
@@ -41,17 +45,15 @@ export const WrapNode = ({
       onMouseLeave={() => setHovered(false)}
     >
       {children}
-      {(hovered || active) && (
-        <span className="WrapperBox">
-          {_.map(wrappers, (W, i) => (
-            <W
-              key={i}
-              n={n}
-              reportActive={b => setActives(a => arrUpdate(a, i, b))}
-            />
-          ))}
-        </span>
-      )}
+      <span className={className}>
+        {_.map(wrappers, (W, i) => (
+          <W
+            key={i}
+            n={n}
+            reportActive={b => setActives(a => arrUpdate(a, i, b))}
+          />
+        ))}
+      </span>
     </span>
   );
 };

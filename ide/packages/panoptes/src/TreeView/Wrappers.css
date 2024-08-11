@@ -24,10 +24,17 @@
 }
 
 .WrapperBox {
-    display: inline-flex;
+    display: none;
+    padding-left: 0.5em;
+
     flex-direction: row;
     justify-content: space-evenly;
+    align-items: center;
     gap: 0.25em;
+}
+
+.WrapperBox.is-hovered {
+    display: inline-flex;
 }
 
 .WrapperBox i:hover {
