@@ -56,6 +56,10 @@ pub fn drain_implied_ambiguities<'tcx>(
   _infcx: &InferCtxt<'tcx>,
   obligation: &PredicateObligation<'tcx>,
 ) {
+  // FIXME: this causes an internal compiler error that *should not happen*, it's setting
+  // tainted by errors to be true when it shouldn't.
+  return;
+
   OBLIGATIONS.with(|obls| {
     let mut obls = obls.borrow_mut();
 

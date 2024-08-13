@@ -55,43 +55,44 @@ pub fn process_obligation<'tcx>(
 
   log::trace!("RECV OBLIGATION {result:?} {obl:?}");
 
-  // Use this to get rid of any resolved inference variables,
-  // these could have been resolved while trying to solve the obligation
-  // and we want to present it as such to the user.
-  let obl = &infcx.resolve_vars_if_possible(obl.clone());
+  // Anything we accidentally do in here should not affect type checking
+  infcx.probe(|_| {
+    // Use this to get rid of any resolved inference variables,
+    // these could have been resolved while trying to solve the obligation
+    // and we want to present it as such to the user.
+    let obl = &infcx.resolve_vars_if_possible(obl.clone());
 
-  // HACK: Remove ambiguous obligations if a "stronger" result was found and
-  // the predicate implies the  previous. This is necessary because we
-  // can't (currently) distinguish between a subsequent solving attempt
-  // of a previous obligation.
-  if result.is_yes() || result.is_no() {
-    tls::drain_implied_ambiguities(infcx, obl);
-  }
+    // HACK: Remove ambiguous obligations if a "stronger" result was found and
+    // the predicate implies the  previous. This is necessary because we
+    // can't (currently) distinguish between a subsequent solving attempt
+    // of a previous obligation.
+    if result.is_yes() || result.is_no() {
+      tls::drain_implied_ambiguities(infcx, obl);
+    }
 
-  if !INCLUDE_SUCCESSES.copied().unwrap_or(false) && result.is_yes() {
-    log::debug!("Skipping successful obligation {obl:?}");
-    return;
-  }
+    if !INCLUDE_SUCCESSES.copied().unwrap_or(false) && result.is_yes() {
+      log::debug!("Skipping successful obligation {obl:?}");
+      return;
+    }
 
-  let necessity = infcx.obligation_necessity(obl);
-  let dataid = if matches!(necessity, ObligationNecessity::Yes)
-    || (matches!(necessity, ObligationNecessity::OnError) && result.is_no())
-  {
-    Some(tls::unsafe_store_data(infcx, obl, result))
-  } else {
-    None
-  };
+    let necessity = infcx.obligation_necessity(obl);
+    let dataid = if matches!(necessity, ObligationNecessity::Yes)
+      || (matches!(necessity, ObligationNecessity::OnError) && result.is_no())
+    {
+      Some(tls::unsafe_store_data(infcx, obl, result))
+    } else {
+      None
+    };
 
-  let obligation =
-    transform::compute_provenance(body_id, infcx, obl, result, dataid);
+    let obligation =
+      transform::compute_provenance(body_id, infcx, obl, result, dataid);
 
-  tls::store_obligation(obligation);
+    tls::store_obligation(obligation);
 
-  tls::replace_reported_errors(infcx);
+    tls::replace_reported_errors(infcx);
+  });
 }
 
-// FIXME: this *should* do less work than processing obligations normally would, but
-// it seems to change(?) the typeck results, which is not good.
 pub fn process_obligation_for_tree<'tcx>(
   infcx: &InferCtxt<'tcx>,
   obl: &PredicateObligation<'tcx>,
@@ -103,23 +104,25 @@ pub fn process_obligation_for_tree<'tcx>(
     // Must go after the synthetic check.
     guard_inspection! {}
 
-    // Use this to get rid of any resolved inference variables,
-    // these could have been resolved while trying to solve the obligation
-    // and we want to present it as such to the user.
-    let obl = &infcx.resolve_vars_if_possible(obl.clone());
+    infcx.probe(|_| {
+      // Use this to get rid of any resolved inference variables,
+      // these could have been resolved while trying to solve the obligation
+      // and we want to present it as such to the user.
+      let obl = &infcx.resolve_vars_if_possible(obl.clone());
 
-    let fdata = infcx.bless_fulfilled(obl, result);
+      let fdata = infcx.bless_fulfilled(obl, result);
 
-    if fdata.hash != target.hash {
-      return;
-    }
-
-    match generate_tree(infcx, obl, fdata.result) {
-      Ok(stree) => tls::store_tree(stree),
-      Err(e) => {
-        log::error!("matching target tree not generated {e:?}");
+      if fdata.hash != target.hash {
+        return;
       }
-    }
+
+      match generate_tree(infcx, obl, fdata.result) {
+        Ok(stree) => tls::store_tree(stree),
+        Err(e) => {
+          log::error!("matching target tree not generated {e:?}");
+        }
+      }
+    })
   });
 }
 
