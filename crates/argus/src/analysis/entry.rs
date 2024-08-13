@@ -90,6 +90,8 @@ pub fn process_obligation<'tcx>(
   tls::replace_reported_errors(infcx);
 }
 
+// FIXME: this *should* do less work than processing obligations normally would, but
+// it seems to change(?) the typeck results, which is not good.
 pub fn process_obligation_for_tree<'tcx>(
   infcx: &InferCtxt<'tcx>,
   obl: &PredicateObligation<'tcx>,
@@ -214,10 +216,13 @@ pub(in crate::analysis) fn build_obligations_in_body<'tcx>(
   // so as a first heuristic, if the body isn't tainted by errors, we'll just remove
   // all non-successful obligations.
   if typeck_results.tainted_by_errors.is_none() {
-    log::info!("BODY HAS NO ERRORS");
+    log::info!(
+      "Removing failures: Body not-tainted {:?}",
+      typeck_results.hir_owner
+    );
     obligations.retain(|prov| prov.it.result.is_yes());
   } else {
-    log::info!("BODY TAINTED! {:?}", typeck_results.hir_owner);
+    log::info!("Body tainted! {:?}", typeck_results.hir_owner);
   }
 
   let ctx = ErrorAssemblyCtx {

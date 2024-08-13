@@ -26,15 +26,20 @@
 .WrapperBox {
     display: none;
     padding-left: 0.5em;
-
-    flex-direction: row;
-    justify-content: space-evenly;
-    align-items: center;
-    gap: 0.25em;
 }
 
 .WrapperBox.is-hovered {
-    display: inline-flex;
+    display: inline;
+}
+
+.WrapperBox i.codicon {
+    /* Removes the inline-block default that causes the 
+       icons to overflow the bounding box of the proof node labels 
+
+       TODO: why is this default necessary for the codicons, and how 
+       come it breaks our bounding box here. CSS is a mystery.
+    */
+    display: inline;
 }
 
 .WrapperBox i:hover {

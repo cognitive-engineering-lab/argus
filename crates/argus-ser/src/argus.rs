@@ -183,7 +183,7 @@ pub enum ClauseBound<'tcx> {
   ),
 }
 
-pub fn group_predicates_by_ty<'tcx>(
+pub(crate) fn group_predicates_by_ty<'tcx>(
   tcx: ty::TyCtxt<'tcx>,
   predicates: impl IntoIterator<Item = ty::Clause<'tcx>>,
 ) -> GroupedClauses<'tcx> {

@@ -26,6 +26,19 @@ fluid_let! {
   pub static INCLUDE_SUCCESSES: bool;
 }
 
+/// Check the workspace as rustc would, but with the new solver
+///
+/// Returns `true` if the body is tainted by errors and wouldn't type check.
+pub fn check(tcx: TyCtxt, body_id: BodyId) -> Result<bool> {
+  fluid_let::fluid_set!(entry::BODY_ID, body_id);
+  let typeck_results = tcx.inspect_typeck(body_id, |_, _, _| {});
+  log::info!(
+    "check {body_id:?} tainted? {:?}",
+    typeck_results.tainted_by_errors
+  );
+  Ok(typeck_results.tainted_by_errors.is_some())
+}
+
 /// Generate the set of evaluated obligations within a single body.
 pub fn obligations(tcx: TyCtxt, body_id: BodyId) -> Result<ObligationsInBody> {
   fluid_let::fluid_set!(entry::BODY_ID, body_id);
@@ -48,7 +61,8 @@ pub fn tree(tcx: TyCtxt, body_id: BodyId) -> Result<SerializedTree> {
   log::trace!("tree {body_id:?}");
 
   let typeck_results =
-    tcx.inspect_typeck(body_id, entry::process_obligation_for_tree);
+    // tcx.inspect_typeck(body_id, entry::process_obligation_for_tree);
+    tcx.inspect_typeck(body_id, entry::process_obligation);
 
   entry::build_tree_output(tcx, body_id, typeck_results)
 }
