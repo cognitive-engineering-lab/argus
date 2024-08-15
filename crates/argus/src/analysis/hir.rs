@@ -48,6 +48,8 @@ fn bin_expressions(
   };
 
   binner.visit_body(ctx.tcx.hir().body(ctx.body_id));
+
+  // Add remaining miscelanous unbinned obligations
   let mut bins = binner.bins;
   for (hir_id, obligations) in map {
     bins.push(Bin {
@@ -65,14 +67,13 @@ pub enum BinKind {
   CallableExpr,
   CallArg,
   Call,
-  // MethodCall,
-  // MethodReceiver,
   Misc,
 }
 
 pub struct Bin {
   pub hir_id: HirId,
-  // TODO: use IndexVec for obligations.
+  // TODO: use IndexVec for obligations instead of the--
+  //
   // usize indexes into the obligation vec
   pub obligations: Vec<usize>,
   pub kind: BinKind,
@@ -158,21 +159,21 @@ pub fn find_most_enclosing_node(
     .map(|t| t.0)
 }
 
-// NOTE: this probably needs to be expanded to account for all nodes, not just expressions.
+/// Visitor for finding a `HirId` given a span.
+///
+/// Code taken from rustc_trait_selection::traits::error_reporting and modified
+/// to find items that enclose the span, not just match it exactly.
 struct FindNodeBySpan {
   pub span: Span,
   pub result: Option<(HirId, Span)>,
 }
 
-// Code taken from rustc_trait_selection::traits::error_reporting,
-// modified to find items that enclose the span, not just match it
-// exactly.
-// TODO: this should work on all nodes, not just expressions.
 impl FindNodeBySpan {
   pub fn new(span: Span) -> Self {
     Self { span, result: None }
   }
 
+  /// Is span `s` a closer match than the current best?
   fn is_better_match(&self, s: Span) -> bool {
     s.overlaps(self.span)
       && match self.result {

@@ -37,7 +37,7 @@
        icons to overflow the bounding box of the proof node labels 
 
        TODO: why is this default necessary for the codicons, and how 
-       come it breaks our bounding box here. CSS is a mystery.
+       come it breaks our bounding box here? CSS is a mystery.
     */
     display: inline;
 }

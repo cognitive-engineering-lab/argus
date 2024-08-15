@@ -29,8 +29,6 @@ const DRAIN_WINDOW: usize = 100;
 // NOTE: we use thread local storage to accumulate obligations
 // accross call to the obligation inspector in `typeck_inspect`.
 // DO NOT set this directly, make sure to use the function `push_obligaion`.
-//
-// TODO: documentation
 thread_local! {
   static BODY_DEF_PATH: RefCell<Option<serde_json::Value>> = RefCell::default();
 
@@ -49,15 +47,17 @@ pub fn store_obligation(obl: Provenance<Obligation>) {
   });
 }
 
-// TODO: using `infcx` for error implication panics, but using
+// FIXME: using `infcx` for error implication panics, but using
 // stored contexts doesn't. Investigate why, as this certainly
 // isn't a "solution."
+//
+// NOTE this causes an internal compiler error that *should not happen*, it's setting
+// tainted by errors to be true when it shouldn't. Disabling for now.
+#[allow(unused)]
 pub fn drain_implied_ambiguities<'tcx>(
   _infcx: &InferCtxt<'tcx>,
   obligation: &PredicateObligation<'tcx>,
 ) {
-  // FIXME: this causes an internal compiler error that *should not happen*, it's setting
-  // tainted by errors to be true when it shouldn't.
   return;
 
   OBLIGATIONS.with(|obls| {

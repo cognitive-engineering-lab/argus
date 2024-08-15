@@ -66,9 +66,9 @@ pub fn process_obligation<'tcx>(
     // the predicate implies the  previous. This is necessary because we
     // can't (currently) distinguish between a subsequent solving attempt
     // of a previous obligation.
-    if result.is_yes() || result.is_no() {
-      tls::drain_implied_ambiguities(infcx, obl);
-    }
+    // if result.is_yes() || result.is_no() {
+    //   tls::drain_implied_ambiguities(infcx, obl);
+    // }
 
     if !INCLUDE_SUCCESSES.copied().unwrap_or(false) && result.is_yes() {
       log::debug!("Skipping successful obligation {obl:?}");
@@ -219,13 +219,13 @@ pub(in crate::analysis) fn build_obligations_in_body<'tcx>(
   // so as a first heuristic, if the body isn't tainted by errors, we'll just remove
   // all non-successful obligations.
   if typeck_results.tainted_by_errors.is_none() {
-    log::info!(
+    log::debug!(
       "Removing failures: Body not-tainted {:?}",
       typeck_results.hir_owner
     );
     obligations.retain(|prov| prov.it.result.is_yes());
   } else {
-    log::info!("Body tainted! {:?}", typeck_results.hir_owner);
+    log::debug!("Body tainted! {:?}", typeck_results.hir_owner);
   }
 
   let ctx = ErrorAssemblyCtx {

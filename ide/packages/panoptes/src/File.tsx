@@ -74,10 +74,7 @@ export interface FileProps {
 
 const File = ({ file, osibs }: FileProps) => {
   const showHidden = useContext(AppContext.ShowHiddenObligationsContext);
-  const bodyInfos = _.map(
-    osibs,
-    (osib, idx) => new BodyInfo(osib, idx, showHidden)
-  );
+  const bodyInfos = _.map(osibs, osib => new BodyInfo(osib, showHidden));
 
   const noBodiesFound = (
     <ErrorDiv>
