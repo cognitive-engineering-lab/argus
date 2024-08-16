@@ -110,9 +110,7 @@ impl<'tcx> Storage<'tcx> {
     let tree_start = Instant::now();
 
     let mut sets = vec![];
-    tree.for_correction_set(|conjunct| {
-      sets.push(tree.weight(&conjunct));
-    });
+    tree.for_correction_set(|conjunct| sets.push(tree.weight(conjunct)));
 
     timer::elapsed("aadeg::into_results", tree_start);
 

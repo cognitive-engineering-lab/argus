@@ -335,7 +335,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
 
         self.trait_errors.push(TraitError {
           idx: expr_id,
-          range: self.exprs[expr_id].range.clone(),
+          range: self.exprs[expr_id].range,
           hashes,
         });
         continue;
@@ -380,7 +380,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       // Mark the found Expr as containing an error.
       self.trait_errors.push(TraitError {
         idx: *expr_id,
-        range: self.exprs[*expr_id].range.clone(),
+        range: self.exprs[*expr_id].range,
         hashes: vec![],
       });
     }

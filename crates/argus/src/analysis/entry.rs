@@ -122,7 +122,7 @@ pub fn process_obligation_for_tree<'tcx>(
           log::error!("matching target tree not generated {e:?}");
         }
       }
-    })
+    });
   });
 }
 

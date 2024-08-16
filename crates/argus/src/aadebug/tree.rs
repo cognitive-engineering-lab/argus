@@ -169,6 +169,8 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
   }
 
   fn analyze(&self) -> Heuristic {
+    use std::cmp::Ordering;
+
     // We should only be analyzing failed predicates
     assert!(!self.result.is_yes());
 
@@ -188,16 +190,14 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
         log::debug!("Fn Args {:?}", t.trait_ref.args.into_type_list(tcx));
         log::debug!("{} v {}", fn_arity, trait_arity);
 
-        if fn_arity > trait_arity {
-          GoalKind::DeleteFnParams {
-            delta: fn_arity - trait_arity,
-          }
-        } else if fn_arity < trait_arity {
-          GoalKind::AddFnParams {
+        match fn_arity.cmp(&trait_arity) {
+          Ordering::Less => GoalKind::AddFnParams {
             delta: trait_arity - fn_arity,
-          }
-        } else {
-          GoalKind::IncorrectParams { arity: fn_arity }
+          },
+          Ordering::Greater => GoalKind::DeleteFnParams {
+            delta: fn_arity - trait_arity,
+          },
+          Ordering::Equal => GoalKind::IncorrectParams { arity: fn_arity },
         }
       }
 
@@ -398,10 +398,6 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
   }
 
   pub fn dnf(&self) -> impl Deref<Target = Dnf<I>> + '_ {
-    if self.dnf.borrow().is_some() {
-      return self.expect_dnf();
-    }
-
     fn _goal(this: &T, goal: &Goal) -> Option<Dnf<I>> {
       if !((this.maybe_ambiguous && goal.result.is_maybe())
         || goal.result.is_no())
@@ -428,6 +424,10 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
 
       let goals = candidate.source_subgoals();
       Dnf::and(goals.filter_map(|g| _goal(this, &g)))
+    }
+
+    if self.dnf.borrow().is_some() {
+      return self.expect_dnf();
     }
 
     let dnf_report_msg =

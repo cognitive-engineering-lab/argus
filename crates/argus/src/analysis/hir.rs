@@ -161,7 +161,7 @@ pub fn find_most_enclosing_node(
 
 /// Visitor for finding a `HirId` given a span.
 ///
-/// Code taken from rustc_trait_selection::traits::error_reporting and modified
+/// Code taken from `rustc_trait_selection::traits::error_reporting` and modified
 /// to find items that enclose the span, not just match it exactly.
 struct FindNodeBySpan {
   pub span: Span,
