@@ -1,5 +1,8 @@
 use anyhow::{bail, Result};
-use argus_ext::ty::{EvaluationResultExt, TyExt};
+use argus_ext::{
+  rustc::InferCtxtExt,
+  ty::{EvaluationResultExt, PredicateExt, TyExt},
+};
 use index_vec::IndexVec;
 use rustc_hir::def_id::DefId;
 use rustc_infer::infer::InferCtxt;
@@ -22,6 +25,7 @@ pub struct SerializedTreeVisitor<'tcx> {
   pub topology: TreeTopology,
   pub cycle: Option<ProofCycle>,
   pub projection_values: HashMap<TyIdx, TyIdx>,
+  pub all_impl_candidates: HashMap<ProofNodeIdx, Vec<CandidateIdx>>,
 
   deferred_leafs: Vec<(ProofNodeIdx, EvaluationResult)>,
   interners: Interners,
@@ -37,6 +41,7 @@ impl SerializedTreeVisitor<'_> {
       topology: TreeTopology::new(),
       cycle: None,
       projection_values: HashMap::default(),
+      all_impl_candidates: HashMap::default(),
 
       deferred_leafs: Vec::default(),
       interners: Interners::default(),
@@ -117,6 +122,7 @@ impl SerializedTreeVisitor<'_> {
       mut interners,
       aadebug,
       deferred_leafs,
+      all_impl_candidates,
       ..
     } = self
     else {
@@ -143,6 +149,7 @@ impl SerializedTreeVisitor<'_> {
       results,
       tys,
       projection_values,
+      all_impl_candidates,
       topology,
       cycle,
       analysis,
@@ -154,7 +161,7 @@ impl SerializedTreeVisitor<'_> {
   // interned keys does essentially). We should wait until the new trait solver
   // has some mechanism for detecting cycles and piggy back off that.
   // FIXME: this is currently dissabled but we should check for cycles again...
-  #[allow(dead_code)]
+  #[allow(dead_code, unused)]
   fn check_for_cycle_from(&mut self, from: ProofNodeIdx) {
     if self.cycle.is_some() {
       return;
@@ -226,6 +233,25 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
       }
     }
   }
+
+  fn record_all_impls(
+    &mut self,
+    idx: ProofNodeIdx,
+    goal: &InspectGoal<'_, 'tcx>,
+  ) {
+    // If the Goal is a TraitPredicate we will cache *all* possible implementors
+    if let Some(tp) = goal.goal().predicate.as_trait_predicate() {
+      let infcx = goal.infcx();
+      for can in infcx.find_similar_impl_candidates(tp) {
+        let can_idx = self.interners.intern_impl(infcx, can.impl_def_id);
+        self
+          .all_impl_candidates
+          .entry(idx)
+          .or_default()
+          .push(can_idx);
+      }
+    }
+  }
 }
 
 impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
@@ -240,6 +266,10 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
 
     let here_node = self.interners.mk_goal_node(goal);
     let here_idx = self.nodes.push(here_node);
+
+    // Record all the possible candidate impls for this goal.
+    self.record_all_impls(here_idx, goal);
+
     // Push node into the analysis tree.
     self.aadebug.push_goal(here_idx, goal).unwrap();
 

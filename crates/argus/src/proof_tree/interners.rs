@@ -183,7 +183,11 @@ impl Interners {
       .insert(CanKey::ParamEnv(idx), CandidateData::ParamEnv(idx))
   }
 
-  fn intern_impl(&mut self, infcx: &InferCtxt, def_id: DefId) -> CandidateIdx {
+  pub(super) fn intern_impl(
+    &mut self,
+    infcx: &InferCtxt,
+    def_id: DefId,
+  ) -> CandidateIdx {
     if let Some(i) = self.candidates.get_idx(&CanKey::Impl(def_id)) {
       return i;
     }

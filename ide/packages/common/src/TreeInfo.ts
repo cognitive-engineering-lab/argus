@@ -6,7 +6,6 @@ import type {
   EvaluationResult,
   GoalIdx,
   GoalKind,
-  ImplHeader,
   ProofNodeIdx,
   ResultIdx,
   SerializedTree,
@@ -443,8 +442,8 @@ export class TreeInfo {
     return _.min(_.map(hs, TreeInfo.setInertia)) ?? 10_000;
   }
 
-  public implCandidates(idx: ProofNodeIdx): ImplHeader[] | undefined {
-    return this.tree.analysis.implCandidates[idx];
+  public implCandidates(idx: ProofNodeIdx): CandidateIdx[] | undefined {
+    return this.tree.allImplCandidates[idx];
   }
 }
 

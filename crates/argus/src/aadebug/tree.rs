@@ -1,12 +1,7 @@
 use std::{cell::RefCell, ops::Deref, time::Instant};
 
-use argus_ext::{
-  rustc::InferCtxtExt,
-  ty::{EvaluationResultExt, PredicateExt, TyCtxtExt, TyExt},
-};
-use argus_ser as ser;
+use argus_ext::ty::{EvaluationResultExt, TyCtxtExt, TyExt};
 use index_vec::IndexVec;
-use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::{
   traits::solve::{CandidateSource, Goal as RGoal},
@@ -22,7 +17,6 @@ use super::dnf::{And, Dnf};
 use crate::{
   analysis::EvaluationResult,
   proof_tree::{topology::TreeTopology, ProofNodeIdx},
-  tls,
 };
 
 pub type I = ProofNodeIdx;
@@ -486,43 +480,6 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
       velocity,
       goals,
     }
-  }
-
-  pub fn reportable_impl_candidates(
-    &self,
-  ) -> HashMap<I, Vec<serde_json::Value>> {
-    let mut indices = Vec::default();
-    self.for_correction_set(|and| indices.extend(and.iter().copied()));
-
-    let goals_only = indices.iter().filter_map(|&idx| self.goal(idx));
-
-    let trait_goals = goals_only.filter(|g| {
-      matches!(
-        g.analyze().kind,
-        GoalKind::Trait { .. } | GoalKind::FnToTrait { .. }
-      )
-    });
-
-    trait_goals
-      .filter_map(|g| {
-        g.predicate().as_trait_predicate().map(|tp| {
-          let candidates = g
-            .infcx
-            .find_similar_impl_candidates(tp)
-            .into_iter()
-            .filter_map(|can| {
-              let header =
-                ser::argus::get_opt_impl_header(g.infcx.tcx, can.impl_def_id)?;
-              Some(tls::unsafe_access_interner(|ty_interner| {
-                ser::to_value_expect(g.infcx, ty_interner, &header)
-              }))
-            })
-            .collect();
-
-          (g.idx, candidates)
-        })
-      })
-      .collect()
   }
 }
 

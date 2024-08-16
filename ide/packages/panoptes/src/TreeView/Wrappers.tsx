@@ -6,7 +6,6 @@ import type {
 import { TreeAppContext } from "@argus/common/context";
 import { arrUpdate } from "@argus/common/func";
 import { IcoListUL, IcoTreeDown } from "@argus/print/Icons";
-import { PrintImplHeader } from "@argus/print/lib";
 import {
   FloatingArrow,
   FloatingFocusManager,
@@ -23,6 +22,7 @@ import classNames from "classnames";
 import _ from "lodash";
 import React, { type ReactElement, useState, useContext, useRef } from "react";
 import Graph from "./Graph";
+import { Candidate } from "./Node";
 
 import "./Wrappers.css";
 
@@ -140,10 +140,7 @@ export const WrapTreeIco = ({ n, reportActive }: InfoWrapperProps) => (
 export const WrapImplCandidates = ({ n, reportActive }: InfoWrapperProps) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
   const candidates = tree.implCandidates(n);
-
-  if (candidates === undefined || candidates.length === 0) {
-    return null;
-  }
+  if (candidates === undefined || candidates.length === 0) return null;
 
   return (
     <DetailsPortal reportActive={reportActive} info={<IcoListUL />}>
@@ -151,7 +148,7 @@ export const WrapImplCandidates = ({ n, reportActive }: InfoWrapperProps) => {
       <div className="ImplCandidatesPanel">
         {_.map(candidates, (c, i) => (
           <div key={i}>
-            <PrintImplHeader impl={c} />
+            <Candidate idx={c} />
           </div>
         ))}
       </div>
