@@ -15,6 +15,7 @@ import React from "react";
 
 import { HoverInfo } from "../HoverInfo";
 import { IcoNote } from "../Icons";
+import MonoSpace from "../MonoSpace";
 import { PrintGroupedClauses } from "./argus";
 import { PrintConst } from "./const";
 import { PrintDefinitionPath } from "./path";
@@ -33,7 +34,13 @@ export const PrintPredicateObligation = ({ o }: { o: PredicateObligation }) => {
     o.paramEnv.grouped,
     o.paramEnv.other
   ) ? null : (
-    <HoverInfo Content={() => <PrintParamEnv o={o.paramEnv} />}>
+    <HoverInfo
+      Content={() => (
+        <MonoSpace>
+          <PrintParamEnv o={o.paramEnv} />
+        </MonoSpace>
+      )}
+    >
       {" "}
       <IcoNote />
     </HoverInfo>

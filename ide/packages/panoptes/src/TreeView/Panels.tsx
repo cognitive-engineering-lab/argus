@@ -72,7 +72,7 @@ const Panels = ({
   // NOTE: rerenders should not occur if the user clicks on a tab. We cache the
   // elements in state to avoid this. IFF the change is *programatic*, meaning
   // some GUI action caused the change, we always want to force a rerender so that
-  // state change visuals are shown.
+  // state change animations are shown.
   useEffect(() => {
     console.debug(`Panel(${id}) params changed`, active, programaticSwitch);
     if (programaticSwitch) {
@@ -126,6 +126,7 @@ const Panels = ({
     if (idx < 0 || description.length <= idx) {
       setTabs(idx, undefined);
       setPanels(idx, undefined);
+      return;
     }
 
     const d = desc ?? description[idx];
