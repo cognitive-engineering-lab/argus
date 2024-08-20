@@ -125,12 +125,20 @@ export const PrintWhereClause = ({
 };
 
 const PrintClauseWithBounds = ({ o }: { o: ClauseWithBounds }) => {
-  const [traits, lifetimes] = _.partition(o.bounds, bound => "Trait" in bound);
-  const traitBounds = _.map(traits, bound => <PrintClauseBound o={bound} />);
-  const lifetimeBounds = _.map(lifetimes, bound => (
+  // Sort the bounds to be Ty: Fn() + Trait + Region
+  const sortedBounds = _.sortBy(o.bounds, bound =>
+    "FnTrait" in bound
+      ? 0
+      : "Trait" in bound
+        ? 1
+        : "Region" in bound
+          ? 2
+          : undefined
+  );
+
+  const boundComponents = _.map(sortedBounds, bound => (
     <PrintClauseBound o={bound} />
   ));
-  const boundComponents = _.concat(traitBounds, lifetimeBounds);
 
   return (
     <>
