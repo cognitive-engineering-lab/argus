@@ -354,17 +354,18 @@ pub(super) mod intermediate {
 
   use super::*;
 
-  // The provenance about where an element came from,
-  // or was "spawned from," in the HIR. This type is intermediate
-  // but stored in the TLS, it shouldn't capture lifetimes but
-  // can capture unstable hashes.
+  /// The provenance from where an element came, or was "spawned from,"
+  /// in the HIR. This type is intermediate but stored in the TLS, it
+  /// shouldn't capture lifetimes but can capture unstable hashes.
   pub(crate) struct Provenance<T: Sized> {
-    // The expression from whence `it` came, the
-    // referenced element is expected to be an
-    // expression.
+    /// The expression from whence `it` came, the referenced element
+    /// is expected to be an expression.
     pub hir_id: HirId,
-    // Index into the full provenance data, this is stored for interesting obligations.
+
+    /// Index into the full provenance data, this is stored for interesting obligations.
     pub full_data: Option<UODIdx>,
+
+    /// The actual element.
     pub it: T,
   }
 

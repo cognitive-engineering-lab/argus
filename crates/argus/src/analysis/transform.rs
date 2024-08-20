@@ -46,9 +46,11 @@ pub fn compute_provenance<'tcx>(
 ) -> Provenance<Obligation> {
   let hir = infcx.tcx.hir();
   let fdata = infcx.bless_fulfilled(obligation, result);
+
   // If the span is coming from a macro, point to the callsite.
   let callsite_cause_span =
     infcx.tcx.to_local(body_id, fdata.obligation.cause.span);
+
   let hir_id =
     hier_hir::find_most_enclosing_node(infcx.tcx, body_id, callsite_cause_span)
       .unwrap_or_else(|| hir.body_owner(body_id));
