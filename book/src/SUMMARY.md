@@ -2,14 +2,9 @@
 
 [Introduction](README.md)
 
-- [Debugging trait errors](debug-media.md)
+- [Trait Debugging 101](trait-debugging-101.md)
 
-- [How to think about Argus]()
+- [Trait Methods and Typestate]()
 
-- [Debug a Bevy game]()
+- [Advanced Trait Solving]()
 
-- [Debug an Axum server]()
-
-- [Debug async Rust]()
-
-- [Debug stack overflows]()
