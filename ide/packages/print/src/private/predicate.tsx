@@ -16,7 +16,7 @@ import React from "react";
 import { HoverInfo } from "../HoverInfo";
 import { IcoNote } from "../Icons";
 import MonoSpace from "../MonoSpace";
-import { PrintGroupedClauses } from "./argus";
+import { PrintClauses } from "./argus";
 import { PrintConst } from "./const";
 import { PrintDefinitionPath } from "./path";
 import { PrintTerm } from "./term";
@@ -54,19 +54,17 @@ export const PrintPredicateObligation = ({ o }: { o: PredicateObligation }) => {
   );
 };
 
-export const PrintGoalPredicate = ({ o }: { o: GoalPredicate }) => {
+export const PrintGoalPredicate = ({ o }: { o: GoalPredicate }) => (
   // NOTE: goals and obligations aren't the same thing, but they
   // currently have the same semantic structure.
-  return <PrintPredicateObligation o={o} />;
-};
+  <PrintPredicateObligation o={o} />
+);
 
-export const PrintParamEnv = ({ o }: { o: ParamEnv }) => {
-  return (
-    <div className="WhereConstraintArea">
-      <PrintGroupedClauses o={o} />
-    </div>
-  );
-};
+export const PrintParamEnv = ({ o }: { o: ParamEnv }) => (
+  <div className="WhereConstraintArea">
+    <PrintClauses grouped={o.grouped} ungrouped={o.other} tysWOBound={[]} />
+  </div>
+);
 
 export const PrintBinderPredicateKind = ({ o }: { o: PolyPredicateKind }) => {
   const Inner = ({ value }: { value: PredicateKind }) => (
