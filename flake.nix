@@ -48,7 +48,6 @@
         nodejs_22
         nodePackages.pnpm
 
-        mdbook
         cargo-make
         cargo-watch
         rust-analyzer

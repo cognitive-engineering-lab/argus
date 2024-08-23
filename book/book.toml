@@ -7,3 +7,9 @@ title = "Argus: a trait debugger for Rust"
 
 [output.html]
 curly-quotes = true
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
+
+[preprocessor]
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"

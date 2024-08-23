@@ -30,19 +30,110 @@ trait Comparable<T> {
 }
 
 struct Year {
-  raw_year: i32;
+  raw_year: i32,
 }
 
 impl Comparable<Year> for Year {
-  fn compare_to(&self, o: &T) {
-    // ... implementation elided ...
+  fn compare_to(&self, o: &Year) -> i32 {
+    // ... implementation elided ... 
   }
 }
 ```
 
-Notice in Rust that the trait implementation and struct definition are *separate.* In the Java example we both defined the class `Year` and declared it an implementor using the one line `class Year implements Comparable<Year>`. In Rust, we defined the struct `Year`, and separately provided its implementation for the `Comparable<Year>` trait. This separation is something to keep in mind as you delve into traits, and as we shall see below, this separation is powerful, and with great power comes tricky debugging!
+Notice in Rust that the trait implementation and struct definition are *separate.* In the Java example we both defined the class `Year` and declared it an implementor using the one line `class Year implements Comparable<Year>`. In Rust, we defined the struct `Year`, and separately provided its implementation for the `Comparable<Year>` trait. The separation between definition and trait implementation means that for the compiler to answer the question `Year: Comparable<Year>`, it must *search* for the relevant implementation block. If no block exists, or if multiple blocks exist, this is a type error. The component inside the compiler responsible for this search is called the *trait solver*.
 
-<!-- TODO Expand on trait resolution, show the search tree here and explain what it is -->
+## An Overview of The Trait Solver
+
+The trait solver has a single goal: respond to questions about types implementing traits. Here's some examples of how the trait solver can be invoked, and what the solver would say in response.
+
+- Does `Year: Comparable<String>` hold? *Response: No*
+
+- Does `Year: Comparable<Year>` hold? *Response: Yes*
+
+- Does `Year: Comparable<T>` hold? *Response: Maybe, if `T = Year`*
+
+If the response is *maybe*, as in the third example above, the compiler will perform extra inference to check if `T = Year`, if it isn't, that is a type error. After reading this section you should know how the Rust trait solver determines its response to a question.
+
+The steps to respond for a question `Ty: Trait` proceed as follows.
+
+1. Find all implementation blocks for `Trait`.
+
+2. For all implementation blocks of the form 
+
+   ```rust 
+   impl Trait for T
+   where
+     Constraint_0,
+     Constraint_1, 
+     ...
+     Constraint_N,
+   ```
+   
+   if `T` and `Ty` *unify*, restart from (1) with the question `Constrint_i`. Respond with *yes* if all constraint responses are *yes*.
+   
+3. Respond with *yes* if exactly one implementation block responded with *yes*.
+
+Notice that these steps are recursive. Checking the constrain from a where block starts the process over again, as if it were the original question. Listed in prose the process may seem confusing, but we think it's more enlightening as a diagram. Consider the `Comparable` trait, we'll extend the previous program with one more implementation block as shown below.
+
+```rust 
+trait Comparable<T> {
+  fn compare_to(&self, o: &T) -> i32;
+}
+
+struct Year {
+  raw_year: i32,
+}
+
+impl Comparable<Year> for Year {
+  fn compare_to(&self, o: &Year) -> i32 {
+    // ... implementation elided ... 
+  }
+}
+
+// NEW implementation
+impl<T, U> Comparable<U> for T 
+where 
+  T: Into<String>,
+  U: Into<String>,
+{
+  fn compare_to(&self, o: &U) -> i32 {
+    // ... implementation elided ... 
+  }
+}
+
+```
+
+Let's consider how the trait solver would go about responding to the question `Year: Comparable<Year>`.
+
+```mermaid
+graph TD;
+  root["Year: Comparable&lt;Year&gt;"]
+  implPar["impl Comparable&lt;U&gt; for T"]
+  toStr0["Year: Into&lt;String&gt;"]
+  toStr1["Year: Into&lt;String&gt;"]
+  implCon["impl Comparable&lt;Year&gt; for Year"]
+  succ["✔"]
+  fail0["❌"]
+  fail1["❌"]
+
+  root -.-> implPar
+  implPar --T = Year--> toStr0
+  implPar --U = Year--> toStr1
+  toStr0 --> fail0
+  toStr1 --> fail1
+  root -.-> implCon
+  implCon --> succ
+  
+  linkStyle 0,1,2,3,4 stroke:red
+  linkStyle 5,6 stroke:green, stroke-width:4px
+```
+
+In the above diagram the dotted lines represent an "Or" relationship with child and parent. That is, exactly one of the child blocks needs to respond with "yes." We see these lines coming from the root question and extending to the implementation blocks. This models step (3) in the listed algorithm because one of the implementation blocks must match, no more and no fewer.
+
+Solid lines represent "And" relationships, in other words every child with a solid line must respond with "yes."
+
+TODO: finish this thought
+
 
 ## Your First Web Server
 
