@@ -4,7 +4,7 @@ Traits are a pervasive language feature in Rust: Copying, printing, indexing, mu
 
 Static checks and type safety is great, but compiler errors can become increasingly complex alongside the types and traits you use. This guide serves to teach "trait debugging" in Rust, using a new tool, Argus, developed by the Cognitive Engineering Lab at Brown University.
 
-> If you're familiar with traits and just want to start debugging, [click here](#your-first-web-server).
+> If you're already familiar with traits and trait solving, [click here](#your-first-web-server) to start debugging.
 
 Traits define units of *shared behavior* and serve a similar purpose as Java interfaces. In Java, you would declare an interface with a given name, and list some number of functions for which the interface implementors need to provide an implementation. Below is an example definition of a `Year`, simply a wrapper around an integer, that implements `Comparable<Year>`, meaning a year is only comparable to other years.
 
@@ -41,6 +41,8 @@ impl Comparable<Year> for Year {
 ```
 
 Notice in Rust that the trait implementation and struct definition are *separate.* In the Java example we both defined the class `Year` and declared it an implementor using the one line `class Year implements Comparable<Year>`. In Rust, we defined the struct `Year`, and separately provided its implementation for the `Comparable<Year>` trait. This separation is something to keep in mind as you delve into traits, and as we shall see below, this separation is powerful, and with great power comes tricky debugging!
+
+<!-- TODO Expand on trait resolution, show the search tree here and explain what it is -->
 
 ## Your First Web Server
 
@@ -84,7 +86,15 @@ error[E0277]: the trait bound `fn(LoginAttempt) -> bool {login}: Handler<_, _>` 
 note: required by a bound in `axum::routing::get`
 ```
 
-The above diagnostic, in a long-winded way, is telling us that the function `login` does not implement `Handler`. As the authors, we *intended* to use `login` as a handler, so I'm stumped why it doesn't. Fortunately, Argus is coming to the rescue! If you're following along locally, open the provided crate in VS Code (or an Argus-compatible editor of choice) and let's get started.
+The above diagnostic, in a long-winded way, is telling us that the function `login` does not implement `Handler`. As the authors, we *intended* to use `login` as a handler, so I'm stumped why it doesn't. 
+
+> TODO: describe the process of trait resolution. It should answer the following questions:
+> What is the Trait Solver?
+> How does the trait solver try to resolve predicates? (This should roughly be "how does Prolog resolution work" ;))
+> What does Top-Down mean (with pictures)
+> What does Bottom-Up mean (with pictures)
+
+Fortunately, Argus is coming to the rescue! If you're following along locally, open the provided crate in VS Code (or an Argus-compatible editor of choice) and let's get started.
 
 ## Through the Search Tree
 
@@ -141,8 +151,54 @@ What if you want to see the errors first? Lucky for you, Argus provides a second
   <source alt="Bottom-Up Argus view" src="assets/axum-hello-server/bottom-up-start.mp4" type="video/mp4" />
 </video>
 
-The above video demonstrates that Argus identifies `bool: Future` as a root cause of the overall failure, but also the second failure `LoginAttempt: FromRequest<_, _>`. Argus also indicates that these two failing trait bounds need to be resolved *together* to satisfy the root bound, `{login}: Handler<_, _>`. We'll first make the function `login` asynchronous, now let's get on to fixing the second failing bound: `{login}: Handler<_, _>`.
+The above video demonstrates that Argus identifies `bool: Future` as a root cause of the overall failure, but also the second failure `LoginAttempt: FromRequestParts<_, _>`. Argus also indicates that these two failing trait bounds need to be resolved *together* to satisfy the root bound, `{login}: Handler<_, _>`. We'll first make the function `login` asynchronous, now let's get on to fixing the second failing bound: `{login}: Handler<_, _>`.
 
 ## Fixing Trait Bounds with Argus
 
+<video controls>
+  <source alt="Fix Future and IntoResponse" src="assets/axum-hello-server/async-fix-response.mp4" type="video/mp4" />
+</video>
 
+It turns out there are a lot of problems with our handler. Above is a video demonstrating that after marking the `login` function asynchronous, the bound `bool: IntoResponse` is unsatisfied. This happened because the associated type `Output` of the `Future`, in this case our boolean, needs to implement `IntoResponse`. The video demonstrates additional ways in which you can use Argus for debugging.
+
+1. We expanded the Bottom Up view to see the lineage of implementation blocks used to arrive at the failure. In this case there was only one between the root bound and the failing leaf, but we looked at the constraints in the where clause to find the origin of the bound.
+
+2. After discovering where the `IntoResponse` bound came from, we want to fix it. The list icon next to a tree node shows you all of the implementation blocks for the trait, here that trait is `IntoResponse`. Going through the list we saw that the type `Json<T>` implements `IntoResponse`, which seems clear in hindsight because we want to respond with a JSON value.
+
+You may have noticed that the list of trait implementors is equivalent to what you'd find in documentation. And this would be a great observation! See for yourself on the [`IntoResponse` documentation](https://docs.rs/axum/latest/axum/response/trait.IntoResponse.html#foreign-impls). Rust documentation makes a distinction between "implementations on foreign types" and "implementors," to Argus all implementations are listed together.
+
+Let's push forward and fix the last failing trait bound in our handler. That pesky `LoginAttempt: FromRequestParts<_, _>`.
+
+<video controls>
+  <source alt="Finished debugging" src="assets/axum-hello-server/axum-type-checks.mp4" type="video/mp4" />
+</video>
+
+The above video contains a lot of information. Let's break down what happened.
+
+- We first looked through the implementors of `FromRequestParts`; this trait  was identified by Argus as the failing bound. However, after looking through the list there wasn't anything that seemed to preserve the action of accepting a `LoginAttempt` as input to the handler. It is a little vague to say "we didn't see anything," and of course fixing a type error may require some familiarity with the crate you're using or the domain in which you're working.
+
+- Implementing `FromRequestParts` didn't seem feasible, but we never checked why this bound was introduced. Expanding the Bottom Up view revealed that the bound `FromRequest` was introduced in a where clause of the `Handler`, and that `FromRequestParts` was an attempt to satisfy the `FromRequest` bound. Here's an image from the Top Down view that shows this same lineage.
+
+  ![FromRequestParts provenance](assets/axum-hello-server/from-rqst-prts-annotated.png)
+  
+  What happened is the implementation block `impl<S, T> FromRequest<S, ViaParts> for T ...` unified `T` and `LoginAttempt`. But if we can satisfy the bound `LoginAttempt: FromRequest<_, _>` this also fixes the trait error.
+  
+- Now that we've identified `FromRequest` we look through its list of implementors. Here is where we find that `Json` types implement `FromRequest`. Server clients getting information from this endpoint should send information about login attempts as JSON values. 
+
+- The very last failing bound is `LoginAttempt: Deserialize`. This is needed to deserialize the `LoginAttempt` from its JSON form. We can easily do that by deriving the trait `Deserialize` from `serde`.
+
+Finally, after all of these errors inserted by our initial careless typing, we have fixed all trait errors.
+
+> Note, when Argus doesn't see any failing obligations it may prompt you to open a bug report. Argus is research software and sometimes it might not show failing obligations when you expect there to be some; this scenario would be a bug and we'd appreciate a report. If the code does type check, happily close the Argus window and move on with your programming endeavors.
+
+# Wrapping up
+
+In this chapter we covered quite a bit of ground---let's recap all that information.
+
+Rust uses a mechanism called traits to define units of shared behavior. A trait needs to be implemented for a type, and that can be done in one of two ways: with a non-parameterized implementation, or with a parameterized implementation. Parameterized implementations are powerful because we can write constraints on the type in the *where clause.*
+
+When a trait bound is imposed on a type, the *trait solver* performs a search through the available implementation blocks. If an implementation block unifies with a type, the solver will then need to solve all of the constraints in the where clause. Tracing the steps made by the trait solver is what we call the *search tree,* and Argus exposes the search tree in its IDE interface.
+
+The Argus interface offers two views of the search tree: The Bottom up view starts at the failed leaves of the tree and shows you the path to the root, the Top Down view starts at the root bound and allows you to recursively descend into the different steps taken by the trait solver. Argus additionally shows you all implementation blocks for a specific trait if you click on the list icon next to the tree node.
+
+This was far from the most difficult trait error to debug. In the next chapter we'll see how to debug a Diesel error and show off a more features of Argus that aid the debugging process.
