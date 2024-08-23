@@ -114,6 +114,7 @@ const DetailsPortal = ({
               ref={refs.setFloating}
               style={floatingStyles}
               {...getFloatingProps()}
+              onClick={e => e.stopPropagation()}
             >
               <FloatingArrow
                 ref={arrowRef}
