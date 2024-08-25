@@ -27,7 +27,7 @@ use crate::{
 const DRAIN_WINDOW: usize = 100;
 
 // NOTE: we use thread local storage to accumulate obligations
-// accross call to the obligation inspector in `typeck_inspect`.
+// across call to the obligation inspector in `typeck_inspect`.
 // DO NOT set this directly, make sure to use the function `push_obligaion`.
 thread_local! {
   static BODY_DEF_PATH: RefCell<Option<serde_json::Value>> = RefCell::default();

@@ -18,7 +18,7 @@
 //! If a type requires expansion into a richer form, this is done inside the `new` function.
 //!
 //! If a type needs to be used within a serde `with` attribute, then an associated function
-//! `serialize` is defined, and actual serialization will be deffered to the `serialize`
+//! `serialize` is defined, and actual serialization will be deferred to the `serialize`
 //! extension method.
 //!
 //! If you need to serialize an optional type then prefix it with `Option__`, and

@@ -1,0 +1,5 @@
+[codespell]
+skip = .git,target,node_modules,dist,*.yaml,*.lock,./book/book,*.min.js
+ignore-words-list = implementor,implementors,ser,crate
+count =
+quiet-level = 3

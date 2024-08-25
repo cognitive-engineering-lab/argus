@@ -14,12 +14,13 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - name: Setup
-        uses: ./.github/workflows/setup
-
-      - name: Argus tests
-        uses: actions-rs/cargo@v1
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
         with:
-          command: test
+          extra_nix_config: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+
+      - name: Argus Test
+        run: nix develop --command ci-test

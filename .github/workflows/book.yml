@@ -1,0 +1,28 @@
+name: publish-tutorial
+
+on:
+  commit:
+    branches:
+      - "main"
+
+jobs:
+  tutorial:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v17
+        with:
+          extra_nix_config: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Tutorial
+        run: nix develop --command cd book && mdbook build
+
+      - uses: JamesIves/github-pages-deploy-action@v4.3.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: gh-pages
+          folder: ./book/book
+          clean: true

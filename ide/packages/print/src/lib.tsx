@@ -30,7 +30,7 @@ import {
 // `PrintWithFallback`. Pretty printing is still a fragile process and
 // I don't have full confidence in it yet.
 //
-// Additionally, this component sets the contents to stlye with the editor monospace font.
+// Additionally, this component sets the contents to style with the editor monospace font.
 export const PrintWithFallback = ({
   object,
   Content

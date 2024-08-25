@@ -6,10 +6,20 @@ src = "src"
 title = "Argus: a trait debugger for Rust"
 
 [output.html]
+default-theme = "light"
+
 curly-quotes = true
 additional-js = ["mermaid.min.js", "mermaid-init.js"]
+additional-css = ["./mdbook-admonish.css"]
 
 [preprocessor]
 
+[preprocessor.image-size]
+command = "mdbook-image-size"
+
 [preprocessor.mermaid]
 command = "mdbook-mermaid"
+
+[preprocessor.admonish]
+command = "mdbook-admonish"
+assets_version = "3.0.2" # do not edit: managed by `mdbook-admonish install`

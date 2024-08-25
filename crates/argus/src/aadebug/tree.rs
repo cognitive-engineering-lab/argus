@@ -456,7 +456,7 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
   /// A local type failing to implement a trait (local/external).
   /// NOTE that `T: C` where `T` is an external type is considered impossible
   /// to change, if this is the only option a relaxed rule might suggest
-  /// creating a wapper for the type.
+  /// creating a wrapper for the type.
   ///
   /// Intrusive changes
   ///

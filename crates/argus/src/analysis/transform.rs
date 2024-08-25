@@ -245,7 +245,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       // Filter down the set of obligations as much as possible.
       //
       // 1. Remove obligations that shouldn't have been checked. (I.e., a failed
-      // precondition dissallows it from succeeding.) Hopefully, in the future these
+      // precondition disallows it from succeeding.) Hopefully, in the future these
       // aren't even solved for.
       retain_error_sources(
         &mut obligations,
@@ -263,7 +263,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
 
       let obligations = obligations
         .into_iter()
-        // marge back in indices without data
+        // merge back in indices without data
         .chain(obligations_no_data.into_iter())
         .map(|idx| *self.obligations[idx])
         .collect::<Vec<_>>();
@@ -452,7 +452,7 @@ mod tree_search {
 
   /// Search for the target obligation along the non-branching tree path.
   ///
-  /// This is usefull if a predicate, reported as a trait error, does not
+  /// This is useful if a predicate, reported as a trait error, does not
   /// match one of the stored roots. This can happen when the start of
   /// the "trait tree" is a stick, e.g.,
   ///

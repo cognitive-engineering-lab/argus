@@ -66,7 +66,7 @@ const TreeApp = ({
         <BottomUp
           jumpToTopDown={n =>
             // Callback passed to the BottomUp panel to jump to the TopDown panel.
-            setState({ activePanel: 1, node: n, programatic: true })
+            setState({ activePanel: 1, node: n, programmatic: true })
           }
         />
       )
@@ -93,7 +93,7 @@ const TreeApp = ({
             manager={[
               state.activePanel,
               n => setState({ activePanel: n }),
-              state.programatic
+              state.programmatic
             ]}
             description={tabs}
           />

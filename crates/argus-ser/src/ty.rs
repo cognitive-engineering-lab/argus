@@ -1767,7 +1767,7 @@ pub enum BoundVariable {
 
 impl BoundVariable {
   pub fn new(didx: ty::DebruijnIndex, var: ty::BoundVar) -> Self {
-    // FIXME: bound varialbes shouldn't be in serialized types, I haven't
+    // FIXME: bound variables shouldn't be in serialized types, I haven't
     // encountered one in the raw output, and before release this was a
     // `panic`, which never fired.
     Self::Error(format!("{var:?}^{didx:?}").to_string())

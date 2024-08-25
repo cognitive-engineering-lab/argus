@@ -520,7 +520,7 @@ export const PrintRegion = ({
     case "Anonymous": {
       // NOTE: by default we don't print anonymous lifetimes. There are times
       // when it looks better, e.g., when the region is `mut`. One gotcha right now
-      // is that we don't rename them, which makes reasoning about anonymouse lifetimes
+      // is that we don't rename them, which makes reasoning about anonymous lifetimes
       // tricky.
       if (forceAnonymous) {
         return "'_";
@@ -568,7 +568,7 @@ export const PrintBoundTyKind = ({ o }: { o: BoundTyKind }) => {
 
 export const PrintBoundVariableKind = ({ o }: { o: BoundVariableKind }) => {
   if ("Const" === o) {
-    // TODO: not sure what to do with boudn "consts", we don't have data for them.
+    // TODO: not sure what to do with bound "consts", we don't have data for them.
     return null;
   } else if ("Ty" in o) {
     return <PrintBoundTyKind o={o.Ty} />;
