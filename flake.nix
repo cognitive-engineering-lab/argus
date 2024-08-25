@@ -87,8 +87,8 @@
             darwin.apple_sdk.frameworks.SystemConfiguration
           ] ++ lib.optionals stdenv.isLinux [
             # Libraries needed in testing
-            alsa-lib
-            systemd
+            alsa-lib.dev
+            udev.dev
           ]);
 
           RUSTC_LINKER = "${pkgs.llvmPackages.clangUseLLVM}/bin/clang";
