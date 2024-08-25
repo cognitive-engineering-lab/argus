@@ -23,4 +23,4 @@ jobs:
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
 
       - name: Argus Test
-        run: nix develop --command ci-test
+        run: nix develop --command ci-check
