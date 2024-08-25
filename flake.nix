@@ -59,8 +59,11 @@
           cargo test
         '';
       in {
-        devShell = pkgs.mkShell {
-          buildInputs = [ checkProject ] ++ (with pkgs; [
+        devShell = with pkgs; mkShell {
+          nativeBuildInputs = [ pkg-config ];
+          buildInputs = [
+            checkProject
+
             llvmPackages_latest.llvm
             llvmPackages_latest.lld
 
@@ -86,30 +89,11 @@
           ] ++ lib.optionals stdenv.isDarwin [
             darwin.apple_sdk.frameworks.SystemConfiguration
           ] ++ lib.optionals stdenv.isLinux [
-            # Libraries needed in testing
             alsa-lib.dev
             udev.dev
-          ]);
+          ];
 
-          RUSTC_LINKER = "${pkgs.llvmPackages.clangUseLLVM}/bin/clang";
+          RUSTC_LINKER = "${llvmPackages.clangUseLLVM}/bin/clang";
         };
-
-        # packages = rec {
-        #   default = cargo-argus;
-
-        #   cargo-argus = pkgs.rustPlatform.buildRustPackage {
-        #     pname = name;
-        #     inherit version;
-        #     src = ./.;
-        #     cargoSha256 = pkgs.lib.fakeHash;
-        #     release = true;
-        #   };
-
-        #   # TODO package and release tutorial with nix
-        #   # argus-tutorial = {};
-
-        #   # TODO package and release extension with nix
-        #   # vscode-argus = {};
-        # };
       });
 }
