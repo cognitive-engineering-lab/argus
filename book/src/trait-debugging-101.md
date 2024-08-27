@@ -77,8 +77,6 @@ The steps to respond to `Ty: Trait` proceed as follows.
    
    if `T` and `Ty` *unify*, proceed, otherwise respond no. 
    
-2. For each `Constrint_i`, restart the process with `Constrint_i` as the question. Respond with *yes* if all constraint responses are *yes*.
-   
    ```admonish note
    You may not know what we mean with "if they unify," so let's go over some examples. Two types unify in the trait solver if we can instantiate type variables such that they are equivalent.
    
@@ -88,7 +86,9 @@ The steps to respond to `Ty: Trait` proceed as follows.
    - `Vec<U>` and `Vec<T>` unify if `U = T`
    ```
    
-2. Respond with *yes* if exactly one impl block responded with *yes*.
+2. For each `Constrint_i`, restart the process with `Constrint_i` as the question. Respond with *yes* if all constraint responses are *yes*.
+   
+3. Respond with *yes* if exactly one impl block responded with *yes*.
 
 Notice that these steps are recursive. When checking a where clause constraint the trait solver calls itself. The prosaic version is a bit nebulous, let's consider the diagramatic version instead. Consider the `Comparable` trait, we shall extend the previous program with one more impl block.
 
@@ -148,9 +148,9 @@ graph TD;
   linkStyle 3 stroke:green, stroke-width:4px
 ```
 
-Dotted lines represent an **Or** relationship between parent and child. That is, exactly one of the child blocks needs to respond with 'yes.' We see these lines coming from the root question and extending to the impl blocks. Impl blocks always form an Or relationship with their parents. This models step (3) in the listed algorithm because one of the impl blocks must match, no more and no fewer.
+Dotted lines represent an **Or** relationship between parent and child. That is, exactly one of the child blocks needs to respond with 'yes.' We see these lines coming from the root question and extending to the impl blocks. Impl blocks always form an Or relationship with their parents. This models step 3 in the listed algorithm because one of the impl blocks must match, no more and no fewer.
 
-Solid lines represent **And** relationships between parent and child. That is, every one of the child blocks needs to respond with "yes." We see these lines coming from impl blocks and extending to the constraints. Constraints always form an And relationship with their parent impl block. Or rather, all constraints in a where clause must hold.
+Solid lines represent **And** relationships between parent and child. That is, every one of the child blocks needs to respond with 'yes.' We see these lines coming from impl blocks and extending to the constraints. Constraints always form an And relationship with their parent impl block. Or rather, all constraints in a where clause must hold.
 
 ```admonish faq
 **Why does the trait solver check the impl block for `T` when there exists one directly for `Year`?**
@@ -158,7 +158,7 @@ Solid lines represent **And** relationships between parent and child. That is, e
 The trait solver must consider all potentially matching impl blocks. Because `T` unifies with `Year`, the trait solver must check this block as well. Remember, if multiple impls work then this *is also* an error: ambiguous trait usage. Exactly one impl block must match for there to be a success.
 ```
 
-A neat pattern to observe is that a question always has a impl block as a child, with a dotted line. We can never have two questions in a row; you shouldn't answer a question with a question! Impl blocks always have a question as a child, with a solid line. If you follow a specific path in the tree the pattern of relationships will be "Or, And, Or, And, Or, And, …"
+A neat pattern to observe is that a question always has an impl block as a child, with a dotted line. We can never have two questions in a row; you shouldn't answer a question with a question! Impl blocks always have a question as a child, with a solid line. If you follow a specific path in the tree the pattern of relationships will be "Or, And, Or, And, Or, And, …"
 
 The tree diagram above actually has a name, it's called the *search tree*. Search trees represent the execution of the trait solver! Just as you may have traced your own programs to debug strange behavior, we can trace the trait solver to help us understand why a particular outcome occurred. Search trees are the core data structure used in the Argus trait debugger, let's size up to a real example and see how we can use Argus to do some trait debugging.
 
@@ -194,7 +194,7 @@ The above diagnostic, in a long-winded way, tells us that the function `login` d
 Going forward we will write `{login}` to abbreviate the type of `login`, `fn(LoginAttempt) -> bool`, which is far too verbose to repeat over and over.
 ```
 
-Fortunately, Argus is coming to the rescue! 
+When the compiler diagnostic says "trait `Bleh` is not implemented for type `Blah`", that's a great opportunity to use Argus.
 
 <!--
 If you're following along locally, open the provided crate in VS Code (or an Argus-compatible editor of choice) and let's get started.  
@@ -241,7 +241,7 @@ graph TD
 Traversing the tree from root to leaf is what's referred to as "Top-Down" in the Argus extension. This view represents the full search tree, in other words, *how* the trait solver responded to the query. 
 ````
 
-Notice that the Rust compiler diagnostic mentions the *root question*, `{login}: Handler<_, _>`, instead of the failing nodes at the tree leaves. The compiler is conservative, when presented with multiple failures in different impls, it default to reporting their parent. In the diagram there are two potentially matching impl blocks. There's one for a function with a single argument, and there's one for things that implement directly `IntoResponse` (i.e., static responses that don't need input). Because there's more than one potentially matching impl block, Rust can't decide which is the actual error.
+Notice that the Rust compiler diagnostic mentions the *root question*, `{login}: Handler<_, _>`, instead of the failing nodes at the tree leaves. The compiler is conservative, when presented with multiple failures in different impls, it defaults to reporting their parent. In the diagram there are two potentially matching impl blocks. There's one for a function with a single argument, and there's one for things that implement `IntoResponse` directly (i.e., static responses that don't need input). Because there's more than one potentially matching impl block, Rust can't decide which is the actual error.
 
 Now let's walk through the search tree as presented in Argus' Top-Down view.
 
@@ -344,7 +344,7 @@ Moving forward let's finally fix the last failing bound and get the code to type
 
 The above video contains a lot of information. Let's break down what happened.
 
-1. We look through the implementors of `FromRequestParts`; this being the Argus-identified. However no impl block seemed to preserve my intent of extracting a `LoginAttemp` from request headers. It is a vague to say "nothing seemed right," and of course fixing a type error may require some familiarity with the crate you're using or the domain in which you're working.
+1. We look through the implementors of `FromRequestParts`; this being the Argus-identified. However no impl block seemed to preserve my intent of extracting a `LoginAttempt` from request headers. It is a vague to say "nothing seemed right," and of course fixing a type error may require some familiarity with the crate you're using or the domain in which you're working.
 
 2. Implementing `FromRequestParts` doesn't seem right, but we haven't checked what introduced the bound. Expanding the Bottom Up view reveals the bound `FromRequest` was first a constraint to implement `Handler`, and that `FromRequestParts` is an attempt to satisfy the `FromRequest` bound. Here's how that relationship looks in the Argus Top-Down view.
     ![FromRequestParts provenance](assets/axum-hello-server/from-rqst-prts-annotated.png =600x center)

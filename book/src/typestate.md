@@ -1,6 +1,6 @@
 # Trait Methods and Typestate
 
-Every programming language cultivates its own set of patterns. One pattern common in Rust is the *builder pattern.* Some data structures are complicated to construct, they may require a large number of inputs, or have complex configuration.
+Every programming language cultivates its own set of patterns. One pattern common in Rust is the *builder pattern.* Some data structures are complicated to construct, they may require a large number of inputs, or have complex configuration; the builder pattern helps construct complex values.
 
 A great example of working with builders is the Diesel [`QueryDsl`](https://docs.rs/diesel/latest/diesel/prelude/trait.QueryDsl.html). The `QueryDsl` trait exposes a number of methods to construct a valid SQL query. Each method consumes the caller, and returns a type that itself implements `QueryDsl`. As an example here's the method signature for `select`
 
@@ -74,6 +74,8 @@ We want to call attention to a some aspects of the above video that are easy to 
    ```
 
 3. The printed types in Rust can get painfully verbose, the Rust diagnostic even *wrote types to a file* because they were too long. Argus shortens and condenses type information to keep the panel as readable as possible. One example of this is that fully-qualified identifiers, like `users::columns::id` prints shortened as `id`. On hover, the full path is shown at the bottom of the Argus panel in our mini-buffer. Extra information or notes Argus has for you are printed in the mini-buffer, so keep an eye on that if you feel Argus isn't giving you enough information.
+
+4. Clicking the tree icon next to a node in the Bottom-Up view jumps to that same node in the Top-Down view. This operation is useful if you want to gather contextual information around a node, but don't want to search the Top-Down tree for it. You can get there in one click.
 
 In the video we expanded the Bottom-Up view to see where the bound `Count == Once` came from. The origin stems from the `T: AppearsOnTable<Qs>` constraint in the where clause of the `Eq<T, U>` impl block. In English we can summarize this as "an equality constraint is valid if both expressions appear in the selected table." Looking through the search tree I see that the bound
 
