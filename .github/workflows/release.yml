@@ -29,11 +29,12 @@ jobs:
       - name: Build TS bindings
         run: nix develop --command cargo make init-bindings
 
-      - name: Build VSIX
-        run: nix develop --command cd ide/packages/extension && vsce package
+      - name: Depot Setup
+        run: nix develop --command depot setup
 
-      - name: Publish VS Code Marketplace
-        run: nix develop --command cd ide/packages/extension && vsce publish -p ${{ secrets.VSCODE_MRKT }} --packagePath *.vsix
-
-      - name: Publish OVSX Marketplace
-        run: nix develop --command cd ide/packages/extension && pnpx ovsx publish *.vsix -p ${{ secrets.OVSX_MRKT }}
+      - name: Publish Extension
+        run: |
+          cd ide/packages/extension
+          nix develop --command vsce package
+          nix develop --command vsce publish -p ${{ secrets.VSCODE_MRKT }} --packagePath argus-*.vsix
+          nix develop --command pnpx ovsx publish argus-*.vsix -p ${{ secrets.OVSX_MRKT }}

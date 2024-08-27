@@ -1,0 +1,2 @@
+# Force method chains to a newline
+max_width = 40

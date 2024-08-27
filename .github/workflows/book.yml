@@ -16,7 +16,7 @@ jobs:
       - uses: DeterminateSystems/flake-checker-action@main
 
       - name: Build Tutorial
-        run: nix develop --command cd book && mdbook build
+        run: nix develop --command mdbook build book
 
       - uses: JamesIves/github-pages-deploy-action@v4.3.0
         with:
