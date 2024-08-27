@@ -2,7 +2,7 @@
 
 Every programming language cultivates its own set of patterns. One pattern common in Rust is the *builder pattern.* Some data structures are complicated to construct, they may require a large number of inputs, or have complex configuration.
 
-A great example of working with builders is the Diesel [`QueryDsl`](https://docs.rs/diesel/latest/diesel/prelude/trait.QueryDsl.html#). The `QueryDsl` trait exposes a number of methods to construct a valid SQL query. Each method consumes the caller, and returns a type that itself implements `QueryDsl`. As an example here's the method signature for `select`
+A great example of working with builders is the Diesel [`QueryDsl`](https://docs.rs/diesel/latest/diesel/prelude/trait.QueryDsl.html). The `QueryDsl` trait exposes a number of methods to construct a valid SQL query. Each method consumes the caller, and returns a type that itself implements `QueryDsl`. As an example here's the method signature for `select`
 
 ```rust,ignore
 fn select<Selection>(self, selection: Selection) -> Select<Self, Selection>
@@ -53,4 +53,48 @@ note: required by a bound in `diesel::RunQueryDsl::load`
 
 As we did in the previous section, we shall demo a short workflow using Argus to gather the same information.
 
+<video controls>
+  <source alt="Diesel finding bug" src="assets/diesel-bad-select/find-bug.mp4" type="video/mp4" />
+</video>
 
+We want to call attention to a some aspects of the above video that are easy to glance over.
+
+1. When opening the Argus debugger the hover tooltip said "Expression contains unsatisfied trait bounds," but  there wasn't a link to jump to the error. This is an unfortunate circumstance, but one that does occur. In these cases you can open the Argus panel by clicking the Argus status in the bottom information bar, or run the command 'Argus: Inspect current file' in the command palette.
+
+2. In the Argus panel there are two errors we chose *not* to explore further
+
+   ```rust,ignore
+   id: Iterator
+   table: Iterator
+   ```
+   
+   We chose not to explore them for two reasons. (1) they are in expressions that don't contain errors as shown by Rust Analyzer, the method calls `.eq(...)` and `.filter(...)`. (2) the trait bound for `Iterator` seems strange as it isn't related to the error diagnostic at all; we're looking for something Diesel related but these errors are talking about `Iterator`. For these two reasons I chose to ignore the two `Iterator` bound "errors" and explore the other first. 
+   ```admonish important
+   **Argus may present more errors than the Rust compiler,** it is research software after all. Use your judgement to decide which errors are first worth exploring, if there are multiple, look at all of them before diving down into one specific search tree. We're working hard to reduce noise produced by Argus as much as possible.
+   ```
+
+3. The printed types in Rust can get painfully verbose, the Rust diagnostic even *wrote types to a file* because they were too long. Argus shortens and condenses type information to keep the panel as readable as possible. One example of this is that fully-qualified identifiers, like `users::columns::id` prints shortened as `id`. On hover, the full path is shown at the bottom of the Argus panel in our mini-buffer. Extra information or notes Argus has for you are printed in the mini-buffer, so keep an eye on that if you feel Argus isn't giving you enough information.
+
+In the video we expanded the Bottom-Up view to see where the bound `Count == Once` came from. The origin stems from the `T: AppearsOnTable<Qs>` constraint in the where clause of the `Eq<T, U>` impl block. In English we can summarize this as "an equality constraint is valid if both expressions appear in the selected table." Looking through the search tree I see that the bound
+
+```rust,ignore 
+users::columns::id: AppearsOnTable<users::table>
+```
+
+holds true, while the bound 
+
+```rust,ignore 
+posts::columns::id: AppearsOnTable<users::table>
+```
+
+is unsatisfied. Argh, we forgot to join the `users` and `posts` tables! At this point we understand and have identified the error, now it's time to fix the program. Unfortunately Argus provides no aide to *fix* typestate errors. We're in the wrong state, `posts::id` doesn't appear in the table we're selecting from, we need to get it on the selected-from table. This is a great time to reach for the Diesel documentation for [`QueryDsl`](https://docs.rs/diesel/latest/diesel/prelude/trait.QueryDsl.html).
+
+<video controls>
+  <source alt="Diesel fixing typestate error" src="assets/diesel-bad-select/fixed-error.mp4" type="video/mp4" />
+</video>
+
+Here we used our domain knowledge of SQL to find the appropriate join methods. We decided to use an `inner_join` to join the tables, and then all was fixed.
+
+```admonish note
+Finding the appropriate method to change the typestate won't always be so straightforward. If you lack domain knowledge or are unfamiliar with the terms used in the library, you may have to read more of the documentation and look through examples to find appropriate fixes. When in doubt, try something! And use Argus to continue debugging.
+```
