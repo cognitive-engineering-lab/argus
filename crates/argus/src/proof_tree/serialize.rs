@@ -50,11 +50,12 @@ impl SerializedTreeVisitor<'_> {
   }
 
   fn check_goal_projection(&mut self, goal: &InspectGoal) {
-    if let ty::PredicateKind::AliasRelate(
-      t1,
-      t2,
-      ty::AliasRelationDirection::Equate,
-    ) = goal.goal().predicate.kind().skip_binder()
+    if goal.result().is_yes()
+      && let ty::PredicateKind::AliasRelate(
+        t1,
+        t2,
+        ty::AliasRelationDirection::Equate,
+      ) = goal.goal().predicate.kind().skip_binder()
       && let Some(mut t1) = t1.ty()
       && let Some(mut t2) = t2.ty()
       // Disallow projections involving two aliases
