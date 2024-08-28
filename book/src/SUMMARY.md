@@ -2,7 +2,7 @@
 
 [Introduction](README.md)
 
-- [Whirlwind Tour](whirlwind.md)
+<!-- - [Whirlwind Tour](whirlwind.md) -->
 
 - [Trait Debugging 101](trait-debugging-101.md)
 
