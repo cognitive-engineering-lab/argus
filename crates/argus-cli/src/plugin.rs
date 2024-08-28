@@ -42,7 +42,6 @@ pub struct ArgusPluginArgs {
 
 #[derive(Subcommand, Serialize, Deserialize)]
 enum ArgusCommand {
-  Check,
   Preload,
   RustcVersion,
   Bundle,
@@ -137,13 +136,13 @@ impl RustcPlugin for ArgusPlugin {
         println!("{commit_hash}");
         exit(0);
       }
-      AC::Check | AC::Obligations { .. } | AC::Tree { .. } | AC::Bundle => {}
+      AC::Obligations { .. } | AC::Tree { .. } | AC::Bundle => {}
     };
 
     let file = match &args.command {
       AC::Tree { file, .. } => Some(file),
       AC::Obligations { file } => file.as_ref(),
-      AC::Check | AC::Bundle => None,
+      AC::Bundle => None,
       AC::Preload | AC::RustcVersion => unreachable!(),
     };
 
@@ -162,13 +161,6 @@ impl RustcPlugin for ArgusPlugin {
     use ArgusCommand as AC;
     let no_target = || None::<(ObligationHash, CharRange)>;
     match &plugin_args.command {
-      AC::Check { .. } => postprocess(run(
-        analysis::check,
-        None,
-        no_target,
-        &plugin_args,
-        &compiler_args,
-      )),
       AC::Tree {
         file,
         id,
