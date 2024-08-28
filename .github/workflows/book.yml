@@ -1,0 +1,29 @@
+name: publish-tutorial
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  tutorial:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: DeterminateSystems/flake-checker-action@main
+
+      - name: Build Tutorial
+        run: |
+             nix develop --command mdbook-admonish install book
+             nix develop --command mdbook-mermaid install book
+             nix develop --command mdbook build book
+
+      - uses: JamesIves/github-pages-deploy-action@v4.3.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: gh-pages
+          folder: ./book/book
+          clean: true

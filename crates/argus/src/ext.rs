@@ -79,7 +79,7 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
   /// Determine what level of "necessity" an obligation has.
   ///
   /// For example, obligations with a cause `SizedReturnType`,
-  /// with a `self_ty` `()` (unit), is *unecessary*. Obligations whose
+  /// with a `self_ty` `()` (unit), is *unnecessary*. Obligations whose
   /// kind is not a Trait Clause, are generally deemed `ForProfessionals`
   /// (that is, you can get them when interested), and others are shown
   /// `OnError`. Necessary obligations are trait predicates where the

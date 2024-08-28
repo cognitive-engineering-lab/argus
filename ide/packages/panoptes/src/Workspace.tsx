@@ -45,7 +45,7 @@ const Workspace = observer(
         ({ fn }) => fn === HighlightTargetStore.value?.file
       );
       if (0 <= idx && idx !== state.activePanel)
-        setState({ activePanel: idx, programatic: true });
+        setState({ activePanel: idx, programmatic: true });
     }, [HighlightTargetStore.value?.file]);
 
     const viewProps = {
@@ -79,7 +79,7 @@ const Workspace = observer(
           manager={[
             state.activePanel,
             n => setState({ activePanel: n }),
-            state.programatic
+            state.programmatic
           ]}
         />
       </div>

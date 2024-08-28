@@ -244,7 +244,7 @@ export class TreeInfo {
         const goalData = tree.goals[node.Goal];
         const result = tree.results[goalData.result];
         return "keep";
-        // FIXME: I belive that this logic is correct, but argus crashes when enabled
+        // FIXME: I believe that this logic is correct, but argus crashes when enabled
         // return isHiddenObl({ necessity: goalData.necessity, result })
         //   ? "remove-tree"
         //   : "remove-node";
@@ -425,7 +425,7 @@ export class TreeInfo {
 
   /**
    * Define the heuristic used for inertia in the system. Previously we were
-   * using `momentum / velocity` but this proved too sporatic. Some proof trees
+   * using `momentum / velocity` but this proved too sporadic. Some proof trees
    * were deep, needlessely, and this threw a wrench in the order.
    */
   public static setInertia = (set: SetHeuristic) => {

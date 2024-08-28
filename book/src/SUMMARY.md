@@ -2,14 +2,9 @@
 
 [Introduction](README.md)
 
-- [Debugging trait errors](debug-media.md)
+<!-- - [Whirlwind Tour](whirlwind.md) -->
 
-- [How to think about Argus]()
+- [Trait Debugging 101](trait-debugging-101.md)
 
-- [Debug a Bevy game]()
+- [Trait Methods and Typestate](typestate.md)
 
-- [Debug an Axum server]()
-
-- [Debug async Rust]()
-
-- [Debug stack overflows]()

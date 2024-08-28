@@ -17,7 +17,6 @@ gha-creds-*.json
 /org/meeting*
 /org/*.png
 /org/media/
-sample-book/
 
 # Rust things
 target/

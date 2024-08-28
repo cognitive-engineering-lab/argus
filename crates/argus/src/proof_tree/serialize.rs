@@ -161,8 +161,8 @@ impl SerializedTreeVisitor<'_> {
   // comparing the JSON values is a bad idea in general. (This is what comparing
   // interned keys does essentially). We should wait until the new trait solver
   // has some mechanism for detecting cycles and piggy back off that.
-  // FIXME: this is currently dissabled but we should check for cycles again...
-  #[allow(dead_code, unused)]
+  // FIXME: this is currently disabled but we should check for cycles again...
+  #[allow(dead_code)]
   fn check_for_cycle_from(&mut self, from: ProofNodeIdx) {
     if self.cycle.is_some() {
       return;

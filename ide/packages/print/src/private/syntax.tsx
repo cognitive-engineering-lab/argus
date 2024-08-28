@@ -41,7 +41,7 @@ export const Kw = ({ children }: React.PropsWithChildren) => (
 
 /**
  * Create a wrapper around the children using a `stx-wrapper` class and the
- * additional class `c`. This makes a wrapper that breakes around the wrapped
+ * additional class `c`. This makes a wrapper that breaks around the wrapped
  * elements.
  */
 const makeCSSWrapper =

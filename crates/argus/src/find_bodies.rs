@@ -1,6 +1,6 @@
 //! This is a copy of the `BodyFinder` from `rustc_utils` but it
 //! does *not* skip const/static items. Funny enough, these items
-//! often have imporant trait contraints evaluated (think derive macros).
+//! often have important trait constraints evaluated (think derive macros).
 use rustc_hir::{intravisit::Visitor, BodyId};
 use rustc_middle::{hir::nested_filter::OnlyBodies, ty::TyCtxt};
 use rustc_span::Span;

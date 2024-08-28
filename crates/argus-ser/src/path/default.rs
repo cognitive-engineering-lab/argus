@@ -1,4 +1,4 @@
-//! Default implementaitons from `rustc_middle::ty::print`
+//! Default implementations from `rustc_middle::ty::print`
 
 use rustc_data_structures::sso::SsoHashSet;
 use rustc_hir::{def_id::DefId, definitions::DefPathData};

@@ -83,7 +83,7 @@ export const PrintExpr = ({ o }: { o: ExprDef }) => {
 };
 
 // NOTE: this is the mir BinOp enum so not all operators are "source representable."
-// Exluding "Cmp" as it rearranges the operands and doesn't follow the pattern.
+// Excluding "Cmp" as it rearranges the operands and doesn't follow the pattern.
 const PrintBinOp = ({ o }: { o: Exclude<BinOp, "Cmp"> }) => {
   if (o === "Add") {
     return "+";

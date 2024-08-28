@@ -26,7 +26,7 @@ export interface PanelDescription {
 interface PanelState {
   activePanel: number;
   node?: number;
-  programatic?: boolean;
+  programmatic?: boolean;
 }
 
 export function usePanelState() {
@@ -70,13 +70,13 @@ const Panels = ({
   }, []);
 
   // NOTE: rerenders should not occur if the user clicks on a tab. We cache the
-  // elements in state to avoid this. IFF the change is *programatic*, meaning
+  // elements in state to avoid this. IFF the change is *programmatic*, meaning
   // some GUI action caused the change, we always want to force a rerender so that
   // state change animations are shown.
   useEffect(() => {
     console.debug(`Panel(${id}) params changed`, active, programaticSwitch);
     if (programaticSwitch) {
-      // On a programatic switch only rerender the active tab
+      // On a programmatic switch only rerender the active tab
       rerender(active);
     }
   }, [active, programaticSwitch]);
