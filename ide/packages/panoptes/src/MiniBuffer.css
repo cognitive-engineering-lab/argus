@@ -1,4 +1,7 @@
 #MiniBuffer {
+    /* show the minibuffer on top of all other content, 
+     * and stick it to the bottom of the screen. 
+     */
     z-index: 1;
     position: fixed;
     bottom: 0;
@@ -18,10 +21,11 @@
 #MiniBuffer > h2 {
     padding: 0;
     margin: 0 0 0.5em 0;
-    font-size: 0.6em;
+    font-size: 0.8em;
 }
 
 #MiniBuffer > i {
+    /* Stick the tack icon to the top-right of the buffer */
     position: absolute;
     top: 0;
     right: 0;

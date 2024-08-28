@@ -3,7 +3,7 @@ use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_hir::{
   self as hir, intravisit::Visitor as HirVisitor, BodyId, HirId,
 };
-use rustc_middle::ty::TyCtxt;
+use rustc_middle::{hir::nested_filter, ty::TyCtxt};
 use rustc_span::Span;
 
 use crate::types::intermediate::ErrorAssemblyCtx;
@@ -48,6 +48,8 @@ fn bin_expressions(
   };
 
   binner.visit_body(ctx.tcx.hir().body(ctx.body_id));
+
+  // Add remaining miscellaneous unbinned obligations
   let mut bins = binner.bins;
   for (hir_id, obligations) in map {
     bins.push(Bin {
@@ -65,14 +67,13 @@ pub enum BinKind {
   CallableExpr,
   CallArg,
   Call,
-  // MethodCall,
-  // MethodReceiver,
   Misc,
 }
 
 pub struct Bin {
   pub hir_id: HirId,
-  // TODO: use IndexVec for obligations.
+  // TODO: use IndexVec for obligations instead of the--
+  //
   // usize indexes into the obligation vec
   pub obligations: Vec<usize>,
   pub kind: BinKind,
@@ -110,13 +111,24 @@ impl BinCreator<'_, '_> {
   }
 }
 
-impl<'a, 'tcx: 'a> HirVisitor<'_> for BinCreator<'a, 'tcx> {
+impl<'a, 'tcx: 'a> HirVisitor<'tcx> for BinCreator<'a, 'tcx> {
+  type NestedFilter = nested_filter::All;
+
+  fn nested_visit_map(&mut self) -> Self::Map {
+    self.ctx.tcx.hir()
+  }
+
   // FIXME: after updating to nightly-2024-05-20 this binning logic broke slightly.
   // Obligations associated with parameters are now being assigned to the overall call,
   // this makes more things use a method call table than necessary.
-  fn visit_expr(&mut self, ex: &hir::Expr) {
+  fn visit_expr(&mut self, ex: &'tcx hir::Expr) {
     // Drain nested obligations first to match the most specific node possible.
     hir::intravisit::walk_expr(self, ex);
+
+    log::debug!(
+      "Visiting expression: {}",
+      self.ctx.tcx.hir().node_to_string(ex.hir_id)
+    );
 
     match ex.kind {
       hir::ExprKind::Call(callable, args) => {
@@ -150,29 +162,41 @@ pub fn find_most_enclosing_node(
   span: Span,
 ) -> Option<HirId> {
   let hir = tcx.hir();
-  let mut node_finder = FindNodeBySpan::new(span);
+  let mut node_finder = FindNodeBySpan::new(tcx, span);
+
+  log::trace!(
+    "Finding HirId for span: {:?}, in body {:?}",
+    span,
+    hir.body(body_id)
+  );
+
   node_finder.visit_body(hir.body(body_id));
   node_finder
     .result
-    // NOTE: this should not happen because there must *at least* be an enclosing item.
+    // NOTE: there should always be an enclosing body somewhere, this could be an expect
     .map(|t| t.0)
 }
 
-// NOTE: this probably needs to be expanded to account for all nodes, not just expressions.
-struct FindNodeBySpan {
+/// Visitor for finding a `HirId` given a span.
+///
+/// Similar to what happens in `rustc_trait_selection::traits::error_reporting`, but we
+/// find spans that match as closely as possible and not just those that match exactly.
+struct FindNodeBySpan<'tcx> {
+  tcx: TyCtxt<'tcx>,
   pub span: Span,
   pub result: Option<(HirId, Span)>,
 }
 
-// Code taken from rustc_trait_selection::traits::error_reporting,
-// modified to find items that enclose the span, not just match it
-// exactly.
-// TODO: this should work on all nodes, not just expressions.
-impl FindNodeBySpan {
-  pub fn new(span: Span) -> Self {
-    Self { span, result: None }
+impl<'tcx> FindNodeBySpan<'tcx> {
+  pub fn new(tcx: TyCtxt<'tcx>, span: Span) -> Self {
+    Self {
+      tcx,
+      span,
+      result: None,
+    }
   }
 
+  /// Is span `s` a closer match than the current best?
   fn is_better_match(&self, s: Span) -> bool {
     s.overlaps(self.span)
       && match self.result {
@@ -195,7 +219,7 @@ impl FindNodeBySpan {
 
 macro_rules! simple_visitors {
   ( $( [$visitor:ident, $walker:ident, $t:ty], )* ) => {$(
-      fn $visitor(&mut self, v: &$t) {
+      fn $visitor(&mut self, v: &'tcx $t) {
         hir::intravisit::$walker(self, v);
         if self.is_better_match(v.span) {
           self.result = Some((v.hir_id, v.span));
@@ -204,7 +228,13 @@ macro_rules! simple_visitors {
   };
 }
 
-impl HirVisitor<'_> for FindNodeBySpan {
+impl<'tcx> HirVisitor<'tcx> for FindNodeBySpan<'tcx> {
+  type NestedFilter = nested_filter::All;
+
+  fn nested_visit_map(&mut self) -> Self::Map {
+    self.tcx.hir()
+  }
+
   simple_visitors! {
     [visit_param, walk_param, hir::Param],
     [visit_local, walk_local, hir::LetStmt],

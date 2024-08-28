@@ -6,12 +6,10 @@ use std::time::Instant;
 use anyhow::Result;
 use argus_ext::ty::EvaluationResultExt;
 use index_vec::IndexVec;
-use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_infer::traits::solve::GoalSource;
 use rustc_trait_selection::solve::inspect::{InspectCandidate, InspectGoal};
 use rustc_utils::timer;
 use serde::Serialize;
-use serde_json as json;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
@@ -28,12 +26,6 @@ pub struct Storage<'tcx> {
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct AnalysisResults {
   pub problematic_sets: Vec<tree::SetHeuristic>,
-
-  #[cfg_attr(
-    feature = "testing",
-    ts(type = "Record<ProofNodeIdx, ImplHeader[]>")
-  )]
-  pub impl_candidates: HashMap<ProofNodeIdx, Vec<json::Value>>,
 }
 
 impl<'tcx> Storage<'tcx> {
@@ -118,15 +110,12 @@ impl<'tcx> Storage<'tcx> {
     let tree_start = Instant::now();
 
     let mut sets = vec![];
-    tree.for_correction_set(|conjunct| {
-      sets.push(tree.weight(&conjunct));
-    });
+    tree.for_correction_set(|conjunct| sets.push(tree.weight(conjunct)));
 
     timer::elapsed("aadeg::into_results", tree_start);
 
     AnalysisResults {
       problematic_sets: sets,
-      impl_candidates: tree.reportable_impl_candidates(),
     }
   }
 }

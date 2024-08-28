@@ -8,7 +8,7 @@ use argus_ext::{
 use index_vec::IndexVec;
 use indexmap::IndexSet;
 use rustc_data_structures::fx::{FxHashMap as HashMap, FxIndexMap};
-use rustc_hir::{BodyId, HirId};
+use rustc_hir::{self as hir, intravisit::Map, BodyId, HirId};
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::ty::{TyCtxt, TypeckResults};
 use rustc_span::Span;
@@ -46,9 +46,11 @@ pub fn compute_provenance<'tcx>(
 ) -> Provenance<Obligation> {
   let hir = infcx.tcx.hir();
   let fdata = infcx.bless_fulfilled(obligation, result);
+
   // If the span is coming from a macro, point to the callsite.
   let callsite_cause_span =
     infcx.tcx.to_local(body_id, fdata.obligation.cause.span);
+
   let hir_id =
     hier_hir::find_most_enclosing_node(infcx.tcx, body_id, callsite_cause_span)
       .unwrap_or_else(|| hir.body_owner(body_id));
@@ -182,6 +184,17 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
     span.sanitized_snippet(source_map)
   }
 
+  fn hir_id_to_span(&self, hir_id: HirId) -> Span {
+    let hir = self.tcx.hir();
+    match hir.hir_node(hir_id) {
+      hir::Node::Expr(hir::Expr {
+        kind: hir::ExprKind::MethodCall(_, _, _, span),
+        ..
+      }) => self.to_local(*span),
+      _ => self.to_local(hir.span_with_body(hir_id)),
+    }
+  }
+
   fn sort_bins(&mut self, bins: Vec<Bin>) {
     use ExprKind as EK;
 
@@ -193,7 +206,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         mut obligations,
         kind,
       } = bin;
-      let span = self.to_local(hir.span_with_body(hir_id));
+      let span = self.hir_id_to_span(hir_id);
       let snippet = self.local_snip(span);
       let Ok(range) = CharRange::from_span(span, source_map) else {
         log::error!(
@@ -286,9 +299,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       let uoidx = prov.full_data?;
       let full_data = self.full_data.get(uoidx);
       tree_search::tree_contains_in_branchless(
-        // something
         &full_data.infcx,
-        // something
         &full_data.obligation,
         needle,
       )
@@ -297,15 +308,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
   }
 
   fn relate_trait_bounds(&mut self) {
-    for (&span, predicates) in self.reported_trait_errors {
-      let span = self.to_local(span);
-      let range = CharRange::from_span(span, self.tcx.sess.source_map())
-        .expect("failed to get range for reported trait error");
-
-      log::debug!(
-        "Relating trait bounds:\nrange {range:?}\nspan: {span:?}\n{predicates:#?}"
-      );
-
+    for (error_span, predicates) in self.reported_trait_errors {
       // Search for the obligation hash in our set of computed obligations.
       let predicates = predicates
         .iter()
@@ -334,18 +337,20 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
 
         self.trait_errors.push(TraitError {
           idx: expr_id,
-          range,
+          range: self.exprs[expr_id].range,
           hashes,
         });
         continue;
       }
 
-      log::error!("failed to find root expression for {span:?} {predicates:?}");
+      log::error!(
+        "failed to find root expression for {error_span:?} {predicates:?}"
+      );
 
       // A predicate did not match exactly, now we're scrambling
       // to find an expression by span, and pick an obligation.
       let Some(err_hir_id) =
-        hier_hir::find_most_enclosing_node(self.tcx, self.body_id, span)
+        hier_hir::find_most_enclosing_node(self.tcx, self.body_id, *error_span)
       else {
         log::error!("reported error doesn't have an associated span ...");
         continue;
@@ -377,7 +382,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       // Mark the found Expr as containing an error.
       self.trait_errors.push(TraitError {
         idx: *expr_id,
-        range,
+        range: self.exprs[*expr_id].range,
         hashes: vec![],
       });
     }

@@ -99,15 +99,12 @@ export const DirNode = ({
       <Node node={node} />
     </span>
   );
+  const info = (
+    <WrapNode wrappers={Wrappers ?? []} n={idx}>
+      {infoChild}
+    </WrapNode>
+  );
 
-  const info =
-    Wrappers === undefined ? (
-      infoChild
-    ) : (
-      <WrapNode wrappers={Wrappers} n={idx}>
-        {infoChild}
-      </WrapNode>
-    );
   const startOpen = startOpenP ? startOpenP(idx) : false;
 
   return (

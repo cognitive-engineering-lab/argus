@@ -49,6 +49,7 @@ pub fn tree(tcx: TyCtxt, body_id: BodyId) -> Result<SerializedTree> {
 
   let typeck_results =
     tcx.inspect_typeck(body_id, entry::process_obligation_for_tree);
+  // tcx.inspect_typeck(body_id, entry::process_obligation);
 
   entry::build_tree_output(tcx, body_id, typeck_results)
 }

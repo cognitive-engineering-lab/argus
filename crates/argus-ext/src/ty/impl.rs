@@ -118,11 +118,13 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
 
   fn to_local(&self, body_id: BodyId, span: Span) -> Span {
     use rustc_utils::source_map::span::SpanExt;
+
     let hir = self.hir();
     let mut local_body_span = hir.body(body_id).value.span;
     while local_body_span.from_expansion() {
       local_body_span = local_body_span.source_callsite();
     }
+
     span.as_local(local_body_span).unwrap_or(span)
   }
 

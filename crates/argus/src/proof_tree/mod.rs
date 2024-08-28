@@ -110,9 +110,13 @@ pub struct SerializedTree {
 
   pub projection_values: HashMap<TyIdx, TyIdx>,
 
+  pub all_impl_candidates: HashMap<ProofNodeIdx, Vec<CandidateIdx>>,
+
   pub topology: TreeTopology,
+
   #[serde(skip_serializing_if = "Option::is_none")]
   pub cycle: Option<ProofCycle>,
+
   pub analysis: aadebug::AnalysisResults,
 }
 

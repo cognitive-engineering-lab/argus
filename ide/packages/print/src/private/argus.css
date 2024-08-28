@@ -1,0 +1,11 @@
+.WhereConstraintArea {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+}
+
+/* FIXME: this should be handled by the CommaSeparated component in `syntax.tsx`, but where
+   constraints are in divs which made the commas land in weird places. */
+.WhereConstraintArea > .WhereConstraint:not(:last-child, :empty):after {
+  content: ',';
+}

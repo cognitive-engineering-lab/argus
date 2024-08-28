@@ -28,13 +28,17 @@ import { HighlightTargetStore } from "./signals";
 
 export const ObligationFromIdx = ({ idx }: { idx: ObligationIdx }) => {
   const bodyInfo = useContext(BodyInfoContext)!;
-  const o = bodyInfo.getObligation(idx);
+  const o = bodyInfo.obligation(idx);
+  if (o === undefined) return null;
+
   return <Obligation range={o.range} obligation={o} />;
 };
 
 export const ObligationResultFromIdx = ({ idx }: { idx: ObligationIdx }) => {
   const bodyInfo = useContext(BodyInfoContext)!;
-  const o = bodyInfo.getObligation(idx);
+  const o = bodyInfo.obligation(idx);
+  if (o === undefined) return null;
+
   return <ResultRaw result={o.result} />;
 };
 

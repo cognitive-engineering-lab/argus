@@ -6,6 +6,7 @@ import _ from "lodash";
 import React, { useContext } from "react";
 
 import { DirRecursive } from "./Directory";
+import { WrapImplCandidates } from "./Wrappers";
 
 const TopDown = ({ start }: { start?: ProofNodeIdx }) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
@@ -64,6 +65,7 @@ const TopDown = ({ start }: { start?: ProofNodeIdx }) => {
         })();
 
   const renderParams: TreeRenderParams = {
+    Wrappers: [WrapImplCandidates],
     styleEdges: true,
     ...ops
   };

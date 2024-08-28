@@ -5,8 +5,10 @@ import type {
   BoundTyKind,
   BoundVariableKind,
   CharRange,
+  EvaluationResult,
   GenericArg,
   ObligationHash,
+  ObligationNecessity,
   Predicate,
   Region,
   Ty,
@@ -65,11 +67,19 @@ export function makeHighlightPosters(
   return [addHighlight, removeHighlight];
 }
 
-export function isHiddenObl(o: { necessity: string; result: string }) {
-  return (
-    o.necessity === "Yes" || (o.necessity === "OnError" && o.result === "no")
-  );
-}
+export const isVisibleObligation = (
+  o: { necessity: ObligationNecessity; result: EvaluationResult },
+  filterAmbiguities = false
+) =>
+  // Short-circuit ambiguities if we're filtering them
+  !(
+    (o.result === "maybe-ambiguity" || o.result === "maybe-overflow") &&
+    filterAmbiguities
+  ) &&
+  // If the obligation is listed as necessary, it's visible
+  (o.necessity === "Yes" ||
+    // If the obligation is listed as necessary on error, and it failed, it's visible
+    (o.necessity === "OnError" && o.result === "no"));
 
 export function searchObject(obj: any, target: any) {
   for (let key in obj) {

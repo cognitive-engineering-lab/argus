@@ -122,7 +122,7 @@ impl RustcPlugin for ArgusPlugin {
     match &args.command {
       AC::Preload => {
         let mut cmd = Command::new(cargo_path);
-        // Note: this command must share certain parameters with rustc_plugin so Cargo will not recompute
+        // NOTE: this command must share certain parameters with rustc_plugin so Cargo will not recompute
         // dependencies when actually running the driver, e.g. RUSTFLAGS.
         cmd
           .args(["check", "--all", "--all-features", "--target-dir"])
@@ -136,14 +136,14 @@ impl RustcPlugin for ArgusPlugin {
         println!("{commit_hash}");
         exit(0);
       }
-      _ => {}
+      AC::Obligations { .. } | AC::Tree { .. } | AC::Bundle => {}
     };
 
     let file = match &args.command {
       AC::Tree { file, .. } => Some(file),
       AC::Obligations { file } => file.as_ref(),
       AC::Bundle => None,
-      _ => unreachable!(),
+      AC::Preload | AC::RustcVersion => unreachable!(),
     };
 
     let filter = file.map_or(CrateFilter::OnlyWorkspace, |file| {
@@ -159,6 +159,7 @@ impl RustcPlugin for ArgusPlugin {
     plugin_args: ArgusPluginArgs,
   ) -> RustcResult<()> {
     use ArgusCommand as AC;
+    let no_target = || None::<(ObligationHash, CharRange)>;
     match &plugin_args.command {
       AC::Tree {
         file,
@@ -192,11 +193,10 @@ impl RustcPlugin for ArgusPlugin {
         postprocess(v)
       }
       AC::Obligations { file, .. } => {
-        let nothing = || None::<(ObligationHash, CharRange)>;
         let v = run(
           analysis::obligations,
           file.as_ref().map(PathBuf::from),
-          nothing,
+          no_target,
           &plugin_args,
           &compiler_args,
         );
@@ -204,17 +204,16 @@ impl RustcPlugin for ArgusPlugin {
       }
       AC::Bundle => {
         log::warn!("Bundling takes an enormous amount of time.");
-        let nothing = || None::<(ObligationHash, CharRange)>;
         let v = run(
           analysis::bundle,
           None,
-          nothing,
+          no_target,
           &plugin_args,
           &compiler_args,
         );
         postprocess(v)
       }
-      _ => unreachable!(),
+      AC::Preload | AC::RustcVersion => unreachable!(),
     }
   }
 }

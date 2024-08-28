@@ -16,7 +16,9 @@ import { HighlightTargetStore } from "./signals";
 const Expr = observer(({ idx }: { idx: ExprIdx }) => {
   const bodyInfo = useContext(BodyInfoContext)!;
   const file = useContext(FileContext)!;
-  const expr = bodyInfo.getExpr(idx);
+  const expr = bodyInfo.expr(idx);
+  if (expr === undefined) return null;
+
   const messageSystem = useContext(AppContext.MessageSystemContext)!;
   const [addHighlight, removeHighlight] = makeHighlightPosters(
     messageSystem,
@@ -28,7 +30,7 @@ const Expr = observer(({ idx }: { idx: ExprIdx }) => {
     return null;
   }
 
-  const visibleObligations = bodyInfo.visibleObligations(idx);
+  const visibleObligations = bodyInfo.obligations(idx);
   if (visibleObligations.length === 0) {
     return null;
   }

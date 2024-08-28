@@ -3,12 +3,19 @@ import type {
   ClauseWithBounds,
   GroupedClauses,
   ImplHeader,
+  PolyClauseKind,
+  PolyClauseWithBounds,
   Ty
 } from "@argus/common/bindings";
 import { anyElems, isUnitTy } from "@argus/common/func";
 import _ from "lodash";
-import React, { type PropsWithChildren, useContext } from "react";
+import React, {
+  type PropsWithChildren,
+  type ReactElement,
+  useContext
+} from "react";
 
+import classNames from "classnames";
 import { Toggle } from "../Toggle";
 import { AllowProjectionSubst, LocationActionable, TyCtxt } from "../context";
 import { PrintDefinitionPath } from "./path";
@@ -23,15 +30,30 @@ import {
   PrintTyKind
 } from "./ty";
 
+import "./argus.css";
+
+export const WhereConstraintArea = ({
+  className,
+  children
+}: React.PropsWithChildren<{ className?: string }>) => (
+  <div className={classNames(className, "WhereConstraintArea")}>{children}</div>
+);
+
+export const WhereConstraint = ({ children }: React.PropsWithChildren) => (
+  <div className="WhereConstraint">{children}</div>
+);
+
 // NOTE: it looks ugly, but we need to disable projection substitution for all parts
 // of the impl blocks.
 export const PrintImplHeader = ({ o }: { o: ImplHeader }) => {
   console.debug("Printing ImplHeader", o);
+
   const genArgs = _.map(o.args, arg => (
     <AllowProjectionSubst.Provider value={false}>
       <PrintGenericArg o={arg} />
     </AllowProjectionSubst.Provider>
   ));
+
   const argsWAngle =
     genArgs.length === 0 ? null : (
       <AllowProjectionSubst.Provider value={false}>
@@ -69,68 +91,98 @@ export const PrintImplHeader = ({ o }: { o: ImplHeader }) => {
   );
 };
 
-export const PrintGroupedClauses = ({ o }: { o: GroupedClauses }) => {
-  console.debug("Printing GroupedClauses", o);
-  const Inner = ({ value }: { value: ClauseWithBounds }) => (
-    <PrintClauseWithBounds o={value} />
+export const PrintClauses = ({
+  grouped,
+  ungrouped,
+  tysWOBound
+}: {
+  grouped: PolyClauseWithBounds[];
+  ungrouped: PolyClauseKind[];
+  tysWOBound: Ty[];
+}) => {
+  const Group = ({ value }: { value: PolyClauseWithBounds }) => (
+    <PrintBinder
+      binder={value}
+      Child={({ value }) => <PrintClauseWithBounds o={value} />}
+    />
   );
-  const groupedClauses = _.map(o.grouped, (group, idx) => (
-    <div className="WhereConstraint" key={idx}>
-      <PrintBinder binder={group} Child={Inner} />
-    </div>
-  ));
-  const noGroupedClauses = _.map(o.other, (clause, idx) => (
-    <div className="WhereConstraint" key={idx}>
-      <PrintClause o={clause} />
-    </div>
-  ));
-  return (
+  const Ungrouped = ({ value }: { value: PolyClauseKind }) => (
+    <PrintClause o={value} />
+  );
+  const Unsized = ({ value }: { value: Ty }) => (
     <>
-      {groupedClauses}
-      {noGroupedClauses}
+      <PrintTy o={value} />: ?Sized
     </>
   );
+
+  const rawElements /*: (for<T> [T, React.FC<{ value: T }>])[] */ = [
+    ..._.map(grouped, group => [group, Group] as const),
+    ..._.map(ungrouped, ungroup => [ungroup, Ungrouped] as const),
+    ..._.map(tysWOBound, ty => [ty, Unsized] as const)
+  ] as const;
+
+  const elements = _.map(
+    rawElements,
+    (
+      [value, C] /*: for<T> [T, React.FC<{ value: T }> */,
+      idx
+    ): ReactElement => (
+      <WhereConstraint key={idx}>
+        <C value={value as any} />
+      </WhereConstraint>
+    )
+  );
+
+  // TODO: the `{elements}` should be wrapped in a `CommaSeparated` component,
+  // but comman placement is done manually in the WhereConstraintsArea ... for now. See CSS
+  // file for more comments.
+  return <WhereConstraintArea>{elements}</WhereConstraintArea>;
 };
 
-export const PrintWhereClause = ({
-  predicates,
+const PrintWhereClause = ({
+  predicates: { grouped, other: ungrouped },
   tysWOBound
 }: {
   predicates: GroupedClauses;
   tysWOBound: Ty[];
 }) => {
-  if (!anyElems(predicates.grouped, predicates.other, tysWOBound)) {
+  if (!anyElems(grouped, ungrouped, tysWOBound)) {
     return null;
   }
 
-  const whereHoverContent = () => (
-    <div className="DirNode WhereConstraintArea">
-      <PrintGroupedClauses o={predicates} />
-      {_.map(tysWOBound, (ty, idx) => (
-        <div className="WhereConstraint" key={idx}>
-          <PrintTy o={ty} />: ?Sized
-        </div>
-      ))}
-    </div>
+  const content = (
+    <PrintClauses
+      grouped={grouped}
+      ungrouped={ungrouped}
+      tysWOBound={tysWOBound}
+    />
   );
 
   return (
     <>
-      {" "}
+      <br />
       <Kw>where</Kw>
       {nbsp}
-      <Toggle summary={".."} Children={whereHoverContent} />
+      <Toggle summary={".."} Children={() => content} />
     </>
   );
 };
 
 const PrintClauseWithBounds = ({ o }: { o: ClauseWithBounds }) => {
-  const [traits, lifetimes] = _.partition(o.bounds, bound => "Trait" in bound);
-  const traitBounds = _.map(traits, bound => <PrintClauseBound o={bound} />);
-  const lifetimeBounds = _.map(lifetimes, bound => (
+  // Sort the bounds to be Ty: Fn() + Trait + Region
+  const sortedBounds = _.sortBy(o.bounds, bound =>
+    "FnTrait" in bound
+      ? 0
+      : "Trait" in bound
+        ? 1
+        : "Region" in bound
+          ? 2
+          : undefined
+  );
+
+  const boundComponents = _.map(sortedBounds, bound => (
     <PrintClauseBound o={bound} />
   ));
-  const boundComponents = _.concat(traitBounds, lifetimeBounds);
 
   return (
     <>

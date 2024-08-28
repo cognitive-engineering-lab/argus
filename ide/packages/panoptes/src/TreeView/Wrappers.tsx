@@ -6,7 +6,6 @@ import type {
 import { TreeAppContext } from "@argus/common/context";
 import { arrUpdate } from "@argus/common/func";
 import { IcoListUL, IcoTreeDown } from "@argus/print/Icons";
-import { PrintImplHeader } from "@argus/print/lib";
 import {
   FloatingArrow,
   FloatingFocusManager,
@@ -23,6 +22,7 @@ import classNames from "classnames";
 import _ from "lodash";
 import React, { type ReactElement, useState, useContext, useRef } from "react";
 import Graph from "./Graph";
+import { Candidate } from "./Node";
 
 import "./Wrappers.css";
 
@@ -33,7 +33,11 @@ export const WrapNode = ({
 }: React.PropsWithChildren<{ wrappers: InfoWrapper[]; n: ProofNodeIdx }>) => {
   const [hovered, setHovered] = useState(false);
   const [actives, setActives] = useState(Array(wrappers.length).fill(false));
+
   const active = _.some(actives);
+  const className = classNames("WrapperBox", {
+    "is-hovered": hovered || active
+  });
 
   return (
     <span
@@ -41,17 +45,15 @@ export const WrapNode = ({
       onMouseLeave={() => setHovered(false)}
     >
       {children}
-      {(hovered || active) && (
-        <span className="WrapperBox">
-          {_.map(wrappers, (W, i) => (
-            <W
-              key={i}
-              n={n}
-              reportActive={b => setActives(a => arrUpdate(a, i, b))}
-            />
-          ))}
-        </span>
-      )}
+      <span className={className}>
+        {_.map(wrappers, (W, i) => (
+          <W
+            key={i}
+            n={n}
+            reportActive={b => setActives(a => arrUpdate(a, i, b))}
+          />
+        ))}
+      </span>
     </span>
   );
 };
@@ -112,6 +114,7 @@ const DetailsPortal = ({
               ref={refs.setFloating}
               style={floatingStyles}
               {...getFloatingProps()}
+              onClick={e => e.stopPropagation()}
             >
               <FloatingArrow
                 ref={arrowRef}
@@ -138,10 +141,7 @@ export const WrapTreeIco = ({ n, reportActive }: InfoWrapperProps) => (
 export const WrapImplCandidates = ({ n, reportActive }: InfoWrapperProps) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
   const candidates = tree.implCandidates(n);
-
-  if (candidates === undefined || candidates.length === 0) {
-    return null;
-  }
+  if (candidates === undefined || candidates.length === 0) return null;
 
   return (
     <DetailsPortal reportActive={reportActive} info={<IcoListUL />}>
@@ -149,7 +149,7 @@ export const WrapImplCandidates = ({ n, reportActive }: InfoWrapperProps) => {
       <div className="ImplCandidatesPanel">
         {_.map(candidates, (c, i) => (
           <div key={i}>
-            <PrintImplHeader impl={c} />
+            <Candidate idx={c} />
           </div>
         ))}
       </div>

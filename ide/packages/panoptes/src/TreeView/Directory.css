@@ -29,10 +29,6 @@
     gap: 10px;
 }
 
-.DirNode.WhereConstraintArea {
-    flex-direction: column;    
-}
-
 .DirNodeLabel {
     display: flex;    
 }
