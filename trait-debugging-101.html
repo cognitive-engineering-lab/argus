@@ -1,0 +1,452 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Trait Debugging 101 - Argus: a trait debugger for Rust</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="./mdbook-admonish.css">
+        <link rel="stylesheet" href="book/mdbook-admonish.css">
+
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="index.html">Introduction</a></li><li class="chapter-item expanded "><a href="trait-debugging-101.html" class="active"><strong aria-hidden="true">1.</strong> Trait Debugging 101</a></li><li class="chapter-item expanded "><a href="typestate.html"><strong aria-hidden="true">2.</strong> Trait Methods and Typestate</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Argus: a trait debugger for Rust</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="trait-debugging-101"><a class="header" href="#trait-debugging-101">Trait Debugging 101</a></h1>
+<p>Traits are a pervasive language feature in Rust: Copying, printing, indexing, multiplying, and more common operations use the Rust trait system. As you use more of the language, and utilize the numerous published crates, you will inevitably encounter more traits. Popular crates in the Rust ecosystem use traits to achieve strong type safety, such as the Diesel crate that relies on traits to turn invalid SQL queries into type errors. Impressive!</p>
+<p>Unfortunately, traits also obfuscate type errors. Compiler diagnostics become increasingly complex alongside the types and traits used. This guide demonstrates <em>trait debugging</em> in Rust using a new tool, Argus, developed by the <a href="https://cel.cs.brown.edu/">Cognitive Engineering Lab</a> at Brown University.</p>
+<h2 id="your-first-web-server"><a class="header" href="#your-first-web-server">Your First Web Server</a></h2>
+<p><a href="https://docs.rs/axum/latest/axum/">Axum</a> is a popular Rust web application framework, a great example of how traits can obfuscate type errors. We will use Axum to build a web server, and Argus to debug the trait errors; here’s our starting code.</p>
+<pre><code class="language-rust ignore compile_fail">struct LoginAttempt {
+  user_id: u64,
+  password: String,
+}
+
+fn login(attempt: LoginAttempt) -&gt; bool {
+  todo!()
+}
+
+#[tokio::main]
+async fn main() {
+  let app = Router::new()
+    .route("/login", get(login));
+
+  let listener = TcpListener::bind("0.0.0.0:3000")
+    .await.unwrap();
+  axum::serve(listener, app).await.unwrap();
+}</code></pre>
+<p>Oh no, our server doesn’t type check. Surely, the error diagnostic will tell us why—</p>
+<pre><code class="language-text">error[E0277]: the trait bound `fn(LoginAttempt) -&gt; bool {login}: Handler&lt;_, _&gt;` is not satisfied
+   --&gt; src/main.rs:14:49
+    |
+14  |     let app = Router::new().route("/login", get(login));
+    |                                             --- ^^^^^ the trait `Handler&lt;_, _&gt;` is not implemented for fn item `fn(LoginAttempt) -&gt; bool {login}`            
+    |                                             |
+    |                                             required by a bound introduced by this call
+    |
+    = help: the following other types implement trait `Handler&lt;T, S&gt;`:
+              &lt;Layered&lt;L, H, T, S&gt; as Handler&lt;T, S&gt;&gt;
+              &lt;MethodRouter&lt;S&gt; as Handler&lt;(), S&gt;&gt;
+note: required by a bound in `axum::routing::get`
+</code></pre>
+<p>in a long-winded way the diagnostic has said “<code>login</code> does not implement <code>Handler</code>.” But as the authors we <em>intended</em> for <code>login</code> to be a handler. The diagnostic hasn’t provided much specific information as to why the code doesn’t type check.</p>
+<div id="admonition-note" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-title">
+<div class="admonition-title">
+<div id="admonition-note-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-note"></a>
+</div>
+<div>
+<p>Going forward we will write <code>{login}</code> to abbreviate the type of <code>login</code>, <code>fn(LoginAttempt) -&gt; bool</code>, which is far too verbose to repeat over and over.</p>
+</div>
+</div>
+<p>When the error diagnostic says “trait bound <code>Bleh</code> is not satisfied”, it’s a great opportunity to use Argus.</p>
+<h2 id="down-the-search-tree"><a class="header" href="#down-the-search-tree">Down the Search Tree</a></h2>
+<p>In Rust we write type definitions and trait implementations separately—we refer to trait implementations as “impl blocks.” The inner compiler component called the <em>trait solver</em> is responsible for answering queries like “Does <code>{login}</code> implement <code>Handler</code>?” such queries appear as trait bounds in the source code. The trait solver searches through the impl blocks trying to find whether or not the trait bound holds.</p>
+<p>In this post we will be using the <em>search tree</em> a data structure produced by the trait solver that describes how it searched impl blocks, and why—or why not—a particular trait bound holds.</p>
+<div id="admonition-example" class="admonition admonish-example" role="note" aria-labelledby="admonition-example-title">
+<div class="admonition-title">
+<div id="admonition-example-title">
+<p>Example</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-example"></a>
+</div>
+<div>
+<p>Here’s an illustrative diagram of the Axum-error search tree. Argus provides the search tree in a different format, similar to a directory tree, as you shall see further on.</p>
+<pre class="mermaid">---
+title: Search tree produced by the Axum trait error
+---
+graph TD
+  root[&quot;{login}: Handler&quot;]
+  implRespH[&quot;impl Handler&lt;IntoResponseHandler, S&gt; for T\nwhere\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;T: IntoResponse&quot;]
+  intoResp[&quot;{login}: IntoResponse&quot;]
+  implH[&quot;impl Handler&lt;M, S&gt; for F\nwhere\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;F: FnOnce(T1) -&gt; Fut,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Fut: Future + Send,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;T1: FromRequest&quot;]
+  isFunc[&quot;{login}: FnOnce(LoginAttempt) -&amp;gt; bool&quot;]
+  boolFut[&quot;bool: Future&quot;]
+  loginARqst[&quot;LoginAttempt: FromRequest&quot;]
+  
+  root -.-&gt; implRespH
+  implRespH --T = {login}--&gt; intoResp
+  root -.-&gt; implH
+  implH --F = {login}, T1 = LoginAttempt, Fut = bool--&gt; isFunc
+  implH --Fut = bool--&gt; boolFut
+  implH --T1 = LoginAttempt--&gt; loginARqst
+  
+  class root,implRespH,intoResp,implH,boolFut,loginARqst cssFailure
+  class isFunc cssSuccess
+  
+  classDef default fill:#fafafa, stroke-width:3px, text-align:left
+  classDef cssSuccess stroke:green
+  classDef cssFailure stroke:red
+  linkStyle 0,1,2,4,5  stroke:red
+  linkStyle 3  stroke:green, stroke-width:4px
+</pre>
+<blockquote>
+<p>We elide trivial bounds to declutter the diagram. Don’t panic if you open the Argus panel and see some bounds not shown here.</p>
+</blockquote>
+<p>Dotted lines represent an <strong>Or</strong> relationship between parent and child. That is, exactly one of the child blocks needs to hold—outlined in green. We see dotted lines coming from the root bound and extending to the impl blocks. Impl blocks always form an Or relationship with their parent.</p>
+<p>Solid lines represent <strong>And</strong> relationships between parent and child. That is, every one of the child blocks needs to hold. We see solid lines coming from impl blocks and extending to the nested constraints. Constraints always form an And relationship with their parent impl block.</p>
+<p>Traversing the tree from root to leaf is what’s referred to as “Top-Down” in the Argus extension. This view represents the full search tree, in other words, <em>how</em> the trait solver responded to the query.</p>
+</div>
+</div>
+<p>Notice that the Rust compiler diagnostic mentions the <em>root bound</em>, <code>{login}: Handler&lt;_, _&gt;</code>, instead of the more specific failing bounds at the tree leaves. The compiler is conservative, when presented with multiple failures in different impls, it defaults to reporting their parent. In the diagram there are two potentially matching impl blocks. There’s one for a function with a single argument, and there’s one for things that implement <code>IntoResponse</code> directly—i.e., static responses that don’t need input. Because there’s more than one potentially matching impl block Rust can’t decide which is the actual error, so it reports the parent node of all errors.</p>
+<p>We developed Argus so you can identify the <em>specific failures</em> that led to a particular trait error; Argus can provide more specific details on a trait error than Rust is willing to summarize in a single text-based diagnostic message. Let’s walk through the search tree as presented in Argus’ Top-Down view.</p>
+<p style="text-align:center"><img src="assets/axum-hello-server/top-down-root-highlighted.png" alt="Search tree initial bound" width="600"></p>
+<p>Highlighted at the top in orange is the search tree root. Argus represents the search tree in a directory view sort of way. The nodes are on each line, you expand the node’s children by clicking. Notice how we still use solid and dotted lines to represent the parent child relationship, they’re just to the left of the node instead an arrow connecting two bubbles.</p>
+<p>The trait solver finds an appropriate impl block that matches the initial trait bound (<a href="https://docs.rs/axum/latest/axum/handler/trait.Handler.html#impl-Handler%3C(M,+T1),+S%3E-for-F">RustDoc link</a>)—highlighted below in green.</p>
+<p style="text-align:center"><img src="assets/axum-hello-server/top-down-impl-highlighted.png" alt="Search tree found impl" width="600"></p>
+<p>In order to use this impl block to satisfy the root trait bound, <code>{login}: Handler&lt;_, _&gt;</code>, the trait solver needs to satisfy all of the conditions in the where clause. Here are the steps it performs.</p>
+<ol>
+<li>
+<p><code>F</code> unifies with <code>fn(LoginAttempt) -&gt; bool</code>.</p>
+</li>
+<li>
+<p>Does <code>F</code> implement the trait <code>FnOnce(T1) -&gt; Fut</code>? Yes, it does, we said</p>
+<pre><code class="language-rust ignore">F = fn(LoginAttempt) -&gt; bool</code></pre>
+<p>The type parameters <code>T1</code> and <code>Fut</code> unify with <code>LoginAttempt</code> and <code>bool</code>. The bounds <code>Clone</code>, <code>Send</code>, and <code>'static</code> are also checked successfully.</p>
+</li>
+<li>
+<p>Does <code>Fut</code> implement <code>Future</code>? Hmmmm, no it doesn’t. In step 2 we said that <code>Fut = bool</code>, but booleans aren’t futures.</p>
+</li>
+</ol>
+<p>This failing bound tells us that the output of the function needs to be a future. Argh, we forgot to make the handler function asynchronous! What a silly mistake. However, before we jump back to our code and fix the issue, let’s reflect on the Argus interface and see how we could have reached this same conclusion faster.</p>
+<p style="text-align:center"><img src="assets/axum-hello-server/top-down-error-highlighted.png" alt="Search tree found impl" width="600"></p>
+<p>The screenshots included so far of the trait search tree are from the Top-Down view in Argus. This means we view the search just as Rust performed it: We started at the root question <code>{login}: Handler&lt;_, _&gt;</code>, descended into the impl blocks, and found the failing where-clause in a tree leaf. This failing leaf is highlighted in the above image in red. There’s a second failing bound, but we’ll come back to that in the next section. The insight is that errors are <em>leaves</em> in the search tree, so the Top-Down view doesn’t show you the errors first but rather the full trait solving process.</p>
+<h2 id="up-the-search-tree"><a class="header" href="#up-the-search-tree">Up the Search Tree</a></h2>
+<p>What if you want to see the errors first? Argus provides a second view of the tree called the Bottom-Up view. The Bottom-Up view starts at the error leaves and expanding node children traverses up the tree towards the root. This view prioritizes showing you errors first.</p>
+<div id="admonition-example-1" class="admonition admonish-example" role="note" aria-labelledby="admonition-example-1-title">
+<div class="admonition-title">
+<div id="admonition-example-1-title">
+<p>Example</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-example-1"></a>
+</div>
+<div>
+<p>The Bottom-Up view is the <em>inverted</em> search tree. You start at the leaves and traverse to the root. Here’s the bottom-up version of the Axum error search tree.</p>
+<pre class="mermaid">---
+title: Bottom-Up view of the search tree.
+---
+graph TD
+  root[&quot;{login}: Handler&quot;]
+  implRespH[&quot;impl Handler&lt;IntoResponseHandler, S&gt; for T\nwhere\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;T: IntoResponse&quot;]
+  intoResp[&quot;{login}: IntoResponse&quot;]
+  implH[&quot;impl Handler&lt;M, S&gt; for F\nwhere\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;F: FnOnce(T1) -&gt; Fut,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Fut: Future + Send,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;T1: FromRequest&quot;]
+  isFunc[&quot;{login}: FnOnce(LoginAttempt) -&amp;gt; bool&quot;]
+  boolFut[&quot;bool: Future&quot;]
+  loginARqst[&quot;LoginAttempt: FromRequest&quot;]
+  
+
+  implRespH -.-&gt; root
+  intoResp --&gt; implRespH
+  implH -.-&gt; root
+  isFunc --&gt; implH
+  boolFut --&gt; implH
+  loginARqst --&gt; implH
+  
+  class root,implRespH,intoResp,implH,boolFut,loginARqst cssFailure
+  class isFunc cssSuccess
+  
+  classDef default fill:#fafafa, stroke-width:3px, text-align:left
+  classDef cssSuccess stroke:green
+  classDef cssFailure stroke:red
+  linkStyle 0,1,2,4,5 stroke:red,color:red
+  linkStyle 3 stroke:green, stroke-width:4px, color:green
+</pre>
+<p>Argus sorts the failing leaves in the Bottom-Up view by which are “most-likely” the root cause of the error. No tool is perfect, and Argus can be wrong! If you click on “Other failures,” which appears below the first shown failure, Argus provides you a full list.</p>
+</div>
+</div>
+<video controls>
+  <source alt="Bottom-Up Argus view" src="assets/axum-hello-server/bottom-up-start.mp4" type="video/mp4" />
+</video>
+<p>The above demonstrates that Argus identifies <code>bool: Future</code> as a root cause of the overall failure in addition to the second failure: <code>LoginAttempt: FromRequestParts&lt;_, _&gt;</code>. The note icon in the Bottom-Up view indicates that the two failures must be resolved together if you want to us the function as a handler.</p>
+<video controls>
+  <source alt="Fix Future and IntoResponse" src="assets/axum-hello-server/async-fix-response.mp4" type="video/mp4" />
+</video>
+<p>It turns out there are a lot of problems with our handler. Above shows that after marking the <code>login</code> function asynchronous, the bound <code>bool: IntoResponse</code> remains unsatisfied. This happened because the associated type <code>Output</code> of the <code>Future</code>, in this case our boolean, needs to implement <code>IntoResponse</code>. Some Argus features demonstrated that you may have missed.</p>
+<ol>
+<li>
+<p>We expand the Bottom Up view to see the lineage of impl blocks traversed to arrive at the failure. In this case there was only one between the root bound and the failing leaf, but the constraints in the where clause show the bound’s origin.</p>
+</li>
+<li>
+<p>To fix the <code>IntoResponse</code> bound we looked at all implementors of the trait. The list icon next to a tree node shows all impl blocks for the trait. Going through the list we saw the type <code>Json&lt;T&gt;</code> that satisfies our needs while preserving code intent.</p>
+</li>
+</ol>
+<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
+<div class="admonition-title">
+<div id="admonition-note-1-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-note-1"></a>
+</div>
+<div>
+<p>The list of trait implementors is equivalent to what you’d find in Rust documentation. See for yourself in the <a href="https://docs.rs/axum/latest/axum/response/trait.IntoResponse.html#foreign-impls"><code>IntoResponse</code> documentation</a>. Rust documentation makes a distinction between “implementations on foreign types” and “implementors,” Argus lists both kinds of impl block together.</p>
+</div>
+</div>
+<p>Moving forward let’s finally fix the last failing bound and get the code to type check.</p>
+<video controls>
+  <source alt="Finished debugging" src="assets/axum-hello-server/axum-type-checks.mp4" type="video/mp4" />
+</video>
+<p>The above video contains a lot of information. Let’s break down what happened.</p>
+<ol>
+<li>
+<p>We look through the implementors of <code>FromRequestParts</code>; this being the Argus-identified. However no impl block seemed to preserve my intent of extracting a <code>LoginAttempt</code> from request headers. It is a vague to say “nothing seemed right,” and of course fixing a type error may require some familiarity with the crate you’re using or the domain in which you’re working.</p>
+</li>
+<li>
+<p>Implementing <code>FromRequestParts</code> doesn’t seem right, but we haven’t checked what introduced the bound. Expanding the Bottom-Up view reveals that the bound <code>FromRequest</code> was first a constraint to implement <code>Handler</code>, and that <code>FromRequestParts</code> is an attempt to satisfy the <code>FromRequest</code> bound. Here’s how that relationship looks in the Argus Top-Down view.</p>
+ <p style="text-align:center"><img src="assets/axum-hello-server/from-rqst-prts-annotated.png" alt="FromRequestParts provenance" width="600"></p>
+ What happened is the impl block 
+<pre><code>impl&lt;S, T&gt; FromRequest&lt;S, ViaParts&gt; for T ...
+</code></pre>
+<p>unified <code>T</code> and <code>LoginAttempt</code> leading Argus to believe that <code>FromRequestParts</code> is the failing bound, but if we can satisfy <code>LoginAttempt: FromRequest&lt;_, _&gt;</code> this also fixes the trait error.</p>
+</li>
+<li>
+<p>We look through the list of implementors for <code>FromRequest</code>. It’s here we find that <code>Json</code> types implement <code>FromRequest</code>.</p>
+</li>
+<li>
+<p>We fix the last failing bound, <code>LoginAttempt: Deserialize</code>, by deriving <code>Deserialize</code> for <code>LoginAttempt</code>.</p>
+</li>
+</ol>
+<p>Finally, after all of these errors, we have a type correct program. All of this work to get a type-correct program, you can use your free time to implement the actual functionality if you wish.</p>
+<h1 id="wrapping-up"><a class="header" href="#wrapping-up">Wrapping up</a></h1>
+<p>Rust uses a mechanism called traits to define units of shared behavior. We implement traits for types with impl blocks.</p>
+<p>The <em>trait solver</em> searches through available impl blocks to determine if a given type implements a specified trait. Tracing the steps made by the trait solver is what we call the <em>search tree,</em> the core data structure exposed by the Argus IDE extension.</p>
+<p>The Argus interface shows the search tree either Top-Down or Bottom-Up. The Top-Down view is the search tree as generated by the trait solver. The Bottom-Up view inverts the search tree and traverses the tree from leaves to root. The list icon next to a node shows all impl blocks for the trait in that node.</p>
+<p>In the next chapter we’ll show off more features of Argus and debug a Diesel trait error.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="typestate.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="typestate.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="mermaid.min.js"></script>
+        <script src="mermaid-init.js"></script>
+
+
+    </div>
+    </body>
+</html>
