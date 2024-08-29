@@ -148,6 +148,7 @@ pub fn transform<'a, 'tcx: 'a>(
 
   ObligationsInBody::new(
     name,
+    typeck_results.tainted_by_errors.is_some(),
     body_range,
     builder.ambiguity_errors,
     builder.trait_errors,

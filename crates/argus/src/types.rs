@@ -134,6 +134,8 @@ pub struct ObligationsInBody {
   /// Range of the represented body.
   pub range: CharRange,
 
+  pub is_tainted: bool,
+
   /// All ambiguous expression in the body. These *could* involve
   /// trait errors, so it's important that we can map the specific
   /// obligations to these locations. (That is, if they occur.)
@@ -157,6 +159,7 @@ pub struct ObligationsInBody {
 impl ObligationsInBody {
   pub fn new(
     id: Option<(&InferCtxt, DefId)>,
+    is_tainted: bool,
     range: CharRange,
     ambiguity_errors: IndexSet<AmbiguityError>,
     trait_errors: Vec<TraitError>,
@@ -174,6 +177,7 @@ impl ObligationsInBody {
       name: json_name,
       hash: BodyHash::new(),
       range,
+      is_tainted,
       ambiguity_errors,
       trait_errors,
       obligations,

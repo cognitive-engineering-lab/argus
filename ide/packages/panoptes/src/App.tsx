@@ -3,7 +3,11 @@ import {
   createClosedMessageSystem,
   vscodeMessageSystem
 } from "@argus/common/communication";
-import { AppContext } from "@argus/common/context";
+import {
+  AppContext,
+  type Settings,
+  settingsToggles
+} from "@argus/common/context";
 import {
   type EvaluationMode,
   type FileInfo,
@@ -15,7 +19,7 @@ import {
   isSysMsgPin,
   isSysMsgUnpin
 } from "@argus/common/lib";
-import { IcoComment } from "@argus/print/Icons";
+import { IcoComment, IcoSettingsGear } from "@argus/print/Icons";
 import {
   DefPathRender,
   LocationActionable,
@@ -36,6 +40,7 @@ import type {
 } from "@argus/print/context";
 import { PrintTyValue } from "@argus/print/lib";
 import classNames from "classnames";
+import Floating from "./Floating";
 import MiniBuffer from "./MiniBuffer";
 import Workspace from "./Workspace";
 import { HighlightTargetStore, MiniBufferDataStore } from "./signals";
@@ -216,9 +221,21 @@ const CustomProjectionRender = observer(
   }
 );
 
+const SettingsPortal = ({ children }: React.PropsWithChildren) => (
+  <Floating outerClassName="SettingsIco" toggle={<IcoSettingsGear />}>
+    {children}
+  </Floating>
+);
+
+const settingsKeyText = (key: keyof Settings) => _.upperFirst(_.lowerCase(key));
+
 const App = observer(({ config }: { config: PanoptesConfig }) => {
   const [openFiles, setOpenFiles] = useState(buildInitialData(config));
-  const [showHidden, setShowHidden] = useState(false);
+  const [settings, setSettings] = useState<Settings>({
+    "show-hidden-obligations": false
+  });
+  const toggleSetting = (key: keyof Settings) =>
+    setSettings(curr => ({ ...curr, [key]: !curr[key] }));
 
   const messageSystem =
     config.type === "WEB_BUNDLE"
@@ -253,12 +270,19 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
   const Navbar = (
     <>
       <div className="app-nav">
-        <VSCodeCheckbox
-          onChange={() => setShowHidden(!showHidden)}
-          checked={showHidden}
-        >
-          Show hidden information
-        </VSCodeCheckbox>
+        <SettingsPortal>
+          <div className="SettingsArea">
+            {_.map(settingsToggles, (key, idx) => (
+              <VSCodeCheckbox
+                key={idx}
+                onChange={() => toggleSetting(key)}
+                checked={settings[key]}
+              >
+                {settingsKeyText(key)}
+              </VSCodeCheckbox>
+            ))}
+          </div>
+        </SettingsPortal>
       </div>
       <Spacer />
     </>
@@ -270,7 +294,7 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
     <AppContext.ConfigurationContext.Provider value={configNoUndef}>
       <AppContext.SystemSpecContext.Provider value={systemSpec}>
         <AppContext.MessageSystemContext.Provider value={messageSystem}>
-          <AppContext.ShowHiddenObligationsContext.Provider value={showHidden}>
+          <AppContext.SettingsContext.Provider value={settings}>
             <DefPathRender.Provider value={CustomPathRenderer}>
               <ProjectionPathRender.Provider value={CustomProjectionRender}>
                 <LocationActionable.Provider
@@ -281,7 +305,7 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
                 </LocationActionable.Provider>
               </ProjectionPathRender.Provider>
             </DefPathRender.Provider>
-          </AppContext.ShowHiddenObligationsContext.Provider>
+          </AppContext.SettingsContext.Provider>
         </AppContext.MessageSystemContext.Provider>
       </AppContext.SystemSpecContext.Provider>
     </AppContext.ConfigurationContext.Provider>

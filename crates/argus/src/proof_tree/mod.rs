@@ -13,6 +13,7 @@ use index_vec::IndexVec;
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::ty;
 use serde::Serialize;
+use serde_json as json;
 pub use topology::*;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
@@ -48,7 +49,7 @@ pub enum Node {
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct GoalData {
   #[cfg_attr(feature = "testing", ts(type = "GoalPredicate"))]
-  value: serde_json::Value,
+  value: json::Value,
 
   necessity: ObligationNecessity,
   num_vars: usize,
@@ -69,7 +70,7 @@ pub struct GoalData {
 pub enum CandidateData {
   Impl {
     #[cfg_attr(feature = "testing", ts(type = "ImplHeader"))]
-    hd: serde_json::Value,
+    hd: json::Value,
     is_user_visible: bool,
   },
   ParamEnv(usize),
@@ -106,11 +107,11 @@ pub struct SerializedTree {
   pub results: IndexVec<ResultIdx, ResultData>,
 
   #[cfg_attr(feature = "testing", ts(type = "TyVal[]"))]
-  pub tys: IndexVec<TyIdx, serde_json::Value>,
+  pub tys: IndexVec<TyIdx, json::Value>,
 
   pub projection_values: HashMap<TyIdx, TyIdx>,
 
-  pub all_impl_candidates: HashMap<ProofNodeIdx, Vec<CandidateIdx>>,
+  pub all_impl_candidates: HashMap<ProofNodeIdx, Implementors>,
 
   pub topology: TreeTopology,
 
@@ -118,6 +119,17 @@ pub struct SerializedTree {
   pub cycle: Option<ProofCycle>,
 
   pub analysis: aadebug::AnalysisResults,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+pub struct Implementors {
+  #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
+  pub _trait: json::Value,
+
+  pub impls: Vec<CandidateIdx>,
 }
 
 #[derive(Serialize, Debug, Clone)]

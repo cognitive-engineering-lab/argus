@@ -8,7 +8,7 @@ import type {
   ObligationIdx,
   ObligationsInBody
 } from "./bindings";
-import { isVisibleObligation } from "./func";
+// import { isVisibleObligation } from "./func";
 
 class BodyInfo {
   private existsImportantFailure;
@@ -29,12 +29,20 @@ class BodyInfo {
     );
   }
 
+  get isTainted(): boolean {
+    return this.oib.isTainted;
+  }
+
   get hash(): BodyHash {
     return this.oib.hash;
   }
 
   get numErrors(): number {
-    return this.oib.ambiguityErrors.length + this.oib.traitErrors.length;
+    // NOTE: is the body isn't tainted by errors, the number of errors
+    // is ZERO, even if Argus sends errors to the frontend.
+    return !this.isTainted
+      ? 0
+      : this.oib.ambiguityErrors.length + this.oib.traitErrors.length;
   }
 
   get name() {
@@ -100,18 +108,25 @@ class BodyInfo {
   isVisible(idx: ObligationIdx) {
     const o = this.obligation(idx);
     if (o === undefined) return false;
+    // If the body isn't tainted by errors, we only show obligations that hold true.
+    if (!this.isTainted && o.result !== "yes") return false;
 
-    return (
-      this.showHidden ||
-      isVisibleObligation(
-        o,
+    const _isVisibleObligation = () =>
+      // Short-circuit ambiguities if we're filtering them
+      !(
+        (o.result === "maybe-ambiguity" || o.result === "maybe-overflow") &&
         // HACK: If there is a failing obligation, we filter ambiguities. This is
         // a short workaround for a backend incompleteness. We can't filter obligations
         // that get resolved in a second round of trait solving, this leaves Argus with
         // more "failures" than rustc shows.
         this.existsImportantFailure
-      )
-    );
+      ) &&
+      // If the obligation is listed as necessary, it's visible
+      (o.necessity === "Yes" ||
+        // If the obligation is listed as necessary on error, and it failed, it's visible
+        (o.necessity === "OnError" && o.result === "no"));
+
+    return this.showHidden || _isVisibleObligation();
   }
 }
 

@@ -1,12 +1,9 @@
 import React, { type PropsWithChildren } from "react";
 
+import "./MonoSpace.css";
+
 const MonoSpace = ({ children }: PropsWithChildren) => (
-  <span
-    style={{
-      fontFamily: "var(--vscode-editor-font-family)",
-      fontSize: "var(--vscode-editor-font-size)"
-    }}
-  >
+  <span className="MonoSpaceArea">
     {children}
   </span>
 );

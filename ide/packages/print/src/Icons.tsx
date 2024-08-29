@@ -7,7 +7,7 @@ type ButtonProps = {
   onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
 };
 
-const makeCodicon =
+const codicon =
   (name: string) =>
   (props: React.HTMLAttributes<HTMLElement> & ButtonProps) => (
     <i
@@ -18,27 +18,28 @@ const makeCodicon =
 
 // NOTE: not an exhaustive list of call vscode codicons, just add them when necessary.
 
-export const IcoTriangleRight = makeCodicon("triangle-right");
-export const IcoTriangleDown = makeCodicon("triangle-down");
+export const IcoTriangleRight = codicon("triangle-right");
+export const IcoTriangleDown = codicon("triangle-down");
 
-export const IcoChevronDown = makeCodicon("chevron-down");
-export const IcoChevronUp = makeCodicon("chevron-up");
-export const IcoChevronLeft = makeCodicon("chevron-left");
-export const IcoChevronRight = makeCodicon("chevron-right");
+export const IcoChevronDown = codicon("chevron-down");
+export const IcoChevronUp = codicon("chevron-up");
+export const IcoChevronLeft = codicon("chevron-left");
+export const IcoChevronRight = codicon("chevron-right");
 
-export const IcoCheck = makeCodicon("check");
-export const IcoError = makeCodicon("error");
-export const IcoAmbiguous = makeCodicon("question");
+export const IcoCheck = codicon("check");
+export const IcoError = codicon("error");
+export const IcoAmbiguous = codicon("question");
 
-export const IcoNote = makeCodicon("note");
-export const IcoComment = makeCodicon("comment");
+export const IcoNote = codicon("note");
+export const IcoComment = codicon("comment");
 
-export const IcoPlus = makeCodicon("plus");
-export const IcoDot = makeCodicon("circle-small-filled");
-export const IcoLoop = makeCodicon("sync");
-export const IcoMegaphone = makeCodicon("megaphone");
-export const IcoEyeClosed = makeCodicon("eye-closed");
-export const IcoLock = makeCodicon("lock");
-export const IcoTreeDown = makeCodicon("type-hierarchy-sub");
-export const IcoPinned = makeCodicon("pinned");
-export const IcoListUL = makeCodicon("list-unordered");
+export const IcoPlus = codicon("plus");
+export const IcoDot = codicon("circle-small-filled");
+export const IcoLoop = codicon("sync");
+export const IcoMegaphone = codicon("megaphone");
+export const IcoEyeClosed = codicon("eye-closed");
+export const IcoLock = codicon("lock");
+export const IcoTreeDown = codicon("type-hierarchy-sub");
+export const IcoPinned = codicon("pinned");
+export const IcoListUL = codicon("list-unordered");
+export const IcoSettingsGear = codicon("settings-gear");

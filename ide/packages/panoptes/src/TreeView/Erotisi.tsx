@@ -1,8 +1,8 @@
 import type { TreeInfo } from "@argus/common/TreeInfo";
 import type { ProofNodeIdx, SetHeuristic } from "@argus/common/bindings";
 import { TreeAppContext } from "@argus/common/context";
-import ErrorDiv from "@argus/print/ErrorDiv";
 import Indented from "@argus/print/Indented";
+import { ErrorDiv } from "@argus/print/Info";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";

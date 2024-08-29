@@ -25,7 +25,7 @@ pub struct SerializedTreeVisitor<'tcx> {
   pub topology: TreeTopology,
   pub cycle: Option<ProofCycle>,
   pub projection_values: HashMap<TyIdx, TyIdx>,
-  pub all_impl_candidates: HashMap<ProofNodeIdx, Vec<CandidateIdx>>,
+  pub all_impl_candidates: HashMap<ProofNodeIdx, Implementors>,
 
   deferred_leafs: Vec<(ProofNodeIdx, EvaluationResult)>,
   interners: Interners,
@@ -243,14 +243,26 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
     // If the Goal is a TraitPredicate we will cache *all* possible implementors
     if let Some(tp) = goal.goal().predicate.as_trait_predicate() {
       let infcx = goal.infcx();
+
+      // Make Trait ref name
+      // FIXME: this is a mega hack
+      let _trait =
+        ser::TraitRefPrintOnlyTraitPathDef(tp.skip_binder().trait_ref);
+
+      let _trait = tls::unsafe_access_interner(|ty_interner| {
+        ser::to_value_expect(infcx, ty_interner, &_trait)
+      });
+
+      // Gather all impls
+      let mut impls = vec![];
       for can in infcx.find_similar_impl_candidates(tp) {
         let can_idx = self.interners.intern_impl(infcx, can.impl_def_id);
-        self
-          .all_impl_candidates
-          .entry(idx)
-          .or_default()
-          .push(can_idx);
+        impls.push(can_idx);
       }
+
+      self
+        .all_impl_candidates
+        .insert(idx, Implementors { _trait, impls });
     }
   }
 }

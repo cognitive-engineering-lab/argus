@@ -26,14 +26,10 @@ const Expr = observer(({ idx }: { idx: ExprIdx }) => {
     file
   );
 
-  if (expr.isBody && !bodyInfo.showHidden) {
-    return null;
-  }
+  if (expr.isBody && !bodyInfo.showHidden) return null;
 
   const visibleObligations = bodyInfo.obligations(idx);
-  if (visibleObligations.length === 0) {
-    return null;
-  }
+  if (visibleObligations.length === 0) return null;
 
   const Content = () =>
     _.map(visibleObligations, (oi, i) => (

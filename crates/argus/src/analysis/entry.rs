@@ -209,24 +209,8 @@ pub(in crate::analysis) fn build_obligations_in_body<'tcx>(
   body_id: BodyId,
   typeck_results: &'tcx TypeckResults<'tcx>,
 ) -> (Forgettable<FullData<'tcx>>, ObligationsInBody) {
-  let mut obligations = tls::take_obligations();
-  let obligation_data = tls::unsafe_take_data();
-  let obligation_data = FullData::new(obligation_data);
-
-  // XXX: it's possible that Argus reports false negatives. Meaning that
-  // in a body that type checks, failing obligations are reported.
-  // This happens as a result of how predicates are extracted from rustc (ask gavin)
-  // so as a first heuristic, if the body isn't tainted by errors, we'll just remove
-  // all non-successful obligations.
-  if typeck_results.tainted_by_errors.is_none() {
-    log::debug!(
-      "Removing failures: Body not-tainted {:?}",
-      typeck_results.hir_owner
-    );
-    obligations.retain(|prov| prov.it.result.is_yes());
-  } else {
-    log::debug!("Body tainted! {:?}", typeck_results.hir_owner);
-  }
+  let obligations = tls::take_obligations();
+  let obligation_data = FullData::new(tls::unsafe_take_data());
 
   let ctx = ErrorAssemblyCtx {
     tcx,

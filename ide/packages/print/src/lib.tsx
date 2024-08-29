@@ -10,7 +10,7 @@ import type {
 import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
-import ErrorDiv from "./ErrorDiv";
+import { ErrorDiv } from "./Info";
 import MonoSpace from "./MonoSpace";
 import ReportBugUrl from "./ReportBugUrl";
 import "./lib.css";

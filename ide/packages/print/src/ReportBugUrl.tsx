@@ -1,6 +1,9 @@
 import { AppContext } from "@argus/common/context";
 import { getArgusIssueUrl } from "@argus/common/lib";
-import { VSCodeProgressRing } from "@vscode/webview-ui-toolkit/react";
+import {
+  VSCodeLink,
+  VSCodeProgressRing
+} from "@vscode/webview-ui-toolkit/react";
 import React, { useContext, useEffect, useState } from "react";
 
 const PASTE_SUCCESS: number = 201;
@@ -42,14 +45,14 @@ const ReportBugUrl = ({
   }, []);
 
   return logState ? (
-    <a
+    <VSCodeLink
       href={getArgusIssueUrl(error, {
         logText: logState,
         ...systemSpec
       })}
     >
       {displayText}
-    </a>
+    </VSCodeLink>
   ) : (
     <>
       <VSCodeProgressRing /> building link ...

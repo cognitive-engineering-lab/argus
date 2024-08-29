@@ -7,8 +7,8 @@ import type {
 } from "@argus/common/bindings";
 import React from "react";
 
+import { DBraced, Placeholder } from "../syntax";
 import { PrintDefinitionPath, PrintValuePath } from "./path";
-import { DBraced, Placeholder } from "./syntax";
 import { PrintExpr, PrintValueTree } from "./term";
 import { PrintBoundVariable, PrintSymbol } from "./ty";
 

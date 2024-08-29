@@ -36,9 +36,12 @@ export const PrintPredicateObligation = ({ o }: { o: PredicateObligation }) => {
   ) ? null : (
     <HoverInfo
       Content={() => (
-        <MonoSpace>
-          <PrintParamEnv o={o.paramEnv} />
-        </MonoSpace>
+        <>
+          <p>Facts in the type environment</p>
+          <MonoSpace>
+            <PrintParamEnv o={o.paramEnv} />
+          </MonoSpace>
+        </>
       )}
     >
       {" "}

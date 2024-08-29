@@ -5,10 +5,8 @@ import type {
   BoundTyKind,
   BoundVariableKind,
   CharRange,
-  EvaluationResult,
   GenericArg,
   ObligationHash,
-  ObligationNecessity,
   Predicate,
   Region,
   Ty,
@@ -67,19 +65,10 @@ export function makeHighlightPosters(
   return [addHighlight, removeHighlight];
 }
 
-export const isVisibleObligation = (
-  o: { necessity: ObligationNecessity; result: EvaluationResult },
-  filterAmbiguities = false
-) =>
-  // Short-circuit ambiguities if we're filtering them
-  !(
-    (o.result === "maybe-ambiguity" || o.result === "maybe-overflow") &&
-    filterAmbiguities
-  ) &&
-  // If the obligation is listed as necessary, it's visible
-  (o.necessity === "Yes" ||
-    // If the obligation is listed as necessary on error, and it failed, it's visible
-    (o.necessity === "OnError" && o.result === "no"));
+export const composeEvents =
+  <T>(...es: (((t: T) => void) | undefined)[]) =>
+  (t: T) =>
+    _.forEach(es, e => (e ? e(t) : {}));
 
 export function searchObject(obj: any, target: any) {
   for (let key in obj) {

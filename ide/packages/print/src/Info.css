@@ -1,0 +1,13 @@
+.ErrorDiv {
+    padding: 0.5em;
+    border: 2pt solid var(--vscode-inputValidation-errorBorder);
+    border-radius: 3px;
+    background: var(--vscode-inputValidation-errorBackground)
+}
+
+.InfoDiv {
+    padding: 0.5em;
+    border: 2px solid var(--vscode-inputValidation-infoBorder);
+    border-radius: 3px;
+    background: var(--vscode-inputValidation-infoBackground)
+}

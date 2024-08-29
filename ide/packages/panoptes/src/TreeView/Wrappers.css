@@ -8,19 +8,18 @@
 }
 
 .floating-graph {
-    box-shadow: 0 0 5px 0 var(--vscode-focusBorder);
     max-height: 70vh;
-    overflow-y: auto;
-    overflow-x: hidden;
-    width: 90%;
+    max-width: 80%;
+    overflow: scroll;
+    box-shadow: 0 0 5px 0 var(--vscode-focusBorder);
 }
 
 .ImplCandidatesPanel {
-    padding: 0.5em;
-}
-
-.ImplCandidatesPanel > div {
-    margin-bottom: 1em;
+    padding: 1em;
+    gap: 1.5em;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
 }
 
 .WrapperBox {
