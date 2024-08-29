@@ -57,6 +57,8 @@ pub fn process_obligation<'tcx>(
 
   // Anything we accidentally do in here should not affect type checking
   infcx.probe(|_| {
+    tls::store_body_def_path(infcx, body_id);
+
     // Use this to get rid of any resolved inference variables,
     // these could have been resolved while trying to solve the obligation
     // and we want to present it as such to the user.
@@ -211,6 +213,7 @@ pub(in crate::analysis) fn build_obligations_in_body<'tcx>(
 ) -> (Forgettable<FullData<'tcx>>, ObligationsInBody) {
   let obligations = tls::take_obligations();
   let obligation_data = FullData::new(tls::unsafe_take_data());
+  let mut body_names = tls::take_body_names();
 
   let ctx = ErrorAssemblyCtx {
     tcx,
@@ -225,6 +228,7 @@ pub(in crate::analysis) fn build_obligations_in_body<'tcx>(
   let oib = transform::transform(
     tcx,
     body_id,
+    body_names.swap_remove(&body_id),
     typeck_results,
     obligations,
     &obligation_data,

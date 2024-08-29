@@ -11,8 +11,10 @@ use argus_ser::{
 };
 use index_vec::IndexVec;
 use rustc_data_structures::fx::FxIndexMap;
+use rustc_hir::BodyId;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_span::Span;
+use serde_json as json;
 pub use unsafe_tls::{
   access_interner as unsafe_access_interner, store as unsafe_store_data,
   take as unsafe_take_data, take_interned_values as take_interned_tys,
@@ -30,13 +32,13 @@ const DRAIN_WINDOW: usize = 100;
 // across call to the obligation inspector in `typeck_inspect`.
 // DO NOT set this directly, make sure to use the function `push_obligaion`.
 thread_local! {
-  static BODY_DEF_PATH: RefCell<Option<serde_json::Value>> = RefCell::default();
-
   static OBLIGATIONS: RefCell<Vec<Provenance<Obligation>>> = RefCell::default();
 
   static TREE: RefCell<Option<SerializedTree>> = RefCell::default();
 
   static REPORTED_ERRORS: RefCell<FxIndexMap<Span, Vec<ObligationHash>>> = RefCell::default();
+
+  static BODY_NAMES: RefCell<FxIndexMap<BodyId, json::Value>> = RefCell::default();
 }
 
 pub fn store_obligation(obl: Provenance<Obligation>) {
@@ -44,6 +46,22 @@ pub fn store_obligation(obl: Provenance<Obligation>) {
     if !obls.borrow().iter().any(|o| *o.hash == *obl.hash) {
       obls.borrow_mut().push(obl);
     }
+  });
+}
+
+pub fn store_body_def_path(infcx: &InferCtxt, body_id: BodyId) {
+  BODY_NAMES.with(|names| {
+    let mut names = names.borrow_mut();
+    if names.contains_key(&body_id) {
+      return;
+    }
+
+    let def_id = infcx.tcx.hir().body_owner_def_id(body_id).to_def_id();
+    let name = unsafe_tls::access_interner(|ty_interner| {
+      ser::to_value_expect(infcx, ty_interner, &ser::PathDefNoArgs(def_id))
+    });
+
+    names.insert(body_id, name);
   });
 }
 
@@ -100,6 +118,10 @@ pub fn drain_implied_ambiguities<'tcx>(
 
 pub fn take_obligations() -> Vec<Provenance<Obligation>> {
   OBLIGATIONS.with(RefCell::take)
+}
+
+pub fn take_body_names() -> FxIndexMap<BodyId, json::Value> {
+  BODY_NAMES.with(RefCell::take)
 }
 
 pub fn replace_reported_errors(infcx: &InferCtxt) {
@@ -241,7 +263,7 @@ mod unsafe_tls {
     })
   }
 
-  pub fn take_interned_values() -> IndexVec<TyIdx, serde_json::Value> {
+  pub fn take_interned_values() -> IndexVec<TyIdx, json::Value> {
     TY_INTERNER.with(RefCell::take).consume()
   }
 }
