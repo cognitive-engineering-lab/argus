@@ -5,7 +5,7 @@
   "description": "A trait debugger for Rust",
   "license": "MIT",
   "icon": "argus-logo-128.png",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "engines": {
     "vscode": "^1.79.0"
   },

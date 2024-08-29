@@ -1,6 +1,6 @@
 [package]
 name = "argus-ext"
-version = "0.1.10"
+version = "0.1.11"
 edition = "2021"
 authors = ["Gavin Gray <gavinleroy6@gmail.com>"]
 repository = "https://github.com/cognitive-engineering-lab/argus"
