@@ -64,14 +64,6 @@ pub fn process_obligation<'tcx>(
     // and we want to present it as such to the user.
     let obl = &infcx.resolve_vars_if_possible(obl.clone());
 
-    // HACK: Remove ambiguous obligations if a "stronger" result was found and
-    // the predicate implies the  previous. This is necessary because we
-    // can't (currently) distinguish between a subsequent solving attempt
-    // of a previous obligation.
-    // if result.is_yes() || result.is_no() {
-    //   tls::drain_implied_ambiguities(infcx, obl);
-    // }
-
     if !INCLUDE_SUCCESSES.copied().unwrap_or(false) && result.is_yes() {
       log::debug!("Skipping successful obligation {obl:?}");
       return;

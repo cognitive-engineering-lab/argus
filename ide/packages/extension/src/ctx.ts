@@ -113,10 +113,6 @@ export class Ctx {
     backend: CallArgus,
     commandFactories: Record<string, CommandFactory>
   ) {
-    vscode.window.showInformationMessage(
-      "Loading Argus, this may take several minutes."
-    );
-
     await backend(
       ["preload"],
       true, // Don't expect output
@@ -259,8 +255,8 @@ export class Ctx {
 
   async openError(target: ErrorJumpTargetInfo) {
     await this.inspectAt(target);
-    // XXX: If the view is not initialized after calling `inspectAt`
-    // there is definitely a bug somewhere.
+    // SAFETY: if the view is not initialized after
+    // calling `inspectAt` there is definitely a bug somewhere.
     await this.view!.blingObligation(target);
   }
 
@@ -282,19 +278,15 @@ export class Ctx {
   // Here we load the obligations for a file, and cache the results,
   // there's a distinction between having an editor and not because
   // we only have definitive access to the editor when it's visible.
-  private async loadObligations(
-    editor: RustEditor
-  ): Promise<[ObligationsInBody[] | undefined, string]> {
+  private async loadObligations(editor: RustEditor) {
     const [obligationsP, sig] = this.cache.getObligationsInBody(
       editor.document.fileName
     );
-    const obligations = await obligationsP;
-    if (obligations === undefined) {
-      return [undefined, sig];
-    }
 
-    this.refreshDiagnostics(editor, obligations);
-    return [obligations, sig];
+    const obligations = await obligationsP;
+    if (obligations !== undefined) this.refreshDiagnostics(editor, obligations);
+
+    return [obligations, sig] as const;
   }
 
   async getObligations(filename: Filename) {
@@ -435,28 +427,39 @@ export class Ctx {
     return mdStr;
   }
 
+  async _addHighlightRange(editor: RustEditor, range: CharRange) {
+    this.highlightRanges.push(range);
+    await this.refreshHighlights(editor);
+  }
+
   async addHighlightRange(filename: Filename, range: CharRange) {
     const editor = this.findVisibleEditorByName(filename);
-    if (editor) {
-      this.highlightRanges.push(range);
-      await this.refreshHighlights(editor);
-    }
+    if (editor) await this._addHighlightRange(editor, range);
+  }
+
+  async _removeHighlightRange(editor: RustEditor, range: CharRange) {
+    this.highlightRanges = _.filter(
+      this.highlightRanges,
+      r => !_.isEqual(r, range)
+    );
+    await this.refreshHighlights(editor);
   }
 
   async removeHighlightRange(filename: Filename, range: CharRange) {
     const editor = this.findVisibleEditorByName(filename);
-    if (editor) {
-      this.highlightRanges = _.filter(
-        this.highlightRanges,
-        r => !_.isEqual(r, range)
-      );
-      await this.refreshHighlights(editor);
-    }
+    if (editor) await this._removeHighlightRange(editor, range);
   }
 
   async jumpToDef(location: DefLocation) {
-    console.error("Jumping to definition", location);
-    const uri = vscode.Uri.parse(location.f);
+    let uri: vscode.Uri;
+    try {
+      uri = vscode.Uri.file(location.f);
+    } catch (e: any) {
+      // TODO: files from the current crate default to paths from `src/..`
+      // but they should be sent fully qualified as well for consistency.
+      uri = vscode.Uri.joinPath(this.ictxt.extCtx.extensionUri, location.f);
+    }
+
     const range = rustRangeToVscodeRange(location.r);
 
     // Open the document at the URI
@@ -468,7 +471,12 @@ export class Ctx {
       // ideally it doesn't cover up argus.
       viewColumn: vscode.ViewColumn.One
     });
-    editor.selection = new vscode.Selection(range.start, range.end);
+
+    if (isRustEditor(editor)) {
+      await this._addHighlightRange(editor, location.r);
+      setTimeout(() => this._removeHighlightRange(editor, location.r), 5000);
+    }
+
     editor.revealRange(range);
   }
 
