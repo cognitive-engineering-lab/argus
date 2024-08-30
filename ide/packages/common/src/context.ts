@@ -10,13 +10,19 @@ import type {
   SystemSpec
 } from "./lib";
 
+export const settingsToggles = ["show-hidden-obligations"] as const;
+
+export type Settings = {
+  [K in (typeof settingsToggles)[number]]: boolean;
+};
+
 export const AppContext = {
   MessageSystemContext: createContext<MessageSystem | undefined>(undefined),
   ConfigurationContext: createContext<
     (PanoptesConfig & { evalMode: EvaluationMode }) | undefined
   >(undefined),
   SystemSpecContext: createContext<SystemSpec | undefined>(undefined),
-  ShowHiddenObligationsContext: createContext<boolean>(false)
+  SettingsContext: createContext<Settings>({ "show-hidden-obligations": false })
 };
 
 export const FileContext = createContext<Filename | undefined>(undefined);

@@ -6,25 +6,16 @@ import type {
 import { TreeAppContext } from "@argus/common/context";
 import { arrUpdate } from "@argus/common/func";
 import { IcoListUL, IcoTreeDown } from "@argus/print/Icons";
-import {
-  FloatingArrow,
-  FloatingFocusManager,
-  FloatingPortal,
-  arrow,
-  offset,
-  shift,
-  useClick,
-  useDismiss,
-  useFloating,
-  useInteractions
-} from "@floating-ui/react";
+import {} from "@floating-ui/react";
 import classNames from "classnames";
 import _ from "lodash";
-import React, { type ReactElement, useState, useContext, useRef } from "react";
+import React, { type ReactElement, useState, useContext } from "react";
 import Graph from "./Graph";
 import { Candidate } from "./Node";
 
 import "./Wrappers.css";
+import { PrintDefPath } from "@argus/print/lib";
+import Floating from "../Floating";
 
 export const WrapNode = ({
   children,
@@ -58,79 +49,22 @@ export const WrapNode = ({
   );
 };
 
-const composeEvents =
-  <T,>(...es: ((t: T) => void)[]) =>
-  (t: T) =>
-    _.forEach(es, e => e(t));
-
 const DetailsPortal = ({
   children,
   info,
   reportActive
 }: React.PropsWithChildren<
   Omit<InfoWrapperProps, "n"> & { info: ReactElement }
->) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const openCallback = composeEvents(setIsOpen, reportActive);
-  const arrowRef = useRef(null);
-
-  const ARROW_HEIGHT = 10;
-  const GAP = 5;
-
-  const { refs, floatingStyles, context } = useFloating({
-    open: isOpen,
-    onOpenChange: openCallback,
-    placement: "bottom",
-    middleware: [
-      offset(ARROW_HEIGHT + GAP),
-      shift(),
-      arrow({
-        element: arrowRef
-      })
-    ]
-  });
-
-  const click = useClick(context);
-  const dismiss = useDismiss(context);
-  const { getReferenceProps, getFloatingProps } = useInteractions([
-    click,
-    dismiss
-  ]);
-
-  return (
-    <>
-      <span
-        className="tree-toggle"
-        ref={refs.setReference}
-        {...getReferenceProps()}
-      >
-        {info}
-      </span>
-      {isOpen && (
-        <FloatingPortal>
-          <FloatingFocusManager context={context}>
-            <div
-              className={classNames("floating", "floating-graph")}
-              ref={refs.setFloating}
-              style={floatingStyles}
-              {...getFloatingProps()}
-              onClick={e => e.stopPropagation()}
-            >
-              <FloatingArrow
-                ref={arrowRef}
-                context={context}
-                height={ARROW_HEIGHT}
-                tipRadius={3}
-                stroke="2"
-              />
-              {children}
-            </div>
-          </FloatingFocusManager>
-        </FloatingPortal>
-      )}
-    </>
-  );
-};
+>) => (
+  <Floating
+    outerClassName="tree-toggle"
+    innerClassName="floating-graph"
+    toggle={info}
+    reportActive={reportActive}
+  >
+    {children}
+  </Floating>
+);
 
 export const WrapTreeIco = ({ n, reportActive }: InfoWrapperProps) => (
   <DetailsPortal reportActive={reportActive} info={<IcoTreeDown />}>
@@ -140,14 +74,18 @@ export const WrapTreeIco = ({ n, reportActive }: InfoWrapperProps) => (
 
 export const WrapImplCandidates = ({ n, reportActive }: InfoWrapperProps) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
-  const candidates = tree.implCandidates(n);
-  if (candidates === undefined || candidates.length === 0) return null;
+  const implementors = tree.implCandidates(n);
+  if (implementors === undefined || implementors.impls.length === 0)
+    return null;
 
   return (
     <DetailsPortal reportActive={reportActive} info={<IcoListUL />}>
-      <p>The following {candidates.length} implementations are available:</p>
+      <p>
+        There are {implementors.impls.length}{" "}
+        <PrintDefPath defPath={implementors.trait} /> implementors
+      </p>
       <div className="ImplCandidatesPanel">
-        {_.map(candidates, (c, i) => (
+        {_.map(implementors.impls, (c, i) => (
           <div key={i}>
             <Candidate idx={c} />
           </div>

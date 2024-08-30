@@ -1,11 +1,3 @@
 .HoverMainInfo {
   display: inline;
 }
-
-.floating {
-    background-color: var(--vscode-dropdown-background);
-    color: var(--vscode-dropdown-foreground);
-    border: 1.5px solid var(--vscode-dropdown-border);
-    border-radius: 3px;
-    padding: 0.25em;
-  }

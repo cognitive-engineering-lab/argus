@@ -48,8 +48,6 @@ import _, { isObject } from "lodash";
 import React, { useContext } from "react";
 import { Toggle } from "../Toggle";
 import { AllowProjectionSubst, ProjectionPathRender, TyCtxt } from "../context";
-import { PrintConst } from "./const";
-import { PrintDefinitionPath } from "./path";
 import {
   Angled,
   CommaSeparated,
@@ -59,7 +57,9 @@ import {
   PlusSeparated,
   SqBraced,
   nbsp
-} from "./syntax";
+} from "../syntax";
+import { PrintConst } from "./const";
+import { PrintDefinitionPath } from "./path";
 import { PrintTerm } from "./term";
 
 interface Binding<T> {

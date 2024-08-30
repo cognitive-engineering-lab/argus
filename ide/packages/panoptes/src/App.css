@@ -1,5 +1,5 @@
 #root {
-    font-size: var(--vscode-editor-font-size);
+    font-size: var(--vscode-font-size);
 }
 
 .app-nav {
@@ -18,6 +18,22 @@
 
     /* Some breathing room. Make sure the `spacer` has the same value. */
     margin-bottom: 0.25em;
+}
+
+.SettingsArea {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    justify-content: flex-start;
+}
+
+.SettingsIco {
+    padding: 0.25em;
+}
+
+.SettingsIco > i:hover {
+    cursor: pointer;
+    color: var(--vscode-input-placeholderForeground);
 }
 
 .DefinitionWrapper.hovered.meta-pressed {

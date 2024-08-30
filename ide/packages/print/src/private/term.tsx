@@ -11,16 +11,16 @@ import type {
 import _ from "lodash";
 import React from "react";
 
-import { PrintConst } from "./const";
-import { PrintConstScalarInt } from "./const";
-import { PrintValuePath } from "./path";
 import {
   Angled,
   CommaSeparated,
   DBraced,
   Parenthesized,
   SqBraced
-} from "./syntax";
+} from "../syntax";
+import { PrintConst } from "./const";
+import { PrintConstScalarInt } from "./const";
+import { PrintValuePath } from "./path";
 import { PrintSymbol, PrintTy } from "./ty";
 
 export const PrintTerm = ({ o }: { o: Term }) => {

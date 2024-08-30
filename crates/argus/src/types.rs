@@ -13,9 +13,10 @@ use rustc_middle::{
   },
   ty::{self, TyCtxt, TypeckResults},
 };
-use rustc_span::{def_id::DefId, Span};
+use rustc_span::Span;
 use rustc_utils::source_map::range::{CharRange, ToSpan};
 use serde::{Deserialize, Serialize};
+use serde_json as json;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
@@ -46,7 +47,7 @@ pub struct BodyBundle {
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct ExtensionCandidates {
   #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath[]"))]
-  data: serde_json::Value,
+  data: json::Value,
 }
 
 impl ExtensionCandidates {
@@ -127,12 +128,14 @@ pub struct TraitError {
 pub struct ObligationsInBody {
   #[serde(skip_serializing_if = "Option::is_none")]
   #[cfg_attr(feature = "testing", ts(type = "PathDefNoArgs | undefined"))]
-  name: Option<serde_json::Value>,
+  name: Option<json::Value>,
 
   hash: BodyHash,
 
   /// Range of the represented body.
   pub range: CharRange,
+
+  pub is_tainted: bool,
 
   /// All ambiguous expression in the body. These *could* involve
   /// trait errors, so it's important that we can map the specific
@@ -151,29 +154,25 @@ pub struct ObligationsInBody {
   pub exprs: IndexVec<ExprIdx, Expr>,
 
   #[cfg_attr(feature = "testing", ts(type = "TyVal[]"))]
-  pub tys: IndexVec<TyIdx, serde_json::Value>,
+  pub tys: IndexVec<TyIdx, json::Value>,
 }
 
 impl ObligationsInBody {
   pub fn new(
-    id: Option<(&InferCtxt, DefId)>,
+    name: Option<json::Value>,
+    is_tainted: bool,
     range: CharRange,
     ambiguity_errors: IndexSet<AmbiguityError>,
     trait_errors: Vec<TraitError>,
     obligations: IndexVec<ObligationIdx, Obligation>,
     exprs: IndexVec<ExprIdx, Expr>,
   ) -> Self {
-    let json_name = id.map(|(infcx, id)| {
-      tls::unsafe_access_interner(|ty_interner| {
-        ser::to_value_expect(infcx, ty_interner, &ser::PathDefNoArgs(id))
-      })
-    });
-
     let tys = tls::take_interned_tys();
     ObligationsInBody {
-      name: json_name,
+      name,
       hash: BodyHash::new(),
       range,
+      is_tainted,
       ambiguity_errors,
       trait_errors,
       obligations,
@@ -202,7 +201,7 @@ impl BodyHash {
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct Obligation {
   #[cfg_attr(feature = "testing", ts(type = "PredicateObligation"))]
-  pub obligation: serde_json::Value,
+  pub obligation: json::Value,
   pub hash: ObligationHash,
   pub range: CharRange,
   pub kind: ObligationKind,

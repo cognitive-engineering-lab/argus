@@ -10,7 +10,7 @@ import {
   LocationActionable,
   TyCtxt
 } from "../context";
-import { Angled, CommaSeparated, Kw, nbsp } from "./syntax";
+import { Angled, CommaSeparated, Kw, nbsp } from "../syntax";
 import { PrintGenericArg, PrintTy } from "./ty";
 
 // A `DefinedPath` includes extra information about the definition location.

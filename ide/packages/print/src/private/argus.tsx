@@ -18,9 +18,9 @@ import React, {
 import classNames from "classnames";
 import { Toggle } from "../Toggle";
 import { AllowProjectionSubst, LocationActionable, TyCtxt } from "../context";
+import { Angled, CommaSeparated, Kw, PlusSeparated, nbsp } from "../syntax";
 import { PrintDefinitionPath } from "./path";
 import { PrintClause } from "./predicate";
-import { Angled, CommaSeparated, Kw, PlusSeparated, nbsp } from "./syntax";
 import {
   PrintBinder,
   PrintGenericArg,

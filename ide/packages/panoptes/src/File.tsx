@@ -6,12 +6,13 @@ import {
   FileContext
 } from "@argus/common/context";
 import type { Filename } from "@argus/common/lib";
-import ErrorDiv from "@argus/print/ErrorDiv";
+import { ErrorDiv, InfoDiv } from "@argus/print/Info";
 import MonoSpace from "@argus/print/MonoSpace";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
 import { TyCtxt } from "@argus/print/context";
 import { PrintBodyName } from "@argus/print/lib";
-import { VSCodeDivider } from "@vscode/webview-ui-toolkit/react";
+import { nbsp } from "@argus/print/syntax";
+import { VSCodeBadge, VSCodeDivider } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import { observer } from "mobx-react";
 import React, { Fragment, useContext } from "react";
@@ -37,7 +38,10 @@ const ObligationBody = observer(({ bodyInfo }: { bodyInfo: BodyInfo }) => {
 
   const errCount =
     bodyInfo.numErrors > 0 ? (
-      <span className="ErrorCount"> ({bodyInfo.numErrors})</span>
+      <>
+        {nbsp}
+        <VSCodeBadge>{bodyInfo.numErrors}</VSCodeBadge>
+      </>
     ) : null;
 
   const header = (
@@ -73,8 +77,11 @@ export interface FileProps {
 }
 
 const File = ({ file, osibs }: FileProps) => {
-  const showHidden = useContext(AppContext.ShowHiddenObligationsContext);
-  const bodyInfos = _.map(osibs, osib => new BodyInfo(osib, showHidden));
+  const settings = useContext(AppContext.SettingsContext);
+  const bodyInfos = _.map(
+    osibs,
+    osib => new BodyInfo(osib, settings["show-hidden-obligations"])
+  );
 
   const noBodiesFound = (
     <ErrorDiv>
@@ -89,12 +96,30 @@ const File = ({ file, osibs }: FileProps) => {
     </ErrorDiv>
   );
 
+  const fileTypecks = (
+    <InfoDiv>
+      <p>
+        Argus thinks this file type checks! You may close the Argus inspector
+        panel. If you think it shouldn’t, please click below to report this as a
+        bug!
+      </p>
+      <ReportBugUrl
+        error={`File typecks but shouldn't: ${file}`}
+        logText={JSON.stringify({ file, osibs })}
+      />
+    </InfoDiv>
+  );
+
   const bodiesWithVisibleExprs = _.filter(bodyInfos, bi =>
     bi.hasVisibleExprs()
   );
 
   if (bodiesWithVisibleExprs.length === 0) {
-    return noBodiesFound;
+    if (_.some(bodyInfos, bi => bi.isTainted)) {
+      return noBodiesFound;
+    } else {
+      return fileTypecks;
+    }
   }
 
   return (

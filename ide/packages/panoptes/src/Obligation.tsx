@@ -7,7 +7,7 @@ import type {
 import { BodyInfoContext, FileContext } from "@argus/common/context";
 import { AppContext } from "@argus/common/context";
 import { makeHighlightPosters, obligationCardId } from "@argus/common/func";
-import ErrorDiv from "@argus/print/ErrorDiv";
+import { ErrorDiv } from "@argus/print/Info";
 import ReportBugUrl from "@argus/print/ReportBugUrl";
 import { PrintObligation } from "@argus/print/lib";
 import { observer } from "mobx-react";

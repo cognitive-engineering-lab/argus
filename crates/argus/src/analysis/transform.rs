@@ -13,6 +13,7 @@ use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::ty::{TyCtxt, TypeckResults};
 use rustc_span::Span;
 use rustc_utils::source_map::{range::CharRange, span::SpanExt};
+use serde_json as json;
 
 use super::{
   hir::{self as hier_hir, Bin, BinKind},
@@ -82,6 +83,7 @@ pub fn compute_provenance<'tcx>(
 pub fn transform<'a, 'tcx: 'a>(
   tcx: TyCtxt<'tcx>,
   body_id: BodyId,
+  body_name: Option<json::Value>,
   typeck_results: &'tcx TypeckResults<'tcx>,
   obligations: Vec<Provenance<Obligation>>,
   obligation_data: &FullData<'tcx>,
@@ -139,15 +141,9 @@ pub fn transform<'a, 'tcx: 'a>(
     property_is_ok!(builder.is_valid(), "builder is invalid");
   }
 
-  let name = obligation_data.iter().next().map(|fdata| {
-    (
-      &fdata.infcx,
-      tcx.hir().body_owner_def_id(body_id).to_def_id(),
-    )
-  });
-
   ObligationsInBody::new(
-    name,
+    body_name,
+    typeck_results.tainted_by_errors.is_some(),
     body_range,
     builder.ambiguity_errors,
     builder.trait_errors,

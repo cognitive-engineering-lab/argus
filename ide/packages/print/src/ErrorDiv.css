@@ -1,7 +1,0 @@
-.ErrorDiv {
-    padding: 0.5em;
-    border-radius: 3px;
-    border-width: 2px;
-    border-color: var(--vscode-inputValidation-errorBorder);
-    background: var(--vscode-inputValidation-errorBackground)
-}
