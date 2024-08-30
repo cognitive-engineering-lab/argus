@@ -13,27 +13,14 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - uses: DeterminateSystems/flake-checker-action@main
-      - run: nix develop --command cargo ws publish skip --no-remove-dev-deps --from-git --yes --token ${{ secrets.CRATES_IO }}
+      - run: nix develop --command ci-crate-pub ${{ secrets.CRATES_IO }}
 
   publish-ide:
     runs-on: ubuntu-latest
     needs: publish-crates
     steps:
       - uses: actions/checkout@v3
-
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - uses: DeterminateSystems/flake-checker-action@main
-
-      - name: Build TS bindings
-        run: nix develop --command cargo make init-bindings
-
-      - name: Depot Setup
-        run: nix develop --command depot setup
-
-      - name: Publish Extension
-        run: |
-          cd ide/packages/extension
-          nix develop --command vsce package
-          nix develop --command vsce publish -p ${{ secrets.VSCODE_MRKT }} --packagePath argus-*.vsix
-          nix develop --command pnpx ovsx publish argus-*.vsix -p ${{ secrets.OVSX_MRKT }}
+      - run: nix develop --command ci-ext-pub ${{ secrets.VSCODE_MRKT }} ${{ secrets.OVSX_MRKT }}

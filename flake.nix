@@ -58,11 +58,27 @@
           codespell .
           cargo test
         '';
+
+        publishCrates = pkgs.writeScriptBin "ci-crate-pub" ''
+          cargo ws publish skip --no-remove-dev-deps --from-git --yes --token "$1"
+        '';
+
+        publishExtension = pkgs.writeScriptBin "ci-ext-pub" ''
+          cargo make init-bindings
+          cd ide
+          depot setup
+          cd packages/extension
+          vsce package
+          vsce publish -p "$1" --packagePath argus-*.vsix
+          pnpx ovsx publish argus-*.vsix -p "$2"
+        '';
       in {
         devShell = with pkgs; mkShell {
           nativeBuildInputs = [ pkg-config ];
           buildInputs = [
             checkProject
+            publishCrates
+            publishExtension
 
             llvmPackages_latest.llvm
             llvmPackages_latest.lld
