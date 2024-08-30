@@ -2,18 +2,16 @@
 
 [![tests](https://github.com/cognitive-engineering-lab/argus/actions/workflows/ci.yml/badge.svg)](https://github.com/cognitive-engineering-lab/argus/actions/workflows/ci.yml)
 
-Argus is a tool to help you with compiler errors related to traits. If you have ever seen an error that says `the trait bound ... is not satisfied`, that is a good opportunity to use Argus. An IDE extension is available for VSCode which provides the Argus Inspection Panel.
+Argus is a tool to help you with compiler errors related to traits. If you have ever seen an error that says `the trait bound ... is not satisfied`, that is a good opportunity to use Argus. An IDE extension is available for VSCode which provides the Argus Inspection Panel. Read the [trait debugging tutorial](https://cel.cs.brown.edu/argus/) to learn more.
 
 ## Limitations
 
 > :warning: **Argus is research software and is under active development!** :warning:
 
-Argus relies on the New Trait Solver for Rust. Therefore, Argus inherits all the limitations of that solver which is also _under active development_. The New Trait Solver is known to be unsound and incomplete — while using Argus you may accidentally run into these areas. This does not mean that Argus is useless. The New Trait Solver is only used to type-check the current workspace and still works if you're using a trait-heavy crate.
+Argus relies on the New Trait Solver for Rust. Therefore, Argus inherits all the limitations of that solver which is also _under active development_. The New Trait Solver is known to be incomplete — while using Argus you may accidentally run into areas of Rust where the solver is limited. This does not mean that Argus is useless. The New Trait Solver is only used to type-check the current workspace and is still useful to debug a wide-range of trait errors.
 
 
-
-https://github.com/cognitive-engineering-lab/argus/assets/20209337/b0373b48-26d1-4346-b241-9bc08ebf0964
-
+https://github.com/user-attachments/assets/9a544060-e8ad-455e-9831-5e5d48c96542
 
 
 ## Installation
@@ -27,7 +25,7 @@ Argus is available as a VSCode extension. You can install Argus from the [VSCode
 
 ### Building from source
 
-Some additional software is needed to build Argus from source. For the TypeScript bindings, you need to install the language [Guile](https://www.gnu.org/software/guile/). The IDE requires [Depot](https://github.com/cognitive-engineering-lab/depot), a JS "devtool orchestrator." After this simply run the following:
+Some additional software is needed to build Argus from source. For the TypeScript bindings, you need to install the language [Guile](https://www.gnu.org/software/guile/). The IDE requires [Depot](https://github.com/cognitive-engineering-lab/depot). Afterward run
 
 ```sh
 $ cargo make init-bindings
@@ -61,4 +59,4 @@ Argus or Argos Panoptes (Ancient Greek: Ἄργος Πανόπτης, "All-seein
 
 ## Having trouble? (or providing feedback!)
 
-If you want to use Argus but are having trouble finding the relevant information, please leave an issue or email us at <gavinleroy@brown.edu> and <wcrichto@brown.edu>. Feedback and comments are always welcome as we iterate in the design and development of Argus!
+We're happy to chat and answer questions on the [Argus Zulip channel](https://cognitive-engineering-lab.zulipchat.com/#narrow/stream/453634-argus). You can also reach the authors via email, <gavinleroy@brown.edu> and <wcrichto@brown.edu>, we'd love to hear your feedback as we iterate in the design and development of Argus!
