@@ -91,7 +91,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded affix "><a href="index.html">Introduction</a></li><li class="chapter-item expanded "><a href="trait-debugging-101.html"><strong aria-hidden="true">1.</strong> Trait Debugging 101</a></li><li class="chapter-item expanded "><a href="typestate.html"><strong aria-hidden="true">2.</strong> Trait Methods and Typestate</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="trait-debugging-101.html"><strong aria-hidden="true">1.</strong> Trait Debugging 101</a></li><li class="chapter-item expanded "><a href="typestate.html"><strong aria-hidden="true">2.</strong> Trait Methods and Typestate</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -176,10 +176,9 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="trait-debugging-101"><a class="header" href="#trait-debugging-101">Trait Debugging 101</a></h1>
+                        <h1 id="trait-debugging-101"><a class="header" href="#trait-debugging-101">Trait Debugging 101</a></h1>
 <p>Traits are a pervasive language feature in Rust: Copying, printing, indexing, multiplying, and more common operations use the Rust trait system. As you use more of the language, and utilize the numerous published crates, you will inevitably encounter more traits. Popular crates in the Rust ecosystem use traits to achieve strong type safety, such as the Diesel crate that relies on traits to turn invalid SQL queries into type errors. Impressive!</p>
-<p>Unfortunately, traits also obfuscate type errors. Compiler diagnostics become increasingly complex alongside the types and traits used. This guide demonstrates <em>trait debugging</em> in Rust using a new tool, Argus, developed by the <a href="https://cel.cs.brown.edu/">Cognitive Engineering Lab</a> at Brown University.</p>
+<p>Unfortunately, traits also obfuscate type errors. Compiler diagnostics become increasingly complex alongside the types and traits used. This guide demonstrates <em>trait debugging</em> in Rust using a new tool, Argus, developed by the <a href="https://cel.cs.brown.edu/">Cognitive Engineering Lab</a> at Brown University. The examples used in this tutorial are <a href="https://github.com/cognitive-engineering-lab/argus-test">available online</a>, we recommend you follow along at home.</p>
 <h2 id="your-first-web-server"><a class="header" href="#your-first-web-server">Your First Web Server</a></h2>
 <p><a href="https://docs.rs/axum/latest/axum/">Axum</a> is a popular Rust web application framework, a great example of how traits can obfuscate type errors. We will use Axum to build a web server, and Argus to debug the trait errors; here’s our starting code.</p>
 <pre><code class="language-rust ignore compile_fail">struct LoginAttempt {
@@ -230,14 +229,6 @@ note: required by a bound in `axum::routing::get`
 <h2 id="down-the-search-tree"><a class="header" href="#down-the-search-tree">Down the Search Tree</a></h2>
 <p>In Rust we write type definitions and trait implementations separately—we refer to trait implementations as “impl blocks.” The inner compiler component called the <em>trait solver</em> is responsible for answering queries like “Does <code>{login}</code> implement <code>Handler</code>?” such queries appear as trait bounds in the source code. The trait solver searches through the impl blocks trying to find whether or not the trait bound holds.</p>
 <p>In this post we will be using the <em>search tree</em> a data structure produced by the trait solver that describes how it searched impl blocks, and why—or why not—a particular trait bound holds.</p>
-<div id="admonition-example" class="admonition admonish-example" role="note" aria-labelledby="admonition-example-title">
-<div class="admonition-title">
-<div id="admonition-example-title">
-<p>Example</p>
-</div>
-<a class="admonition-anchor-link" href="trait-debugging-101.html#admonition-example"></a>
-</div>
-<div>
 <p>Here’s an illustrative diagram of the Axum-error search tree. Argus provides the search tree in a different format, similar to a directory tree, as you shall see further on.</p>
 <pre class="mermaid">---
 title: Search tree produced by the Axum trait error
@@ -267,47 +258,35 @@ graph TD
   linkStyle 0,1,2,4,5  stroke:red
   linkStyle 3  stroke:green, stroke-width:4px
 </pre>
-<blockquote>
-<p>We elide trivial bounds to declutter the diagram. Don’t panic if you open the Argus panel and see some bounds not shown here.</p>
-</blockquote>
+<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
+<div class="admonition-title">
+<div id="admonition-note-1-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="trait-debugging-101.html#admonition-note-1"></a>
+</div>
+<div>
+<p>We elided trivial bounds to declutter the above diagram. Don’t panic if you open the Argus panel and see some bounds not shown here.</p>
+</div>
+</div>
 <p>Dotted lines represent an <strong>Or</strong> relationship between parent and child. That is, exactly one of the child blocks needs to hold—outlined in green. We see dotted lines coming from the root bound and extending to the impl blocks. Impl blocks always form an Or relationship with their parent.</p>
 <p>Solid lines represent <strong>And</strong> relationships between parent and child. That is, every one of the child blocks needs to hold. We see solid lines coming from impl blocks and extending to the nested constraints. Constraints always form an And relationship with their parent impl block.</p>
 <p>Traversing the tree from root to leaf is what’s referred to as “Top-Down” in the Argus extension. This view represents the full search tree, in other words, <em>how</em> the trait solver responded to the query.</p>
-</div>
-</div>
-<p>Notice that the Rust compiler diagnostic mentions the <em>root bound</em>, <code>{login}: Handler&lt;_, _&gt;</code>, instead of the more specific failing bounds at the tree leaves. The compiler is conservative, when presented with multiple failures in different impls, it defaults to reporting their parent. In the diagram there are two potentially matching impl blocks. There’s one for a function with a single argument, and there’s one for things that implement <code>IntoResponse</code> directly—i.e., static responses that don’t need input. Because there’s more than one potentially matching impl block Rust can’t decide which is the actual error, so it reports the parent node of all errors.</p>
+<p>Comparing the search tree to the error diagnostic is curious: Why did the error diagnostic mention the <em>root bound</em>, <code>{login}: Handler&lt;_, _&gt;</code>, instead of a more specific failing bound at the tree leaves? The compilers job is to take the search tree and tell you something useful about why the trait bound failed—but Rust can’t tell you everything, because there’s simply too much information. So it picks the most specific failure it can, which in this case is the root node. Rust doesn’t know which of the two impl blocks you <em>intended</em> to use and it won’t speculate on your behalf.</p>
 <p>We developed Argus so you can identify the <em>specific failures</em> that led to a particular trait error; Argus can provide more specific details on a trait error than Rust is willing to summarize in a single text-based diagnostic message. Let’s walk through the search tree as presented in Argus’ Top-Down view.</p>
 <p style="text-align:center"><img src="assets/axum-hello-server/top-down-root-highlighted.png" alt="Search tree initial bound" width="600"></p>
-<p>Highlighted at the top in orange is the search tree root. Argus represents the search tree in a directory view sort of way. The nodes are on each line, you expand the node’s children by clicking. Notice how we still use solid and dotted lines to represent the parent child relationship, they’re just to the left of the node instead an arrow connecting two bubbles.</p>
-<p>The trait solver finds an appropriate impl block that matches the initial trait bound (<a href="https://docs.rs/axum/latest/axum/handler/trait.Handler.html#impl-Handler%3C(M,+T1),+S%3E-for-F">RustDoc link</a>)—highlighted below in green.</p>
+<p>Highlighted at the top in orange is the search tree root. Argus represents the search tree in a directory view sort of way, so the orange node is equivalent to the tree root node in the illustrative diagram. In the Argus tree you expand the nodes’ children by clicking on the line. Notice how we still use solid and dotted lines to represent the parent child relationship, they now appear to the left of the node.</p>
 <p style="text-align:center"><img src="assets/axum-hello-server/top-down-impl-highlighted.png" alt="Search tree found impl" width="600"></p>
-<p>In order to use this impl block to satisfy the root trait bound, <code>{login}: Handler&lt;_, _&gt;</code>, the trait solver needs to satisfy all of the conditions in the where clause. Here are the steps it performs.</p>
-<ol>
-<li>
-<p><code>F</code> unifies with <code>fn(LoginAttempt) -&gt; bool</code>.</p>
-</li>
-<li>
-<p>Does <code>F</code> implement the trait <code>FnOnce(T1) -&gt; Fut</code>? Yes, it does, we said</p>
-<pre><code class="language-rust ignore">F = fn(LoginAttempt) -&gt; bool</code></pre>
-<p>The type parameters <code>T1</code> and <code>Fut</code> unify with <code>LoginAttempt</code> and <code>bool</code>. The bounds <code>Clone</code>, <code>Send</code>, and <code>'static</code> are also checked successfully.</p>
-</li>
-<li>
-<p>Does <code>Fut</code> implement <code>Future</code>? Hmmmm, no it doesn’t. In step 2 we said that <code>Fut = bool</code>, but booleans aren’t futures.</p>
-</li>
-</ol>
-<p>This failing bound tells us that the output of the function needs to be a future. Argh, we forgot to make the handler function asynchronous! What a silly mistake. However, before we jump back to our code and fix the issue, let’s reflect on the Argus interface and see how we could have reached this same conclusion faster.</p>
+<p>Above we show one branch in the search tree for the function handler impl block—highlighted in green. In this branch we unify the type variables</p>
+<pre><code class="language-text">F = fn(LoginAttempt) -&gt; bool
+T1 = LoginAttempt
+Fut = bool
+</code></pre>
+<p>and add the where-clause constraints as children of the impl block. Notice the constraint <code>Fut: Future</code>, given that <code>Fut = bool</code>, the constraint requires that booleans be futures, but they aren’t! Argh, we forgot to make the handler function asynchronous! What a silly mistake. Before we jump back to our code and fix the issue, let’s reflect on the Argus interface and see how we can reach the same conclusion faster.</p>
 <p style="text-align:center"><img src="assets/axum-hello-server/top-down-error-highlighted.png" alt="Search tree found impl" width="600"></p>
-<p>The screenshots included so far of the trait search tree are from the Top-Down view in Argus. This means we view the search just as Rust performed it: We started at the root question <code>{login}: Handler&lt;_, _&gt;</code>, descended into the impl blocks, and found the failing where-clause in a tree leaf. This failing leaf is highlighted in the above image in red. There’s a second failing bound, but we’ll come back to that in the next section. The insight is that errors are <em>leaves</em> in the search tree, so the Top-Down view doesn’t show you the errors first but rather the full trait solving process.</p>
+<p>The screenshots included so far of the trait search tree are from the Top-Down view in Argus. This means we view the search just as Rust performed it: We started at the root question <code>{login}: Handler&lt;_, _&gt;</code>, descended into the impl blocks, and found the failing where-clause in a tree leaf—highlighted in red. There’s a second failing bound, but we’ll come back to that in the next section. The insight is that errors are <em>leaves</em> in the search tree, so the Top-Down view doesn’t prioritize showing you errors, but rather the full trait solving process.</p>
 <h2 id="up-the-search-tree"><a class="header" href="#up-the-search-tree">Up the Search Tree</a></h2>
 <p>What if you want to see the errors first? Argus provides a second view of the tree called the Bottom-Up view. The Bottom-Up view starts at the error leaves and expanding node children traverses up the tree towards the root. This view prioritizes showing you errors first.</p>
-<div id="admonition-example-1" class="admonition admonish-example" role="note" aria-labelledby="admonition-example-1-title">
-<div class="admonition-title">
-<div id="admonition-example-1-title">
-<p>Example</p>
-</div>
-<a class="admonition-anchor-link" href="trait-debugging-101.html#admonition-example-1"></a>
-</div>
-<div>
 <p>The Bottom-Up view is the <em>inverted</em> search tree. You start at the leaves and traverse to the root. Here’s the bottom-up version of the Axum error search tree.</p>
 <pre class="mermaid">---
 title: Bottom-Up view of the search tree.
@@ -339,8 +318,6 @@ graph TD
   linkStyle 3 stroke:green, stroke-width:4px, color:green
 </pre>
 <p>Argus sorts the failing leaves in the Bottom-Up view by which are “most-likely” the root cause of the error. No tool is perfect, and Argus can be wrong! If you click on “Other failures,” which appears below the first shown failure, Argus provides you a full list.</p>
-</div>
-</div>
 <video controls>
   <source alt="Bottom-Up Argus view" src="assets/axum-hello-server/bottom-up-start.mp4" type="video/mp4" />
 </video>
@@ -348,21 +325,12 @@ graph TD
 <video controls>
   <source alt="Fix Future and IntoResponse" src="assets/axum-hello-server/async-fix-response.mp4" type="video/mp4" />
 </video>
-<p>It turns out there are a lot of problems with our handler. Above shows that after marking the <code>login</code> function asynchronous, the bound <code>bool: IntoResponse</code> remains unsatisfied. This happened because the associated type <code>Output</code> of the <code>Future</code>, in this case our boolean, needs to implement <code>IntoResponse</code>. Some Argus features demonstrated that you may have missed.</p>
-<ol>
-<li>
-<p>We expand the Bottom Up view to see the lineage of impl blocks traversed to arrive at the failure. In this case there was only one between the root bound and the failing leaf, but the constraints in the where clause show the bound’s origin.</p>
-</li>
-<li>
-<p>To fix the <code>IntoResponse</code> bound we looked at all implementors of the trait. The list icon next to a tree node shows all impl blocks for the trait. Going through the list we saw the type <code>Json&lt;T&gt;</code> that satisfies our needs while preserving code intent.</p>
-</li>
-</ol>
-<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
+<div id="admonition-note-2" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-2-title">
 <div class="admonition-title">
-<div id="admonition-note-1-title">
+<div id="admonition-note-2-title">
 <p>Note</p>
 </div>
-<a class="admonition-anchor-link" href="trait-debugging-101.html#admonition-note-1"></a>
+<a class="admonition-anchor-link" href="trait-debugging-101.html#admonition-note-2"></a>
 </div>
 <div>
 <p>The list of trait implementors is equivalent to what you’d find in Rust documentation. See for yourself in the <a href="https://docs.rs/axum/latest/axum/response/trait.IntoResponse.html#foreign-impls"><code>IntoResponse</code> documentation</a>. Rust documentation makes a distinction between “implementations on foreign types” and “implementors,” Argus lists both kinds of impl block together.</p>
@@ -372,24 +340,14 @@ graph TD
 <video controls>
   <source alt="Finished debugging" src="assets/axum-hello-server/axum-type-checks.mp4" type="video/mp4" />
 </video>
-<p>The above video contains a lot of information. Let’s break down what happened.</p>
+<p>The above video contains a lot of information. We’ll comment on the two key pieces of information.</p>
 <ol>
 <li>
-<p>We look through the implementors of <code>FromRequestParts</code>; this being the Argus-identified. However no impl block seemed to preserve my intent of extracting a <code>LoginAttempt</code> from request headers. It is a vague to say “nothing seemed right,” and of course fixing a type error may require some familiarity with the crate you’re using or the domain in which you’re working.</p>
+<p>We look through the implementors of <code>FromRequestParts</code>; this being the Argus-identified error, but no impl block seemed to preserve our intent of extracting a <code>LoginAttempt</code> from request headers. It’s vague to say “nothing seemed right,” and of course fixing a type error may require some familiarity with the crate you’re using or the domain in which you’re working.</p>
 </li>
 <li>
-<p>Implementing <code>FromRequestParts</code> doesn’t seem right, but we haven’t checked what introduced the bound. Expanding the Bottom-Up view reveals that the bound <code>FromRequest</code> was first a constraint to implement <code>Handler</code>, and that <code>FromRequestParts</code> is an attempt to satisfy the <code>FromRequest</code> bound. Here’s how that relationship looks in the Argus Top-Down view.</p>
+<p>Instead of implementing <code>FromRequestParts</code> it turns out we can also implement <code>FromRequest</code>. We determined this by expanding the Bottom-Up view to reveal that the bound <code>FromRequest</code> was first a constraint to implement <code>Handler</code>, and that <code>FromRequestParts</code> is an attempt to satisfy the <code>FromRequest</code> bound. Here’s an annotated image of the Top-Down view to highlight the relationship between these two traits.</p>
  <p style="text-align:center"><img src="assets/axum-hello-server/from-rqst-prts-annotated.png" alt="FromRequestParts provenance" width="600"></p>
- What happened is the impl block 
-<pre><code>impl&lt;S, T&gt; FromRequest&lt;S, ViaParts&gt; for T ...
-</code></pre>
-<p>unified <code>T</code> and <code>LoginAttempt</code> leading Argus to believe that <code>FromRequestParts</code> is the failing bound, but if we can satisfy <code>LoginAttempt: FromRequest&lt;_, _&gt;</code> this also fixes the trait error.</p>
-</li>
-<li>
-<p>We look through the list of implementors for <code>FromRequest</code>. It’s here we find that <code>Json</code> types implement <code>FromRequest</code>.</p>
-</li>
-<li>
-<p>We fix the last failing bound, <code>LoginAttempt: Deserialize</code>, by deriving <code>Deserialize</code> for <code>LoginAttempt</code>.</p>
 </li>
 </ol>
 <p>Finally, after all of these errors, we have a type correct program. All of this work to get a type-correct program, you can use your free time to implement the actual functionality if you wish.</p>
@@ -461,20 +419,11 @@ note: required by a bound in `diesel::RunQueryDsl::load`
      |              ^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `RunQueryDsl::load`
      = note: the full name for the type has been written to 'bad_select-fa50bb6fe8eee519.long-type-16986433487391717729.txt'
 </code></pre>
-<p>As we did in the previous section, we shall demo a short workflow using Argus to gather the same information.</p>
+<p>As we did in the previous section, we shall demo a short workflow using Argus to gather the same information. Opening the Argus panel works a little differently, as you shall see in the following video. When there isn’t a link to the obligation in the error tooltip, you can always open Argus from the Command Palette or the bottom toolbar.</p>
 <video controls>
-  <source alt="Diesel finding bug" src="assets/diesel-bad-select/find-bug.mp4" type="video/mp4" />
+  <source alt="Opening the Argus panel" src="assets/diesel-bad-select/open-argus.mp4" type="video/mp4" />
 </video>
-<p>We want to call attention to a some aspects of the above video that are easy to glance over.</p>
-<ol>
-<li>
-<p>When opening the Argus debugger the hover tooltip said “Expression contains unsatisfied trait bounds,” but  there wasn’t a link to jump to the error. This is an unfortunate circumstance, but one that does occur. In these cases you can open the Argus panel by clicking the Argus status in the bottom information bar, or run the command ‘Argus: Inspect current file’ in the command palette.</p>
-</li>
-<li>
-<p>In the Argus panel there are two errors we chose <em>not</em> to explore further</p>
-<pre><code class="language-rust ignore">id: Iterator
-table: Iterator</code></pre>
-<p>We chose not to explore them for two reasons. (1) they are in expressions that don’t contain errors as shown by Rust Analyzer, the method calls <code>.eq(...)</code> and <code>.filter(...)</code>. (2) the trait bound for <code>Iterator</code> seems strange as it isn’t related to the error diagnostic at all; we’re looking for something Diesel related but these errors are talking about <code>Iterator</code>. For these two reasons I chose to ignore the two <code>Iterator</code> bound “errors” and explore the other first.</p>
+<p>Below we see that Argus presents <em>more</em> failing bounds than the compiler did. To debug effectively with Argus you should consider all failing founds in the context of your problem and start with the one that is most relevant. You can also compare the failing bound with information provided in the Rust error diagnostic to get you on the right track.</p>
 <div id="admonition-important" class="admonition admonish-tip" role="note" aria-labelledby="admonition-important-title">
 <div class="admonition-title">
 <div id="admonition-important-title">
@@ -486,6 +435,17 @@ table: Iterator</code></pre>
 <p><strong>Argus may present more errors than the Rust compiler,</strong> it is research software after all. Use your judgement to decide which errors are first worth exploring, if there are multiple, look at all of them before diving down into one specific search tree. We’re working hard to reduce noise produced by Argus as much as possible.</p>
 </div>
 </div>
+<video controls>
+  <source alt="Failing bounds in Argus" src="assets/diesel-bad-select/failing-bounds.mp4" type="video/mp4" />
+</video>
+<p>Now let’s dive into the trait error.</p>
+<video controls>
+  <source alt="Diesel finding bug" src="assets/diesel-bad-select/find-bug.mp4" type="video/mp4" />
+</video>
+<p>Here are some key points from above that we’d like to highlight</p>
+<ol>
+<li>
+<p>When opening the Argus debugger the hover tooltip said “Expression contains unsatisfied trait bounds,” but  there wasn’t a link to jump to the error. This is an unfortunate circumstance, but one that does occur. In these cases you can open the Argus panel by clicking the Argus status in the bottom information bar, or run the command ‘Argus: Inspect current file’ in the command palette.</p>
 </li>
 <li>
 <p>The printed types in Rust can get painfully verbose, the Rust diagnostic even <em>wrote types to a file</em> because they were too long. Argus shortens and condenses type information to keep the panel as readable as possible. One example of this is that fully-qualified identifiers, like <code>users::columns::id</code> prints shortened as <code>id</code>. On hover, the full path is shown at the bottom of the Argus panel in our mini-buffer. Extra information or notes Argus has for you are printed in the mini-buffer, so keep an eye on that if you feel Argus isn’t giving you enough information.</p>
@@ -494,11 +454,7 @@ table: Iterator</code></pre>
 <p>Clicking the tree icon next to a node in the Bottom-Up view jumps to that same node in the Top-Down view. This operation is useful if you want to gather contextual information around a node, but don’t want to search the Top-Down tree for it. You can get there in one click.</p>
 </li>
 </ol>
-<p>In the video we expanded the Bottom-Up view to see where the bound <code>Count == Once</code> came from. The origin stems from the <code>T: AppearsOnTable&lt;Qs&gt;</code> constraint in the where clause of the <code>Eq&lt;T, U&gt;</code> impl block. In English we can summarize this as “an equality constraint is valid if both expressions appear in the selected table.” Looking through the search tree I see that the bound</p>
-<pre><code class="language-rust ignore">users::columns::id: AppearsOnTable&lt;users::table&gt;</code></pre>
-<p>holds true, while the bound</p>
-<pre><code class="language-rust ignore">posts::columns::id: AppearsOnTable&lt;users::table&gt;</code></pre>
-<p>is unsatisfied. Argh, we forgot to join the <code>users</code> and <code>posts</code> tables! At this point we understand and have identified the error, now it’s time to fix the program. Unfortunately Argus provides no aide to <em>fix</em> typestate errors. We’re in the wrong state, <code>posts::id</code> doesn’t appear in the table we’re selecting from, we need to get it on the selected-from table. This is a great time to reach for the Diesel documentation for <a href="https://docs.rs/diesel/latest/diesel/prelude/trait.QueryDsl.html"><code>QueryDsl</code></a>.</p>
+<p>Turns out we forgot to join the <code>users</code> and <code>posts</code> tables! At this point we understand and have identified the error, now it’s time to fix the program. Unfortunately Argus provides no aide to <em>fix</em> typestate errors. We’re in the wrong state, <code>posts::id</code> doesn’t appear in the table we’re selecting from, we need to get it on the selected-from table. This is a great time to reach for the Diesel documentation for <a href="https://docs.rs/diesel/latest/diesel/prelude/trait.QueryDsl.html"><code>QueryDsl</code></a>.</p>
 <video controls>
   <source alt="Diesel fixing typestate error" src="assets/diesel-bad-select/fixed-error.mp4" type="video/mp4" />
 </video>

@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Introduction - Argus: a trait debugger for Rust</title>
+        <title>Trait Debugging 101 - Argus: a trait debugger for Rust</title>
 
 
         <!-- Custom HTML head -->
@@ -90,7 +90,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded affix "><a href="index.html" class="active">Introduction</a></li><li class="chapter-item expanded "><a href="trait-debugging-101.html"><strong aria-hidden="true">1.</strong> Trait Debugging 101</a></li><li class="chapter-item expanded "><a href="typestate.html"><strong aria-hidden="true">2.</strong> Trait Methods and Typestate</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="trait-debugging-101.html" class="active"><strong aria-hidden="true">1.</strong> Trait Debugging 101</a></li><li class="chapter-item expanded "><a href="typestate.html"><strong aria-hidden="true">2.</strong> Trait Methods and Typestate</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -175,14 +175,193 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
+                        <h1 id="trait-debugging-101"><a class="header" href="#trait-debugging-101">Trait Debugging 101</a></h1>
+<p>Traits are a pervasive language feature in Rust: Copying, printing, indexing, multiplying, and more common operations use the Rust trait system. As you use more of the language, and utilize the numerous published crates, you will inevitably encounter more traits. Popular crates in the Rust ecosystem use traits to achieve strong type safety, such as the Diesel crate that relies on traits to turn invalid SQL queries into type errors. Impressive!</p>
+<p>Unfortunately, traits also obfuscate type errors. Compiler diagnostics become increasingly complex alongside the types and traits used. This guide demonstrates <em>trait debugging</em> in Rust using a new tool, Argus, developed by the <a href="https://cel.cs.brown.edu/">Cognitive Engineering Lab</a> at Brown University. The examples used in this tutorial are <a href="https://github.com/cognitive-engineering-lab/argus-test">available online</a>, we recommend you follow along at home.</p>
+<h2 id="your-first-web-server"><a class="header" href="#your-first-web-server">Your First Web Server</a></h2>
+<p><a href="https://docs.rs/axum/latest/axum/">Axum</a> is a popular Rust web application framework, a great example of how traits can obfuscate type errors. We will use Axum to build a web server, and Argus to debug the trait errors; here’s our starting code.</p>
+<pre><code class="language-rust ignore compile_fail">struct LoginAttempt {
+  user_id: u64,
+  password: String,
+}
+
+fn login(attempt: LoginAttempt) -&gt; bool {
+  todo!()
+}
+
+#[tokio::main]
+async fn main() {
+  let app = Router::new()
+    .route("/login", get(login));
+
+  let listener = TcpListener::bind("0.0.0.0:3000")
+    .await.unwrap();
+  axum::serve(listener, app).await.unwrap();
+}</code></pre>
+<p>Oh no, our server doesn’t type check. Surely, the error diagnostic will tell us why—</p>
+<pre><code class="language-text">error[E0277]: the trait bound `fn(LoginAttempt) -&gt; bool {login}: Handler&lt;_, _&gt;` is not satisfied
+   --&gt; src/main.rs:14:49
+    |
+14  |     let app = Router::new().route("/login", get(login));
+    |                                             --- ^^^^^ the trait `Handler&lt;_, _&gt;` is not implemented for fn item `fn(LoginAttempt) -&gt; bool {login}`            
+    |                                             |
+    |                                             required by a bound introduced by this call
+    |
+    = help: the following other types implement trait `Handler&lt;T, S&gt;`:
+              &lt;Layered&lt;L, H, T, S&gt; as Handler&lt;T, S&gt;&gt;
+              &lt;MethodRouter&lt;S&gt; as Handler&lt;(), S&gt;&gt;
+note: required by a bound in `axum::routing::get`
+</code></pre>
+<p>in a long-winded way the diagnostic has said “<code>login</code> does not implement <code>Handler</code>.” But as the authors we <em>intended</em> for <code>login</code> to be a handler. The diagnostic hasn’t provided much specific information as to why the code doesn’t type check.</p>
+<div id="admonition-note" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-title">
+<div class="admonition-title">
+<div id="admonition-note-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-note"></a>
+</div>
+<div>
+<p>Going forward we will write <code>{login}</code> to abbreviate the type of <code>login</code>, <code>fn(LoginAttempt) -&gt; bool</code>, which is far too verbose to repeat over and over.</p>
+</div>
+</div>
+<p>When the error diagnostic says “trait bound <code>Bleh</code> is not satisfied”, it’s a great opportunity to use Argus.</p>
+<h2 id="down-the-search-tree"><a class="header" href="#down-the-search-tree">Down the Search Tree</a></h2>
+<p>In Rust we write type definitions and trait implementations separately—we refer to trait implementations as “impl blocks.” The inner compiler component called the <em>trait solver</em> is responsible for answering queries like “Does <code>{login}</code> implement <code>Handler</code>?” such queries appear as trait bounds in the source code. The trait solver searches through the impl blocks trying to find whether or not the trait bound holds.</p>
+<p>In this post we will be using the <em>search tree</em> a data structure produced by the trait solver that describes how it searched impl blocks, and why—or why not—a particular trait bound holds.</p>
+<p>Here’s an illustrative diagram of the Axum-error search tree. Argus provides the search tree in a different format, similar to a directory tree, as you shall see further on.</p>
+<pre class="mermaid">---
+title: Search tree produced by the Axum trait error
+---
+graph TD
+  root[&quot;{login}: Handler&quot;]
+  implRespH[&quot;impl Handler&lt;IntoResponseHandler, S&gt; for T\nwhere\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;T: IntoResponse&quot;]
+  intoResp[&quot;{login}: IntoResponse&quot;]
+  implH[&quot;impl Handler&lt;M, S&gt; for F\nwhere\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;F: FnOnce(T1) -&gt; Fut,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Fut: Future + Send,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;T1: FromRequest&quot;]
+  isFunc[&quot;{login}: FnOnce(LoginAttempt) -&amp;gt; bool&quot;]
+  boolFut[&quot;bool: Future&quot;]
+  loginARqst[&quot;LoginAttempt: FromRequest&quot;]
+  
+  root -.-&gt; implRespH
+  implRespH --T = {login}--&gt; intoResp
+  root -.-&gt; implH
+  implH --F = {login}, T1 = LoginAttempt, Fut = bool--&gt; isFunc
+  implH --Fut = bool--&gt; boolFut
+  implH --T1 = LoginAttempt--&gt; loginARqst
+  
+  class root,implRespH,intoResp,implH,boolFut,loginARqst cssFailure
+  class isFunc cssSuccess
+  
+  classDef default fill:#fafafa, stroke-width:3px, text-align:left
+  classDef cssSuccess stroke:green
+  classDef cssFailure stroke:red
+  linkStyle 0,1,2,4,5  stroke:red
+  linkStyle 3  stroke:green, stroke-width:4px
+</pre>
+<div id="admonition-note-1" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-1-title">
+<div class="admonition-title">
+<div id="admonition-note-1-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-note-1"></a>
+</div>
+<div>
+<p>We elided trivial bounds to declutter the above diagram. Don’t panic if you open the Argus panel and see some bounds not shown here.</p>
+</div>
+</div>
+<p>Dotted lines represent an <strong>Or</strong> relationship between parent and child. That is, exactly one of the child blocks needs to hold—outlined in green. We see dotted lines coming from the root bound and extending to the impl blocks. Impl blocks always form an Or relationship with their parent.</p>
+<p>Solid lines represent <strong>And</strong> relationships between parent and child. That is, every one of the child blocks needs to hold. We see solid lines coming from impl blocks and extending to the nested constraints. Constraints always form an And relationship with their parent impl block.</p>
+<p>Traversing the tree from root to leaf is what’s referred to as “Top-Down” in the Argus extension. This view represents the full search tree, in other words, <em>how</em> the trait solver responded to the query.</p>
+<p>Comparing the search tree to the error diagnostic is curious: Why did the error diagnostic mention the <em>root bound</em>, <code>{login}: Handler&lt;_, _&gt;</code>, instead of a more specific failing bound at the tree leaves? The compilers job is to take the search tree and tell you something useful about why the trait bound failed—but Rust can’t tell you everything, because there’s simply too much information. So it picks the most specific failure it can, which in this case is the root node. Rust doesn’t know which of the two impl blocks you <em>intended</em> to use and it won’t speculate on your behalf.</p>
+<p>We developed Argus so you can identify the <em>specific failures</em> that led to a particular trait error; Argus can provide more specific details on a trait error than Rust is willing to summarize in a single text-based diagnostic message. Let’s walk through the search tree as presented in Argus’ Top-Down view.</p>
+<p style="text-align:center"><img src="assets/axum-hello-server/top-down-root-highlighted.png" alt="Search tree initial bound" width="600"></p>
+<p>Highlighted at the top in orange is the search tree root. Argus represents the search tree in a directory view sort of way, so the orange node is equivalent to the tree root node in the illustrative diagram. In the Argus tree you expand the nodes’ children by clicking on the line. Notice how we still use solid and dotted lines to represent the parent child relationship, they now appear to the left of the node.</p>
+<p style="text-align:center"><img src="assets/axum-hello-server/top-down-impl-highlighted.png" alt="Search tree found impl" width="600"></p>
+<p>Above we show one branch in the search tree for the function handler impl block—highlighted in green. In this branch we unify the type variables</p>
+<pre><code class="language-text">F = fn(LoginAttempt) -&gt; bool
+T1 = LoginAttempt
+Fut = bool
+</code></pre>
+<p>and add the where-clause constraints as children of the impl block. Notice the constraint <code>Fut: Future</code>, given that <code>Fut = bool</code>, the constraint requires that booleans be futures, but they aren’t! Argh, we forgot to make the handler function asynchronous! What a silly mistake. Before we jump back to our code and fix the issue, let’s reflect on the Argus interface and see how we can reach the same conclusion faster.</p>
+<p style="text-align:center"><img src="assets/axum-hello-server/top-down-error-highlighted.png" alt="Search tree found impl" width="600"></p>
+<p>The screenshots included so far of the trait search tree are from the Top-Down view in Argus. This means we view the search just as Rust performed it: We started at the root question <code>{login}: Handler&lt;_, _&gt;</code>, descended into the impl blocks, and found the failing where-clause in a tree leaf—highlighted in red. There’s a second failing bound, but we’ll come back to that in the next section. The insight is that errors are <em>leaves</em> in the search tree, so the Top-Down view doesn’t prioritize showing you errors, but rather the full trait solving process.</p>
+<h2 id="up-the-search-tree"><a class="header" href="#up-the-search-tree">Up the Search Tree</a></h2>
+<p>What if you want to see the errors first? Argus provides a second view of the tree called the Bottom-Up view. The Bottom-Up view starts at the error leaves and expanding node children traverses up the tree towards the root. This view prioritizes showing you errors first.</p>
+<p>The Bottom-Up view is the <em>inverted</em> search tree. You start at the leaves and traverse to the root. Here’s the bottom-up version of the Axum error search tree.</p>
+<pre class="mermaid">---
+title: Bottom-Up view of the search tree.
+---
+graph TD
+  root[&quot;{login}: Handler&quot;]
+  implRespH[&quot;impl Handler&lt;IntoResponseHandler, S&gt; for T\nwhere\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;T: IntoResponse&quot;]
+  intoResp[&quot;{login}: IntoResponse&quot;]
+  implH[&quot;impl Handler&lt;M, S&gt; for F\nwhere\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;F: FnOnce(T1) -&gt; Fut,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Fut: Future + Send,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;T1: FromRequest&quot;]
+  isFunc[&quot;{login}: FnOnce(LoginAttempt) -&amp;gt; bool&quot;]
+  boolFut[&quot;bool: Future&quot;]
+  loginARqst[&quot;LoginAttempt: FromRequest&quot;]
+  
+
+  implRespH -.-&gt; root
+  intoResp --&gt; implRespH
+  implH -.-&gt; root
+  isFunc --&gt; implH
+  boolFut --&gt; implH
+  loginARqst --&gt; implH
+  
+  class root,implRespH,intoResp,implH,boolFut,loginARqst cssFailure
+  class isFunc cssSuccess
+  
+  classDef default fill:#fafafa, stroke-width:3px, text-align:left
+  classDef cssSuccess stroke:green
+  classDef cssFailure stroke:red
+  linkStyle 0,1,2,4,5 stroke:red,color:red
+  linkStyle 3 stroke:green, stroke-width:4px, color:green
+</pre>
+<p>Argus sorts the failing leaves in the Bottom-Up view by which are “most-likely” the root cause of the error. No tool is perfect, and Argus can be wrong! If you click on “Other failures,” which appears below the first shown failure, Argus provides you a full list.</p>
+<video controls>
+  <source alt="Bottom-Up Argus view" src="assets/axum-hello-server/bottom-up-start.mp4" type="video/mp4" />
+</video>
+<p>The above demonstrates that Argus identifies <code>bool: Future</code> as a root cause of the overall failure in addition to the second failure: <code>LoginAttempt: FromRequestParts&lt;_, _&gt;</code>. The note icon in the Bottom-Up view indicates that the two failures must be resolved together if you want to us the function as a handler.</p>
+<video controls>
+  <source alt="Fix Future and IntoResponse" src="assets/axum-hello-server/async-fix-response.mp4" type="video/mp4" />
+</video>
+<div id="admonition-note-2" class="admonition admonish-note" role="note" aria-labelledby="admonition-note-2-title">
+<div class="admonition-title">
+<div id="admonition-note-2-title">
+<p>Note</p>
+</div>
+<a class="admonition-anchor-link" href="#admonition-note-2"></a>
+</div>
+<div>
+<p>The list of trait implementors is equivalent to what you’d find in Rust documentation. See for yourself in the <a href="https://docs.rs/axum/latest/axum/response/trait.IntoResponse.html#foreign-impls"><code>IntoResponse</code> documentation</a>. Rust documentation makes a distinction between “implementations on foreign types” and “implementors,” Argus lists both kinds of impl block together.</p>
+</div>
+</div>
+<p>Moving forward let’s finally fix the last failing bound and get the code to type check.</p>
+<video controls>
+  <source alt="Finished debugging" src="assets/axum-hello-server/axum-type-checks.mp4" type="video/mp4" />
+</video>
+<p>The above video contains a lot of information. We’ll comment on the two key pieces of information.</p>
+<ol>
+<li>
+<p>We look through the implementors of <code>FromRequestParts</code>; this being the Argus-identified error, but no impl block seemed to preserve our intent of extracting a <code>LoginAttempt</code> from request headers. It’s vague to say “nothing seemed right,” and of course fixing a type error may require some familiarity with the crate you’re using or the domain in which you’re working.</p>
+</li>
+<li>
+<p>Instead of implementing <code>FromRequestParts</code> it turns out we can also implement <code>FromRequest</code>. We determined this by expanding the Bottom-Up view to reveal that the bound <code>FromRequest</code> was first a constraint to implement <code>Handler</code>, and that <code>FromRequestParts</code> is an attempt to satisfy the <code>FromRequest</code> bound. Here’s an annotated image of the Top-Down view to highlight the relationship between these two traits.</p>
+ <p style="text-align:center"><img src="assets/axum-hello-server/from-rqst-prts-annotated.png" alt="FromRequestParts provenance" width="600"></p>
+</li>
+</ol>
+<p>Finally, after all of these errors, we have a type correct program. All of this work to get a type-correct program, you can use your free time to implement the actual functionality if you wish.</p>
+<h1 id="wrapping-up"><a class="header" href="#wrapping-up">Wrapping up</a></h1>
+<p>Rust uses a mechanism called traits to define units of shared behavior. We implement traits for types with impl blocks.</p>
+<p>The <em>trait solver</em> searches through available impl blocks to determine if a given type implements a specified trait. Tracing the steps made by the trait solver is what we call the <em>search tree,</em> the core data structure exposed by the Argus IDE extension.</p>
+<p>The Argus interface shows the search tree either Top-Down or Bottom-Up. The Top-Down view is the search tree as generated by the trait solver. The Bottom-Up view inverts the search tree and traverses the tree from leaves to root. The list icon next to a node shows all impl blocks for the trait in that node.</p>
+<p>In the next chapter we’ll show off more features of Argus and debug a Diesel trait error.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
 
-                            <a rel="next prefetch" href="trait-debugging-101.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="typestate.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -193,7 +372,7 @@
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
 
-                    <a rel="next prefetch" href="trait-debugging-101.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="typestate.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
