@@ -51,45 +51,37 @@ note: required by a bound in `diesel::RunQueryDsl::load`
      = note: the full name for the type has been written to 'bad_select-fa50bb6fe8eee519.long-type-16986433487391717729.txt'
 ```
 
-As we did in the previous section, we shall demo a short workflow using Argus to gather the same information.
+As we did in the previous section, we shall demo a short workflow using Argus to gather the same information. Opening the Argus panel works a little differently, as you shall see in the following video. When there isn't a link to the obligation in the error tooltip, you can always open Argus from the Command Palette or the bottom toolbar.
+
+<video controls>
+  <source alt="Opening the Argus panel" src="assets/diesel-bad-select/open-argus.mp4" type="video/mp4" />
+</video>
+
+Below we see that Argus presents *more* failing bounds than the compiler did. To debug effectively with Argus you should consider all failing founds in the context of your problem and start with the one that is most relevant. You can also compare the failing bound with information provided in the Rust error diagnostic to get you on the right track.
+
+```admonish important
+**Argus may present more errors than the Rust compiler,** it is research software after all. Use your judgement to decide which errors are first worth exploring, if there are multiple, look at all of them before diving down into one specific search tree. We're working hard to reduce noise produced by Argus as much as possible.
+```
+
+<video controls>
+  <source alt="Failing bounds in Argus" src="assets/diesel-bad-select/failing-bounds.mp4" type="video/mp4" />
+</video>
+
+Now let's dive into the trait error.
 
 <video controls>
   <source alt="Diesel finding bug" src="assets/diesel-bad-select/find-bug.mp4" type="video/mp4" />
 </video>
 
-We want to call attention to a some aspects of the above video that are easy to glance over.
+Here are some key points from above that we'd like to highlight
 
 1. When opening the Argus debugger the hover tooltip said "Expression contains unsatisfied trait bounds," but  there wasn't a link to jump to the error. This is an unfortunate circumstance, but one that does occur. In these cases you can open the Argus panel by clicking the Argus status in the bottom information bar, or run the command 'Argus: Inspect current file' in the command palette.
 
-2. In the Argus panel there are two errors we chose *not* to explore further
+2. The printed types in Rust can get painfully verbose, the Rust diagnostic even *wrote types to a file* because they were too long. Argus shortens and condenses type information to keep the panel as readable as possible. One example of this is that fully-qualified identifiers, like `users::columns::id` prints shortened as `id`. On hover, the full path is shown at the bottom of the Argus panel in our mini-buffer. Extra information or notes Argus has for you are printed in the mini-buffer, so keep an eye on that if you feel Argus isn't giving you enough information.
 
-   ```rust,ignore
-   id: Iterator
-   table: Iterator
-   ```
-   
-   We chose not to explore them for two reasons. (1) they are in expressions that don't contain errors as shown by Rust Analyzer, the method calls `.eq(...)` and `.filter(...)`. (2) the trait bound for `Iterator` seems strange as it isn't related to the error diagnostic at all; we're looking for something Diesel related but these errors are talking about `Iterator`. For these two reasons I chose to ignore the two `Iterator` bound "errors" and explore the other first. 
-   ```admonish important
-   **Argus may present more errors than the Rust compiler,** it is research software after all. Use your judgement to decide which errors are first worth exploring, if there are multiple, look at all of them before diving down into one specific search tree. We're working hard to reduce noise produced by Argus as much as possible.
-   ```
+3. Clicking the tree icon next to a node in the Bottom-Up view jumps to that same node in the Top-Down view. This operation is useful if you want to gather contextual information around a node, but don't want to search the Top-Down tree for it. You can get there in one click.
 
-3. The printed types in Rust can get painfully verbose, the Rust diagnostic even *wrote types to a file* because they were too long. Argus shortens and condenses type information to keep the panel as readable as possible. One example of this is that fully-qualified identifiers, like `users::columns::id` prints shortened as `id`. On hover, the full path is shown at the bottom of the Argus panel in our mini-buffer. Extra information or notes Argus has for you are printed in the mini-buffer, so keep an eye on that if you feel Argus isn't giving you enough information.
-
-4. Clicking the tree icon next to a node in the Bottom-Up view jumps to that same node in the Top-Down view. This operation is useful if you want to gather contextual information around a node, but don't want to search the Top-Down tree for it. You can get there in one click.
-
-In the video we expanded the Bottom-Up view to see where the bound `Count == Once` came from. The origin stems from the `T: AppearsOnTable<Qs>` constraint in the where clause of the `Eq<T, U>` impl block. In English we can summarize this as "an equality constraint is valid if both expressions appear in the selected table." Looking through the search tree I see that the bound
-
-```rust,ignore 
-users::columns::id: AppearsOnTable<users::table>
-```
-
-holds true, while the bound 
-
-```rust,ignore 
-posts::columns::id: AppearsOnTable<users::table>
-```
-
-is unsatisfied. Argh, we forgot to join the `users` and `posts` tables! At this point we understand and have identified the error, now it's time to fix the program. Unfortunately Argus provides no aide to *fix* typestate errors. We're in the wrong state, `posts::id` doesn't appear in the table we're selecting from, we need to get it on the selected-from table. This is a great time to reach for the Diesel documentation for [`QueryDsl`](https://docs.rs/diesel/latest/diesel/prelude/trait.QueryDsl.html).
+Turns out we forgot to join the `users` and `posts` tables! At this point we understand and have identified the error, now it's time to fix the program. Unfortunately Argus provides no aide to *fix* typestate errors. We're in the wrong state, `posts::id` doesn't appear in the table we're selecting from, we need to get it on the selected-from table. This is a great time to reach for the Diesel documentation for [`QueryDsl`](https://docs.rs/diesel/latest/diesel/prelude/trait.QueryDsl.html).
 
 <video controls>
   <source alt="Diesel fixing typestate error" src="assets/diesel-bad-select/fixed-error.mp4" type="video/mp4" />
