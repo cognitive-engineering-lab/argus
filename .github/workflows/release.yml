@@ -13,8 +13,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - uses: DeterminateSystems/flake-checker-action@main
-      - run: nix develop --command \
-          cargo ws publish skip --no-remove-dev-deps --from-git --yes --token ${{ secrets.CRATES_IO }}
+      - run: nix develop --command cargo ws publish skip --no-remove-dev-deps --from-git --yes --token ${{ secrets.CRATES_IO }}
 
   publish-ide:
     runs-on: ubuntu-latest
