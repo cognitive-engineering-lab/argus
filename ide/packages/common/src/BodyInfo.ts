@@ -65,6 +65,22 @@ class BodyInfo {
     return this.oib.tys;
   }
 
+  traitErrors() {
+    return _.compact(
+      _.flatMap(this.oib.traitErrors, e =>
+        this.hasVisibleObligations(e.idx) ? null : e
+      )
+    );
+  }
+
+  ambiguityErrors() {
+    return _.compact(
+      _.flatMap(this.oib.ambiguityErrors, e =>
+        this.hasVisibleObligations(e.idx) ? null : e
+      )
+    );
+  }
+
   exprs(): ExprIdx[] {
     return _.range(0, this.oib.exprs.length);
   }

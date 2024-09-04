@@ -1,3 +1,4 @@
+import BodyInfo from "@argus/common/BodyInfo";
 import type {
   BodyHash,
   CharRange,
@@ -372,34 +373,32 @@ export class Ctx {
   private refreshDiagnostics(editor: RustEditor, info: ObligationsInBody[]) {
     this.diagnosticCollection.clear();
 
-    const traitDiags = _.flatMap(info, ob =>
-      _.map(
-        ob.traitErrors,
+    const diags = _.flatMap(info, ob => {
+      // NOTE: the false is to hide superfluous errors.
+      const body = new BodyInfo(ob, false);
+      const traitDiags = _.map(
+        body.traitErrors(),
         e =>
           new vscode.Diagnostic(
             rustRangeToVscodeRange(e.range),
             diagnosticMessage("trait"),
             vscode.DiagnosticSeverity.Error
           )
-      )
-    );
+      );
 
-    const ambigDiags = _.flatMap(info, ob =>
-      _.map(
-        ob.ambiguityErrors,
+      const ambigDiags = _.map(
+        body.ambiguityErrors(),
         e =>
           new vscode.Diagnostic(
             rustRangeToVscodeRange(e.range),
             diagnosticMessage("ambig"),
             vscode.DiagnosticSeverity.Error
           )
-      )
-    );
+      );
+      return [...traitDiags, ...ambigDiags];
+    });
 
-    this.diagnosticCollection.set(editor.document.uri, [
-      ...traitDiags,
-      ...ambigDiags
-    ]);
+    this.diagnosticCollection.set(editor.document.uri, diags);
   }
 
   private buildOpenErrorItemCmd(
