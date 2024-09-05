@@ -237,16 +237,16 @@ graph TD
   root[&quot;{login}: Handler&quot;]
   implRespH[&quot;impl Handler&lt;IntoResponseHandler, S&gt; for T\nwhere\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;T: IntoResponse&quot;]
   intoResp[&quot;{login}: IntoResponse&quot;]
-  implH[&quot;impl Handler&lt;M, S&gt; for F\nwhere\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;F: FnOnce(T1) -&gt; Fut,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Fut: Future + Send,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;T1: FromRequest&quot;]
+  implH[&quot;impl Handler&lt;M, S&gt; for F\nwhere\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;F: FnOnce(T1) -&gt; Res,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Res: IntoResponse + Send,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;T1: FromRequest&quot;]
   isFunc[&quot;{login}: FnOnce(LoginAttempt) -&amp;gt; bool&quot;]
-  boolFut[&quot;bool: Future&quot;]
+  boolFut[&quot;bool: IntoResponse&quot;]
   loginARqst[&quot;LoginAttempt: FromRequest&quot;]
   
   root -.-&gt; implRespH
   implRespH --T = {login}--&gt; intoResp
   root -.-&gt; implH
-  implH --F = {login}, T1 = LoginAttempt, Fut = bool--&gt; isFunc
-  implH --Fut = bool--&gt; boolFut
+  implH --F = {login}, T1 = LoginAttempt, Res = bool--&gt; isFunc
+  implH --Res = bool--&gt; boolFut
   implH --T1 = LoginAttempt--&gt; loginARqst
   
   class root,implRespH,intoResp,implH,boolFut,loginARqst cssFailure
@@ -280,9 +280,10 @@ graph TD
 <p>Above we show one branch in the search tree for the function handler impl block—highlighted in green. In this branch we unify the type variables</p>
 <pre><code class="language-text">F = fn(LoginAttempt) -&gt; bool
 T1 = LoginAttempt
-Fut = bool
+Fut = Future&lt;Output = Res&gt;
+Res = bool
 </code></pre>
-<p>and add the where-clause constraints as children of the impl block. Notice the constraint <code>Fut: Future</code>, given that <code>Fut = bool</code>, the constraint requires that booleans be futures, but they aren’t! Argh, we forgot to make the handler function asynchronous! What a silly mistake. Before we jump back to our code and fix the issue, let’s reflect on the Argus interface and see how we can reach the same conclusion faster.</p>
+<p>and add the where-clause constraints as children of the impl block. Notice the constraint <code>Res: IntoResponse</code>, given that <code>Res = bool</code>, the constraint requires that booleans implement <code>IntoResponse</code>, but they don’t. This is one of the root causes of the error and we shal look at how to fix the problem in the following section. But before we jump back to the code and start fixing issues, let’s reflect on the Argus interface and see how we can reach the same conclusion faster.</p>
 <p style="text-align:center"><img src="assets/axum-hello-server/top-down-error-highlighted.png" alt="Search tree found impl" width="600"></p>
 <p>The screenshots included so far of the trait search tree are from the Top-Down view in Argus. This means we view the search just as Rust performed it: We started at the root question <code>{login}: Handler&lt;_, _&gt;</code>, descended into the impl blocks, and found the failing where-clause in a tree leaf—highlighted in red. There’s a second failing bound, but we’ll come back to that in the next section. The insight is that errors are <em>leaves</em> in the search tree, so the Top-Down view doesn’t prioritize showing you errors, but rather the full trait solving process.</p>
 <h2 id="up-the-search-tree"><a class="header" href="#up-the-search-tree">Up the Search Tree</a></h2>
@@ -295,9 +296,9 @@ graph TD
   root[&quot;{login}: Handler&quot;]
   implRespH[&quot;impl Handler&lt;IntoResponseHandler, S&gt; for T\nwhere\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;T: IntoResponse&quot;]
   intoResp[&quot;{login}: IntoResponse&quot;]
-  implH[&quot;impl Handler&lt;M, S&gt; for F\nwhere\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;F: FnOnce(T1) -&gt; Fut,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Fut: Future + Send,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;T1: FromRequest&quot;]
+  implH[&quot;impl Handler&lt;M, S&gt; for F\nwhere\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;F: FnOnce(T1) -&gt; Res,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;Res: IntoResponse + Send,\n&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;T1: FromRequest&quot;]
   isFunc[&quot;{login}: FnOnce(LoginAttempt) -&amp;gt; bool&quot;]
-  boolFut[&quot;bool: Future&quot;]
+  boolFut[&quot;bool: IntoResponse&quot;]
   loginARqst[&quot;LoginAttempt: FromRequest&quot;]
   
 
@@ -321,7 +322,7 @@ graph TD
 <video controls>
   <source alt="Bottom-Up Argus view" src="assets/axum-hello-server/bottom-up-start.mp4" type="video/mp4" />
 </video>
-<p>The above demonstrates that Argus identifies <code>bool: Future</code> as a root cause of the overall failure in addition to the second failure: <code>LoginAttempt: FromRequestParts&lt;_, _&gt;</code>. The note icon in the Bottom-Up view indicates that the two failures must be resolved together if you want to us the function as a handler.</p>
+<p>The above demonstrates that Argus identifies <code>Res: IntoResponse</code> as a root cause of the overall failure in addition to the second failure: <code>LoginAttempt: FromRequestParts&lt;_, _&gt;</code>. The note icon in the Bottom-Up view indicates that the two failures must be resolved together if you want to us the function as a handler.</p>
 <video controls>
   <source alt="Fix Future and IntoResponse" src="assets/axum-hello-server/async-fix-response.mp4" type="video/mp4" />
 </video>
