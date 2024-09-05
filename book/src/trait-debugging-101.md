@@ -53,16 +53,16 @@ graph TD
   root["{login}: Handler"]
   implRespH["impl Handler<IntoResponseHandler, S> for T\nwhere\n&nbsp;&nbsp;&nbsp;&nbsp;T: IntoResponse"]
   intoResp["{login}: IntoResponse"]
-  implH["impl Handler<M, S> for F\nwhere\n&nbsp;&nbsp;&nbsp;&nbsp;F: FnOnce(T1) -> Fut,\n&nbsp;&nbsp;&nbsp;&nbsp;Fut: Future + Send,\n&nbsp;&nbsp;&nbsp;&nbsp;T1: FromRequest"]
+  implH["impl Handler<M, S> for F\nwhere\n&nbsp;&nbsp;&nbsp;&nbsp;F: FnOnce(T1) -> Res,\n&nbsp;&nbsp;&nbsp;&nbsp;Res: IntoResponse + Send,\n&nbsp;&nbsp;&nbsp;&nbsp;T1: FromRequest"]
   isFunc["{login}: FnOnce(LoginAttempt) -&gt; bool"]
-  boolFut["bool: Future"]
+  boolFut["bool: IntoResponse"]
   loginARqst["LoginAttempt: FromRequest"]
   
   root -.-> implRespH
   implRespH --T = {login}--> intoResp
   root -.-> implH
-  implH --F = {login}, T1 = LoginAttempt, Fut = bool--> isFunc
-  implH --Fut = bool--> boolFut
+  implH --F = {login}, T1 = LoginAttempt, Res = bool--> isFunc
+  implH --Res = bool--> boolFut
   implH --T1 = LoginAttempt--> loginARqst
   
   class root,implRespH,intoResp,implH,boolFut,loginARqst cssFailure
@@ -100,10 +100,11 @@ Above we show one branch in the search tree for the function handler impl block-
 ```text
 F = fn(LoginAttempt) -> bool
 T1 = LoginAttempt
-Fut = bool
+Fut = Future<Output = Res>
+Res = bool
 ```
 
-and add the where-clause constraints as children of the impl block. Notice the constraint `Fut: Future`, given that `Fut = bool`, the constraint requires that booleans be futures, but they aren't! Argh, we forgot to make the handler function asynchronous! What a silly mistake. Before we jump back to our code and fix the issue, let's reflect on the Argus interface and see how we can reach the same conclusion faster.
+and add the where-clause constraints as children of the impl block. Notice the constraint `Res: IntoResponse`, given that `Res = bool`, the constraint requires that booleans implement `IntoResponse`, but they don't. This is one of the root causes of the error and we shal look at how to fix the problem in the following section. But before we jump back to the code and start fixing issues, let's reflect on the Argus interface and see how we can reach the same conclusion faster.
 
 ![Search tree found impl](assets/axum-hello-server/top-down-error-highlighted.png =600x center)
 
@@ -123,9 +124,9 @@ graph TD
   root["{login}: Handler"]
   implRespH["impl Handler<IntoResponseHandler, S> for T\nwhere\n&nbsp;&nbsp;&nbsp;&nbsp;T: IntoResponse"]
   intoResp["{login}: IntoResponse"]
-  implH["impl Handler<M, S> for F\nwhere\n&nbsp;&nbsp;&nbsp;&nbsp;F: FnOnce(T1) -> Fut,\n&nbsp;&nbsp;&nbsp;&nbsp;Fut: Future + Send,\n&nbsp;&nbsp;&nbsp;&nbsp;T1: FromRequest"]
+  implH["impl Handler<M, S> for F\nwhere\n&nbsp;&nbsp;&nbsp;&nbsp;F: FnOnce(T1) -> Res,\n&nbsp;&nbsp;&nbsp;&nbsp;Res: IntoResponse + Send,\n&nbsp;&nbsp;&nbsp;&nbsp;T1: FromRequest"]
   isFunc["{login}: FnOnce(LoginAttempt) -&gt; bool"]
-  boolFut["bool: Future"]
+  boolFut["bool: IntoResponse"]
   loginARqst["LoginAttempt: FromRequest"]
   
 
@@ -152,7 +153,7 @@ Argus sorts the failing leaves in the Bottom-Up view by which are "most-likely" 
   <source alt="Bottom-Up Argus view" src="assets/axum-hello-server/bottom-up-start.mp4" type="video/mp4" />
 </video>
 
-The above demonstrates that Argus identifies `bool: Future` as a root cause of the overall failure in addition to the second failure: `LoginAttempt: FromRequestParts<_, _>`. The note icon in the Bottom-Up view indicates that the two failures must be resolved together if you want to us the function as a handler.
+The above demonstrates that Argus identifies `Res: IntoResponse` as a root cause of the overall failure in addition to the second failure: `LoginAttempt: FromRequestParts<_, _>`. The note icon in the Bottom-Up view indicates that the two failures must be resolved together if you want to us the function as a handler.
 
 <video controls>
   <source alt="Fix Future and IntoResponse" src="assets/axum-hello-server/async-fix-response.mp4" type="video/mp4" />
