@@ -1,15 +1,23 @@
 import MonoSpace from "@argus/print/MonoSpace";
 import { VSCodeProgressRing } from "@vscode/webview-ui-toolkit/react";
+import _ from "lodash";
 import React, { useEffect, useState } from "react";
 import { type Highlighter, getHighlighter } from "shiki";
 
 import "./Code.css";
 
+const ARGUS_THEMES = {
+  dark: "dark-plus",
+  light: "light-plus",
+  "contrast-dark": "synthwave-84",
+  "contrast-light": "github-light-default"
+};
+
 const mkHighlighter = (() => {
   let h: Promise<Highlighter | undefined>;
   try {
     h = getHighlighter({
-      themes: ["dark-plus", "light-plus"],
+      themes: _.values(ARGUS_THEMES),
       langs: ["rust"]
     });
   } catch (e: any) {
@@ -21,18 +29,18 @@ const mkHighlighter = (() => {
 })();
 
 const codeToHtml = async ({ code, lang }: { code: string; lang: string }) => {
-  const highlighter = await mkHighlighter();
-  // TODO: I haven't tested that this works because Shiki has yet to fail :)
-  if (!highlighter) {
+  let highlighter: Highlighter | undefined;
+
+  try {
+    highlighter = await mkHighlighter();
+    if (!highlighter) throw new Error("Highlighter not initialized");
+  } catch (e: any) {
     return `<pre>${code}</pre>`;
   }
 
   return highlighter.codeToHtml(code, {
     lang,
-    themes: {
-      dark: "dark-plus",
-      light: "light-plus"
-    },
+    themes: ARGUS_THEMES,
     defaultColor: "light"
   });
 };

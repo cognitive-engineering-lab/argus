@@ -5,7 +5,6 @@ import { TyCtxt } from "@argus/print/context";
 import React from "react";
 
 import BottomUp from "./BottomUp";
-import Erotisi from "./Erotisi";
 import Panels, { type PanelDescription, usePanelState } from "./Panels";
 import TopDown from "./TopDown";
 import "./TreeApp.css";
@@ -72,8 +71,9 @@ const TreeApp = ({
       )
     });
 
+    // FIXME: we will want to include this eventually, but not right now.
     // Push to place this last
-    tabs.push({ title: "Help Me", Content: Erotisi });
+    // tabs.push({ title: "Help Me", Content: Erotisi });
   }
 
   // HACK: we shouldn't test for eval mode here but Playwright is off on the button click.
