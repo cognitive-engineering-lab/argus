@@ -13,7 +13,30 @@ pre.shiki {
   font-family: var(--vscode-editor-font-family);
 }
 
+
 /* Change the code colors based on VSCode exported body classes */
+/* Light is the default, we need to catch dark and high-contrast themes. */
+
+body.vscode-high-contrast .shiki,
+body.vscode-high-contrast .shiki span {
+  color: var(--shiki-contrast-dark) !important;
+  background-color: transparent !important;
+  /* Optional, if you also want font styles */
+  font-style: var(--shiki-contrast-dark-font-style) !important;
+  font-weight: var(--shiki-contrast-dark-font-weight) !important;
+  text-decoration: var(--shiki-contrast-dark-text-decoration) !important;
+}
+
+body.vscode-high-contrast-light .shiki,
+body.vscode-high-contrast-light .shiki span {
+  color: var(--shiki-contrast-light) !important;
+  background-color: transparent !important;
+  /* Optional, if you also want font styles */
+  font-style: var(--shiki-contrast-light-font-style) !important;
+  font-weight: var(--shiki-contrast-light-font-weight) !important;
+  text-decoration: var(--shiki-contrast-light-text-decoration) !important;
+}
+
 body.vscode-dark .shiki,
 body.vscode-dark .shiki span {
   color: var(--shiki-dark) !important;

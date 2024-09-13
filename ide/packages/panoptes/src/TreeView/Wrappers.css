@@ -23,12 +23,15 @@
 }
 
 .WrapperBox {
-    display: none;
+    /* display: none; */
+    display: inline;
+    opacity: 0.20;
     padding-left: 0.5em;
 }
 
 .WrapperBox.is-hovered {
-    display: inline;
+    /* display: inline; */
+    opacity: 100;
 }
 
 .WrapperBox i.codicon {
