@@ -323,6 +323,8 @@ graph TD
   <source alt="Bottom-Up Argus view" src="assets/axum-hello-server/bottom-up-start.mp4" type="video/mp4" />
 </video>
 <p>The above demonstrates that Argus identifies <code>Res: IntoResponse</code> as a root cause of the overall failure in addition to the second failure: <code>LoginAttempt: FromRequestParts&lt;_, _&gt;</code>. The note icon in the Bottom-Up view indicates that the two failures must be resolved together if you want to us the function as a handler.</p>
+<p>It’s always important to <strong>read</strong> and <strong>understand</strong> the failing obligation(s) that Argus presents first in the Bottom Up view. These errors are the <em>leaves</em> of the search tree, in other words, the <em>root cause</em> of the overall error; if you satisfy these bounds, then the root bound will also be satisfied.</p>
+<p>If additional failing bounds are present under “Other failures,” you need to only resolve a single set of these failures. Argus shows you the set it believes was your intent, but as the developer with intent double check for yourself that it makes sense.</p>
 <video controls>
   <source alt="Fix Future and IntoResponse" src="assets/axum-hello-server/async-fix-response.mp4" type="video/mp4" />
 </video>
