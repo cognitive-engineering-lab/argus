@@ -53,7 +53,9 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
       let items = vec![LI::Iterator, LI::Sized, LI::Deref];
       let lis = self.tcx.lang_items();
       for i in items {
-        if let Some(def_id) = lis.get(i) && p.is_trait_pred_rhs(def_id) {
+        if let Some(def_id) = lis.get(i)
+          && p.is_trait_pred_rhs(def_id)
+        {
           return true;
         }
       }

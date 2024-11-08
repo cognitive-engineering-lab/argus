@@ -35,7 +35,8 @@ export function testCases() {
     "axum",
     "bevy",
     "diesel",
-    "easy_ml",
+    // "easy_ml",
+    // "chumsky",
     "entrait",
     "nalgebra",
     "uom"

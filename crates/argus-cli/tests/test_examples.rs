@@ -1,8 +1,15 @@
-use std::{env, fs, path::Path, process::Command, sync::Once};
+use std::{
+  env, fs,
+  path::Path,
+  process::{Command, Stdio},
+  sync::Once,
+};
 
 use anyhow::{ensure, Context, Result};
 
 static SETUP: Once = Once::new();
+
+static DNF_PERF_P: &str = "dnf-perf.csv";
 
 fn run<P: AsRef<Path>>(dir: P, f: impl FnOnce(&mut Command)) -> Result<String> {
   let root = env::temp_dir().join("argus");
@@ -17,12 +24,13 @@ fn run<P: AsRef<Path>>(dir: P, f: impl FnOnce(&mut Command)) -> Result<String> {
     if !status.success() {
       panic!("installing argus failed")
     }
+
+    fs::write(DNF_PERF_P, "Label,N,Time\n").unwrap();
   });
 
   let mut cmd = Command::new("cargo");
   cmd.arg("argus");
-  cmd.arg("obligations");
-  // Don't specify a file to analyze all local crates.
+  cmd.arg("bundle");
 
   let path = format!(
     "{}:{}",
@@ -33,6 +41,14 @@ fn run<P: AsRef<Path>>(dir: P, f: impl FnOnce(&mut Command)) -> Result<String> {
 
   let ws = heredir.join("tests").join(dir);
   cmd.current_dir(&ws);
+
+  // NOTE: performance data is written to STDERR, so we capture it and place it in a file.
+  let perf_file = fs::OpenOptions::new()
+    .create(true)
+    .append(true)
+    .open(DNF_PERF_P)
+    .unwrap();
+  cmd.stderr(Stdio::from(perf_file));
 
   f(&mut cmd);
 
@@ -61,13 +77,12 @@ macro_rules! mk_tests_for {
 mk_tests_for! {
   axum,
   bevy,
-  // chumsky, // NOTE: as of now this consumes too much memory
+  // chumsky,
   diesel,
-  easy_ml,
+  // easy_ml,
   entrait,
   nalgebra,
   uom
-  // tauri_project
 }
 
 // TODO: include individual test if we want to see a particular output

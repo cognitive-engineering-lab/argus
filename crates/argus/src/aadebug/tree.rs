@@ -333,6 +333,7 @@ pub struct T<'a, 'tcx: 'a> {
   pub ns: &'a IndexVec<I, N<'tcx>>,
   pub topology: &'a TreeTopology,
   pub maybe_ambiguous: bool,
+  report_performance: bool,
   dnf: RefCell<Option<Dnf<I>>>,
 }
 
@@ -342,12 +343,14 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
     ns: &'a IndexVec<I, N<'tcx>>,
     topology: &'a TreeTopology,
     maybe_ambiguous: bool,
+    report_performance: bool,
   ) -> Self {
     Self {
       root,
       ns,
       topology,
       maybe_ambiguous,
+      report_performance,
       dnf: RefCell::new(None),
     }
   }
@@ -436,7 +439,18 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
 
     let root = self.goal(self.root).expect("invalid root");
     let dnf = _goal(self, &root).unwrap_or_else(Dnf::default);
+
     timer::elapsed(&dnf_report_msg, dnf_start);
+
+    // HACK to gather the performance report we write to stderr the CSV values `PERF<NODES><TIME>`
+    // The testing harness will take the stderr output and place it in a file for analysis.
+    if self.report_performance {
+      eprintln!(
+        "PERF,{:?},{:.04}",
+        self.ns.len(),
+        dnf_start.elapsed().as_secs_f64()
+      );
+    }
 
     self.dnf.replace(Some(dnf));
     self.expect_dnf()

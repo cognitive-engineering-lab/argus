@@ -2,27 +2,84 @@
 skip_core_tasks = true
 default_to_workspace = false
 
-[tasks.watch-front]
-script = "cargo watch -i frontend -x 'install --path crates/argus-cli'"
+# #################### #
+# Binding initializers #
+# #################### #
 
-[tasks.watch-front-debug]
-script = "cargo watch -i frontend -x 'install --path crates/argus-cli --frozen --offline --debug'"
+[tasks.init-bindings-lib]
+command = "cargo"
+args = [
+  "test", "-p", "argus-lib", "--lib", "export_bindings", "--locked"
+]
 
-[tasks.watch.run_task]
-name = ["watch-front"]
-parallel = true
+[tasks.init-bindings-ser]
+command = "cargo"
+args = ["test", "-p", "argus-ser", "--locked"]
 
 [tasks.init-bindings]
+command = "./scripts/ts-rs.scm"
+dependences = ["tasks.init-bindings-lib", "tasks.init-bindings-ser"]
+
+[tasks.evaluation-node]
+command = "node"
+args = ["ide/packages/evaluation/dist/evaluation.cjs", "-s", "./data", "${@}"]
+
+# #################### #
+#       Builders       #
+# #################### #
+
+[tasks.build-back]
+command = "cargo"
+args = [
+  "install", "--path", "crates/argus-cli", "--locked", 
+]
+
+# TODO: is there a way to set a command specific environment variable?
+#       The below will make the configuration global...
+# [env]
+# CARGO_MAKE_WORKING_DIRECTORY = "ide"
+[tasks.build-ide]
 script = """
-cargo test -p argus-lib --lib export_bindings --locked
-cargo test -p argus-ser --locked
-./scripts/ts-rs.scm
+cd ide && depot build
 """
 
-[tasks.evaluation]
+[tasks.build.run_task]
+name = ["build-back", "build-ide"]
+parallel = true
+
+[tasks.watch-back]
+command = "cargo"
+args = [	
+  "watch", 
+  "-i", 
+  "frontend", 
+  "-x", 
+  "'install", "--path", "crates/argus-cli", "${@}", "'", 
+]
+
+[tasks.watch.run_task]
+name = ["watch-back"]
+parallel = true
+
+# ############### #
+# Evaluation Crap #
+# ############### #
+
+[tasks.evaluate-inertia]
+command = "node"
+args = ["ide/packages/evaluation/dist/evaluation.cjs", "-h", "${@}"]
+dependencies = ["build"]
+
+[tasks.evaluation-init]
+command = "node"
+args = ["ide/packages/evaluation/dist/evaluation.cjs", "-s", "./data", "${@}"]
+dependencies = ["build"]
+
+[tasks.evaluation-serve]
 script = """
-cd ide && depot build && cd ..
-node ide/packages/evaluation/dist/evaluation.cjs -s ./data
 python3 -m webbrowser http://localhost:8080/eval
 ./scripts/evaluation.scm
 """
+
+[tasks.evaluation]
+dependencies = ["evaluation-init", "evaluation-serve"]

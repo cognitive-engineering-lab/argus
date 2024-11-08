@@ -3,9 +3,10 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
+    depot-js.url = "github:cognitive-engineering-lab/depot";
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay }:
+  outputs = { self, nixpkgs, flake-utils, rust-overlay, depot-js }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [ (import rust-overlay) ];
@@ -16,27 +17,6 @@
         toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
         meta = (builtins.fromTOML (builtins.readFile (entry-crate/Cargo.toml))).package;
         inherit (meta) name version;
-
-        depotjs = pkgs.rustPlatform.buildRustPackage rec {
-          pname = "depot";
-          version = "0.2.17";
-
-          # Depot tests require lots of external toolchains, node, typedoc, biome, ...
-          # so we'll just skip all tests for now and figure this out later.
-          doCheck = false;
-
-          src = pkgs.fetchFromGitHub {
-            owner = "cognitive-engineering-lab";
-            repo = pname;
-            rev = "v${version}";
-            hash = "sha256-kiQXxTVvzfovCn0YmOH/vTUQHyRS39gH7iBGaKyRZFg=";
-          };
-
-          cargoHash = "sha256-m9sG//vBUqGLwWHkyq+sJ8rkQOeaif56l394dgPU1uQ=";
-          buildInputs = with pkgs; lib.optionals stdenv.isDarwin [
-            darwin.apple_sdk.frameworks.SystemConfiguration
-          ];
-        };
 
         mdbook-image-size = with pkgs; rustPlatform.buildRustPackage rec {
           pname = "mdbook-image-size";
@@ -85,8 +65,11 @@
 
             toolchain
 
+            # Required for the evaluation
             guile
-            depotjs
+            guile-json
+
+            depot-js.packages.${system}.default
             nodejs_22
             nodePackages.pnpm
             codespell
@@ -109,7 +92,17 @@
             udev.dev
           ];
 
+          # Needed in order to run `cargo argus ...` within the directory
+          shellHook = ''
+            export DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:$(rustc --print target-libdir)"
+          '';
+
           RUSTC_LINKER = "${llvmPackages.clangUseLLVM}/bin/clang";
+
+          # NOTE: currently playwright-driver uses version 1.40.0, when something inevitably fails,
+          # check that the version of playwright-driver and that of the NPM playwright 
+          # `packages/evaluation/package.json` match.
+          PLAYWRIGHT_BROWSERS_PATH="${playwright-driver.browsers}";
         };
       });
 }

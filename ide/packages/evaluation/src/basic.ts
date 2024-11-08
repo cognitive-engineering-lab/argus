@@ -48,15 +48,16 @@ async function createWorkspaceRunner() {
       const ranksStr = await Promise.all(
         _.map(goals, goal => goal.getAttribute("data-rank"))
       );
-      const rank = _.min(_.map(_.compact(ranksStr), r => Number(r)));
+      const rank = _.min(_.map(_.compact(ranksStr), r => Number(r))) ?? -1;
 
-      const numberTreeNodes = _.max(
-        _.flatten(
-          _.map(bundles, bundle =>
-            _.map(_.values(bundle.trees), tree => tree.nodes.length)
+      const numberTreeNodes =
+        _.max(
+          _.flatten(
+            _.map(bundles, bundle =>
+              _.map(_.values(bundle.trees), tree => tree.nodes.length)
+            )
           )
-        )
-      );
+        ) ?? -1;
 
       await page.close();
       return {

@@ -283,18 +283,29 @@ export class TreeInfo {
   public failedSets() {
     if (this.showHidden) return this.tree.analysis.problematicSets;
 
+    const setHasBadUnification = (s: SetHeuristic) =>
+      _.some(s.goals, g => isBadUnification(g.kind));
+
+    // Find the lowest inertia set that *does not* have a unification failure.
+    const nonUnificationFailureLowestInertia = _.min(
+      _.map(this.tree.analysis.problematicSets, s =>
+        setHasBadUnification(s) ? undefined : TreeInfo.setInertia(s)
+      )
+    );
+
     // If all the problematic sets involve a bad unification, then we
     // have to live with them, don't filter.
-    if (
-      _.every(this.tree.analysis.problematicSets, s =>
-        _.some(s.goals, g => isBadUnification(g.kind))
-      )
-    )
+    if (nonUnificationFailureLowestInertia === undefined) {
       return this.tree.analysis.problematicSets;
+    }
 
-    // Keep only the sets that don't have a bad unification
-    return _.filter(this.tree.analysis.problematicSets, s =>
-      _.every(s.goals, g => !isBadUnification(g.kind))
+    // Keep the sets that *don't* have unification failures OR have an
+    // inertia lower than `nonUnificationFailureLowestInertia`.
+    return _.filter(
+      this.tree.analysis.problematicSets,
+      s =>
+        !setHasBadUnification(s) ||
+        TreeInfo.setInertia(s) < nonUnificationFailureLowestInertia
     );
   }
 

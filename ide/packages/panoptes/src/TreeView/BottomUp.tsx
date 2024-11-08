@@ -23,6 +23,7 @@ import { WrapImplCandidates, mkJumpToTopDownWrapper } from "./Wrappers";
 
 import { CollapsibleElement, DirRecursive } from "./Directory";
 import "./BottomUp.css";
+import { TyCtxt } from "@argus/print/context";
 
 const RenderEvaluationViews = ({
   recommended,
@@ -33,6 +34,9 @@ const RenderEvaluationViews = ({
   others: TreeViewWithRoot[];
   mode: "rank" | "random";
 }) => {
+  const tree = useContext(TreeAppContext.TreeContext)!;
+  const tyCtxt = useContext(TyCtxt)!;
+
   const nodeToString = (node: React.ReactNode) => {
     const div = document.createElement("div");
     const root = createRoot(div);
@@ -40,7 +44,6 @@ const RenderEvaluationViews = ({
     return div.innerText;
   };
 
-  const tree = useContext(TreeAppContext.TreeContext)!;
   let together = _.concat(recommended, others);
 
   if (mode === "random") {
@@ -52,7 +55,9 @@ const RenderEvaluationViews = ({
     _.map(together, (leaf, i) => {
       const node = tree.node(leaf.root);
       return "Goal" in node ? (
-        <PrintGoal key={i} o={tree.goal(node.Goal)} />
+        <TyCtxt.Provider value={tyCtxt} key={i}>
+          <PrintGoal o={tree.goal(node.Goal)} />
+        </TyCtxt.Provider>
       ) : null;
     })
   );
@@ -129,8 +134,8 @@ export const BottomUpImpersonator = ({
   recommended: TreeViewWithRoot[];
   others: TreeViewWithRoot[];
   mode: EvaluationMode;
-}) => {
-  return mode === "release" ? (
+}) =>
+  mode === "release" ? (
     <RenderBottomUpViews recommended={recommended} others={others} />
   ) : (
     <RenderEvaluationViews
@@ -139,7 +144,6 @@ export const BottomUpImpersonator = ({
       mode={mode}
     />
   );
-};
 
 export const sortedSubsets = (sets: SetHeuristic[]) =>
   _.sortBy(sets, TreeInfo.setInertia);

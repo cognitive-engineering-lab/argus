@@ -1,5 +1,7 @@
 import _ from "lodash";
 
+import fs from "node:fs";
+
 import { run as runBasic } from "./basic";
 import { run as runRandom } from "./random";
 import { rootCauses as TEST_CAUSES } from "./rootCauses";
@@ -9,6 +11,7 @@ import { run as runVisual } from "./visual";
 declare global {
   var debugging: boolean;
   var testMatcher: string;
+  var outputFile: string;
 }
 
 async function runForJson<T>(func: () => Promise<T>) {
@@ -16,8 +19,13 @@ async function runForJson<T>(func: () => Promise<T>) {
 }
 
 async function main() {
-  global.debugging = _.includes(process.argv, "--debug");
   const hasTestMatcher = _.find(process.argv, arg => arg.startsWith("--test="));
+  const hasOutputFile = _.find(process.argv, arg => arg.startsWith("--ofile="));
+
+  global.debugging = _.includes(process.argv, "--debug");
+  global.outputFile = hasOutputFile
+    ? hasOutputFile?.split("=")[1]
+    : "heuristic-precision.csv";
   global.testMatcher = hasTestMatcher
     ? hasTestMatcher.split("=")[1]
     : "[\\s\\S]*";
@@ -36,9 +44,9 @@ async function main() {
       break;
     }
     case "-h": {
-      await withServerOnPort(PORT, () =>
-        runForJson(() => runBasic(TEST_CAUSES))
-      ).then(console.log);
+      await withServerOnPort(PORT, () => runBasic(TEST_CAUSES)).then(
+        writeToCSV(global.outputFile)
+      );
       break;
     }
     case "-s": {
@@ -53,6 +61,15 @@ async function main() {
   }
   process.exit(0);
 }
+
+const writeToCSV = (filename: string) => (os: Object[]) => {
+  if (os.length === 0) return;
+
+  const names = Object.keys(os[0]).join(",");
+  const data = _.map(os, obj => _.map(_.values(obj), JSON.stringify).join(","));
+  const all = [names, ...data];
+  return fs.writeFileSync(filename, all.join("\n"));
+};
 
 main().catch(err => {
   console.error("Error running evaluation");
