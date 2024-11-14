@@ -1,4 +1,3 @@
-import type { EvaluationMode } from "@argus/common/lib";
 import { PrintGoal } from "@argus/print/lib";
 import React, { useContext, useState } from "react";
 import { flushSync } from "react-dom";
@@ -32,7 +31,7 @@ const RenderEvaluationViews = ({
 }: {
   recommended: TreeViewWithRoot[];
   others: TreeViewWithRoot[];
-  mode: "rank" | "random";
+  mode: "evaluate";
 }) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
   const tyCtxt = useContext(TyCtxt)!;
@@ -45,10 +44,6 @@ const RenderEvaluationViews = ({
   };
 
   let together = _.concat(recommended, others);
-
-  if (mode === "random") {
-    together = _.shuffle(together);
-  }
 
   const [goals, setGoals] = React.useState<string[]>([]);
   const nodeList: React.ReactNode[] = _.compact(
@@ -124,26 +119,6 @@ export function liftTo(
   }
   return curr;
 }
-
-// A bit of a hack to allow the evaluation script to render the bottom up view differently.
-export const BottomUpImpersonator = ({
-  recommended,
-  others,
-  mode
-}: {
-  recommended: TreeViewWithRoot[];
-  others: TreeViewWithRoot[];
-  mode: EvaluationMode;
-}) =>
-  mode === "release" ? (
-    <RenderBottomUpViews recommended={recommended} others={others} />
-  ) : (
-    <RenderEvaluationViews
-      recommended={recommended}
-      others={others}
-      mode={mode}
-    />
-  );
 
 export const sortedSubsets = (sets: SetHeuristic[]) =>
   _.sortBy(sets, TreeInfo.setInertia);
@@ -257,9 +232,11 @@ const BottomUp = ({
   jumpToTopDown
 }: { jumpToTopDown: (n: ProofNodeIdx) => void }) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
-  const evaluationMode =
-    useContext(AppContext.ConfigurationContext)?.evalMode ?? "release";
-  const sets = sortedSubsets(tree.failedSets());
+  const cfg = useContext(AppContext.ConfigurationContext)!;
+  const evaluationMode = cfg.evalMode ?? "release";
+  const rankMode = cfg.rankMode ?? "inertia";
+
+  const sets = tree.failedSetsSorted(rankMode);
 
   const makeSets = (sets: SetHeuristic[]) =>
     _.map(sets, h => {
@@ -290,7 +267,7 @@ const BottomUp = ({
   const suggestedPredicates = flattenSets(_.slice(sets, 0, 3));
   const others = flattenSets(_.slice(sets, 3));
   return (
-    <BottomUpImpersonator
+    <RenderEvaluationViews
       recommended={suggestedPredicates}
       others={others}
       mode={evaluationMode}

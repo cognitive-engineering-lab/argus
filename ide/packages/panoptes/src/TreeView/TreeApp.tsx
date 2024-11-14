@@ -55,7 +55,7 @@ const TreeApp = ({
     }
   ];
 
-  if (treeInfo.failedSets().length > 0) {
+  if (0 < treeInfo.numFailedSets()) {
     // Unshift to place this first
     // NOTE: the passing the TopDown panel ID is important, make sure it's always correct.
     // FIXME: we probably shouldn't hard-code that value here...

@@ -65,17 +65,17 @@ parallel = true
 # Evaluation Crap #
 # ############### #
 
-[tasks.evaluate-inertia]
+[tasks.eval]
 command = "node"
 args = ["ide/packages/evaluation/dist/evaluation.cjs", "-h", "${@}"]
 dependencies = ["build"]
 
-[tasks.evaluation-init]
+[tasks.eval-init]
 command = "node"
 args = ["ide/packages/evaluation/dist/evaluation.cjs", "-s", "./data", "${@}"]
 dependencies = ["build"]
 
-[tasks.evaluation-serve]
+[tasks.eval-serve]
 script = """
 python3 -m webbrowser http://localhost:8080/eval
 ./scripts/evaluation.scm

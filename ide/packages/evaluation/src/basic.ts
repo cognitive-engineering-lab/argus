@@ -32,7 +32,7 @@ async function createWorkspaceRunner() {
         console.debug(`MISSING: cause ${workspace}/${filename}`);
         return;
       }
-      const page = await openPage(context, filename, bundles, "rank");
+      const page = await openPage(context, filename, bundles);
 
       await sleep(5000);
       await expandBottomUpView(page);
@@ -63,8 +63,6 @@ async function createWorkspaceRunner() {
       return {
         workspace,
         filename,
-        cause: cause.message,
-        numberTreeNodes,
         rank
       };
     });

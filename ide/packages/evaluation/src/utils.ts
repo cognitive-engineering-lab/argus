@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import type { BodyBundle } from "@argus/common/bindings";
-import type { EvaluationMode, Filename, Result } from "@argus/common/lib";
+import type { Filename, Result, SortStrategy } from "@argus/common/lib";
 import { type ExecNotifyOpts, execNotify as _execNotify } from "@argus/system";
 import _ from "lodash";
 import type { BrowserContext, Page } from "playwright";
@@ -90,14 +90,21 @@ export async function forFileInBundle<T>(
   );
 }
 
+function sanitizeSort(s: string | undefined): s is SortStrategy {
+  return s !== undefined && (s === "inertia" || s === "depth" || s === "vars");
+}
+
 export async function openPage(
   context: BrowserContext,
   filename: string,
-  bundles: BodyBundle[],
-  evalMode: EvaluationMode
+  bundles: BodyBundle[]
 ) {
+  if (!sanitizeSort(global.rankBy)) {
+    throw new Error(`Invalid rank mode: ${global.rankBy}`);
+  }
+
   const tmpobj = tmp.fileSync({ postfix: ".html" });
-  const html = webHtml("EVAL", filename, bundles, evalMode);
+  const html = webHtml("EVAL", filename, bundles, global.rankBy, "evaluate");
   fs.writeSync(tmpobj.fd, html);
   const page = await context.newPage();
   await page.goto(`file://${tmpobj.name}`, {
