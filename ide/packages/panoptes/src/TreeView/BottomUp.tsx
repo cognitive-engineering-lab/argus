@@ -1,4 +1,3 @@
-import type { EvaluationMode } from "@argus/common/lib";
 import { PrintGoal } from "@argus/print/lib";
 import React, { useContext, useState } from "react";
 import { flushSync } from "react-dom";
@@ -23,6 +22,7 @@ import { WrapImplCandidates, mkJumpToTopDownWrapper } from "./Wrappers";
 
 import { CollapsibleElement, DirRecursive } from "./Directory";
 import "./BottomUp.css";
+import { TyCtxt } from "@argus/print/context";
 
 const RenderEvaluationViews = ({
   recommended,
@@ -31,8 +31,11 @@ const RenderEvaluationViews = ({
 }: {
   recommended: TreeViewWithRoot[];
   others: TreeViewWithRoot[];
-  mode: "rank" | "random";
+  mode: "evaluate";
 }) => {
+  const tree = useContext(TreeAppContext.TreeContext)!;
+  const tyCtxt = useContext(TyCtxt)!;
+
   const nodeToString = (node: React.ReactNode) => {
     const div = document.createElement("div");
     const root = createRoot(div);
@@ -40,19 +43,16 @@ const RenderEvaluationViews = ({
     return div.innerText;
   };
 
-  const tree = useContext(TreeAppContext.TreeContext)!;
   let together = _.concat(recommended, others);
-
-  if (mode === "random") {
-    together = _.shuffle(together);
-  }
 
   const [goals, setGoals] = React.useState<string[]>([]);
   const nodeList: React.ReactNode[] = _.compact(
     _.map(together, (leaf, i) => {
       const node = tree.node(leaf.root);
       return "Goal" in node ? (
-        <PrintGoal key={i} o={tree.goal(node.Goal)} />
+        <TyCtxt.Provider value={tyCtxt} key={i}>
+          <PrintGoal o={tree.goal(node.Goal)} />
+        </TyCtxt.Provider>
       ) : null;
     })
   );
@@ -119,27 +119,6 @@ export function liftTo(
   }
   return curr;
 }
-
-// A bit of a hack to allow the evaluation script to render the bottom up view differently.
-export const BottomUpImpersonator = ({
-  recommended,
-  others,
-  mode
-}: {
-  recommended: TreeViewWithRoot[];
-  others: TreeViewWithRoot[];
-  mode: EvaluationMode;
-}) => {
-  return mode === "release" ? (
-    <RenderBottomUpViews recommended={recommended} others={others} />
-  ) : (
-    <RenderEvaluationViews
-      recommended={recommended}
-      others={others}
-      mode={mode}
-    />
-  );
-};
 
 export const sortedSubsets = (sets: SetHeuristic[]) =>
   _.sortBy(sets, TreeInfo.setInertia);
@@ -253,9 +232,11 @@ const BottomUp = ({
   jumpToTopDown
 }: { jumpToTopDown: (n: ProofNodeIdx) => void }) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
-  const evaluationMode =
-    useContext(AppContext.ConfigurationContext)?.evalMode ?? "release";
-  const sets = sortedSubsets(tree.failedSets());
+  const cfg = useContext(AppContext.ConfigurationContext)!;
+  const evaluationMode = cfg.evalMode ?? "release";
+  const rankMode = cfg.rankMode ?? "inertia";
+
+  const sets = tree.failedSetsSorted(rankMode);
 
   const makeSets = (sets: SetHeuristic[]) =>
     _.map(sets, h => {
@@ -286,7 +267,7 @@ const BottomUp = ({
   const suggestedPredicates = flattenSets(_.slice(sets, 0, 3));
   const others = flattenSets(_.slice(sets, 3));
   return (
-    <BottomUpImpersonator
+    <RenderEvaluationViews
       recommended={suggestedPredicates}
       others={others}
       mode={evaluationMode}

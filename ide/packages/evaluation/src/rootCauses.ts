@@ -47,7 +47,7 @@ export const rootCauses: RootCause[] = [
       },
       {
         file: "extract_self_ref.rs",
-        message: "&'_ A: FromRequestParts"
+        message: "&A: FromRequestParts"
       },
       {
         file: "missing_deserialize.rs",
@@ -71,7 +71,8 @@ export const rootCauses: RootCause[] = [
       },
       {
         file: "too_many_extractors.rs",
-        message: ": FnOnce<(_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _)>"
+        // NOTE: HACK: the commas are added by CSS, so we don't need them here.
+        message: ": FnOnce<(________________)>"
       },
       {
         file: "wrong_return_type.rs",

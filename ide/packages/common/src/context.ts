@@ -3,12 +3,7 @@ import { createContext } from "react";
 import type BodyInfo from "./BodyInfo";
 import type TreeInfo from "./TreeInfo";
 import type { MessageSystem, TreeRenderParams } from "./communication";
-import type {
-  EvaluationMode,
-  Filename,
-  PanoptesConfig,
-  SystemSpec
-} from "./lib";
+import type { Filename, PanoptesConfig, SystemSpec } from "./lib";
 
 export const settingsToggles = ["show-hidden-obligations"] as const;
 
@@ -18,9 +13,9 @@ export type Settings = {
 
 export const AppContext = {
   MessageSystemContext: createContext<MessageSystem | undefined>(undefined),
-  ConfigurationContext: createContext<
-    (PanoptesConfig & { evalMode: EvaluationMode }) | undefined
-  >(undefined),
+  ConfigurationContext: createContext<Required<PanoptesConfig> | undefined>(
+    undefined
+  ),
   SystemSpecContext: createContext<SystemSpec | undefined>(undefined),
   SettingsContext: createContext<Settings>({ "show-hidden-obligations": false })
 };

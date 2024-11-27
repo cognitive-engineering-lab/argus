@@ -18,6 +18,7 @@ use crate::proof_tree::{topology::TreeTopology, ProofNodeIdx};
 pub struct Storage<'tcx> {
   pub ns: IndexVec<ProofNodeIdx, tree::N<'tcx>>,
   maybe_ambiguous: bool,
+  report_performance: bool,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -30,9 +31,11 @@ pub struct AnalysisResults {
 
 impl<'tcx> Storage<'tcx> {
   pub fn new(maybe_ambiguous: bool) -> Self {
+    let report_performance = std::env::var("ARGUS_DNF_PERF").is_ok();
     Self {
       ns: IndexVec::new(),
       maybe_ambiguous,
+      report_performance,
     }
   }
 
@@ -106,7 +109,8 @@ impl<'tcx> Storage<'tcx> {
     root: ProofNodeIdx,
     topo: &TreeTopology,
   ) -> AnalysisResults {
-    let tree = &tree::T::new(root, &self.ns, topo, false);
+    let tree =
+      &tree::T::new(root, &self.ns, topo, false, self.report_performance);
     let tree_start = Instant::now();
 
     let mut sets = vec![];

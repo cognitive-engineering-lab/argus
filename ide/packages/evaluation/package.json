@@ -16,7 +16,7 @@
     "@types/tmp": "^0.2.6",
     "glob": "^8.1.0",
     "lodash": "^4.17.21",
-    "playwright": "^1.42.1",
+    "playwright": "1.40.0",
     "tmp": "^0.2.3",
     "unique-filename": "^3.0.0",
     "vite": "^4.4.9"

@@ -6,6 +6,7 @@ import {
   type EvaluationMode,
   type Filename,
   type PanoptesConfig,
+  type SortStrategy,
   configToString
 } from "@argus/common/lib";
 import _ from "lodash";
@@ -741,13 +742,15 @@ export function webHtml(
   title: string,
   filename: Filename,
   bundles: BodyBundle[],
-  evalMode: EvaluationMode = "rank"
+  rankMode: SortStrategy,
+  evalMode: EvaluationMode = "evaluate"
 ) {
   const config: PanoptesConfig = {
     type: "WEB_BUNDLE",
     target: findErrorTargetInBundles(bundles),
     closedSystem: bundles,
-    evalMode
+    evalMode,
+    rankMode
   };
 
   const panoptesDir = path.resolve(__dirname, "..", "..", "panoptes");

@@ -9,7 +9,6 @@ import {
   settingsToggles
 } from "@argus/common/context";
 import {
-  type EvaluationMode,
   type FileInfo,
   type PanoptesConfig,
   type SystemSpec,
@@ -245,8 +244,9 @@ const App = observer(({ config }: { config: PanoptesConfig }) => {
     config.type === "VSCODE_BACKING" ? config.spec : webSysSpec;
 
   config.evalMode = config.evalMode ?? "release";
-  const configNoUndef: PanoptesConfig & { evalMode: EvaluationMode } =
-    config as any;
+  config.rankMode = config.rankMode ?? "inertia";
+
+  const configNoUndef: Required<PanoptesConfig> = config as any;
 
   useEffect(() => {
     const listen = (e: MessageEvent) =>

@@ -31,10 +31,13 @@ export const ConfigConsts = {
 export type PanoptesOptionalData = {
   target?: ErrorJumpTargetInfo;
   evalMode?: EvaluationMode;
+  rankMode?: SortStrategy;
 };
 
 export type SystemSpec = Omit<IssueOptions, "logText">;
-export type EvaluationMode = "release" | "rank" | "random";
+export type EvaluationMode = "release" | "evaluate";
+export type SortStrategy = "inertia" | "depth" | "vars";
+
 export interface FileInfo {
   fn: Filename;
   data: ObligationsInBody[];

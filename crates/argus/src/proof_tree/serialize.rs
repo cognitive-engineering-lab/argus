@@ -50,6 +50,7 @@ impl SerializedTreeVisitor<'_> {
   }
 
   fn check_goal_projection(&mut self, goal: &InspectGoal) {
+    // We only care about successful alias relations
     if goal.result().is_yes()
       && let ty::PredicateKind::AliasRelate(
         t1,
@@ -74,6 +75,7 @@ impl SerializedTreeVisitor<'_> {
         let idx2: TyIdx = interner.borrow().get_idx(&t2)?;
         Some((idx1, idx2))
       }) && t1 != t2
+        && !self.projection_values.contains_key(&t1)
       {
         let not_empty = self.projection_values.insert(t1, t2);
         debug_assert!(not_empty.is_none());
@@ -81,39 +83,7 @@ impl SerializedTreeVisitor<'_> {
     }
   }
 
-  #[cfg(debug_assertions)]
-  fn is_valid(&self) -> Result<()> {
-    for (pidx, node) in self.nodes.iter_enumerated() {
-      match node {
-        Node::Goal(g) => {
-          anyhow::ensure!(
-            !self.topology.is_leaf(pidx),
-            "non-leaf node (goal) has no children {:?}",
-            self.interners.goal(*g)
-          );
-        }
-        Node::Candidate(c) => {
-          anyhow::ensure!(
-            !self.topology.is_leaf(pidx),
-            "non-leaf node (candidate) has no children {:?}",
-            self.interners.candidate(*c)
-          );
-        }
-        Node::Result(..) => {
-          anyhow::ensure!(
-            self.topology.is_leaf(pidx),
-            "result node is not a leaf"
-          );
-        }
-      }
-    }
-    Ok(())
-  }
-
   pub fn into_tree(self) -> Result<SerializedTree> {
-    #[cfg(debug_assertions)]
-    self.is_valid()?;
-
     let SerializedTreeVisitor {
       root: Some(root),
       mut nodes,

@@ -7,8 +7,6 @@ import ReportBugUrl from "@argus/print/ReportBugUrl";
 import { VSCodeButton } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
 import React, { useContext, useState } from "react";
-
-import { sortedSubsets } from "./BottomUp";
 import { Node } from "./Node";
 
 type Target =
@@ -83,8 +81,7 @@ function formOptions(
 
 const Erotisi = () => {
   const tree = useContext(TreeAppContext.TreeContext)!;
-  const sets = sortedSubsets(tree.failedSets());
-  if (sets.length === 0) {
+  if (tree.numFailedSets() <= 0) {
     return (
       <ErrorDiv>
         <p>
@@ -99,6 +96,7 @@ const Erotisi = () => {
     );
   }
 
+  const sets = tree.failedSetsSorted();
   const firstForm = formOptions(tree, sets, []);
   const [currentPanel, setCurrentPanel] = useState<MaybeProp>(firstForm);
 

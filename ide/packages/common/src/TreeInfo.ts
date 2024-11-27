@@ -6,6 +6,7 @@ import type {
   EvaluationResult,
   GoalIdx,
   GoalKind,
+  Heuristic,
   Implementors,
   ProofNodeIdx,
   ResultIdx,
@@ -13,6 +14,7 @@ import type {
   SetHeuristic,
   TreeTopology
 } from "./bindings";
+import type { SortStrategy } from "./lib";
 
 export type TreeViewWithRoot = TreeView & { root: ProofNodeIdx };
 
@@ -280,21 +282,51 @@ export class TreeInfo {
     return this.tree.root;
   }
 
-  public failedSets() {
+  public numFailedSets() {
+    return this.failedSets().length;
+  }
+
+  public failedSetsSorted(sortAs: SortStrategy = "inertia"): SetHeuristic[] {
+    const sets = this.failedSets();
+
+    switch (sortAs) {
+      case "inertia":
+        return _.sortBy(sets, TreeInfo.setInertia);
+      case "depth":
+        return _.sortBy(sets, s => this.setDepth(s));
+      case "vars":
+        return _.sortBy(sets, s => this.setInferVars(s));
+      default:
+        throw new Error("Unknown sort strategy");
+    }
+  }
+
+  private failedSets(): SetHeuristic[] {
     if (this.showHidden) return this.tree.analysis.problematicSets;
+
+    const setHasBadUnification = (s: SetHeuristic) =>
+      _.some(s.goals, g => isBadUnification(g.kind));
+
+    // Find the lowest inertia set that *does not* have a unification failure.
+    const nonUnificationFailureLowestInertia = _.min(
+      _.map(this.tree.analysis.problematicSets, s =>
+        setHasBadUnification(s) ? undefined : TreeInfo.setInertia(s)
+      )
+    );
 
     // If all the problematic sets involve a bad unification, then we
     // have to live with them, don't filter.
-    if (
-      _.every(this.tree.analysis.problematicSets, s =>
-        _.some(s.goals, g => isBadUnification(g.kind))
-      )
-    )
+    if (nonUnificationFailureLowestInertia === undefined) {
       return this.tree.analysis.problematicSets;
+    }
 
-    // Keep only the sets that don't have a bad unification
-    return _.filter(this.tree.analysis.problematicSets, s =>
-      _.every(s.goals, g => !isBadUnification(g.kind))
+    // Keep the sets that *don't* have unification failures OR have an
+    // inertia lower than `nonUnificationFailureLowestInertia`.
+    return _.filter(
+      this.tree.analysis.problematicSets,
+      s =>
+        !setHasBadUnification(s) ||
+        TreeInfo.setInertia(s) < nonUnificationFailureLowestInertia
     );
   }
 
@@ -349,13 +381,6 @@ export class TreeInfo {
 
   public children(n: ProofNodeIdx): ProofNodeIdx[] {
     const nodesToUnifyFailures = this.nodesInUnificationFailurePath();
-
-    // if (_.includes(nodesToUnifyFailures, 6222)) {
-    //   throw new Error("NODE NOT THERE");
-    // } else {
-    //   console.debug("Nodes to unify failures includes 6222");
-    // }
-
     const children = this.view.topology.children[n] ?? [];
     return _.difference(children, nodesToUnifyFailures);
   }
@@ -432,6 +457,16 @@ export class TreeInfo {
   public static setInertia = (set: SetHeuristic) => {
     return set.momentum;
   };
+
+  public setDepth(set: SetHeuristic) {
+    const heuristicDepth = (h: Heuristic) => this.depth(h.idx);
+    return _.sum(_.map(set.goals, heuristicDepth));
+  }
+
+  public setInferVars(set: SetHeuristic) {
+    const heuristicVars = (h: Heuristic) => this.inferVars(h.idx);
+    return _.sum(_.map(set.goals, heuristicVars));
+  }
 
   public minInertiaOnPath(n: ProofNodeIdx): number {
     const hs = _.filter(this.failedSets(), h =>

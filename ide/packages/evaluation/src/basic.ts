@@ -32,7 +32,7 @@ async function createWorkspaceRunner() {
         console.debug(`MISSING: cause ${workspace}/${filename}`);
         return;
       }
-      const page = await openPage(context, filename, bundles, "rank");
+      const page = await openPage(context, filename, bundles);
 
       await sleep(5000);
       await expandBottomUpView(page);
@@ -48,22 +48,21 @@ async function createWorkspaceRunner() {
       const ranksStr = await Promise.all(
         _.map(goals, goal => goal.getAttribute("data-rank"))
       );
-      const rank = _.min(_.map(_.compact(ranksStr), r => Number(r)));
+      const rank = _.min(_.map(_.compact(ranksStr), r => Number(r))) ?? -1;
 
-      const numberTreeNodes = _.max(
-        _.flatten(
-          _.map(bundles, bundle =>
-            _.map(_.values(bundle.trees), tree => tree.nodes.length)
+      const numberTreeNodes =
+        _.max(
+          _.flatten(
+            _.map(bundles, bundle =>
+              _.map(_.values(bundle.trees), tree => tree.nodes.length)
+            )
           )
-        )
-      );
+        ) ?? -1;
 
       await page.close();
       return {
         workspace,
         filename,
-        cause: cause.message,
-        numberTreeNodes,
         rank
       };
     });

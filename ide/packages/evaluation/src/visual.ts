@@ -38,7 +38,7 @@ async function argusScreenshots(
     filename: Filename,
     bundles: BodyBundle[]
   ) => {
-    const page = await openPage(context, filename, bundles, "rank");
+    const page = await openPage(context, filename, bundles);
     await expandBottomUpView(page);
     await page.screenshot({ path: out, fullPage: true });
   };
