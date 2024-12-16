@@ -128,8 +128,8 @@ pub struct SerializedTree {
 pub struct Implementors {
   #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
   pub _trait: json::Value,
-
   pub impls: Vec<CandidateIdx>,
+  pub inductive_impls: Vec<CandidateIdx>,
 }
 
 #[derive(Serialize, Debug, Clone)]

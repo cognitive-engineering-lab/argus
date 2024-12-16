@@ -1,4 +1,4 @@
-import type { ProofNodeIdx } from "@argus/common/bindings";
+import type { CandidateIdx, ProofNodeIdx } from "@argus/common/bindings";
 import type {
   InfoWrapper,
   InfoWrapperProps
@@ -75,21 +75,28 @@ export const WrapTreeIco = ({ n, reportActive }: InfoWrapperProps) => (
 export const WrapImplCandidates = ({ n, reportActive }: InfoWrapperProps) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
   const implementors = tree.implCandidates(n);
-  if (implementors === undefined || implementors.impls.length === 0)
-    return null;
+  if (implementors === undefined) return null;
+  const totalImpls =
+    implementors.impls.length + implementors.inductiveImpls.length;
+
+  if (totalImpls === 0) return null;
+
+  const Section = ({ candidates }: { candidates: CandidateIdx[] }) =>
+    _.map(candidates, (c, i) => (
+      <div key={i}>
+        <Candidate idx={c} />
+      </div>
+    ));
 
   return (
     <DetailsPortal reportActive={reportActive} info={<IcoListUL />}>
       <p>
-        There are {implementors.impls.length}{" "}
-        <PrintDefPath defPath={implementors.trait} /> implementors
+        There are {totalImpls} <PrintDefPath defPath={implementors.trait} />{" "}
+        implementors
       </p>
       <div className="ImplCandidatesPanel">
-        {_.map(implementors.impls, (c, i) => (
-          <div key={i}>
-            <Candidate idx={c} />
-          </div>
-        ))}
+        <Section candidates={implementors.impls} />
+        <Section candidates={implementors.inductiveImpls} />
       </div>
     </DetailsPortal>
   );
