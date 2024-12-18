@@ -14,10 +14,16 @@ use ts_rs::TS;
 use super::ProofNodeIdx;
 
 #[cfg(feature = "testing")]
-pub trait Idx = Copy + PartialEq + Eq + Hash + Debug + Serialize + TS;
+pub trait Idx: Copy + PartialEq + Eq + Hash + Debug + Serialize + TS {}
+
+#[cfg(feature = "testing")]
+impl<T> Idx for T where T: Copy + PartialEq + Eq + Hash + Debug + Serialize + TS {}
 
 #[cfg(not(feature = "testing"))]
-pub trait Idx = Copy + PartialEq + Eq + Hash + Debug + Serialize;
+pub trait Idx: Copy + PartialEq + Eq + Hash + Debug + Serialize {}
+
+#[cfg(not(feature = "testing"))]
+impl<T> Idx for T where T: Copy + PartialEq + Eq + Hash + Debug + Serialize {}
 
 /// Parent child relationships between structures.
 // NOTE: instead of using a generic parameter `I: Idx` it's

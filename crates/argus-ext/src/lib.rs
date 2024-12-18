@@ -1,6 +1,5 @@
 #![feature(
   rustc_private,
-  if_let_guard,
   let_chains,
   box_patterns,
   control_flow_enum

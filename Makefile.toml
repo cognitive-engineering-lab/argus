@@ -8,17 +8,15 @@ default_to_workspace = false
 
 [tasks.init-bindings-lib]
 command = "cargo"
-args = [
-  "test", "-p", "argus-lib", "--lib", "export_bindings", "--locked"
-]
+args = ["test", "-p", "argus-lib", "--lib", "export_bindings", "--locked"]
 
 [tasks.init-bindings-ser]
 command = "cargo"
 args = ["test", "-p", "argus-ser", "--locked"]
 
 [tasks.init-bindings]
+dependencies = ["init-bindings-lib", "init-bindings-ser"]
 command = "./scripts/ts-rs.scm"
-dependences = ["tasks.init-bindings-lib", "tasks.init-bindings-ser"]
 
 [tasks.evaluation-node]
 command = "node"
@@ -30,9 +28,7 @@ args = ["ide/packages/evaluation/dist/evaluation.cjs", "-s", "./data", "${@}"]
 
 [tasks.build-back]
 command = "cargo"
-args = [
-  "install", "--path", "crates/argus-cli", "--locked", 
-]
+args = ["install", "--path", "crates/argus-cli", "--locked"]
 
 # TODO: is there a way to set a command specific environment variable?
 #       The below will make the configuration global...
@@ -48,14 +44,9 @@ name = ["build-back", "build-ide"]
 parallel = true
 
 [tasks.watch-back]
-command = "cargo"
-args = [	
-  "watch", 
-  "-i", 
-  "frontend", 
-  "-x", 
-  "'install", "--path", "crates/argus-cli", "${@}", "'", 
-]
+script = """
+cargo watch -i frontend -x 'install --path crates/argus-cli ${@}'
+"""
 
 [tasks.watch.run_task]
 name = ["watch-back"]

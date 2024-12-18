@@ -1,17 +1,4 @@
-#![feature(
-    rustc_private,
-    trait_alias,
-    never_type, // proof tree visitor
-    min_specialization, // for rustc_index
-    let_chains,
-    decl_macro, // path serialize
-    extract_if,
-    hash_extract_if,
-    box_patterns,
-    control_flow_enum,
-    if_let_guard,
-    lazy_cell
-)]
+#![feature(rustc_private)]
 #![warn(clippy::pedantic)]
 #![allow(
   clippy::missing_errors_doc,
@@ -19,6 +6,7 @@
   clippy::must_use_candidate,
   clippy::module_name_repetitions
 )]
+extern crate rustc_ast_ir;
 extern crate rustc_data_structures;
 #[cfg(feature = "testing")]
 extern crate rustc_driver;

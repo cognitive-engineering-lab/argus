@@ -89,11 +89,18 @@ impl BinCreator<'_, '_> {
   fn drain_nested(&mut self, target: HirId, kind: BinKind) {
     let is_nested = |id: HirId| self.ctx.tcx.is_parent_of(target, id);
 
-    let obligations = self
-      .map
-      .extract_if(|&id, _| is_nested(id))
-      .flat_map(|(_, idxs)| idxs)
-      .collect::<Vec<_>>();
+    let mut to_remove = Vec::default();
+    let mut obligations = Vec::default();
+    for (&id, idxs) in self.map.iter() {
+      if is_nested(id) {
+          to_remove.push(id);
+          obligations.extend(idxs.iter().copied());
+        }
+    }
+
+    for id in to_remove {
+      self.map.remove(&id);
+    }
 
     if !obligations.is_empty() {
       log::debug!(

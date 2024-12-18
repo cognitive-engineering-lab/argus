@@ -181,20 +181,21 @@ impl<'tcx> UnevaluatedConstDef<'tcx> {
         },
         DefKind::AnonConst => {
           if def.is_local()
-            && let span = infcx.tcx.def_span(def)
-            && let Ok(snip) = infcx.tcx.sess.source_map().span_to_snippet(span)
           {
-            Self::AnonSnippet { data: snip }
-          } else {
-            // Do not call `print_value_path` as if a parent of this anon const is an impl it will
-            // attempt to print out the impl trait ref i.e. `<T as Trait>::{constant#0}`. This would
-            // cause printing to enter an infinite recursion if the anon const is in the self type i.e.
-            // `impl<T: Default> Default for [T; 32 - 1 - 1 - 1] {`
-            // where we would try to print `<[T; /* print `constant#0` again */] as Default>::{constant#0}`
-            Self::AnonLocation {
-              krate: infcx.tcx.crate_name(def.krate),
-              path: path::BasicPathNoArgs::new(*def),
+            let span = infcx.tcx.def_span(def);
+            if let Ok(snip) = infcx.tcx.sess.source_map().span_to_snippet(span) {
+              return Self::AnonSnippet { data: snip };
             }
+          }
+
+          // Do not call `print_value_path` as if a parent of this anon const is an impl it will
+          // attempt to print out the impl trait ref i.e. `<T as Trait>::{constant#0}`. This would
+          // cause printing to enter an infinite recursion if the anon const is in the self type i.e.
+          // `impl<T: Default> Default for [T; 32 - 1 - 1 - 1] {`
+          // where we would try to print `<[T; /* print `constant#0` again */] as Default>::{constant#0}`
+          Self::AnonLocation {
+            krate: infcx.tcx.crate_name(def.krate),
+            path: path::BasicPathNoArgs::new(*def),
           }
         }
         defkind => panic!("unexpected defkind {defkind:?} {value:?}"),
