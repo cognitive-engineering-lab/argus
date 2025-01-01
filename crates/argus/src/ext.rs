@@ -44,24 +44,6 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
   ) -> ObligationNecessity {
     use ObligationNecessity as ON;
 
-    // HACK REMOVE: for the user study we want to reduce
-    // noise that otherwise shouldn't be there. Iterator / IntoIterator
-    // bounds are common when the solver is scrambling for diagnostic
-    // notes and we don't have any problems that "need" them.
-    let is_user_study_hack = || {
-      use rustc_hir::lang_items::LangItem as LI;
-      let items = vec![LI::Iterator, LI::Sized, LI::Deref];
-      let lis = self.tcx.lang_items();
-      for i in items {
-        match lis.get(i) {
-          Some(def_id) if p.is_trait_pred_rhs(def_id) => return true,
-          _ => {},
-        }
-      }
-
-      false
-    };
-
     let is_rhs_lang_item = || {
       self
         .tcx
@@ -84,8 +66,6 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     };
 
     if !is_writeable() || p.is_lhs_unit() {
-      ON::No
-    } else if is_user_study_hack() {
       ON::No
     } else if (p.is_trait_predicate() && is_rhs_lang_item())
       || !p.is_trait_predicate()

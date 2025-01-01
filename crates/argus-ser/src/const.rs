@@ -180,10 +180,10 @@ impl<'tcx> UnevaluatedConstDef<'tcx> {
           data: path::ValuePathWithArgs::new(*def, args),
         },
         DefKind::AnonConst => {
-          if def.is_local()
-          {
+          if def.is_local() {
             let span = infcx.tcx.def_span(def);
-            if let Ok(snip) = infcx.tcx.sess.source_map().span_to_snippet(span) {
+            if let Ok(snip) = infcx.tcx.sess.source_map().span_to_snippet(span)
+            {
               return Self::AnonSnippet { data: snip };
             }
           }

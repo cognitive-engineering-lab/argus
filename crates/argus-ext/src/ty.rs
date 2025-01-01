@@ -204,7 +204,7 @@ pub fn retain_error_sources<'tcx, T>(
   let mut swap_with = all_items.len();
   while let Some(i) = to_remove.pop() {
     swap_with -= 1;
-    assert!(swap_with < all_items.len());
+    debug_assert!(swap_with < all_items.len());
     all_items.swap(i, swap_with);
   }
 

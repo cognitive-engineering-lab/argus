@@ -93,9 +93,9 @@ impl BinCreator<'_, '_> {
     let mut obligations = Vec::default();
     for (&id, idxs) in self.map.iter() {
       if is_nested(id) {
-          to_remove.push(id);
-          obligations.extend(idxs.iter().copied());
-        }
+        to_remove.push(id);
+        obligations.extend(idxs.iter().copied());
+      }
     }
 
     for id in to_remove {

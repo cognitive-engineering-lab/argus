@@ -185,9 +185,9 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
       let identity_trait_ref =
         ty::TraitRef::identity(tcx, tp.skip_binder().trait_ref.def_id);
 
-      let _trait = ser::TraitRefPrintOnlyTraitPathDef(identity_trait_ref);
-      let _trait = tls::unsafe_access_interner(|ty_interner| {
-        ser::to_value_expect(infcx, ty_interner, &_trait)
+      let trait_ = ser::TraitRefPrintOnlyTraitPathDef(identity_trait_ref);
+      let trait_ = tls::unsafe_access_interner(|ty_interner| {
+        ser::to_value_expect(infcx, ty_interner, &trait_)
       });
 
       // Gather all impls
@@ -226,7 +226,7 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
       }
 
       self.all_impl_candidates.insert(idx, Implementors {
-        _trait,
+        trait_,
         impls,
         inductive_impls,
       });
@@ -318,7 +318,7 @@ impl<'tcx> InspectCandidateExt<'tcx> for InspectCandidate<'_, 'tcx> {
 
       let cap = argus_ext::ty::retain_error_sources(
         failed_subgoals,
-        |g| g.result(),
+        InspectGoal::result,
         |g| g.goal().predicate,
         |g| g.infcx().tcx,
       );

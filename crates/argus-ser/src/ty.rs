@@ -957,9 +957,7 @@ impl<'tcx> RegionDef {
       | ty::RePlaceholder(ty::Placeholder {
         bound: ty::BoundRegion { kind: br, .. },
         ..
-      }) if br.is_named()
-               =>
-      {
+      }) if br.is_named() => {
         if let ty::BrNamed(_, name) = br {
           Self::Named { data: name }
         } else {
@@ -1087,18 +1085,17 @@ impl<'tcx> InferTyDef<'tcx> {
 
       if let Some(origin) = infcx.type_var_origin(ty) {
         if let Some(def_id) = origin.param_def_id {
-        return Self::Unnamed(path::PathDefNoArgs::new(def_id));
+          return Self::Unnamed(path::PathDefNoArgs::new(def_id));
         }
       }
 
-      if let Some(origin) = infcx.type_var_origin(ty)
-      {
+      if let Some(origin) = infcx.type_var_origin(ty) {
         if !origin.span.is_dummy() {
           let span = origin.span.source_callsite();
           if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(span) {
-            return Self::SourceInfo(snippet)
+            return Self::SourceInfo(snippet);
           } else {
-            return Self::Unresolved
+            return Self::Unresolved;
           }
         }
       }
@@ -1900,7 +1897,8 @@ impl<'tcx> OpaqueImpl<'tcx> {
             Some(trait_ref);
           return;
         }
-      }}
+      }
+    }
 
     // Otherwise, just group our traits and projection types.
     traits
@@ -2074,19 +2072,20 @@ impl<'tcx> OpaqueImpl<'tcx> {
           let mut assoc_args = vec![];
 
           let maybe_associated_item = |term: ty::Binder<ty::Term>| {
-              let Some(ty) = term.skip_binder().ty() else {
-                return false;
-              };
+            let Some(ty) = term.skip_binder().ty() else {
+              return false;
+            };
 
-              let ty::Alias(ty::Projection, proj) = ty.kind() else {
-                return false;
-              };
+            let ty::Alias(ty::Projection, proj) = ty.kind() else {
+              return false;
+            };
 
-              let Some(assoc) = tcx.opt_associated_item(proj.def_id) else {
-                return false;
-              };
+            let Some(assoc) = tcx.opt_associated_item(proj.def_id) else {
+              return false;
+            };
 
-              assoc.trait_container(tcx) == tcx.lang_items().coroutine_trait() && assoc.name == rustc_span::sym::Return
+            assoc.trait_container(tcx) == tcx.lang_items().coroutine_trait()
+              && assoc.name == rustc_span::sym::Return
           };
 
           for (assoc_item_def_id, term) in assoc_items {

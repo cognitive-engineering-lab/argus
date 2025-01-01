@@ -127,7 +127,8 @@ pub struct SerializedTree {
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct Implementors {
   #[cfg_attr(feature = "testing", ts(type = "TraitRefPrintOnlyTraitPath"))]
-  pub _trait: json::Value,
+  #[serde(rename = "trait")]
+  pub trait_: json::Value,
   pub impls: Vec<CandidateIdx>,
   pub inductive_impls: Vec<CandidateIdx>,
 }
