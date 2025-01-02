@@ -228,7 +228,7 @@ note: required by a bound in `axum::routing::get`
 <h2 id="down-the-search-tree"><a class="header" href="#down-the-search-tree">Down the Search Tree</a></h2>
 <p>In Rust we write type definitions and trait implementations separately—we refer to trait implementations as “impl blocks.” The inner compiler component called the <em>trait solver</em> is responsible for answering queries like “Does <code>{login}</code> implement <code>Handler</code>?” such queries appear as trait bounds in the source code. The trait solver searches through the impl blocks trying to find whether or not the trait bound holds.</p>
 <p>In this post we will be using the <em>search tree</em> a data structure produced by the trait solver that describes how it searched impl blocks, and why—or why not—a particular trait bound holds.</p>
-<p>Here’s an illustrative diagram of the Axum-error search tree. Argus provides the search tree in a different format, similar to a directory tree, as you shall see further on.</p>
+<p>Here’s an illustrative diagram of the Axum-error search tree. Argus provides the search tree in a different format, similar to a directory tree, as you will see further on.</p>
 <pre class="mermaid">---
 title: Search tree produced by the Axum trait error
 ---
@@ -282,7 +282,7 @@ T1 = LoginAttempt
 Fut = Future&lt;Output = Res&gt;
 Res = bool
 </code></pre>
-<p>and add the where-clause constraints as children of the impl block. Notice the constraint <code>Res: IntoResponse</code>, given that <code>Res = bool</code>, the constraint requires that booleans implement <code>IntoResponse</code>, but they don’t. This is one of the root causes of the error and we shal look at how to fix the problem in the following section. But before we jump back to the code and start fixing issues, let’s reflect on the Argus interface and see how we can reach the same conclusion faster.</p>
+<p>and add the where-clause constraints as children of the impl block. Notice the constraint <code>Res: IntoResponse</code>, given that <code>Res = bool</code>, the constraint requires that booleans implement <code>IntoResponse</code>, but they don’t. This is one of the root causes of the error and we will look at how to fix the problem in the following section. But before we jump back to the code and start fixing issues, let’s reflect on the Argus interface and see how we can reach the same conclusion faster.</p>
 <p style="text-align:center"><img src="assets/axum-hello-server/top-down-error-highlighted.png" alt="Search tree found impl" width="600"></p>
 <p>The screenshots included so far of the trait search tree are from the Top-Down view in Argus. This means we view the search just as Rust performed it: We started at the root question <code>{login}: Handler&lt;_, _&gt;</code>, descended into the impl blocks, and found the failing where-clause in a tree leaf—highlighted in red. There’s a second failing bound, but we’ll come back to that in the next section. The insight is that errors are <em>leaves</em> in the search tree, so the Top-Down view doesn’t prioritize showing you errors, but rather the full trait solving process.</p>
 <h2 id="up-the-search-tree"><a class="header" href="#up-the-search-tree">Up the Search Tree</a></h2>
