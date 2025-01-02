@@ -147,6 +147,9 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
   }
 
   pub fn last_ancestor_pre_builtin(&self) -> Self {
+    let mut i = self.idx;
+    let tree = self.tree;
+
     let not_builtin = |kind| {
       !matches!(kind, ProbeKind::TraitCandidate {
         source: CandidateSource::BuiltinImpl(..),
@@ -154,14 +157,15 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
       })
     };
 
-    let mut i = self.idx;
-    let tree = self.tree;
+    let get_next_ancestor = |i: I| -> Option<I> {
+      let parent = tree.topology.parent(i)?;
+      match tree.ns[parent] {
+        N::C { kind, .. } if not_builtin(kind) => tree.topology.parent(parent),
+        _ => None,
+      }
+    };
 
-    while let Some(parent) = tree.topology.parent(i)
-      && let N::C { kind, .. } = tree.ns[parent]
-      && not_builtin(kind)
-      && let Some(grandparent) = tree.topology.parent(parent)
-    {
+    while let Some(grandparent) = get_next_ancestor(i) {
       i = grandparent;
     }
 
@@ -182,8 +186,9 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
       ty::PredicateKind::Clause(ty::ClauseKind::Trait(t))
         if t.polarity == ty::PredicatePolarity::Positive
           && tcx.is_fn_trait(t.def_id())
-          && let Some(fn_arity) = tcx.function_arity(t.self_ty()) =>
+          && tcx.function_arity(t.self_ty()).is_some() =>
       {
+        let fn_arity = tcx.function_arity(t.self_ty()).unwrap();
         let trait_arity = tcx.fn_trait_arity(t).unwrap_or(usize::MAX);
 
         log::debug!("FnSigs\n{:?}\n{:?}", t.self_ty(), t.trait_ref);
@@ -213,8 +218,9 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
       // Self type is a function type but the trait isn't
       ty::PredicateKind::Clause(ty::ClauseKind::Trait(t))
         if t.polarity == ty::PredicatePolarity::Positive
-          && let Some(fn_arity) = tcx.function_arity(t.self_ty()) =>
+          && tcx.function_arity(t.self_ty()).is_some() =>
       {
+        let fn_arity = tcx.function_arity(t.self_ty()).unwrap();
         let def_id = t.def_id();
         let location = if def_id.is_local() {
           Location::Local
@@ -304,13 +310,13 @@ impl<'a, 'tcx> Candidate<'a, 'tcx> {
 
   fn source_subgoals(&self) -> impl Iterator<Item = Goal<'a, 'tcx>> + '_ {
     let mut all_goals = self.all_subgoals().collect::<Vec<_>>();
-    argus_ext::ty::retain_error_sources(
+    let cap = argus_ext::ty::retain_error_sources(
       &mut all_goals,
       |g| g.result,
       |g| g.goal.predicate,
       |g| g.infcx.tcx,
     );
-
+    all_goals.truncate(cap);
     all_goals.into_iter()
   }
 }

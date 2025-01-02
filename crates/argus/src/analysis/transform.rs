@@ -243,12 +243,14 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       // 1. Remove obligations that shouldn't have been checked. (I.e., a failed
       // precondition disallows it from succeeding.) Hopefully, in the future these
       // aren't even solved for.
-      retain_error_sources(
+      let cap = retain_error_sources(
         &mut obligations,
         |&i| gfdata(i).result,
         |&i| gfdata(i).obligation.predicate,
         |_| self.tcx,
       );
+
+      obligations.truncate(cap);
 
       retain_method_calls(
         &mut obligations,

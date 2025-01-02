@@ -43,7 +43,7 @@ In Rust we write type definitions and trait implementations separately---we refe
 
 In this post we will be using the *search tree* a data structure produced by the trait solver that describes how it searched impl blocks, and why---or why not---a particular trait bound holds.
 
-Here's an illustrative diagram of the Axum-error search tree. Argus provides the search tree in a different format, similar to a directory tree, as you shall see further on.
+Here's an illustrative diagram of the Axum-error search tree. Argus provides the search tree in a different format, similar to a directory tree, as you will see further on.
 
 ```mermaid 
 ---
@@ -104,7 +104,7 @@ Fut = Future<Output = Res>
 Res = bool
 ```
 
-and add the where-clause constraints as children of the impl block. Notice the constraint `Res: IntoResponse`, given that `Res = bool`, the constraint requires that booleans implement `IntoResponse`, but they don't. This is one of the root causes of the error and we shal look at how to fix the problem in the following section. But before we jump back to the code and start fixing issues, let's reflect on the Argus interface and see how we can reach the same conclusion faster.
+and add the where-clause constraints as children of the impl block. Notice the constraint `Res: IntoResponse`, given that `Res = bool`, the constraint requires that booleans implement `IntoResponse`, but they don't. This is one of the root causes of the error and we will look at how to fix the problem in the following section. But before we jump back to the code and start fixing issues, let's reflect on the Argus interface and see how we can reach the same conclusion faster.
 
 ![Search tree found impl](assets/axum-hello-server/top-down-error-highlighted.png =600x center)
 

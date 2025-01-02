@@ -1,110 +1,113 @@
 {
-  "name": "argus",
-  "publisher": "gavinleroy",
-  "displayName": "Argus",
-  "description": "A trait debugger for Rust",
-  "license": "MIT",
-  "icon": "argus-logo-128.png",
-  "version": "0.1.13",
-  "engines": {
-    "vscode": "^1.79.0"
-  },
-  "bugs": {
-    "url": "https://github.com/cognitive-engineering-lab/argus/issues",
-    "email": "gavinleroy6@gmail.com"
-  },
-  "repository": {
-    "url": "https://github.com/cognitive-engineering-lab/argus",
-    "type": "git"
-  },
-  "categories": [
-    "Programming Languages"
-  ],
-  "activationEvents": [
-    "onLanguage:rust"
-  ],
-  "contributes": {
-    "commands": [
-      {
-        "command": "argus.inspectWorkspace",
-        "title": "Argus: Inspect current file"
-      },
-      {
-        "command": "argus.cancelTasks",
-        "title": "Argus: Cancel running tasks"
-      },
-      {
-        "command": "argus.pinMBData",
-        "title": "Argus: Pin mini-buffer data"
-      },
-      {
-        "command": "argus.unpinMBData",
-        "title": "Argus: Unpin mini-buffer data"
-      }
-    ],
-    "keybindings": [
-      {
-        "command": "argus.pinMBData",
-        "key": "ctrl+alt+T",
-        "mac": "shift+cmd+t"
-      },
-      {
-        "command": "argus.unpinMBData",
-        "key": "ctrl+alt+U",
-        "mac": "shift+cmd+u"
-      }
-    ]
-  },
-  "files": [
-    "dist",
-    "argus-logo-128.png",
-    "LICENSE",
-    "README.md"
-  ],
-  "main": "./dist/argus.js",
-  "exports": {
-    ".": {
-      "default": "./dist/argus.js"
-    },
-    "./*": {
-      "default": "./dist/*.js"
-    }
-  },
-  "type": "commonjs",
-  "depot": {
-    "platform": "node"
-  },
-  "typedoc": {
-    "entryPoint": "./src/main.ts"
-  },
-  "vsce": {
-    "dependencies": false
-  },
-  "scripts": {
-    "build": "depot build",
-    "vscode:prepublish": "depot build",
-    "pretest": "pnpm run build",
-    "test": "node ./dist/tests/runTests.js"
-  },
-  "devDependencies": {
-    "@argus/common": "workspace:*",
-    "@argus/panoptes": "workspace:*",
-    "@argus/system": "workspace:*",
-    "@estruyf/vscode": "^1.1.0",
-    "@types/lodash": "^4.17.0",
-    "@types/node": "20.2.5",
-    "@types/react": "^18.2.14",
-    "@types/react-dom": "^18.2.6",
-    "@types/vscode": "^1.79.0",
-    "cancelable-promise": "^4.3.1",
-    "lodash": "^4.17.21",
-    "new-github-issue-url": "^1.0.0",
-    "open": "^8.2.1",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0",
-    "toml": "^3.0.0",
-    "typescript": "^5.1.3",
-    "vite": "^4.4.9",
-    "vite-plugin-static-copy": "^1.0.1"
-  }
+	"name": "argus",
+	"publisher": "gavinleroy",
+	"displayName": "Argus",
+	"description": "A trait debugger for Rust",
+	"license": "MIT",
+	"icon": "argus-logo-128.png",
+	"version": "0.1.13",
+	"engines": {
+		"vscode": "^1.79.0"
+	},
+	"bugs": {
+		"url": "https://github.com/cognitive-engineering-lab/argus/issues",
+		"email": "gavinleroy6@gmail.com"
+	},
+	"repository": {
+		"url": "https://github.com/cognitive-engineering-lab/argus",
+		"type": "git"
+	},
+	"categories": [
+		"Programming Languages"
+	],
+	"activationEvents": [
+		"onLanguage:rust"
+	],
+	"contributes": {
+		"commands": [
+			{
+				"command": "argus.inspectWorkspace",
+				"title": "Argus: Inspect current file"
+			},
+			{
+				"command": "argus.cancelTasks",
+				"title": "Argus: Cancel running tasks"
+			},
+			{
+				"command": "argus.pinMBData",
+				"title": "Argus: Pin mini-buffer data"
+			},
+			{
+				"command": "argus.unpinMBData",
+				"title": "Argus: Unpin mini-buffer data"
+			}
+		],
+		"keybindings": [
+			{
+				"command": "argus.pinMBData",
+				"key": "ctrl+alt+T",
+				"mac": "shift+cmd+t"
+			},
+			{
+				"command": "argus.unpinMBData",
+				"key": "ctrl+alt+U",
+				"mac": "shift+cmd+u"
+			}
+		]
+	},
+	"files": [
+		"dist",
+		"argus-logo-128.png",
+		"LICENSE",
+		"README.md"
+	],
+	"main": "./dist/argus.js",
+	"exports": {
+		".": {
+			"default": "./dist/argus.js"
+		},
+		"./*": {
+			"default": "./dist/*.js"
+		}
+	},
+	"type": "commonjs",
+	"depot": {
+		"platform": "node"
+	},
+	"typedoc": {
+		"entryPoint": "./src/main.ts"
+	},
+	"vsce": {
+		"dependencies": false
+	},
+	"scripts": {
+		"build": "depot build",
+		"vscode:prepublish": "depot build",
+		"pretest": "pnpm run build",
+		"test": "node ./dist/tests/runTests.js"
+	},
+	"devDependencies": {
+		"@argus/common": "workspace:*",
+		"@argus/panoptes": "workspace:*",
+		"@argus/system": "workspace:*",
+		"@estruyf/vscode": "^1.1.0",
+		"@types/lodash": "^4.17.0",
+		"@types/node": "20.2.5",
+		"@types/react": "^18.2.14",
+		"@types/react-dom": "^18.2.6",
+		"@types/vscode": "^1.79.0",
+		"cancelable-promise": "^4.3.1",
+		"lodash": "^4.17.21",
+		"new-github-issue-url": "^1.0.0",
+		"open": "^8.2.1",
+		"react": "^18.0.0",
+		"react-dom": "^18.0.0",
+		"toml": "^3.0.0",
+		"typescript": "^5.1.3",
+		"vite": "^4.4.9",
+		"vite-plugin-static-copy": "^1.0.1"
+	},
+	"__metadata": {
+		"size": 233201290
+	}
 }

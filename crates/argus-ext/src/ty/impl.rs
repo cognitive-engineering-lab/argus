@@ -21,7 +21,7 @@ use rustc_utils::source_map::range::CharRange;
 
 #[allow(clippy::wildcard_imports)]
 use super::*;
-use crate::{hash::StableHash, EvaluationResult};
+use crate::{hash::StableHash, rustc::ImplCandidate, EvaluationResult};
 
 impl EvaluationResultExt for EvaluationResult {
   fn is_yes(&self) -> bool {
@@ -482,5 +482,22 @@ impl<'tcx, T: TypeVisitable<TyCtxt<'tcx>>> VarCounterExt<'tcx> for T {
     let mut folder = TyVarCounterVisitor { count: 0 };
     self.visit_with(&mut folder);
     folder.count
+  }
+}
+
+impl<'tcx> ImplCandidateExt<'tcx> for ImplCandidate<'tcx> {
+  fn is_inductive(&self, tcx: TyCtxt<'tcx>) -> bool {
+    // The `DefId` of the trait being implemented
+    let trait_id = self.trait_ref.def_id;
+    for (p, _) in tcx.predicates_of(self.impl_def_id).predicates {
+      // Check if the trait in bound `Ty: Trait` matches the trait being implemented
+      if let Some(ptrait_ref) = p.as_trait_clause()
+        && ptrait_ref.def_id() == trait_id
+      {
+        return true;
+      }
+    }
+
+    false
   }
 }

@@ -9,6 +9,7 @@ use rustc_macros::TypeVisitable;
 use rustc_middle::ty::{self, Upcast};
 use rustc_utils::source_map::range::CharRange;
 use serde::Serialize;
+use smallvec::SmallVec;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
@@ -209,7 +210,10 @@ pub(crate) fn group_predicates_by_ty<'tcx>(
         .entry(ty)
         .or_default()
         .push(poly_trait_pred.rebind(bound));
-    } else if let Some(poly_ty_outl) = p.as_type_outlives_clause() {
+      continue;
+    }
+
+    if let Some(poly_ty_outl) = p.as_type_outlives_clause() {
       let ty = poly_ty_outl.map_bound(|t| t.0).skip_binder();
       let r = poly_ty_outl.map_bound(|t| t.1).skip_binder();
       let bound = ClauseBound::Region(r);
@@ -217,14 +221,19 @@ pub(crate) fn group_predicates_by_ty<'tcx>(
         .entry(ty)
         .or_default()
         .push(poly_ty_outl.rebind(bound));
-    } else if let Some(poly_projection) = p.as_projection_clause()
-      && let Some(output_defid) = fn_trait_output
-      && poly_projection.projection_def_id() == output_defid
-    {
-      fn_output_projections.push(poly_projection);
-    } else {
-      other.push(p);
+      continue;
     }
+
+    if let Some(poly_projection) = p.as_projection_clause() {
+      if let Some(output_defid) = fn_trait_output {
+        if poly_projection.projection_def_id() == output_defid {
+          fn_output_projections.push(poly_projection);
+          continue;
+        }
+      }
+    }
+
+    other.push(p);
   }
 
   let grouped = grouped
@@ -237,36 +246,46 @@ pub(crate) fn group_predicates_by_ty<'tcx>(
         .into_iter()
         .map(|bclause| {
           let clause = bclause.skip_binder();
-          if let ClauseBound::Trait(p, tref) = clause
-            && tcx.is_fn_trait(tref.def_id)
-            && let poly_tr = bclause.rebind(tref)
-            && let matching_projections = fn_output_projections
-              .extract_if(move |p| {
-                tcx.does_trait_ref_occur_in(
-                  poly_tr,
-                  p.map_bound(|p| {
-                    ty::PredicateKind::Clause(ty::ClauseKind::Projection(p))
-                  })
-                  .upcast(tcx),
-                )
-              })
-              .unique()
-              .collect::<smallvec::SmallVec<[_; 2]>>()
-            && !matching_projections.is_empty()
-          {
-            log::debug!(
-              "Matching projections for {bclause:?} {matching_projections:#?}"
-            );
-            let ret_ty = matching_projections[0]
-              .term()
-              .skip_binder()
-              .ty()
-              .expect("FnOnce::Output Ty");
-            debug_assert!(matching_projections.len() == 1);
-            ClauseBound::FnTrait(p, tref, ret_ty)
-          } else {
-            clause
+          if let ClauseBound::Trait(p, tref) = clause {
+            if tcx.is_fn_trait(tref.def_id) {
+              let poly_tr = bclause.rebind(tref);
+
+              let mut to_remove = SmallVec::<[_; 4]>::new();
+              let mut matching_projection = None;
+
+              for (i, p) in fn_output_projections.iter().enumerate() {
+               if  tcx.does_trait_ref_occur_in(
+                    poly_tr,
+                    p.map_bound(|p| {
+                      ty::PredicateKind::Clause(ty::ClauseKind::Projection(p))
+                    })
+                     .upcast(tcx),
+                  ) {
+                 log::debug!("Removing matching projection {p:#?}");
+                 to_remove.push(i);
+               }
+              }
+
+              while let Some(i) = to_remove.pop() {
+                matching_projection = Some(fn_output_projections.remove(i));
+              }
+
+              if let Some(proj) = matching_projection {
+                log::debug!(
+                  "Matching projections for {bclause:?} {matching_projection:#?}"
+                );
+                let ret_ty = proj
+                  .term()
+                  .skip_binder()
+                  .ty()
+                  .expect("FnOnce::Output Ty");
+
+                return ClauseBound::FnTrait(p, tref, ret_ty);
+              }
+            }
           }
+
+          clause
         })
         .collect();
       ty::Binder::bind_with_vars(

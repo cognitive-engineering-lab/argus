@@ -957,10 +957,12 @@ impl<'tcx> RegionDef {
       | ty::RePlaceholder(ty::Placeholder {
         bound: ty::BoundRegion { kind: br, .. },
         ..
-      }) if let ty::BrNamed(_, name) = br
-        && br.is_named() =>
-      {
-        Self::Named { data: name }
+      }) if br.is_named() => {
+        if let ty::BrNamed(_, name) = br {
+          Self::Named { data: name }
+        } else {
+          Self::Anonymous
+        }
       }
       ty::ReStatic => Self::Static,
 
@@ -1081,27 +1083,29 @@ impl<'tcx> InferTyDef<'tcx> {
 
       let ty = ty::Ty::new_infer(tcx, root_value);
 
-      if let Some(origin) = infcx.type_var_origin(ty)
-        && let Some(def_id) = origin.param_def_id
-      {
-        Self::Unnamed(path::PathDefNoArgs::new(def_id))
-      } else if let Some(origin) = infcx.type_var_origin(ty)
-        && !origin.span.is_dummy()
-      {
-        let span = origin.span.source_callsite();
-        if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(span) {
-          Self::SourceInfo(snippet)
-        } else {
-          Self::Unresolved
+      if let Some(origin) = infcx.type_var_origin(ty) {
+        if let Some(def_id) = origin.param_def_id {
+          return Self::Unnamed(path::PathDefNoArgs::new(def_id));
         }
-      } else {
-        match value {
-          ty::InferTy::IntVar(_) | ty::InferTy::FreshIntTy(_) => Self::IntVar,
-          ty::InferTy::FloatVar(_) | ty::InferTy::FreshFloatTy(_) => {
-            Self::FloatVar
+      }
+
+      if let Some(origin) = infcx.type_var_origin(ty) {
+        if !origin.span.is_dummy() {
+          let span = origin.span.source_callsite();
+          if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(span) {
+            return Self::SourceInfo(snippet);
+          } else {
+            return Self::Unresolved;
           }
-          ty::InferTy::TyVar(_) | ty::InferTy::FreshTy(_) => Self::Unresolved,
         }
+      }
+
+      match value {
+        ty::InferTy::IntVar(_) | ty::InferTy::FreshIntTy(_) => Self::IntVar,
+        ty::InferTy::FloatVar(_) | ty::InferTy::FreshFloatTy(_) => {
+          Self::FloatVar
+        }
+        ty::InferTy::TyVar(_) | ty::InferTy::FreshTy(_) => Self::Unresolved,
       }
     })
   }
@@ -1863,36 +1867,36 @@ impl<'tcx> OpaqueImpl<'tcx> {
     // If our trait_ref is FnOnce or any of its children, project it onto the parent FnOnce
     // super-trait ref and record it there.
     // We skip negative Fn* bounds since they can't use parenthetical notation anyway.
-    if polarity == ty::PredicatePolarity::Positive
-      && let Some(fn_once_trait) = tcx.lang_items().fn_once_trait()
-    {
-      // If we have a FnOnce, then insert it into
-      if trait_def_id == fn_once_trait {
-        let entry = fn_traits.entry(trait_ref).or_default();
-        // Optionally insert the return_ty as well.
-        if let Some((_, ty)) = proj_ty {
-          entry.return_ty = Some(ty);
+    if polarity == ty::PredicatePolarity::Positive {
+      if let Some(fn_once_trait) = tcx.lang_items().fn_once_trait() {
+        // If we have a FnOnce, then insert it into
+        if trait_def_id == fn_once_trait {
+          let entry = fn_traits.entry(trait_ref).or_default();
+          // Optionally insert the return_ty as well.
+          if let Some((_, ty)) = proj_ty {
+            entry.return_ty = Some(ty);
+          }
+          entry.has_fn_once = true;
+          return;
+        } else if Some(trait_def_id) == tcx.lang_items().fn_mut_trait() {
+          let super_trait_ref = supertraits_for_pretty_printing(tcx, trait_ref)
+            .find(|super_trait_ref| super_trait_ref.def_id() == fn_once_trait)
+            .unwrap();
+
+          fn_traits
+            .entry(super_trait_ref)
+            .or_default()
+            .fn_mut_trait_ref = Some(trait_ref);
+          return;
+        } else if Some(trait_def_id) == tcx.lang_items().fn_trait() {
+          let super_trait_ref = supertraits_for_pretty_printing(tcx, trait_ref)
+            .find(|super_trait_ref| super_trait_ref.def_id() == fn_once_trait)
+            .unwrap();
+
+          fn_traits.entry(super_trait_ref).or_default().fn_trait_ref =
+            Some(trait_ref);
+          return;
         }
-        entry.has_fn_once = true;
-        return;
-      } else if Some(trait_def_id) == tcx.lang_items().fn_mut_trait() {
-        let super_trait_ref = supertraits_for_pretty_printing(tcx, trait_ref)
-          .find(|super_trait_ref| super_trait_ref.def_id() == fn_once_trait)
-          .unwrap();
-
-        fn_traits
-          .entry(super_trait_ref)
-          .or_default()
-          .fn_mut_trait_ref = Some(trait_ref);
-        return;
-      } else if Some(trait_def_id) == tcx.lang_items().fn_trait() {
-        let super_trait_ref = supertraits_for_pretty_printing(tcx, trait_ref)
-          .find(|super_trait_ref| super_trait_ref.def_id() == fn_once_trait)
-          .unwrap();
-
-        fn_traits.entry(super_trait_ref).or_default().fn_trait_ref =
-          Some(trait_ref);
-        return;
       }
     }
 
@@ -2067,16 +2071,27 @@ impl<'tcx> OpaqueImpl<'tcx> {
           let own_args = generics.own_args_no_defaults(tcx, trait_ref.args);
           let mut assoc_args = vec![];
 
+          let maybe_associated_item = |term: ty::Binder<ty::Term>| {
+            let Some(ty) = term.skip_binder().ty() else {
+              return false;
+            };
+
+            let ty::Alias(ty::Projection, proj) = ty.kind() else {
+              return false;
+            };
+
+            let Some(assoc) = tcx.opt_associated_item(proj.def_id) else {
+              return false;
+            };
+
+            assoc.trait_container(tcx) == tcx.lang_items().coroutine_trait()
+              && assoc.name == rustc_span::sym::Return
+          };
+
           for (assoc_item_def_id, term) in assoc_items {
             // Skip printing `<{coroutine@} as Coroutine<_>>::Return` from async blocks,
             // unless we can find out what coroutine return type it comes from.
-            let term = if let Some(ty) = term.skip_binder().ty()
-              && let ty::Alias(ty::Projection, proj) = ty.kind()
-              && let Some(assoc) = tcx.opt_associated_item(proj.def_id)
-              && assoc.trait_container(tcx)
-                == tcx.lang_items().coroutine_trait()
-              && assoc.name == rustc_span::sym::Return
-            {
+            let term = if maybe_associated_item(term) {
               if let ty::Coroutine(_, args) = args.type_at(0).kind() {
                 let return_ty = args.as_coroutine().return_ty();
                 if return_ty.is_ty_var() {

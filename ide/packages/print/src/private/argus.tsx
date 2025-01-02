@@ -134,7 +134,7 @@ export const PrintClauses = ({
   );
 
   // TODO: the `{elements}` should be wrapped in a `CommaSeparated` component,
-  // but comman placement is done manually in the WhereConstraintsArea ... for now. See CSS
+  // but comma placement is done manually in the `WhereConstraintsArea`---for now. See CSS
   // file for more comments.
   return <WhereConstraintArea>{elements}</WhereConstraintArea>;
 };

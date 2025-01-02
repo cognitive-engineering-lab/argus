@@ -1,10 +1,4 @@
-#![feature(
-  rustc_private,
-  if_let_guard,
-  let_chains,
-  box_patterns,
-  control_flow_enum
-)]
+#![feature(rustc_private, let_chains, box_patterns, control_flow_enum)]
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions, clippy::missing_errors_doc)]
 extern crate rustc_data_structures;

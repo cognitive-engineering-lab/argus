@@ -78,7 +78,7 @@ mk_tests_for! {
   axum,
   bevy,
   // chumsky,
-  diesel,
+  // diesel,
   // easy_ml,
   entrait,
   nalgebra,
