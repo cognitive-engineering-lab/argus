@@ -263,9 +263,8 @@ pub fn run_with_callbacks(
 
   // Argus works even when the compiler exits with an error.
   #[allow(unused_must_use)]
-  let _ = compiler
-    .run()
-    .map_err(|_| ArgusError::BuildError { range: None });
+  let _ = compiler.run();
+  // .map_err(|_| ArgusError::BuildError { range: None });
 
   Ok(())
 }
@@ -290,61 +289,59 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
         false,
       );
 
-      sess.dcx.make_silent(fallback_bundle, None, false);
+      sess.dcx().make_silent(fallback_bundle, None, false);
     }));
   }
 
   fn after_expansion<'tcx>(
     &mut self,
     _compiler: &rustc_interface::interface::Compiler,
-    queries: &'tcx rustc_interface::Queries<'tcx>,
+    tcx: TyCtxt<'tcx>,
   ) -> rustc_driver::Compilation {
     elapsed("rustc", self.rustc_start);
     let start = Instant::now();
 
-    queries.global_ctxt().unwrap().enter(|tcx| {
-      elapsed("global_ctxt", start);
-      let mut analysis = self.analysis.take().unwrap();
-      let target_file = self.file.as_ref();
+    elapsed("global_ctxt", start);
+    let mut analysis = self.analysis.take().unwrap();
+    let target_file = self.file.as_ref();
 
-      let mut inner = |(_, body)| {
-        if let FileName::Real(RealFileName::LocalPath(p)) =
-          tcx.body_filename(body)
-        {
-          if target_file.map_or(true, |f| f.ends_with(&p)) {
-            log::info!("analyzing {:?}", body);
-            match analysis.analyze(tcx, body) {
-              Ok(v) => Some(v),
-              Err(e) => {
-                log::error!("Error analyzing body {:?} {:?}", body, e);
-                None
-              }
+    let mut inner = |(_, body)| {
+      if let FileName::Real(RealFileName::LocalPath(p)) =
+        tcx.body_filename(body)
+      {
+        if target_file.map_or(true, |f| f.ends_with(&p)) {
+          log::info!("analyzing {:?}", body);
+          match analysis.analyze(tcx, body) {
+            Ok(v) => Some(v),
+            Err(e) => {
+              log::error!("Error analyzing body {:?} {:?}", body, e);
+              None
             }
-          } else {
-            log::debug!("Skipping file {:?} due to target {:?}", p, self.file);
-            None
           }
         } else {
+          log::debug!("Skipping file {:?} due to target {:?}", p, self.file);
           None
         }
-      };
+      } else {
+        None
+      }
+    };
 
-      self.result = match (self.compute_target.take().unwrap())() {
-        Some(target) => {
-          let target = target.to_target(tcx).expect("Couldn't compute target");
-          let body_span = target.span;
-          fluid_set!(analysis::OBLIGATION_TARGET, target);
+    self.result = match (self.compute_target.take().unwrap())() {
+      Some(target) => {
+        let target = target.to_target(tcx).expect("Couldn't compute target");
+        let body_span = target.span;
+        fluid_set!(analysis::OBLIGATION_TARGET, target);
 
-          find_enclosing_bodies(tcx, body_span)
-            .filter_map(|b| inner((body_span, b)))
-            .collect::<Vec<_>>()
-        }
-        None => find_bodies(tcx)
-          .into_iter()
-          .filter_map(inner)
-          .collect::<Vec<_>>(),
-      };
-    });
+        find_enclosing_bodies(tcx, body_span)
+          .filter_map(|b| inner((body_span, b)))
+          .collect::<Vec<_>>()
+      }
+      None => find_bodies(tcx)
+        .into_iter()
+        .filter_map(inner)
+        .collect::<Vec<_>>(),
+    };
 
     rustc_driver::Compilation::Stop
   }

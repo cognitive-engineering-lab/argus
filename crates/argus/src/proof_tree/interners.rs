@@ -120,6 +120,7 @@ impl Interners {
       ProbeKind::OpaqueTypeStorageLookup { .. } => {
         self.intern_can_string("opaque-type-storage-lookup")
       }
+      ProbeKind::RigidAlias { .. } => self.intern_can_string("rigid-alias"),
     };
 
     Node::Candidate(can_idx)

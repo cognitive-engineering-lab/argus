@@ -243,19 +243,17 @@ where
         rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
         false,
       );
-      sess.dcx.make_silent(fallback_bundle, None, false);
+      sess.dcx().make_silent(fallback_bundle, None, false);
     }));
   }
 
   fn after_expansion<'tcx>(
     &mut self,
     _compiler: &rustc_interface::interface::Compiler,
-    queries: &'tcx rustc_interface::Queries<'tcx>,
+    tcx: TyCtxt<'tcx>,
   ) -> rustc_driver::Compilation {
-    queries.global_ctxt().unwrap().enter(|tcx| {
-      let callback = self.callback.take().unwrap();
-      callback(tcx);
-    });
+    let callback = self.callback.take().unwrap();
+    callback(tcx);
     rustc_driver::Compilation::Stop
   }
 }

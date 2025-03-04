@@ -2,7 +2,7 @@ use rustc_data_structures::fx::FxIndexMap;
 use rustc_hir::{self as hir, def::DefKind, def_id::DefId, LangItem, Safety};
 use rustc_infer::traits::{ObligationCause, PredicateObligation};
 use rustc_macros::TypeVisitable;
-use rustc_middle::{traits::util::supertraits_for_pretty_printing, ty};
+use rustc_middle::ty::{self, elaborate::supertraits};
 use rustc_span::symbol::{kw, Symbol};
 use rustc_target::spec::abi::Abi;
 use serde::Serialize;
@@ -207,7 +207,14 @@ impl<'tcx> From<&ty::TyKind<'tcx>> for TyKindDef<'tcx> {
       ty::TyKind::Closure(def_id, args) => {
         Self::Closure(path::PathDefWithArgs::new(*def_id, args))
       }
-      ty::TyKind::FnPtr(v) => Self::FnPtr(*v),
+      ty::TyKind::FnPtr(ios, header) => {
+        Self::FnPtr(ios.map_bound(|ios| ty::FnSig {
+          inputs_and_output: ios.inputs_and_output,
+          c_variadic: header.c_variadic,
+          safety: header.safety,
+          abi: header.abi,
+        }))
+      }
       ty::TyKind::Param(param_ty) => Self::Param(*param_ty),
       ty::TyKind::Bound(dji, bound_ty) => {
         Self::Bound(BoundTyDef::new(*dji, *bound_ty))
@@ -676,7 +683,6 @@ pub enum AbiDef {
   AvrInterrupt,
   AvrNonBlockingInterrupt,
   CCmseNonSecureCall,
-  Wasm,
   System { unwind: bool },
   RustIntrinsic,
   RustCall,
@@ -684,6 +690,7 @@ pub enum AbiDef {
   RustCold,
   RiscvInterruptM,
   RiscvInterruptS,
+  CCmseNonSecureEntry,
 }
 
 #[derive(Serialize)]
@@ -834,14 +841,14 @@ impl Slice__BoundVariableKindDef {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "BoundRegionKind"))]
 pub enum BoundRegionKindDef {
-  BrAnon,
-  BrNamed(
+  Anon,
+  Named(
     #[serde(skip)] DefId,
     #[serde(with = "SymbolDef")]
     #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
     Symbol,
   ),
-  BrEnv,
+  ClosureEnv,
 }
 
 #[derive(Serialize)]
@@ -958,7 +965,7 @@ impl<'tcx> RegionDef {
         bound: ty::BoundRegion { kind: br, .. },
         ..
       }) if br.is_named() => {
-        if let ty::BrNamed(_, name) = br {
+        if let ty::BoundRegionKind::Named(_, name) = br {
           Self::Named { data: name }
         } else {
           Self::Anonymous
@@ -1063,6 +1070,11 @@ pub enum GenericArgKindDef<'tcx> {
 pub enum InferTyDef<'tcx> {
   IntVar,
   FloatVar,
+  Named(
+    #[serde(with = "SymbolDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
+    Symbol,
+  ),
   Unnamed(path::PathDefNoArgs<'tcx>),
   SourceInfo(String),
   Unresolved,
@@ -1071,41 +1083,53 @@ pub enum InferTyDef<'tcx> {
 impl<'tcx> InferTyDef<'tcx> {
   pub fn new(value: &ty::InferTy) -> Self {
     // See: `ty_getter` in `printer.ty_infer_name_resolver = Some(Box::new(ty_getter))`
-    // from: `rustc_infer::infer::error_reporting::need_type_info.rs`
+    // from: `rustc_trait_selection::infer::error_reporting::need_type_info.rs`
     InferCtxt::access(|infcx| {
       let tcx = infcx.tcx;
 
-      let root_value = if let ty::InferTy::TyVar(v) = value {
-        ty::InferTy::TyVar(infcx.root_var(*v))
-      } else {
-        *value
-      };
-
-      let ty = ty::Ty::new_infer(tcx, root_value);
-
-      if let Some(origin) = infcx.type_var_origin(ty) {
-        if let Some(def_id) = origin.param_def_id {
-          return Self::Unnamed(path::PathDefNoArgs::new(def_id));
-        }
-      }
-
-      if let Some(origin) = infcx.type_var_origin(ty) {
-        if !origin.span.is_dummy() {
-          let span = origin.span.source_callsite();
-          if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(span) {
-            return Self::SourceInfo(snippet);
+      if let ty::InferTy::TyVar(ty_vid) = value {
+        let var_origin = infcx.type_var_origin(*ty_vid);
+        if let Some(def_id) = var_origin.param_def_id
+            // The `Self` param of a trait has the def-id of the trait,
+            // since it's a synthetic parameter.
+            && infcx.tcx.def_kind(def_id) == DefKind::TyParam
+            && let name = infcx.tcx.item_name(def_id)
+            && !var_origin.span.from_expansion()
+        {
+          let generics = infcx.tcx.generics_of(infcx.tcx.parent(def_id));
+          let idx = generics.param_def_id_to_index(infcx.tcx, def_id).unwrap();
+          let generic_param_def = generics.param_at(idx as usize, infcx.tcx);
+          if let ty::GenericParamDefKind::Type {
+            synthetic: true, ..
+          } = generic_param_def.kind
+          {
+            Self::Unnamed(path::PathDefNoArgs::new(def_id))
           } else {
-            return Self::Unresolved;
+            Self::Named(Symbol::intern(name.as_str()))
+          }
+        } else if let Some(def_id) = var_origin.param_def_id {
+          Self::Unnamed(path::PathDefNoArgs::new(def_id))
+        } else {
+          if !var_origin.span.is_dummy() {
+            let span = var_origin.span.source_callsite();
+            if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(span) {
+              Self::SourceInfo(snippet)
+            } else {
+              Self::Unresolved
+            }
+          } else {
+            Self::Unresolved
           }
         }
-      }
-
-      match value {
-        ty::InferTy::IntVar(_) | ty::InferTy::FreshIntTy(_) => Self::IntVar,
-        ty::InferTy::FloatVar(_) | ty::InferTy::FreshFloatTy(_) => {
-          Self::FloatVar
+        // ty::InferTy::TyVar(infcx.root_var(*ty_vid))
+      } else {
+        match value {
+          ty::InferTy::IntVar(_) | ty::InferTy::FreshIntTy(_) => Self::IntVar,
+          ty::InferTy::FloatVar(_) | ty::InferTy::FreshFloatTy(_) => {
+            Self::FloatVar
+          }
+          ty::InferTy::TyVar(_) | ty::InferTy::FreshTy(_) => Self::Unresolved,
         }
-        ty::InferTy::TyVar(_) | ty::InferTy::FreshTy(_) => Self::Unresolved,
       }
     })
   }
@@ -1287,7 +1311,7 @@ pub enum PredicateKindDef<'tcx> {
     #[cfg_attr(feature = "testing", ts(type = "ClauseKind"))]
     ty::ClauseKind<'tcx>,
   ),
-  ObjectSafe(
+  DynCompatible(
     #[serde(with = "path::PathDefNoArgs")]
     #[cfg_attr(feature = "testing", ts(type = "PathDefNoArgs"))]
     DefId,
@@ -1419,6 +1443,24 @@ pub enum ClauseKindDef<'tcx> {
     #[cfg_attr(feature = "testing", ts(type = "Const"))]
     ty::Const<'tcx>,
   ),
+  HostEffect(
+    #[serde(with = "HostEffectPredicateDef")]
+    #[cfg_attr(feature = "testing", ts(type = "HostEffectPredicate"))]
+    ty::HostEffectPredicate<'tcx>,
+  ),
+}
+
+#[derive(Serialize)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "HostEffectPredicate"))]
+#[serde(remote = "ty::HostEffectPredicate")]
+pub struct HostEffectPredicateDef<'tcx> {
+  #[serde(with = "TraitRefPrintOnlyTraitPathDef")]
+  #[cfg_attr(feature = "testing", ts(type = "HostEffectPredicate"))]
+  pub trait_ref: ty::TraitRef<'tcx>,
+  #[serde(with = "BoundConstnessDef")]
+  #[cfg_attr(feature = "testing", ts(type = "BoundConstness"))]
+  pub constness: ty::BoundConstness,
 }
 
 impl<'tcx> ClauseKindDef<'tcx> {
@@ -1446,6 +1488,7 @@ impl<'tcx> From<&ty::ClauseKind<'tcx>> for ClauseKindDef<'tcx> {
       }
       ty::ClauseKind::WellFormed(v) => Self::WellFormed(*v),
       ty::ClauseKind::ConstEvaluatable(v) => Self::ConstEvaluatable(*v),
+      ty::ClauseKind::HostEffect(v) => Self::HostEffect(*v),
     }
   }
 }
@@ -1469,10 +1512,10 @@ pub struct SubtypePredicateDef<'tcx> {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-pub enum BoundConstness {
-  C,
-  // TC,
-  No,
+#[serde(remote = "ty::BoundConstness")]
+pub enum BoundConstnessDef {
+  Const,
+  Maybe,
 }
 
 #[derive(Serialize)]
@@ -1482,8 +1525,6 @@ pub struct TraitPredicateDef<'tcx> {
   #[serde(with = "TyDef")]
   #[cfg_attr(feature = "testing", ts(type = "Ty"))]
   pub self_ty: ty::Ty<'tcx>,
-
-  pub constness: BoundConstness,
 
   pub trait_ref: TraitRefPrintSugaredDef<'tcx>,
 
@@ -1496,29 +1537,9 @@ impl<'tcx> TraitPredicateDef<'tcx> {
   fn new(value: &ty::TraitPredicate<'tcx>) -> Self {
     Self {
       self_ty: value.trait_ref.self_ty(),
-      constness: Self::bound_constness(&value.trait_ref),
       trait_ref: TraitRefPrintSugaredDef::new(&value.trait_ref),
       polarity: value.polarity,
     }
-  }
-  fn bound_constness(trait_ref: &ty::TraitRef<'tcx>) -> BoundConstness {
-    InferCtxt::access(|infcx| {
-      let tcx = &infcx.tcx;
-      let Some(idx) = tcx.generics_of(trait_ref.def_id).host_effect_index
-      else {
-        return BoundConstness::No;
-      };
-      let arg = trait_ref.args.const_at(idx);
-
-      if arg == tcx.consts.false_ {
-        BoundConstness::C
-        // FIXME: const infer is a newer feature we'll need to handle in the future
-        // } else if arg != tcx.consts.true_ && !arg.has_infer() {
-        //   BoundConstness::TC
-      } else {
-        BoundConstness::No
-      }
-    })
   }
   pub fn serialize<S>(
     value: &ty::TraitPredicate<'tcx>,
@@ -1653,9 +1674,7 @@ pub struct RegionOutlivesRegionDef<'tcx> {
 }
 
 impl<'tcx> RegionOutlivesRegionDef<'tcx> {
-  pub fn new(
-    value: &ty::OutlivesPredicate<ty::Region<'tcx>, ty::Region<'tcx>>,
-  ) -> Self {
+  pub fn new(value: &ty::OutlivesPredicate<'tcx, ty::Region<'tcx>>) -> Self {
     Self {
       a: value.0,
       b: value.1,
@@ -1677,9 +1696,7 @@ pub struct TyOutlivesRegionDef<'tcx> {
 }
 
 impl<'tcx> TyOutlivesRegionDef<'tcx> {
-  pub fn new(
-    value: &ty::OutlivesPredicate<ty::Ty<'tcx>, ty::Region<'tcx>>,
-  ) -> Self {
+  pub fn new(value: &ty::OutlivesPredicate<'tcx, ty::Ty<'tcx>>) -> Self {
     Self {
       a: value.0,
       b: value.1,
@@ -1879,7 +1896,7 @@ impl<'tcx> OpaqueImpl<'tcx> {
           entry.has_fn_once = true;
           return;
         } else if Some(trait_def_id) == tcx.lang_items().fn_mut_trait() {
-          let super_trait_ref = supertraits_for_pretty_printing(tcx, trait_ref)
+          let super_trait_ref = supertraits(tcx, trait_ref)
             .find(|super_trait_ref| super_trait_ref.def_id() == fn_once_trait)
             .unwrap();
 
@@ -1889,7 +1906,7 @@ impl<'tcx> OpaqueImpl<'tcx> {
             .fn_mut_trait_ref = Some(trait_ref);
           return;
         } else if Some(trait_def_id) == tcx.lang_items().fn_trait() {
-          let super_trait_ref = supertraits_for_pretty_printing(tcx, trait_ref)
+          let super_trait_ref = supertraits(tcx, trait_ref)
             .find(|super_trait_ref| super_trait_ref.def_id() == fn_once_trait)
             .unwrap();
 
@@ -1977,11 +1994,12 @@ impl<'tcx> OpaqueImpl<'tcx> {
             );
           }
           ty::ClauseKind::Projection(pred) => {
-            let proj_ref = bound_predicate.rebind(pred);
-            let trait_ref = proj_ref.required_poly_trait_ref(tcx);
+            let proj = bound_predicate.rebind(pred);
+            let trait_ref =
+              proj.map_bound(|proj| proj.projection_term.trait_ref(tcx));
 
             // Projection type entry -- the def-id for naming, and the ty.
-            let proj_ty = (proj_ref.projection_def_id(), proj_ref.term());
+            let proj_ty = (proj.item_def_id(), proj.term());
 
             Self::insert_trait_and_projection(
               tcx,
@@ -2025,7 +2043,7 @@ impl<'tcx> OpaqueImpl<'tcx> {
               };
 
               let params = arg_tys.tuple_fields().iter().collect::<Vec<_>>();
-              let ret_ty = return_ty.skip_binder().ty();
+              let ret_ty = return_ty.skip_binder().as_type();
 
               here_opaque_type.fn_traits.push(FnTrait {
                 params,
@@ -2072,7 +2090,7 @@ impl<'tcx> OpaqueImpl<'tcx> {
           let mut assoc_args = vec![];
 
           let maybe_associated_item = |term: ty::Binder<ty::Term>| {
-            let Some(ty) = term.skip_binder().ty() else {
+            let Some(ty) = term.skip_binder().as_type() else {
               return false;
             };
 

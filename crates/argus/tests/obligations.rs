@@ -1,3 +1,4 @@
+#![feature(rustc_private)]
 use argus_lib::{test_utils as tu, types::ObligationNecessity};
 
 #[test_log::test]

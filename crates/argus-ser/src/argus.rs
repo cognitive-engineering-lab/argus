@@ -226,7 +226,7 @@ pub(crate) fn group_predicates_by_ty<'tcx>(
 
     if let Some(poly_projection) = p.as_projection_clause() {
       if let Some(output_defid) = fn_trait_output {
-        if poly_projection.projection_def_id() == output_defid {
+        if poly_projection.item_def_id() == output_defid {
           fn_output_projections.push(poly_projection);
           continue;
         }
@@ -277,7 +277,7 @@ pub(crate) fn group_predicates_by_ty<'tcx>(
                 let ret_ty = proj
                   .term()
                   .skip_binder()
-                  .ty()
+                  .as_type()
                   .expect("FnOnce::Output Ty");
 
                 return ClauseBound::FnTrait(p, tref, ret_ty);

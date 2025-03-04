@@ -276,7 +276,7 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
       ty::PredicateKind::Clause(..)
       | ty::PredicateKind::NormalizesTo(..)
       | ty::PredicateKind::AliasRelate(..)
-      | ty::PredicateKind::ObjectSafe(..)
+      | ty::PredicateKind::DynCompatible(..)
       | ty::PredicateKind::Subtype(..)
       | ty::PredicateKind::Coerce(..)
       | ty::PredicateKind::ConstEquate(..)
