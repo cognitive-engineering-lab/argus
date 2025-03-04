@@ -1,7 +1,7 @@
 use rustc_hir::def::CtorKind;
 use rustc_middle::{
   mir::{BinOp, UnOp},
-  ty::{self, abstract_const::CastKind, ExprKind::*, *},
+  ty::{self, abstract_const::CastKind, *},
 };
 use rustc_span::Symbol;
 use serde::Serialize;
@@ -48,7 +48,7 @@ impl<'tcx> ValTreeDef<'tcx> {
   }
 }
 
-impl<'tcx> Serialize for ValTreeDef<'tcx> {
+impl Serialize for ValTreeDef<'_> {
   fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
@@ -306,15 +306,6 @@ impl<'tcx> From<&Expr<'tcx>> for ExprDef<'tcx> {
         Self::Cast(kind, val, ty)
       }
     }
-  }
-}
-
-impl<'tcx> ExprDef<'tcx> {
-  fn serialize<S>(value: &Expr<'tcx>, s: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    ExprDef::from(value).serialize(s)
   }
 }
 

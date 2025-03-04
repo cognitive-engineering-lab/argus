@@ -2,8 +2,7 @@ use rustc_data_structures::stable_hasher::Hash64;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::ty::{self, Predicate, TypeFoldable};
 use rustc_trait_selection::{
-  solve::{GenerateProofTree, InferCtxtSelectExt},
-  traits::query::NoSolution,
+  solve::InferCtxtSelectExt, traits::query::NoSolution,
 };
 
 use crate::{ty::TyCtxtExt, EvaluationResult};
@@ -56,11 +55,7 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     &self,
     obligation: &PredicateObligation<'tcx>,
   ) -> EvaluationResult {
-    use rustc_infer::{
-      infer::InferCtxt,
-      traits::{solve::MaybeCause, Obligation},
-    };
-    use rustc_type_ir::TraitPredicate;
+    use rustc_infer::traits::{solve::MaybeCause, Obligation};
 
     use crate::{ty::PredicateExt, Certainty};
     let obligation = obligation.clone();

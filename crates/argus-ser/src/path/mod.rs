@@ -19,7 +19,7 @@ mod pretty;
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct PathDefNoArgs<'tcx>(DefinedPath<'tcx>);
 
-impl<'tcx> PathDefNoArgs<'tcx> {
+impl PathDefNoArgs<'_> {
   pub fn new(def_id: DefId) -> Self {
     Self(PathBuilder::compile_def_path(def_id, &[]))
   }
@@ -68,7 +68,7 @@ impl<'tcx> ValuePathWithArgs<'tcx> {
 // Useful in scenarios when using a `ValuePathXXX` would cause the
 // pretty printer to enter an infinite loop.
 pub struct BasicPathNoArgs<'tcx>(DefinedPath<'tcx>);
-impl<'tcx> BasicPathNoArgs<'tcx> {
+impl BasicPathNoArgs<'_> {
   pub fn new(def_id: DefId) -> Self {
     Self(PathBuilder::compile_value_path(def_id, &[]))
   }
@@ -180,7 +180,7 @@ impl<'tcx> From<PathBuilder<'tcx>> for DefinedPath<'tcx> {
   }
 }
 
-impl<'a, 'tcx: 'a> PathBuilder<'tcx> {
+impl<'tcx> PathBuilder<'tcx> {
   fn new(def_id: DefId) -> Self {
     PathBuilder {
       def_id,

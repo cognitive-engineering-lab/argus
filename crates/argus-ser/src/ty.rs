@@ -329,9 +329,9 @@ impl<'tcx> AliasTyKindDef<'tcx> {
               // Complex opaque type, e.g. `type Foo = (i32, impl Debug);`
               // CHANGE: p!(print_def_path(def_id, args));
               // return Ok(())
-              return Self::DefPath {
+              Self::DefPath {
                 data: path::PathDefWithArgs::new(def_id, args),
-              };
+              }
             }
             _ => {
               if with_no_queries() {
@@ -950,8 +950,8 @@ pub enum RegionDef {
   Static,
 }
 
-impl<'tcx> RegionDef {
-  pub fn new(value: &ty::Region<'tcx>) -> Self {
+impl RegionDef {
+  pub fn new(value: &ty::Region<'_>) -> Self {
     let region = value;
     match **region {
       ty::ReEarlyParam(ref data) if data.name != kw::Empty => {
@@ -1080,7 +1080,7 @@ pub enum InferTyDef<'tcx> {
   Unresolved,
 }
 
-impl<'tcx> InferTyDef<'tcx> {
+impl InferTyDef<'_> {
   pub fn new(value: &ty::InferTy) -> Self {
     // See: `ty_getter` in `printer.ty_infer_name_resolver = Some(Box::new(ty_getter))`
     // from: `rustc_trait_selection::infer::error_reporting::need_type_info.rs`
@@ -1109,17 +1109,15 @@ impl<'tcx> InferTyDef<'tcx> {
           }
         } else if let Some(def_id) = var_origin.param_def_id {
           Self::Unnamed(path::PathDefNoArgs::new(def_id))
-        } else {
-          if !var_origin.span.is_dummy() {
-            let span = var_origin.span.source_callsite();
-            if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(span) {
-              Self::SourceInfo(snippet)
-            } else {
-              Self::Unresolved
-            }
+        } else if !var_origin.span.is_dummy() {
+          let span = var_origin.span.source_callsite();
+          if let Ok(snippet) = tcx.sess.source_map().span_to_snippet(span) {
+            Self::SourceInfo(snippet)
           } else {
             Self::Unresolved
           }
+        } else {
+          Self::Unresolved
         }
         // ty::InferTy::TyVar(infcx.root_var(*ty_vid))
       } else {
@@ -1466,7 +1464,7 @@ impl<'tcx> HostEffectPredicateDef<'tcx> {
   pub fn new(value: &ty::HostEffectPredicate<'tcx>) -> Self {
     Self {
       predicate: ty::TraitPredicate {
-        trait_ref: value.trait_ref.clone(),
+        trait_ref: value.trait_ref,
         polarity: ty::PredicatePolarity::Positive,
       },
       constness: value.constness,

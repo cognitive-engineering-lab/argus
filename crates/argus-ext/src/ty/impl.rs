@@ -132,7 +132,7 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
     self,
     body_id: BodyId,
     inspector: ObligationInspector<'tcx>,
-  ) -> &TypeckResults {
+  ) -> &'tcx TypeckResults<'tcx> {
     let local_def_id = self.hir().body_owner_def_id(body_id);
     // Typeck current body, accumulating inspected information in TLS.
     inspect_typeck(self, local_def_id, inspector)
@@ -400,7 +400,7 @@ impl<'tcx> PredicateExt<'tcx> for Predicate<'tcx> {
       )) => ty.is_ty_var(),
       ty::PredicateKind::Clause(ty::ClauseKind::Projection(proj)) => {
         proj.self_ty().is_ty_var()
-          || proj.term.as_type().map_or(false, ty::Ty::is_ty_var)
+          || proj.term.as_type().is_some_and(ty::Ty::is_ty_var)
       }
       _ => false,
     }

@@ -88,7 +88,7 @@ trait InferCtxtSerializeExt {
   fn should_print_verbose(&self) -> bool;
 }
 
-impl<'tcx> InferCtxtSerializeExt for InferCtxt<'tcx> {
+impl InferCtxtSerializeExt for InferCtxt<'_> {
   fn should_print_verbose(&self) -> bool {
     self.tcx.sess.verbose_internals()
   }

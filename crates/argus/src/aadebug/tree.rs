@@ -407,7 +407,7 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
   }
 
   pub fn dnf(&self) -> impl Deref<Target = Dnf<I>> + '_ {
-    fn _goal(this: &T, goal: &Goal) -> Option<Dnf<I>> {
+    fn goal_(this: &T, goal: &Goal) -> Option<Dnf<I>> {
       if !((this.maybe_ambiguous && goal.result.is_maybe())
         || goal.result.is_no())
       {
@@ -416,7 +416,7 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
 
       let candidates = goal.interesting_candidates();
       let nested = candidates
-        .filter_map(|c| _candidate(this, &c))
+        .filter_map(|c| candidate_(this, &c))
         .collect::<Vec<_>>();
 
       if nested.is_empty() {
@@ -426,13 +426,13 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
       Dnf::or(nested.into_iter())
     }
 
-    fn _candidate(this: &T, candidate: &Candidate) -> Option<Dnf<I>> {
+    fn candidate_(this: &T, candidate: &Candidate) -> Option<Dnf<I>> {
       if candidate.result.is_yes() {
         return None;
       }
 
       let goals = candidate.source_subgoals();
-      Dnf::and(goals.filter_map(|g| _goal(this, &g)))
+      Dnf::and(goals.filter_map(|g| goal_(this, &g)))
     }
 
     if self.dnf.borrow().is_some() {
@@ -444,7 +444,7 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
     let dnf_start = Instant::now();
 
     let root = self.goal(self.root).expect("invalid root");
-    let dnf = _goal(self, &root).unwrap_or_else(Dnf::default);
+    let dnf = goal_(self, &root).unwrap_or_else(Dnf::default);
 
     timer::elapsed(&dnf_report_msg, dnf_start);
 

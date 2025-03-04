@@ -75,7 +75,7 @@ enum ConstKindDef<'tcx> {
   },
 }
 
-impl<'a, 'tcx: 'a> From<&Const<'tcx>> for ConstKindDef<'tcx> {
+impl<'tcx> From<&Const<'tcx>> for ConstKindDef<'tcx> {
   fn from(value: &Const<'tcx>) -> Self {
     let kind = value.kind();
 
@@ -234,22 +234,22 @@ pub enum ConstScalarIntDef {
   },
 }
 
-impl<'tcx> ConstScalarIntDef {
-  pub fn new(int: ScalarInt, ty: Ty<'tcx>) -> Self {
+impl ConstScalarIntDef {
+  pub fn new(int: ScalarInt, ty: Ty) -> Self {
     InferCtxt::access(|infcx| {
       let tcx = infcx.tcx;
       match ty.kind() {
         Bool if int == ScalarInt::FALSE => Self::False,
         Bool if int == ScalarInt::TRUE => Self::True,
         Float(FloatTy::F32) => {
-          let val = Single::try_from(int).unwrap();
+          let val = Single::from(int);
           Self::Float {
             data: format!("{val}"),
             is_finite: val.is_finite(),
           }
         }
         Float(FloatTy::F64) => {
-          let val = Double::try_from(int).unwrap();
+          let val = Double::from(int);
           Self::Float {
             data: format!("{val}"),
             is_finite: val.is_finite(),

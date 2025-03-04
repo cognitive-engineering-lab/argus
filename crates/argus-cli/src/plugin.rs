@@ -294,10 +294,10 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
     }));
   }
 
-  fn after_expansion<'tcx>(
+  fn after_expansion(
     &mut self,
     _compiler: &rustc_interface::interface::Compiler,
-    tcx: TyCtxt<'tcx>,
+    tcx: TyCtxt,
   ) -> rustc_driver::Compilation {
     elapsed("rustc", self.rustc_start);
     let start = Instant::now();
@@ -310,7 +310,7 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
       if let FileName::Real(RealFileName::LocalPath(p)) =
         tcx.body_filename(body)
       {
-        if target_file.map_or(true, |f| f.ends_with(&p)) {
+        if target_file.is_none_or(|f| f.ends_with(&p)) {
           log::info!("analyzing {:?}", body);
           match analysis.analyze(tcx, body) {
             Ok(v) => Some(v),
