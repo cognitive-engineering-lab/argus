@@ -1453,14 +1453,35 @@ pub enum ClauseKindDef<'tcx> {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "HostEffectPredicate"))]
-#[serde(remote = "ty::HostEffectPredicate")]
 pub struct HostEffectPredicateDef<'tcx> {
-  #[serde(with = "TraitRefPrintOnlyTraitPathDef")]
-  #[cfg_attr(feature = "testing", ts(type = "HostEffectPredicate"))]
-  pub trait_ref: ty::TraitRef<'tcx>,
+  #[serde(with = "TraitPredicateDef")]
+  #[cfg_attr(feature = "testing", ts(type = "TraitPredicate"))]
+  pub predicate: ty::TraitPredicate<'tcx>,
   #[serde(with = "BoundConstnessDef")]
   #[cfg_attr(feature = "testing", ts(type = "BoundConstness"))]
   pub constness: ty::BoundConstness,
+}
+
+impl<'tcx> HostEffectPredicateDef<'tcx> {
+  pub fn new(value: &ty::HostEffectPredicate<'tcx>) -> Self {
+    Self {
+      predicate: ty::TraitPredicate {
+        trait_ref: value.trait_ref.clone(),
+        polarity: ty::PredicatePolarity::Positive,
+      },
+      constness: value.constness,
+    }
+  }
+
+  pub fn serialize<S>(
+    value: &ty::HostEffectPredicate<'tcx>,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    Self::new(value).serialize(s)
+  }
 }
 
 impl<'tcx> ClauseKindDef<'tcx> {
