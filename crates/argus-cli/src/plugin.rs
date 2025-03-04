@@ -261,10 +261,11 @@ pub fn run_with_callbacks(
 
   log::debug!("Building compiler ...");
 
-  // Argus works even when the compiler exits with an error.
   #[allow(unused_must_use)]
-  let _ = compiler.run();
-  // .map_err(|_| ArgusError::BuildError { range: None });
+  rustc_driver::catch_fatal_errors(move || {
+    compiler.run();
+  })
+  .map_err(|_| ArgusError::BuildError { range: None });
 
   Ok(())
 }
