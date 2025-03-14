@@ -1530,7 +1530,7 @@ pub struct SubtypePredicateDef<'tcx> {
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export))]
+#[cfg_attr(feature = "testing", ts(export, rename = "BoundConstness"))]
 #[serde(remote = "ty::BoundConstness")]
 pub enum BoundConstnessDef {
   Const,

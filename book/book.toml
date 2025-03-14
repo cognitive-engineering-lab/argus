@@ -8,7 +8,7 @@ title = "Argus: a trait debugger for Rust"
 [output.html]
 default-theme = "light"
 
-curly-quotes = true
+smart-punctuation = true
 additional-js = ["mermaid.min.js", "mermaid-init.js"]
 additional-css = ["./mdbook-admonish.css"]
 

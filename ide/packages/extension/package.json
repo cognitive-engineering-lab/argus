@@ -72,7 +72,8 @@
 	},
 	"type": "commonjs",
 	"depot": {
-		"platform": "node"
+		"platform": "node",
+		"depot-version": "0.3.0"
 	},
 	"typedoc": {
 		"entryPoint": "./src/main.ts"

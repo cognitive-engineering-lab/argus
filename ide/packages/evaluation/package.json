@@ -2,11 +2,13 @@
   "name": "@argus/evaluation",
   "version": "0.1.0",
   "bin": {
+    "platform": "node",
     "evaluation": "dist/evaluation.cjs"
   },
   "type": "module",
   "depot": {
-    "platform": "node"
+    "platform": "node",
+    "depot-version": "0.3.0"
   },
   "devDependencies": {
     "@argus/common": "workspace:*",

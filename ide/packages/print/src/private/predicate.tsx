@@ -205,9 +205,7 @@ export const PrintClauseKind = ({ o }: { o: ClauseKind }) => {
 };
 
 export const PrintBoundConstness = ({ o }: { o: BoundConstness }) => {
-  if (o === "C") {
-    return "const ";
-  }
+  if (o === "Const") return "const ";
   return null;
 };
 

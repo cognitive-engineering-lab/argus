@@ -4,6 +4,9 @@
   "files": [
     "dist"
   ],
+  "depot": {
+    "depot-version": "0.3.0"
+  },
   "main": "dist/lib.js",
   "exports": {
     ".": {
