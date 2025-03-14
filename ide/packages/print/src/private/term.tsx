@@ -63,11 +63,11 @@ export const PrintExpr = ({ o }: { o: ExprDef }) => {
   }
   if ("FunctionCall" in o) {
     const [callable, args] = o.FunctionCall;
-    const argEs = _.map(args, arg => <PrintConst o={arg} />);
+    const prettyArgs = _.map(args, arg => <PrintConst o={arg} />);
     return (
       <>
         <PrintConst o={callable} />(
-        <CommaSeparated components={argEs} />)
+        <CommaSeparated components={prettyArgs} />)
       </>
     );
   }

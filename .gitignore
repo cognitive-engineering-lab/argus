@@ -27,3 +27,6 @@ bindings/
 # Evaluation cache
 data/
 *.csv
+
+# When testing nix builds
+result

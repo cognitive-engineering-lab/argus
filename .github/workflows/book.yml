@@ -16,14 +16,11 @@ jobs:
       - uses: DeterminateSystems/flake-checker-action@main
 
       - name: Build Tutorial
-        run: |
-             nix develop --command mdbook-admonish install book
-             nix develop --command mdbook-mermaid install book
-             nix develop --command mdbook build book
+        run: nix build .#argus-book 
 
       - uses: JamesIves/github-pages-deploy-action@v4.3.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: gh-pages
-          folder: ./book/book
+          folder: ./result
           clean: true

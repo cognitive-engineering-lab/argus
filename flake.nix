@@ -89,8 +89,7 @@
         };
 
 
-        archiveBase = "${name}-${version}";
-        vscodeExtPublisher = "gavinleroy";
+        archiveBase = "argus-${version}";
         packageArgusWithExt = ext: ''
           cargo make init-bindings
           cd ide/packages/extension
@@ -116,10 +115,12 @@
         };
 
         argus-ide = pkgs.vscode-utils.buildVscodeExtension rec {
-          inherit name version vscodeExtPublisher;
+          name = "argus-ide";
+          vscodeExtPublisher = "gavinleroy";
+          inherit version;
           src = "${argus-vsix}/share/vscode/extensions/${archiveBase}.zip";
           vscodeExtName = name;
-          vscodeExtUniqueId = "${vscodeExtPublisher}.${name}";
+          vscodeExtUniqueId = "gavinleroy.argus";
         };
 
         argus-book = pkgs.stdenv.mkDerivation {
