@@ -3,7 +3,7 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
-    depot-js.url = "github:cognitive-engineering-lab/depot";
+    depot-js.url = "github:cognitive-engineering-lab/depot?rev=3676b134767aba6a951ed5fdaa9e037255921475";
   };
 
   outputs = { self, nixpkgs, flake-utils, rust-overlay, depot-js }:
@@ -25,15 +25,15 @@
         mdbook-image-size = rustNightly.buildRustPackage rec {
           pname = "mdbook-image-size";
           version = "0.2.0";
-
           src = pkgs.fetchFromGitHub {
             owner = "lhybdv";
             repo = pname;
             rev = version;
             hash = "sha256-fySGDx3vbLsc3fL/54nMVjVRHNlQ2ZYSM4LMDHxUUvs=";
           };
-          cargoHash = "sha256-qeak0f6mVcIgMQrh8a6R+p7KzSTdiBE4meBhCPyT2kk=";
+          cargoHash = "sha256-TPtBuabdx80Lgjn8s2CNPXfN6DdMJTI230Vm09exX9A=";
           doCheck = false;
+          useFetchCargoVendor = true;
         };
 
         env-vars = {
@@ -85,6 +85,7 @@
           nativeBuildInputs = native-deps;
           buildInputs = cli-deps;
           doCheck = false;
+          useFetchCargoVendor = true;
           env = env-vars;
         };
 
