@@ -227,18 +227,18 @@ fn characteristic_def_id_of_type_cached<'a>(
 
     ty::Bool
     | ty::Char
-    | ty::Int(_)
-    | ty::Uint(_)
+    | ty::Int(..)
+    | ty::Uint(..)
     | ty::Str
-    | ty::FnPtr(_)
+    | ty::FnPtr(..)
     | ty::Alias(..)
     | ty::Placeholder(..)
-    | ty::Param(_)
-    | ty::Infer(_)
+    | ty::Param(..)
+    | ty::Infer(..)
     | ty::Bound(..)
-    | ty::Error(_)
+    | ty::Error(..)
     | ty::Never
-    | ty::Float(_) => None,
+    | ty::Float(..) => None,
   }
 }
 

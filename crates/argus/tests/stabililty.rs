@@ -1,3 +1,4 @@
+#![feature(rustc_private)]
 use std::fmt::Debug;
 
 use argus_lib::test_utils as tu;

@@ -71,24 +71,23 @@ enum ConstKindDef<'tcx> {
   },
   Error,
   Expr {
-    #[serde(with = "ExprDef")]
-    #[cfg_attr(feature = "testing", ts(type = "ExprDef"))]
-    data: Expr<'tcx>,
+    data: ExprDef<'tcx>,
   },
 }
 
-impl<'a, 'tcx: 'a> From<&Const<'tcx>> for ConstKindDef<'tcx> {
+impl<'tcx> From<&Const<'tcx>> for ConstKindDef<'tcx> {
   fn from(value: &Const<'tcx>) -> Self {
-    let self_ty = value.ty();
     let kind = value.kind();
 
     match kind {
       ConstKind::Unevaluated(uc) => Self::Unevaluated { data: uc },
       ConstKind::Param(v) => Self::Param { data: v },
-      ConstKind::Value(v) => Self::Value {
-        data: ValTreeDef::new(v, self_ty),
+      ConstKind::Value(ty, v) => Self::Value {
+        data: ValTreeDef::new(v, ty),
       },
-      ConstKind::Expr(e) => Self::Expr { data: e },
+      ConstKind::Expr(e) => Self::Expr {
+        data: ExprDef::from(&e),
+      },
       ConstKind::Error(..) => Self::Error,
 
       ConstKind::Bound(didx, bv) => Self::Bound {
@@ -119,9 +118,7 @@ impl InferConstDef {
   pub fn new(value: &InferConst) -> Self {
     // TODO: can we get the name of an inference variable?
     match value {
-      InferConst::Fresh(_) | InferConst::EffectVar(_) | InferConst::Var(_) => {
-        Self::Anon
-      }
+      InferConst::Fresh(_) | InferConst::Var(_) => Self::Anon,
     }
   }
 
@@ -237,22 +234,22 @@ pub enum ConstScalarIntDef {
   },
 }
 
-impl<'tcx> ConstScalarIntDef {
-  pub fn new(int: ScalarInt, ty: Ty<'tcx>) -> Self {
+impl ConstScalarIntDef {
+  pub fn new(int: ScalarInt, ty: Ty) -> Self {
     InferCtxt::access(|infcx| {
       let tcx = infcx.tcx;
       match ty.kind() {
         Bool if int == ScalarInt::FALSE => Self::False,
         Bool if int == ScalarInt::TRUE => Self::True,
         Float(FloatTy::F32) => {
-          let val = Single::try_from(int).unwrap();
+          let val = Single::from(int);
           Self::Float {
             data: format!("{val}"),
             is_finite: val.is_finite(),
           }
         }
         Float(FloatTy::F64) => {
-          let val = Double::try_from(int).unwrap();
+          let val = Double::from(int);
           Self::Float {
             data: format!("{val}"),
             is_finite: val.is_finite(),
@@ -271,8 +268,8 @@ impl<'tcx> ConstScalarIntDef {
         Char if char::try_from(int).is_ok() => Self::Char {
           data: format!("{}", char::try_from(int).is_ok()),
         },
-        Ref(..) | RawPtr(..) | FnPtr(_) => {
-          let data = int.assert_bits(tcx.data_layout.pointer_size);
+        Ref(..) | RawPtr(..) | FnPtr(..) => {
+          let data = int.to_bits(tcx.data_layout.pointer_size);
           Self::Misc {
             data: format!("0x{data:x}"),
           }

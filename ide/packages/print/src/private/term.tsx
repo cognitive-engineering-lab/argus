@@ -63,11 +63,11 @@ export const PrintExpr = ({ o }: { o: ExprDef }) => {
   }
   if ("FunctionCall" in o) {
     const [callable, args] = o.FunctionCall;
-    const argEs = _.map(args, arg => <PrintConst o={arg} />);
+    const prettyArgs = _.map(args, arg => <PrintConst o={arg} />);
     return (
       <>
         <PrintConst o={callable} />(
-        <CommaSeparated components={argEs} />)
+        <CommaSeparated components={prettyArgs} />)
       </>
     );
   }
@@ -85,22 +85,13 @@ export const PrintExpr = ({ o }: { o: ExprDef }) => {
 // NOTE: this is the mir BinOp enum so not all operators are "source representable."
 // Excluding "Cmp" as it rearranges the operands and doesn't follow the pattern.
 const PrintBinOp = ({ o }: { o: Exclude<BinOp, "Cmp"> }) => {
-  if (o === "Add") {
+  if (o === "Add" || o === "AddUnchecked" || o === "AddWithOverflow") {
     return "+";
   }
-  if (o === "AddUnchecked") {
-    return "+";
-  }
-  if (o === "Sub") {
+  if (o === "Sub" || o === "SubUnchecked" || o === "SubWithOverflow") {
     return "-";
   }
-  if (o === "SubUnchecked") {
-    return "-";
-  }
-  if (o === "Mul") {
-    return "*";
-  }
-  if (o === "MulUnchecked") {
+  if (o === "Mul" || o === "MulUnchecked" || o === "MulWithOverflow") {
     return "*";
   }
   if (o === "Div") {
@@ -118,16 +109,10 @@ const PrintBinOp = ({ o }: { o: Exclude<BinOp, "Cmp"> }) => {
   if (o === "BitOr") {
     return "|";
   }
-  if (o === "Shl") {
+  if (o === "Shl" || o === "ShlUnchecked") {
     return "<<";
   }
-  if (o === "ShlUnchecked") {
-    return "<<";
-  }
-  if (o === "Shr") {
-    return ">>";
-  }
-  if (o === "ShrUnchecked") {
+  if (o === "Shr" || o === "ShrUnchecked") {
     return ">>";
   }
   if (o === "Eq") {
@@ -160,6 +145,9 @@ const PrintUnOp = ({ o }: { o: UnOp }) => {
   }
   if (o === "Neg") {
     return "-";
+  }
+  if (o === "PtrMetadata") {
+    return "ptr_metadata";
   }
   throw new Error("Unknown unop", o);
 };

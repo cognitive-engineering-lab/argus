@@ -81,10 +81,10 @@ export const PrintPredicateKind = ({ o }: { o: PredicateKind }) => {
     return "ambiguous";
   } else if ("Clause" in o) {
     return <PrintClauseKind o={o.Clause} />;
-  } else if ("ObjectSafe" in o) {
+  } else if ("DynCompatible" in o) {
     return (
       <>
-        The trait <PrintDefinitionPath o={o.ObjectSafe} /> is object-safe
+        The trait <PrintDefinitionPath o={o.DynCompatible} /> is object-safe
       </>
     );
   } else if ("Subtype" in o) {
@@ -194,22 +194,33 @@ export const PrintClauseKind = ({ o }: { o: ClauseKind }) => {
         <PrintConst o={o.ConstEvaluatable} /> can be evaluated
       </>
     );
+  } else if ("HostEffect" in o) {
+    <PrintTraitPredicate
+      o={o.HostEffect.predicate}
+      constness={o.HostEffect.constness}
+    />;
   } else {
     throw new Error("Unknown clause kind", o);
   }
 };
 
 export const PrintBoundConstness = ({ o }: { o: BoundConstness }) => {
-  if (o === "C") {
-    return "const ";
-  }
+  if (o === "Const") return "const ";
   return null;
 };
 
-export const PrintTraitPredicate = ({ o }: { o: TraitPredicate }) => {
+export const PrintTraitPredicate = ({
+  o,
+  constness
+}: { o: TraitPredicate; constness?: BoundConstness }) => {
   return (
     <>
-      <PrintTy o={o.self_ty} />: <PrintBoundConstness o={o.constness} />
+      <PrintTy o={o.self_ty} />:{" "}
+      {constness ? (
+        <>
+          <PrintBoundConstness o={constness} />{" "}
+        </>
+      ) : null}
       <PrintPolarity o={o.polarity} />
       <PrintDefinitionPath o={o.trait_ref} />
     </>

@@ -3,7 +3,8 @@
   "version": "0.0.1",
   "main": "dist/panoptes.iife.js",
   "depot": {
-    "platform": "browser"
+    "platform": "browser",
+    "depot-version": "0.3.0"
   },
   "devDependencies": {
     "@argus/common": "workspace:*",

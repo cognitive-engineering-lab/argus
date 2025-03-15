@@ -496,8 +496,8 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
     impl<'tcx> TypeVisitor<TyCtxt<'tcx>> for FindAmbiguousParameter<'_, 'tcx> {
       type Result = ControlFlow<ty::GenericArg<'tcx>>;
       fn visit_ty(&mut self, ty: Ty<'tcx>) -> Self::Result {
-        if let Some(origin) = self.0.type_var_origin(ty)
-          && let Some(def_id) = origin.param_def_id
+        if let ty::Infer(ty::TyVar(vid)) = *ty.kind()
+          && let Some(def_id) = self.0.type_var_origin(vid).param_def_id
           && let generics = self.0.tcx.generics_of(self.1)
           && let Some(index) =
             generics.param_def_id_to_index(self.0.tcx, def_id)
@@ -576,10 +576,10 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
   }
 
   /// - `blame_specific_*` means that the function will recursively traverse the expression,
-  /// looking for the most-specific-possible span to blame.
+  ///   looking for the most-specific-possible span to blame.
   ///
   /// - `point_at_*` means that the function will only go "one level", pointing at the specific
-  /// expression mentioned.
+  ///   expression mentioned.
   ///
   /// `blame_specific_arg_if_possible` will find the most-specific expression anywhere inside
   /// the provided function call expression, and mark it as responsible for the fulfillment
@@ -643,17 +643,17 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
     false
   }
 
-  /**
-   * Recursively searches for the most-specific blameable expression.
-   * For example, if you have a chain of constraints like:
-   * - want `Vec<i32>: Copy`
-   * - because `Option<Vec<i32>>: Copy` needs `Vec<i32>: Copy` because `impl <T: Copy> Copy for Option<T>`
-   * - because `(Option<Vec<i32>, bool)` needs `Option<Vec<i32>>: Copy` because `impl <A: Copy, B: Copy> Copy for (A, B)`
-   * then if you pass in `(Some(vec![1, 2, 3]), false)`, this helper `point_at_specific_expr_if_possible`
-   * will find the expression `vec![1, 2, 3]` as the "most blameable" reason for this missing constraint.
-   *
-   * This function only updates the error span.
-   */
+  ///
+  /// Recursively searches for the most-specific blameable expression.
+  /// For example, if you have a chain of constraints like:
+  /// - want `Vec<i32>: Copy`
+  /// - because `Option<Vec<i32>>: Copy` needs `Vec<i32>: Copy` because `impl <T: Copy> Copy for Option<T>`
+  /// - because `(Option<Vec<i32>, bool)` needs `Option<Vec<i32>>: Copy` because `impl <A: Copy, B: Copy> Copy for (A, B)`
+  ///   then if you pass in `(Some(vec![1, 2, 3]), false)`, this helper `point_at_specific_expr_if_possible`
+  ///   will find the expression `vec![1, 2, 3]` as the "most blameable" reason for this missing constraint.
+  //
+  ///   This function only updates the error span.
+  ///
   #[allow(clippy::match_same_arms)]
   fn blame_specific_expr_if_possible(
     &self,
@@ -799,7 +799,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
   /// - expr: `(Some(vec![1, 2, 3]), false)`
   /// - param: `T`
   /// - `in_ty`: `(Option<Vec<T>, bool)`
-  /// we would drill until we arrive at `vec![1, 2, 3]`.
+  ///   we would drill until we arrive at `vec![1, 2, 3]`.
   ///
   /// If successful, we return `Ok(refined_expr)`. If unsuccessful, we return `Err(partially_refined_expr`),
   /// which will go as far as possible. For example, given `(foo(), false)` instead, we would drill to

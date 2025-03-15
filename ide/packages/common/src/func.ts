@@ -164,7 +164,7 @@ export function isNamedGenericArg(ga: GenericArg) {
 }
 
 export const isNamedBoundRegion = (br: BoundRegionKind) =>
-  isObject(br) && "BrNamed" in br && br.BrNamed[0] !== "'_";
+  isObject(br) && "Named" in br && br.Named[0] !== "'_";
 
 export const isNamedBoundTy = (bt: BoundTyKind) =>
   isObject(bt) && "Param" in bt;

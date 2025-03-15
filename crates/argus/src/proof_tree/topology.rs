@@ -111,7 +111,7 @@ impl TreeTopology {
   }
 
   pub fn is_parent(&self, parent: ProofNodeIdx, child: ProofNodeIdx) -> bool {
-    self.parent.get(&child).map_or(false, |p| *p == parent)
+    self.parent.get(&child).is_some_and(|p| *p == parent)
   }
 
   pub fn is_leaf(&self, node: ProofNodeIdx) -> bool {

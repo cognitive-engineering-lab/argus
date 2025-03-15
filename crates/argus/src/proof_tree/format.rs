@@ -119,7 +119,7 @@ impl<'a, 'b> ProofTreeFormatter<'a, 'b> {
   }
 }
 
-impl<'a, 'b, 'tcx> ProofTreeVisitor<'tcx> for ProofTreeFormatter<'a, 'b> {
+impl<'tcx> ProofTreeVisitor<'tcx> for ProofTreeFormatter<'_, '_> {
   type Result = ();
 
   fn span(&self) -> Span {

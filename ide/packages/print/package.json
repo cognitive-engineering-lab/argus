@@ -16,7 +16,8 @@
   "type": "module",
   "depot": {
     "platform": "browser",
-    "target": "lib"
+    "target": "lib",
+    "depot-version": "0.3.0"
   },
   "devDependencies": {
     "@argus/common": "workspace:*",

@@ -48,7 +48,7 @@ impl<'tcx> ValTreeDef<'tcx> {
   }
 }
 
-impl<'tcx> Serialize for ValTreeDef<'tcx> {
+impl Serialize for ValTreeDef<'_> {
   fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
@@ -244,7 +244,6 @@ impl<'tcx> From<&ValTreeDef<'tcx>> for ValTreeKind<'tcx> {
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-#[serde(remote = "Expr")]
 pub enum ExprDef<'tcx> {
   Binop(
     #[serde(with = "BinOpDef")]
@@ -271,7 +270,7 @@ pub enum ExprDef<'tcx> {
     Const<'tcx>,
     #[serde(with = "Slice__ConstDef")]
     #[cfg_attr(feature = "testing", ts(type = "Const[]"))]
-    &'tcx List<Const<'tcx>>,
+    Vec<Const<'tcx>>,
   ),
   Cast(
     #[serde(with = "CastKindDef")]
@@ -286,6 +285,30 @@ pub enum ExprDef<'tcx> {
   ),
 }
 
+impl<'tcx> From<&Expr<'tcx>> for ExprDef<'tcx> {
+  fn from(value: &Expr<'tcx>) -> Self {
+    use rustc_middle::ty::ExprKind::*;
+    match value.kind {
+      Binop(op) => {
+        let (_t1, _ty2, lhs, rhs) = value.binop_args();
+        Self::Binop(op, lhs, rhs)
+      }
+      UnOp(op) => {
+        let (_t1, val) = value.unop_args();
+        Self::UnOp(op, val)
+      }
+      FunctionCall => {
+        let (_ty, val, args) = value.call_args();
+        Self::FunctionCall(val, args.collect())
+      }
+      Cast(kind) => {
+        let (_t1, val, ty) = value.cast_args();
+        Self::Cast(kind, val, ty)
+      }
+    }
+  }
+}
+
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "BinOp"))]
@@ -293,11 +316,14 @@ pub enum ExprDef<'tcx> {
 pub enum BinOpDef {
   Add,
   AddUnchecked,
+  AddWithOverflow,
   Cmp,
   Sub,
   SubUnchecked,
+  SubWithOverflow,
   Mul,
   MulUnchecked,
+  MulWithOverflow,
   Div,
   Rem,
   BitXor,
@@ -323,6 +349,7 @@ pub enum BinOpDef {
 pub enum UnOpDef {
   Not,
   Neg,
+  PtrMetadata,
 }
 
 #[derive(Serialize)]

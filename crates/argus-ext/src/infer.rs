@@ -2,8 +2,7 @@ use rustc_data_structures::stable_hasher::Hash64;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::ty::{self, Predicate, TypeFoldable};
 use rustc_trait_selection::{
-  solve::{GenerateProofTree, InferCtxtEvalExt},
-  traits::query::NoSolution,
+  solve::InferCtxtSelectExt, traits::query::NoSolution,
 };
 
 use crate::{ty::TyCtxtExt, EvaluationResult};
@@ -56,12 +55,26 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     &self,
     obligation: &PredicateObligation<'tcx>,
   ) -> EvaluationResult {
-    match self
-      .evaluate_root_goal(obligation.clone().into(), GenerateProofTree::Never)
-      .0
-    {
-      Ok((_, c)) => Ok(c),
-      _ => Err(NoSolution),
+    use rustc_infer::traits::{solve::MaybeCause, Obligation};
+
+    use crate::{ty::PredicateExt, Certainty};
+    let obligation = obligation.clone();
+
+    if let Some(trait_p) = obligation.predicate.as_trait_predicate() {
+      let trait_obligation = Obligation {
+        predicate: trait_p,
+        cause: obligation.cause,
+        param_env: obligation.param_env,
+        recursion_depth: obligation.recursion_depth,
+      };
+
+      match self.select_in_new_trait_solver(&trait_obligation) {
+        Ok(Some(_)) => Ok(Certainty::Yes),
+        Ok(None) => Ok(Certainty::Maybe(MaybeCause::Ambiguity)),
+        _ => Err(NoSolution),
+      }
+    } else {
+      Err(NoSolution)
     }
   }
 }

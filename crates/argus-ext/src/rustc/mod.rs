@@ -9,8 +9,8 @@
 use rustc_infer::{
   infer::{self, InferCtxt},
   traits::{
-    query::NoSolution, FulfillmentError, FulfillmentErrorCode,
-    MismatchedProjectionTypes, PredicateObligation, SelectionError,
+    query::NoSolution, MismatchedProjectionTypes, PredicateObligation,
+    SelectionError,
   },
 };
 use rustc_middle::ty::{
@@ -19,7 +19,10 @@ use rustc_middle::ty::{
   ToPolyTraitRef,
 };
 use rustc_span::DUMMY_SP;
-use rustc_trait_selection::traits::elaborate;
+use rustc_trait_selection::{
+  infer::InferCtxtExt as RustcInferCtxtExt,
+  traits::{elaborate, FulfillmentError, FulfillmentErrorCode},
+};
 
 use crate::EvaluationResult;
 
@@ -147,7 +150,7 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
             let (a, b) = infcx.enter_forall_and_leak_universe(
               obligation.predicate.kind().rebind((pred.a, pred.b)),
             );
-            let expected_found = ExpectedFound::new(true, a, b);
+            let expected_found = ExpectedFound::new(a, b);
             FulfillmentErrorCode::Subtype(
               expected_found,
               TypeError::Sorts(expected_found),
@@ -157,14 +160,14 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
             let (a, b) = infcx.enter_forall_and_leak_universe(
               obligation.predicate.kind().rebind((pred.a, pred.b)),
             );
-            let expected_found = ExpectedFound::new(false, a, b);
+            let expected_found = ExpectedFound::new(b, a);
             FulfillmentErrorCode::Subtype(
               expected_found,
               TypeError::Sorts(expected_found),
             )
           }
           ty::PredicateKind::Clause(_)
-          | ty::PredicateKind::ObjectSafe(_)
+          | ty::PredicateKind::DynCompatible(_)
           | ty::PredicateKind::Ambiguous => {
             FulfillmentErrorCode::Select(SelectionError::Unimplemented)
           }

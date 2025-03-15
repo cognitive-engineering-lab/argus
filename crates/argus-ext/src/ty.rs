@@ -51,7 +51,7 @@ pub trait TyCtxtExt<'tcx> {
     self,
     body_id: BodyId,
     inspector: ObligationInspector<'tcx>,
-  ) -> &TypeckResults;
+  ) -> &'tcx TypeckResults<'tcx>;
 
   /// Test whether `a` is a parent node of `b`.
   fn is_parent_of(&self, a: HirId, b: HirId) -> bool;

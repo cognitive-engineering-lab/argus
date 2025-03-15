@@ -81,7 +81,7 @@ impl SerializedTreeVisitor<'_> {
       return;
     };
 
-    if let (Some(mut t1), Some(mut t2)) = (t1.ty(), t2.ty()) {
+    if let (Some(mut t1), Some(mut t2)) = (t1.as_type(), t2.as_type()) {
       // Disallow projections involving two aliases
       if !(t1.is_alias() && t2.is_alias()) && t1 != t2 {
         if t2.is_alias() {

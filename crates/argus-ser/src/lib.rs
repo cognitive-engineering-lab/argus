@@ -23,7 +23,7 @@
 //!
 //! If you need to serialize an optional type then prefix it with `Option__`, and
 //! lists of elements are serialized with a prefixed `Slice__`.
-#![feature(rustc_private, decl_macro)]
+#![feature(rustc_private, decl_macro, let_chains)]
 #![allow(non_camel_case_types, non_snake_case)]
 extern crate rustc_apfloat;
 extern crate rustc_ast_ir;
@@ -88,7 +88,7 @@ trait InferCtxtSerializeExt {
   fn should_print_verbose(&self) -> bool;
 }
 
-impl<'tcx> InferCtxtSerializeExt for InferCtxt<'tcx> {
+impl InferCtxtSerializeExt for InferCtxt<'_> {
   fn should_print_verbose(&self) -> bool {
     self.tcx.sess.verbose_internals()
   }

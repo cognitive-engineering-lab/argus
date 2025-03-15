@@ -132,7 +132,7 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
     self,
     body_id: BodyId,
     inspector: ObligationInspector<'tcx>,
-  ) -> &TypeckResults {
+  ) -> &'tcx TypeckResults<'tcx> {
     let local_def_id = self.hir().body_owner_def_id(body_id);
     // Typeck current body, accumulating inspected information in TLS.
     inspect_typeck(self, local_def_id, inspector)
@@ -222,8 +222,12 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
             .occurs_in_projection(projection_term.args, projection_term.def_id);
           let deep_check = || {
             let prj_ply_trait_ref = predicate.kind().rebind(pp);
+            // NOTE, This is the inlined version of the prior `required_poly_trait_ref` function.
+            // See commit `https://github.com/rust-lang/rust/commit/7540306a4994df05e4aca27130b2757e55000ac7#diff-212d862294e979a5e170dac73a0c4f4cb73836fe91cab8ef22e0d829cf6e29dfL687`
             let poly_supertrait_ref =
-              prj_ply_trait_ref.required_poly_trait_ref(self.tcx);
+              prj_ply_trait_ref.map_bound(|predicate| {
+                predicate.projection_term.trait_ref(self.tcx)
+              });
             // Check whether `poly_supertrait_ref` is a supertrait of `self.tr`.
             // HACK FIXME: this is too simplistic, it's unsound to check
             // *just* that the `self_ty`s are equivalent and that the `def_id` is
@@ -277,16 +281,16 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
       )
     };
 
-    let from_sig = |sig: &ty::PolyFnSig| Some(sig.inputs().skip_binder().len());
-
     match ty.kind() {
       // References to closures are also callable
       ty::TyKind::Ref(_, ty, _) | ty::TyKind::RawPtr(ty, _) => {
         self.function_arity(*ty)
       }
       ty::TyKind::FnDef(def_id, ..) => from_def_id(def_id),
-      ty::TyKind::FnPtr(sig) => from_sig(sig),
-      ty::TyKind::Closure(_, args) => from_sig(&args.as_closure().sig()),
+      ty::TyKind::FnPtr(sig, ..) => Some(sig.inputs().skip_binder().len()),
+      ty::TyKind::Closure(_, args) => {
+        Some(args.as_closure().sig().inputs().skip_binder().len())
+      }
       ty::TyKind::CoroutineClosure(_, args) => {
         if let ty::TyKind::Tuple(tys) = args
           .as_coroutine_closure()
@@ -396,7 +400,7 @@ impl<'tcx> PredicateExt<'tcx> for Predicate<'tcx> {
       )) => ty.is_ty_var(),
       ty::PredicateKind::Clause(ty::ClauseKind::Projection(proj)) => {
         proj.self_ty().is_ty_var()
-          || proj.term.ty().map_or(false, ty::Ty::is_ty_var)
+          || proj.term.as_type().is_some_and(ty::Ty::is_ty_var)
       }
       _ => false,
     }

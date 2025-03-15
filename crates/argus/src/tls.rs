@@ -93,7 +93,7 @@ pub fn drain_implied_ambiguities<'tcx>(
       // 1. Ambiguous and--
       // 2. Implied by the passed obligation
       let is_ambig = provenance.result.is_maybe();
-      let is_implied = provenance.full_data.map_or(false, |idx| {
+      let is_implied = provenance.full_data.is_some_and(|idx| {
         unsafe_tls::borrow_in(idx, |fdata| {
           let infcx = &fdata.infcx;
           let previous_pred = &fdata.obligation.predicate;
