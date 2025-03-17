@@ -2,6 +2,9 @@
 skip_core_tasks = true
 default_to_workspace = false
 
+[env]
+PATH = "${PWD}/scripts:${PATH}"
+
 # #################### #
 # Binding initializers #
 # #################### #
@@ -16,7 +19,7 @@ args = ["test", "-p", "argus-ser", "--locked"]
 
 [tasks.init-bindings]
 dependencies = ["init-bindings-lib", "init-bindings-ser"]
-command = "./scripts/ts-rs.scm"
+command = "ts-rs.scm"
 
 [tasks.evaluation-node]
 command = "node"
