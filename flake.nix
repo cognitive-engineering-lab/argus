@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/80a3e9ca766a82fcec24648ab3a771d5dd8f9bf2";
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
     depot-js.url = "github:cognitive-engineering-lab/depot?rev=3676b134767aba6a951ed5fdaa9e037255921475";
@@ -77,18 +77,19 @@
           mdbook-image-size
         ];
 
+        # 
+        argus-source = ./.;
+
         argus-cli = rustNightly.buildRustPackage {
           pname = name;
           inherit version;
-          src = pkgs.lib.cleanSource ./.;
+          src = argus-source;
           cargoLock.lockFile = ./Cargo.lock;
           nativeBuildInputs = native-deps;
           buildInputs = cli-deps;
-          doCheck = false;
           useFetchCargoVendor = true;
           env = env-vars;
         };
-
 
         archiveBase = "argus-${version}";
         packageArgusWithExt = ext: ''
@@ -100,7 +101,7 @@
         argus-vsix = pkgs.stdenv.mkDerivation {
           name = "argus-vsix";
           inherit version;
-          src = pkgs.lib.cleanSource ./.;
+          src = argus-source;
           nativeBuildInputs = native-deps;
           buildInputs = cli-deps ++ ide-deps; 
 
@@ -122,6 +123,19 @@
           src = "${argus-vsix}/share/vscode/extensions/${archiveBase}.zip";
           vscodeExtName = name;
           vscodeExtUniqueId = "gavinleroy.argus";
+        };
+
+        argus-evaluation = pkgs.stdenv.mkDerivation {
+          nativeBuildInputs = native-deps ++ ide-deps;
+
+          buildPhase = ''
+            cd ide
+            depot build
+          '';
+
+          installPhase = ''
+
+          '';
         };
 
         argus-book = pkgs.stdenv.mkDerivation {

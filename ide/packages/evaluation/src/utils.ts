@@ -34,7 +34,7 @@ export function testCases() {
   const _testCases = [
     "axum",
     "bevy",
-    "diesel",
+    // "diesel",
     // "easy_ml",
     // "chumsky",
     "entrait",

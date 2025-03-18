@@ -269,6 +269,7 @@ pub enum AliasTyKindDef<'tcx> {
 impl<'tcx> AliasTyKindDef<'tcx> {
   pub fn new(kind: ty::AliasTyKind, ty: ty::AliasTy<'tcx>) -> Self {
     InferCtxt::access(|infcx| {
+
       match (kind, ty) {
         (
           ty::AliasTyKind::Projection
@@ -450,6 +451,7 @@ impl<'tcx> CoroutineTyKindDef<'tcx> {
     args: &'tcx ty::List<ty::GenericArg<'tcx>>,
   ) -> Self {
     InferCtxt::access(|infcx| {
+
       let tcx = infcx.tcx;
       let coroutine_kind = tcx.coroutine_kind(def_id).unwrap();
       let upvar_tys = args.as_coroutine().tupled_upvars_ty();
@@ -553,6 +555,7 @@ pub struct FnDef<'tcx> {
 impl<'tcx> FnDef<'tcx> {
   pub fn new(def_id: DefId, args: &'tcx [ty::GenericArg<'tcx>]) -> Self {
     InferCtxt::access(|infcx| {
+
       let sig = infcx.tcx.fn_sig(def_id).instantiate(infcx.tcx, args);
       Self {
         sig,
@@ -744,6 +747,7 @@ pub enum AliasTyDef<'tcx> {
 impl<'tcx> AliasTyDef<'tcx> {
   pub fn new(value: &ty::AliasTy<'tcx>) -> Self {
     InferCtxt::access(|cx| {
+
       if let DefKind::Impl { of_trait: false } =
         cx.tcx.def_kind(cx.tcx.parent(value.def_id))
       {
@@ -796,10 +800,6 @@ impl BoundTyDef {
     }
   }
 }
-
-// ==================================================
-// VV TODO: the DefId's here need to be dealt with VV
-// ==================================================
 
 #[derive(Serialize)]
 #[serde(remote = "ty::BoundVariableKind")]
@@ -864,10 +864,6 @@ pub enum BoundTyKindDef {
     Symbol,
   ),
 }
-
-// ============================================================
-// ^^^^^^^^^ Above comment applies within this range ^^^^^^^^^^
-// ============================================================
 
 #[derive(Serialize)]
 #[serde(remote = "ty::IntTy")]
@@ -1085,6 +1081,7 @@ impl InferTyDef<'_> {
     // See: `ty_getter` in `printer.ty_infer_name_resolver = Some(Box::new(ty_getter))`
     // from: `rustc_trait_selection::infer::error_reporting::need_type_info.rs`
     InferCtxt::access(|infcx| {
+
       let tcx = infcx.tcx;
 
       if let ty::InferTy::TyVar(ty_vid) = value {
@@ -1119,7 +1116,6 @@ impl InferTyDef<'_> {
         } else {
           Self::Unresolved
         }
-        // ty::InferTy::TyVar(infcx.root_var(*ty_vid))
       } else {
         match value {
           ty::InferTy::IntVar(_) | ty::InferTy::FreshIntTy(_) => Self::IntVar,

@@ -30,7 +30,8 @@ fluid_let! {
 pub fn obligations(tcx: TyCtxt, body_id: BodyId) -> Result<ObligationsInBody> {
   fluid_let::fluid_set!(entry::BODY_ID, body_id);
 
-  let typeck_results = tcx.inspect_typeck(body_id, entry::process_obligation);
+  // let typeck_results = tcx.inspect_typeck(body_id, entry::process_obligation);
+  let typeck_results = tcx.inspect_typeck(body_id, |_, _, _| {});
 
   // Construct the output from the stored data.
   Ok(entry::build_obligations_output(
