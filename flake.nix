@@ -93,7 +93,7 @@
         packageArgusWithExt = ext: ''
           cargo make init-bindings
           cd ide/packages/extension
-          vsce package -o ${archiveBase}.${ext}
+          vsce package --allow-unused-files-pattern -o ${archiveBase}.${ext}
         '';
 
         argus-vsix = pkgs.stdenv.mkDerivation {
