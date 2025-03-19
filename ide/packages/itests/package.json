@@ -4,7 +4,8 @@
   "type": "module",
   "depot": {
     "platform": "node",
-    "target": "script"
+    "target": "script",
+    "depot-version": "0.3.0"
   },
   "dependencies": {
     "mocha": "^10.4.0"

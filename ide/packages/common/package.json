@@ -15,7 +15,8 @@
   },
   "type": "module",
   "depot": {
-    "platform": "browser"
+    "platform": "browser",
+    "depot-version": "0.3.0"
   },
   "typedoc": {
     "entryPoint": "./src/lib.ts"

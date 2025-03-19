@@ -6,7 +6,8 @@
   },
   "type": "module",
   "depot": {
-    "platform": "node"
+    "platform": "node",
+    "depot-version": "0.3.0"
   },
   "devDependencies": {
     "@argus/common": "workspace:*",
