@@ -82,16 +82,27 @@
           inherit version;
           src = pkgs.lib.cleanSource ./.;
           cargoLock.lockFile = ./Cargo.lock;
-          nativeBuildInputs = native-deps;
-          buildInputs = cli-deps;
+          nativeBuildInputs = native-deps ++ cli-deps;
           useFetchCargoVendor = true;
-          env = env-vars;
           doCheck = false;
+
+          env = (env-vars // {
+            CARGO_HOME = "${placeholder "out"}/.cargo";
+          });
+
+          postBuild = ''
+            cargo make init-bindings
+          '';
+
+          postInstall = ''
+            mkdir -p $out/lib
+            cp ide/packages/common/src/bindings.ts $out/lib/
+          '';
         };
 
         archiveBase = "argus-${version}";
         packageArgusWithExt = ext: ''
-          cargo make init-bindings
+          cp ${argus-cli}/lib/bindings.ts ide/packages/common/src/bindings.ts
           cd ide/packages/extension
           vsce package --allow-unused-files-pattern -o ${archiveBase}.${ext}
         '';
@@ -100,13 +111,8 @@
           name = "argus-vsix";
           inherit version;
           src = pkgs.lib.cleanSource ./.;
-          nativeBuildInputs = native-deps;
-          buildInputs = cli-deps ++ ide-deps; 
-
-          env = (env-vars // {
-            CARGO_HOME = "${placeholder "out"}/.cargo";
-          });
-
+          nativeBuildInputs = native-deps ++ ide-deps;
+          env = env-vars;
           buildPhase = packageArgusWithExt "zip";
           installPhase = ''
             mkdir -p $out/share/vscode/extensions
@@ -161,8 +167,7 @@
           inherit 
           argus-cli 
           argus-ide 
-          argus-book 
-          toolchain; 
+          argus-book;
         };
 
         devShell = with pkgs; mkShell ({
