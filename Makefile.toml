@@ -3,7 +3,7 @@ skip_core_tasks = true
 default_to_workspace = false
 
 [env]
-PATH = "${PWD}/scripts:${PATH}"
+PATH = "${PWD}/scripts:${PWD}/argus/scripts:${PATH}"
 
 # #################### #
 # Binding initializers #
