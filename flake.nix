@@ -122,19 +122,6 @@
           vscodeExtUniqueId = "gavinleroy.argus";
         };
 
-        argus-evaluation = pkgs.stdenv.mkDerivation {
-          nativeBuildInputs = native-deps ++ ide-deps;
-
-          buildPhase = ''
-            cd ide
-            depot build
-          '';
-
-          installPhase = ''
-
-          '';
-        };
-
         argus-book = pkgs.stdenv.mkDerivation {
           name = "argus-book";
           inherit version;
@@ -170,6 +157,7 @@
         '');
       in {
         packages = { inherit argus-cli argus-ide argus-book; };
+
         devShell = with pkgs; mkShell ({
           nativeBuildInputs = native-deps;
           buildInputs = cli-deps ++ ide-deps ++ book-deps ++ [
