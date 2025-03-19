@@ -3,7 +3,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/80a3e9ca766a82fcec24648ab3a771d5dd8f9bf2";
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
-    depot-js.url = "github:cognitive-engineering-lab/depot?rev=e7464c57bc11aaeb88930719b84b21c7dfe87536";
+    depot-js.url = "github:cognitive-engineering-lab/depot?rev=3676b134767aba6a951ed5fdaa9e037255921475";
   };
 
   outputs = { self, nixpkgs, flake-utils, rust-overlay, depot-js }:

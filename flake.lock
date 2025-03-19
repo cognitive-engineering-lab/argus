@@ -6,17 +6,17 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1731019925,
-        "narHash": "sha256-Yp2ib3rSza/0YNTtzGQmsDi4uD+COAd4OYfAcvCA0f4=",
+        "lastModified": 1741967107,
+        "narHash": "sha256-SqyJFsiqijoJTKmtpVeInvuhPKBqIZThuXXKqs6YXOI=",
         "owner": "cognitive-engineering-lab",
         "repo": "depot",
-        "rev": "e7464c57bc11aaeb88930719b84b21c7dfe87536",
+        "rev": "3676b134767aba6a951ed5fdaa9e037255921475",
         "type": "github"
       },
       "original": {
         "owner": "cognitive-engineering-lab",
         "repo": "depot",
-        "rev": "e7464c57bc11aaeb88930719b84b21c7dfe87536",
+        "rev": "3676b134767aba6a951ed5fdaa9e037255921475",
         "type": "github"
       }
     },
