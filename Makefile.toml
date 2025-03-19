@@ -2,6 +2,9 @@
 skip_core_tasks = true
 default_to_workspace = false
 
+[env]
+PATH = "${PWD}/scripts:${PATH}"
+
 # #################### #
 # Binding initializers #
 # #################### #

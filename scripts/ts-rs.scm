@@ -1,4 +1,4 @@
-#!/usr/bin/env -Sguile --no-auto-compile -s
+#!/usr/bin/env guile-wrapper.sh
 !#
 
 (use-modules (ice-9 ftw)

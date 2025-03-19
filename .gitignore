@@ -27,3 +27,4 @@ bindings/
 # Evaluation cache
 data/
 *.csv
+result
