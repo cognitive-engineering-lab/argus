@@ -15,7 +15,11 @@ import {
 async function createWorkspaceRunner() {
   // Shared state among all runs
   const workspaceDir = path.resolve(__dirname, "..", "workspaces");
-  const browser = await chromium.launch({ headless: !global.debugging });
+  const browser = await chromium.launch({
+    headless: !global.debugging,
+    ignoreDefaultArgs: ["--headless"],
+    args: ["--headless=new"]
+  });
   const context = await browser.newContext();
 
   return async ({ workspace, causes }: RootCause) => {
