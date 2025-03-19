@@ -86,6 +86,7 @@
           buildInputs = cli-deps;
           useFetchCargoVendor = true;
           env = env-vars;
+          doCheck = false;
         };
 
         archiveBase = "argus-${version}";
@@ -156,7 +157,13 @@
           pnpx ovsx publish ${archiveBase}.vsix -p "$2"
         '');
       in {
-        packages = { inherit argus-cli argus-ide argus-book; };
+        packages = { 
+          inherit 
+          argus-cli 
+          argus-ide 
+          argus-book 
+          toolchain; 
+        };
 
         devShell = with pkgs; mkShell ({
           nativeBuildInputs = native-deps;
