@@ -91,8 +91,7 @@
         archiveBase = "argus-${version}";
         packageArgusWithExt = ext: ''
           cargo make init-bindings
-          cd ide && depot setup
-          cd packages/extension
+          cd ide/packages/extension
           vsce package -o ${archiveBase}.${ext}
         '';
 
@@ -128,7 +127,7 @@
 
           buildPhase = ''
             cd ide
-            depot setup && depot build
+            depot build
           '';
 
           installPhase = ''
