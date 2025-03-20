@@ -9,8 +9,13 @@ import tmp from "tmp";
 import { webHtml } from "./page";
 
 export async function argusData(dir: string) {
+  const tmpdir = tmp.dirSync({ unsafeCleanup: true });
   const argusOutput = await execSilent("cargo", ["argus", "bundle"], {
-    cwd: dir
+    cwd: dir,
+    env: {
+      CARGO_TARGET_DIR: tmpdir.name,
+      ...process.env
+    }
   });
   const bundles: Result<BodyBundle[]> = JSON.parse(argusOutput);
   return bundles;
@@ -22,7 +27,7 @@ export const execSilent = async (
   args: string[],
   opts: ExecNotifyOpts
 ) => {
-  return await _execNotify(cmd, args, opts, (..._args: any[]) => {});
+  return await _execNotify(cmd, args, opts, (..._args) => {});
 };
 
 export async function sleep(waitTime: number) {
@@ -65,15 +70,15 @@ export function diagnosticFilename(msg: DiagnosticMessage) {
   return mainMsg ? mainMsg.file_name : msg.target.src_path;
 }
 
-export function isRustcMessage(obj: any): obj is DiagnosticMessage {
-  return obj.reason === "compiler-message";
+export function isRustcMessage(obj: unknown): obj is DiagnosticMessage {
+  return (obj as DiagnosticMessage)?.reason === "compiler-message";
 }
 
 export async function expandBottomUpView(page: Page) {
-  let bs = await page.getByText("Bottom Up").all();
+  const bs = await page.getByText("Bottom Up").all();
   try {
     await Promise.all(_.map(bs, b => b.click()));
-  } catch (e: any) {
+  } catch (e) {
     console.debug("Error clicking bottom up", e);
   }
 }

@@ -107,8 +107,8 @@
           vsce package --allow-unused-files-pattern -o ${archiveBase}.${ext}
         '';
 
-        argus-vsix = pkgs.stdenv.mkDerivation {
-          name = "argus-vsix";
+        argus-ide = pkgs.stdenv.mkDerivation {
+          name = "argus-ide";
           inherit version;
           src = pkgs.lib.cleanSource ./.;
           nativeBuildInputs = native-deps ++ ide-deps;
@@ -117,14 +117,16 @@
           installPhase = ''
             mkdir -p $out/share/vscode/extensions
             mv ${archiveBase}.zip $out/share/vscode/extensions/
+            cd ../../../
+            cp -LR ide $out/lib
           '';
         };
 
-        argus-ide = pkgs.vscode-utils.buildVscodeExtension rec {
+        argus-extension = pkgs.vscode-utils.buildVscodeExtension rec {
           name = "argus-ide";
           vscodeExtPublisher = "gavinleroy";
           inherit version;
-          src = "${argus-vsix}/share/vscode/extensions/${archiveBase}.zip";
+          src = "${argus-ide}/share/vscode/extensions/${archiveBase}.zip";
           vscodeExtName = name;
           vscodeExtUniqueId = "gavinleroy.argus";
         };
@@ -143,7 +145,7 @@
 
           installPhase = ''
             mkdir -p $out
-            cp -r book/* $out
+            cp -R book/* $out
           '';
         };
 
@@ -167,6 +169,7 @@
           inherit 
           argus-cli 
           argus-ide 
+          argus-extension 
           argus-book;
         };
 

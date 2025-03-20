@@ -147,7 +147,7 @@ const checkVersionAndInstall = async (
         ],
         "Installing nightly Rust..."
       );
-    } catch (e: any) {
+    } catch (e) {
       const choice = await vscode.window.showErrorMessage(
         'Argus failed to install because rustup failed. Click "Show fix" to resolve, or click "Dismiss" to attempt installation later.',
         "Show fix",

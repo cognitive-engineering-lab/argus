@@ -78,12 +78,12 @@ export const execNotifyBinary = (
   const proc = cp.spawn(cmd, args, { ...opts, detached: true });
   msg(`process ${proc.pid}, command: `, cmd, args, opts);
 
-  let stdoutChunks: Buffer[] = [];
+  const stdoutChunks: Buffer[] = [];
   proc.stdout.on("data", data => {
     stdoutChunks.push(data);
   });
 
-  let stderrChunks: string[] = [];
+  const stderrChunks: string[] = [];
   proc.stderr.setEncoding("utf8");
   proc.stderr.on("data", data => {
     msg(data);
