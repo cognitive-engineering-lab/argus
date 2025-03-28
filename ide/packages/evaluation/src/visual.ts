@@ -30,7 +30,11 @@ async function argusScreenshots(
   bundles: BodyBundle[],
   _title = "Argus Output"
 ) {
-  const browser = await chromium.launch({ headless: !global.debugging });
+  const browser = await chromium.launch({
+    headless: !global.debugging,
+    ignoreDefaultArgs: ["--headless"],
+    args: ["--headless=new"]
+  });
   const context = await browser.newContext();
 
   const innerDoScreenshot = async (
