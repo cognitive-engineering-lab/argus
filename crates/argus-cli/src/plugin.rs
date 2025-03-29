@@ -137,7 +137,7 @@ impl RustcPlugin for ArgusPlugin {
         exit(0);
       }
       AC::Obligations { .. } | AC::Tree { .. } | AC::Bundle => {}
-    };
+    }
 
     let file = match &args.command {
       AC::Tree { file, .. } => Some(file),

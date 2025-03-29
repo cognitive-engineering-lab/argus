@@ -14,6 +14,10 @@ struct BodyFinder<'tcx> {
 impl<'tcx> Visitor<'tcx> for BodyFinder<'tcx> {
   type NestedFilter = OnlyBodies;
 
+  fn maybe_tcx(&mut self) -> Self::MaybeTyCtxt {
+    self.tcx
+  }
+
   fn visit_nested_body(&mut self, id: BodyId) {
     // // const/static items are considered to have bodies, so we want to exclude
     // // them from our search for functions

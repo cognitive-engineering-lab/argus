@@ -606,7 +606,7 @@ type PolyTy<'tcx> = Binder__TyDef<'tcx>;
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "testing", derive(TS))]
-#[cfg_attr(feature = "testing", ts(export, rename = "PolyFnSig"))]
+#[cfg_attr(feature = "testing", ts(export, rename = "PolyTy"))]
 pub struct Binder__TyDef<'tcx> {
   #[serde(with = "TyDef")]
   #[cfg_attr(feature = "testing", ts(type = "Ty"))]

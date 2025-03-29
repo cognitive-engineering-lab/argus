@@ -269,7 +269,7 @@ pub fn retain_method_calls<'tcx, T>(
       let tp =
         get_predicate(&trait_preds[*deref_pred]).expect_trait_predicate();
       let self_ty = tp.self_ty().skip_binder();
-      if all_base_tys.iter().any(|&t| t == self_ty) {
+      if all_base_tys.contains(&self_ty) {
         to_remove.push(*deref_pred);
       }
     }
