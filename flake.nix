@@ -45,9 +45,6 @@
         };
 
         native-deps = with pkgs; [
-          which
-          coreutils
-          binutils
           pkg-config
           cacert
         ] ++ lib.optionals stdenv.isDarwin [
@@ -94,9 +91,6 @@
           });
 
           postBuild = ''
-            which guile
-            which sh
-            echo $PATH
             cargo make init-bindings
           '';
 
