@@ -45,6 +45,9 @@
         };
 
         native-deps = with pkgs; [
+          which
+          coreutils
+          binutils
           pkg-config
           cacert
         ] ++ lib.optionals stdenv.isDarwin [
