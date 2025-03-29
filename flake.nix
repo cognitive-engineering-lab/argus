@@ -91,6 +91,9 @@
           });
 
           postBuild = ''
+            which guile
+            which sh
+            echo $PATH
             cargo make init-bindings
           '';
 

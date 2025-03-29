@@ -3,11 +3,15 @@ skip_core_tasks = true
 default_to_workspace = false
 
 [env]
-PATH = "${PWD}/scripts:${PATH}"
+PATH = "${PATH}:${PWD}/scripts"
 
 # #################### #
 # Binding initializers #
 # #################### #
+
+[tasks.echo-path]
+command = "echo"
+args = ["${PATH}"]
 
 [tasks.init-bindings-lib]
 command = "cargo"
@@ -18,7 +22,11 @@ command = "cargo"
 args = ["test", "-p", "argus-ser", "--locked"]
 
 [tasks.init-bindings]
-dependencies = ["init-bindings-lib", "init-bindings-ser"]
+dependencies = [
+  "echo-path",         # For debugging
+  "init-bindings-lib",
+  "init-bindings-ser",
+]
 command = "ts-rs.scm"
 
 [tasks.evaluation-node]
@@ -72,7 +80,7 @@ dependencies = ["build"]
 [tasks.eval-serve]
 script = """
 python3 -m webbrowser http://localhost:8080/eval
-./scripts/evaluation.scm
+evaluation.scm
 """
 
 [tasks.evaluation]
