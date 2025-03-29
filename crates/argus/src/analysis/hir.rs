@@ -47,7 +47,7 @@ fn bin_expressions(
     bins: vec![],
   };
 
-  binner.visit_body(ctx.tcx.hir().body(ctx.body_id));
+  binner.visit_body(ctx.tcx.hir_body(ctx.body_id));
 
   // Add remaining miscellaneous unbinned obligations
   let mut bins = binner.bins;
@@ -121,10 +121,6 @@ impl BinCreator<'_, '_> {
 impl<'a, 'tcx: 'a> HirVisitor<'tcx> for BinCreator<'a, 'tcx> {
   type NestedFilter = nested_filter::All;
 
-  fn nested_visit_map(&mut self) -> Self::Map {
-    self.ctx.tcx.hir()
-  }
-
   // FIXME: after updating to nightly-2024-05-20 this binning logic broke slightly.
   // Obligations associated with parameters are now being assigned to the overall call,
   // this makes more things use a method call table than necessary.
@@ -168,16 +164,15 @@ pub fn find_most_enclosing_node(
   body_id: BodyId,
   span: Span,
 ) -> Option<HirId> {
-  let hir = tcx.hir();
-  let mut node_finder = FindNodeBySpan::new(tcx, span);
+  let mut node_finder = FindNodeBySpan::new(span);
 
   log::trace!(
     "Finding HirId for span: {:?}, in body {:?}",
     span,
-    hir.body(body_id)
+    tcx.hir_body(body_id)
   );
 
-  node_finder.visit_body(hir.body(body_id));
+  node_finder.visit_body(tcx.hir_body(body_id));
   node_finder
     .result
     // NOTE: there should always be an enclosing body somewhere, this could be an expect
@@ -188,19 +183,14 @@ pub fn find_most_enclosing_node(
 ///
 /// Similar to what happens in `rustc_trait_selection::traits::error_reporting`, but we
 /// find spans that match as closely as possible and not just those that match exactly.
-struct FindNodeBySpan<'tcx> {
-  tcx: TyCtxt<'tcx>,
+struct FindNodeBySpan {
   pub span: Span,
   pub result: Option<(HirId, Span)>,
 }
 
-impl<'tcx> FindNodeBySpan<'tcx> {
-  pub fn new(tcx: TyCtxt<'tcx>, span: Span) -> Self {
-    Self {
-      tcx,
-      span,
-      result: None,
-    }
+impl FindNodeBySpan {
+  pub fn new(span: Span) -> Self {
+    Self { span, result: None }
   }
 
   /// Is span `s` a closer match than the current best?
@@ -226,7 +216,7 @@ impl<'tcx> FindNodeBySpan<'tcx> {
 
 macro_rules! simple_visitors {
   ( $( [$visitor:ident, $walker:ident, $t:ty], )* ) => {$(
-      fn $visitor(&mut self, v: &'tcx $t) {
+      fn $visitor(&mut self, v: &$t) {
         hir::intravisit::$walker(self, v);
         if self.is_better_match(v.span) {
           self.result = Some((v.hir_id, v.span));
@@ -235,12 +225,8 @@ macro_rules! simple_visitors {
   };
 }
 
-impl<'tcx> HirVisitor<'tcx> for FindNodeBySpan<'tcx> {
+impl HirVisitor<'_> for FindNodeBySpan {
   type NestedFilter = nested_filter::All;
-
-  fn nested_visit_map(&mut self) -> Self::Map {
-    self.tcx.hir()
-  }
 
   simple_visitors! {
     [visit_param, walk_param, hir::Param],
@@ -252,7 +238,7 @@ impl<'tcx> HirVisitor<'tcx> for FindNodeBySpan<'tcx> {
     [visit_pat_field, walk_pat_field, hir::PatField],
     [visit_expr, walk_expr, hir::Expr],
     [visit_expr_field, walk_expr_field, hir::ExprField],
-    [visit_ty, walk_ty, hir::Ty],
+    [visit_ty, walk_ty, hir::Ty<'_, hir::AmbigArg>],
     [visit_generic_param, walk_generic_param, hir::GenericParam],
   }
 }

@@ -194,7 +194,7 @@ fn generate_tree<'tcx>(
     bail!("missing body id");
   };
 
-  let body_owner = infcx.tcx.hir().body_owner_def_id(body_id).to_def_id();
+  let body_owner = infcx.tcx.hir_body_owner_def_id(body_id).to_def_id();
   try_serialize(goal, result, obligation.cause.span, infcx, body_owner)
 }
 

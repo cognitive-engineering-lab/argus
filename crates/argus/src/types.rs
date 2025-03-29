@@ -4,7 +4,7 @@ use anyhow::Result;
 use argus_ser::{self as ser, interner::TyIdx};
 use index_vec::IndexVec;
 use indexmap::IndexSet;
-use rustc_data_structures::stable_hasher::Hash64;
+use rustc_hashes::Hash64;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::{
   traits::{

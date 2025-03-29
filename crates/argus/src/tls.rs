@@ -56,7 +56,7 @@ pub fn store_body_def_path(infcx: &InferCtxt, body_id: BodyId) {
       return;
     }
 
-    let def_id = infcx.tcx.hir().body_owner_def_id(body_id).to_def_id();
+    let def_id = infcx.tcx.hir_body_owner_def_id(body_id).to_def_id();
     let name = unsafe_tls::access_interner(|ty_interner| {
       ser::to_value_expect(infcx, ty_interner, &ser::PathDefNoArgs(def_id))
     });

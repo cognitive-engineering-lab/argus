@@ -10,6 +10,7 @@ extern crate rustc_ast_ir;
 extern crate rustc_data_structures;
 #[cfg(feature = "testing")]
 extern crate rustc_driver;
+extern crate rustc_hashes;
 extern crate rustc_hir;
 extern crate rustc_hir_typeck;
 extern crate rustc_infer;

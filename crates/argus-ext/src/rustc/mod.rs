@@ -16,7 +16,6 @@ use rustc_infer::{
 use rustc_middle::ty::{
   self,
   error::{ExpectedFound, TypeError},
-  ToPolyTraitRef,
 };
 use rustc_span::DUMMY_SP;
 use rustc_trait_selection::{
@@ -44,6 +43,22 @@ pub enum CandidateSimilarity {
   Other,
 }
 
+type RustcCandidateSimilarity =
+  rustc_trait_selection::error_reporting::traits::CandidateSimilarity;
+
+impl From<RustcCandidateSimilarity> for CandidateSimilarity {
+  fn from(similarity: RustcCandidateSimilarity) -> Self {
+    match similarity {
+      RustcCandidateSimilarity::Exact { .. } => CandidateSimilarity::Exact {
+        ignoring_lifetimes: false,
+      },
+      RustcCandidateSimilarity::Fuzzy { .. } => CandidateSimilarity::Fuzzy {
+        ignoring_lifetimes: false,
+      },
+    }
+  }
+}
+
 macro_rules! bug {
   ($( $tree:tt ),*) => {
     panic!( $( $tree )* )
@@ -51,35 +66,41 @@ macro_rules! bug {
 }
 
 pub trait InferCtxtExt<'tcx> {
-  fn can_match_projection(
-    &self,
-    goal: ty::ProjectionPredicate<'tcx>,
-    assumption: ty::PolyProjectionPredicate<'tcx>,
-  ) -> bool;
-
+  /// Argus defined helper
   fn to_fulfillment_error(
     &self,
     obligation: &PredicateObligation<'tcx>,
     result: EvaluationResult,
   ) -> Option<FulfillmentError<'tcx>>;
 
+  /// Private in TypeErrCtxt
+  fn can_match_projection(
+    &self,
+    goal: ty::ProjectionPredicate<'tcx>,
+    assumption: ty::PolyProjectionPredicate<'tcx>,
+  ) -> bool;
+
+  /// Private in TypeErrCtxt
   fn can_match_trait(
     &self,
     goal: ty::TraitPredicate<'tcx>,
     assumption: ty::PolyTraitPredicate<'tcx>,
   ) -> bool;
 
+  /// Private in TypeErrCtxt
   fn error_implies(
     &self,
     cond: ty::Predicate<'tcx>,
     error: ty::Predicate<'tcx>,
   ) -> bool;
 
+  /// Private in TypeErrorCtxt
   fn find_similar_impl_candidates(
     &self,
     trait_pred: ty::PolyTraitPredicate<'tcx>,
   ) -> Vec<ImplCandidate<'tcx>>;
 
+  /// Public (wrapping for local `CandidateSimilarity`)
   fn fuzzy_match_tys(
     &self,
     a: ty::Ty<'tcx>,
@@ -89,25 +110,6 @@ pub trait InferCtxtExt<'tcx> {
 }
 
 impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
-  fn can_match_trait(
-    &self,
-    goal: ty::TraitPredicate<'tcx>,
-    assumption: ty::PolyTraitPredicate<'tcx>,
-  ) -> bool {
-    if goal.polarity != assumption.polarity() {
-      return false;
-    }
-
-    let trait_goal = goal.trait_ref;
-    let trait_assumption = self.instantiate_binder_with_fresh_vars(
-      DUMMY_SP,
-      infer::BoundRegionConversionTime::HigherRankedType,
-      assumption.to_poly_trait_ref(),
-    );
-
-    self.can_eq(ty::ParamEnv::empty(), trait_goal, trait_assumption)
-  }
-
   // FIXME: there is no longer a single `to_error` function making this logic outdated.
   #[allow(clippy::match_same_arms)]
   fn to_fulfillment_error(
@@ -180,9 +182,34 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     )
   }
 
+  fn can_match_trait(
+    &self,
+    goal: ty::TraitPredicate<'tcx>,
+    assumption: ty::PolyTraitPredicate<'tcx>,
+  ) -> bool {
+    // Fast path
+    if goal.polarity != assumption.polarity() {
+      return false;
+    }
+
+    let trait_assumption = self.instantiate_binder_with_fresh_vars(
+      DUMMY_SP,
+      infer::BoundRegionConversionTime::HigherRankedType,
+      assumption,
+    );
+
+    self.can_eq(
+      ty::ParamEnv::empty(),
+      goal.trait_ref,
+      trait_assumption.trait_ref,
+    )
+  }
+
   fn can_match_projection(
     &self,
+
     goal: ty::ProjectionPredicate<'tcx>,
+
     assumption: ty::PolyProjectionPredicate<'tcx>,
   ) -> bool {
     let assumption = self.instantiate_binder_with_fresh_vars(
@@ -192,6 +219,7 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     );
 
     let param_env = ty::ParamEnv::empty();
+
     self.can_eq(param_env, goal.projection_term, assumption.projection_term)
       && self.can_eq(param_env, goal.term, assumption.term)
   }
@@ -231,11 +259,13 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
       .all_impls(trait_pred.def_id())
       .filter_map(|def_id| {
         let imp = self.tcx.impl_trait_header(def_id).unwrap();
-        if imp.polarity == ty::ImplPolarity::Negative
+
+        if imp.polarity != ty::ImplPolarity::Positive
           || !self.tcx.is_user_visible_dep(def_id.krate)
         {
           return None;
         }
+
         let imp = imp.trait_ref.skip_binder();
 
         self
@@ -249,13 +279,9 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
             similarity,
             impl_def_id: def_id,
           })
-          .or(Some(ImplCandidate {
-            trait_ref: imp,
-            similarity: CandidateSimilarity::Other,
-            impl_def_id: def_id,
-          }))
       })
       .collect();
+
     if candidates
       .iter()
       .any(|c| matches!(c.similarity, CandidateSimilarity::Exact { .. }))
@@ -266,90 +292,20 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
       candidates
         .retain(|c| matches!(c.similarity, CandidateSimilarity::Exact { .. }));
     }
+
     candidates
   }
 
   fn fuzzy_match_tys(
     &self,
-    mut a: ty::Ty<'tcx>,
-    mut b: ty::Ty<'tcx>,
+    a: ty::Ty<'tcx>,
+    b: ty::Ty<'tcx>,
     ignoring_lifetimes: bool,
   ) -> Option<CandidateSimilarity> {
-    /// returns the fuzzy category of a given type, or None
-    /// if the type can be equated to any type.
-    fn type_category(tcx: ty::TyCtxt<'_>, t: ty::Ty<'_>) -> Option<u32> {
-      match t.kind() {
-        ty::Bool => Some(0),
-        ty::Char => Some(1),
-        ty::Str => Some(2),
-        ty::Adt(def, _) if Some(def.did()) == tcx.lang_items().string() => {
-          Some(2)
-        }
-        ty::Int(..)
-        | ty::Uint(..)
-        | ty::Float(..)
-        | ty::Infer(ty::IntVar(..) | ty::FloatVar(..)) => Some(4),
-        ty::Ref(..) | ty::RawPtr(..) => Some(5),
-        ty::Array(..) | ty::Slice(..) => Some(6),
-        ty::FnDef(..) | ty::FnPtr(..) => Some(7),
-        ty::Dynamic(..) => Some(8),
-        ty::Closure(..) => Some(9),
-        ty::Tuple(..) => Some(10),
-        ty::Param(..) => Some(11),
-        ty::Alias(ty::Projection, ..) => Some(12),
-        ty::Alias(ty::Inherent, ..) => Some(13),
-        ty::Alias(ty::Opaque, ..) => Some(14),
-        ty::Alias(ty::Weak, ..) => Some(15),
-        ty::Never => Some(16),
-        ty::Adt(..) => Some(17),
-        ty::Coroutine(..) => Some(18),
-        ty::Foreign(..) => Some(19),
-        ty::CoroutineWitness(..) => Some(20),
-        ty::CoroutineClosure(..) => Some(21),
-        ty::Pat(..) => Some(22),
-        ty::Placeholder(..) | ty::Bound(..) | ty::Infer(..) | ty::Error(_) => {
-          None
-        }
-      }
-    }
-
-    let strip_references = |mut t: ty::Ty<'tcx>| -> ty::Ty<'tcx> {
-      loop {
-        match t.kind() {
-          ty::Ref(_, inner, _) | ty::RawPtr(inner, _) => t = *inner,
-          _ => break t,
-        }
-      }
-    };
-
-    if !ignoring_lifetimes {
-      a = strip_references(a);
-      b = strip_references(b);
-    }
-
-    let cat_a = type_category(self.tcx, a)?;
-    let cat_b = type_category(self.tcx, b)?;
-    if a == b {
-      Some(CandidateSimilarity::Exact { ignoring_lifetimes })
-    } else if cat_a == cat_b {
-      match (a.kind(), b.kind()) {
-        (ty::Adt(def_a, _), ty::Adt(def_b, _)) => def_a == def_b,
-        (ty::Foreign(def_a), ty::Foreign(def_b)) => def_a == def_b,
-        // Matching on references results in a lot of unhelpful
-        // suggestions, so let's just not do that for now.
-        //
-        // We still upgrade successful matches to `ignoring_lifetimes: true`
-        // to prioritize that impl.
-        (ty::Ref(..) | ty::RawPtr(..), ty::Ref(..) | ty::RawPtr(..)) => {
-          self.fuzzy_match_tys(a, b, true).is_some()
-        }
-        _ => true,
-      }
-      .then_some(CandidateSimilarity::Fuzzy { ignoring_lifetimes })
-    } else if ignoring_lifetimes {
-      None
-    } else {
-      self.fuzzy_match_tys(a, b, true)
-    }
+    use rustc_trait_selection::error_reporting::InferCtxtErrorExt;
+    self
+      .err_ctxt()
+      .fuzzy_match_tys(a, b, ignoring_lifetimes)
+      .map(CandidateSimilarity::from)
   }
 }

@@ -173,13 +173,9 @@
           argus-book;
         };
 
-        devShell = with pkgs; mkShell ({
+        devShells.default = with pkgs; mkShell ({
           nativeBuildInputs = native-deps;
           buildInputs = cli-deps ++ ide-deps ++ book-deps ++ [
-            checkProject
-            publishCrates
-            publishExtension
-            cargo-workspaces
             rust-analyzer
           ] ++ lib.optionals stdenv.isLinux [
             alsa-lib.dev
@@ -190,7 +186,17 @@
           shellHook = ''
             export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$(rustc --print target-libdir)"
             export DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:$(rustc --print target-libdir)"
-          '';
+            '';
+        } // env-vars);
+
+        devShells.ci = with pkgs; mkShell ({
+          nativeBuildInputs = native-deps;
+          buildInputs = cli-deps ++ ide-deps ++ book-deps ++ [
+            checkProject
+            publishCrates
+            publishExtension
+            cargo-workspaces
+          ];
         } // env-vars);
       });
 }

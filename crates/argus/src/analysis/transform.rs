@@ -8,7 +8,7 @@ use argus_ext::{
 use index_vec::IndexVec;
 use indexmap::IndexSet;
 use rustc_data_structures::fx::{FxHashMap as HashMap, FxIndexMap};
-use rustc_hir::{self as hir, intravisit::Map, BodyId, HirId};
+use rustc_hir::{self as hir, BodyId, HirId};
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::ty::{TyCtxt, TypeckResults};
 use rustc_span::Span;
@@ -45,7 +45,6 @@ pub fn compute_provenance<'tcx>(
   result: EvaluationResult,
   dataid: Option<UODIdx>,
 ) -> Provenance<Obligation> {
-  let hir = infcx.tcx.hir();
   let fdata = infcx.bless_fulfilled(obligation, result);
 
   // If the span is coming from a macro, point to the callsite.
@@ -54,7 +53,7 @@ pub fn compute_provenance<'tcx>(
 
   let hir_id =
     hier_hir::find_most_enclosing_node(infcx.tcx, body_id, callsite_cause_span)
-      .unwrap_or_else(|| hir.body_owner(body_id));
+      .unwrap_or_else(|| infcx.tcx.hir_body_owner(body_id));
 
   Provenance {
     hir_id,
@@ -101,9 +100,8 @@ pub fn transform<'a, 'tcx: 'a>(
     })
     .collect::<Vec<_>>();
 
-  let hir = tcx.hir();
   let source_map = tcx.sess.source_map();
-  let body_span = tcx.to_local(body_id, hir.body(body_id).value.span);
+  let body_span = tcx.to_local(body_id, tcx.hir_body(body_id).value.span);
   let body_range = CharRange::from_span(body_span, source_map)
     .expect("Couldn't get body range");
 
@@ -182,7 +180,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
 
   fn hir_id_to_span(&self, hir_id: HirId) -> Span {
     let hir = self.tcx.hir();
-    match hir.hir_node(hir_id) {
+    match self.tcx.hir_node(hir_id) {
       hir::Node::Expr(hir::Expr {
         kind: hir::ExprKind::MethodCall(_, _, _, span),
         ..
@@ -266,7 +264,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         .map(|idx| *self.obligations[idx])
         .collect::<Vec<_>>();
 
-      let is_body = hir_id == self.tcx.hir().body_owner(self.body_id);
+      let is_body = hir_id == self.tcx.hir_body_owner(self.body_id);
       let expr_idx = self.exprs.push(Expr {
         range,
         snippet,

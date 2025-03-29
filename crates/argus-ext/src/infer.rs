@@ -1,4 +1,4 @@
-use rustc_data_structures::stable_hasher::Hash64;
+use rustc_hashes::Hash64;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::ty::{self, Predicate, TypeFoldable};
 use rustc_trait_selection::{

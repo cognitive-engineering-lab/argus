@@ -1,7 +1,8 @@
 mod r#impl;
 
 use itertools::Itertools;
-use rustc_data_structures::{fx::FxHashMap as HashMap, stable_hasher::Hash64};
+use rustc_data_structures::fx::FxHashMap as HashMap;
+use rustc_hashes::Hash64;
 use rustc_hir::{def_id::DefId, BodyId, HirId};
 use rustc_infer::{infer::InferCtxt, traits::ObligationInspector};
 use rustc_middle::ty::{self, Predicate, TyCtxt, TypeVisitable, TypeckResults};
