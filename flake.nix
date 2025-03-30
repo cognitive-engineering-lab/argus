@@ -36,12 +36,14 @@
           useFetchCargoVendor = true;
         };
 
-        env-vars = {
-          RUSTC_LINKER = "${pkgs.llvmPackages.clangUseLLVM}/bin/clang";
-          # NOTE: currently playwright-driver uses version 1.40.0, when something inevitably fails,
-          # check that the version of playwright-driver and that of the NPM playwright
-          # `packages/evaluation/package.json` match.
-          PLAYWRIGHT_BROWSERS_PATH="${pkgs.playwright-driver.browsers}";
+        env-vars = with pkgs; {
+          RUSTC_LINKER = "${llvmPackages.clangUseLLVM}/bin/clang";
+          SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt";
+          # NOTE: The version of playwright-driver and that of the NPM playwright
+          # `packages/evaluation/package.json` must match.
+          PLAYWRIGHT_BROWSERS_PATH="${playwright-driver.browsers}";
+        } // lib.optionalAttrs stdenv.isLinux {
+          PKG_CONFIG_PATH="${udev.dev}/lib/pkgconfig:${alsa-lib.dev}/lib/pkgconfig";
         };
 
         native-deps = with pkgs; [
@@ -49,6 +51,9 @@
           cacert
         ] ++ lib.optionals stdenv.isDarwin [
           darwin.apple_sdk.frameworks.SystemConfiguration
+        ] ++ lib.optionals stdenv.isLinux [
+          alsa-lib.dev
+          udev.dev
         ];
 
         cli-deps = with pkgs; [
@@ -181,11 +186,8 @@
         devShells.default = with pkgs; mkShell ({
           nativeBuildInputs = native-deps;
           buildInputs = cli-deps ++ ide-deps ++ book-deps ++ [
-            ci-check
             rust-analyzer
-          ] ++ lib.optionals stdenv.isLinux [
-            alsa-lib.dev
-            udev.dev
+            ci-check
           ];
 
           # Needed in order to run `cargo argus ...` within the directory
@@ -198,10 +200,10 @@
         devShells.ci = with pkgs; mkShell ({
           nativeBuildInputs = native-deps;
           buildInputs = cli-deps ++ ide-deps ++ book-deps ++ [
+            cargo-workspaces
             ci-check
             publishCrates
             publishExtension
-            cargo-workspaces
           ];
         } // env-vars);
       });
