@@ -20,8 +20,5 @@ jobs:
       - uses: DeterminateSystems/flakehub-cache-action@main
       - uses: DeterminateSystems/flake-checker-action@main
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-
       - name: Argus Test
         run: nix develop .#ci --show-trace --print-build-logs --verbose --command ci-check

@@ -90,6 +90,11 @@
             CARGO_HOME = "${placeholder "out"}/.cargo";
           });
 
+          preBuild = ''
+            export PATH = "$PATH:$PWD/scripts"
+            patchShebangs .
+          '';
+
           postBuild = ''
             cargo make init-bindings
           '';
