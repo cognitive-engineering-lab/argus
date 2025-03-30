@@ -87,11 +87,11 @@
           doCheck = false;
 
           env = (env-vars // {
-            CARGO_HOME = "${placeholder "out"}/.cargo";
+            CARGO_HOME="${placeholder "out"}/.cargo";
           });
 
           preBuild = ''
-            export PATH = "$PATH:$PWD/scripts"
+            export PATH="$PATH:$PWD/scripts"
             patchShebangs .
           '';
 
