@@ -1,4 +1,4 @@
-use rustc_data_structures::stable_hasher::Hash64;
+use rustc_hashes::Hash64;
 use rustc_hir::{def_id::DefId, BodyId, HirId};
 use rustc_hir_typeck::inspect_typeck;
 use rustc_infer::{
@@ -97,6 +97,7 @@ impl<'tcx> TyExt<'tcx> for Ty<'tcx> {
       | ty::TyKind::Placeholder(..)
       | ty::TyKind::Pat(..)
       | ty::TyKind::Infer(..)
+      | ty::TyKind::UnsafeBinder(..)
       | ty::TyKind::Error(..) => false,
     }
   }
@@ -119,8 +120,7 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
   fn to_local(&self, body_id: BodyId, span: Span) -> Span {
     use rustc_utils::source_map::span::SpanExt;
 
-    let hir = self.hir();
-    let mut local_body_span = hir.body(body_id).value.span;
+    let mut local_body_span = self.hir_body(body_id).value.span;
     while local_body_span.from_expansion() {
       local_body_span = local_body_span.source_callsite();
     }
@@ -133,13 +133,13 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
     body_id: BodyId,
     inspector: ObligationInspector<'tcx>,
   ) -> &'tcx TypeckResults<'tcx> {
-    let local_def_id = self.hir().body_owner_def_id(body_id);
+    let local_def_id = self.hir_body_owner_def_id(body_id);
     // Typeck current body, accumulating inspected information in TLS.
     inspect_typeck(self, local_def_id, inspector)
   }
 
   fn is_parent_of(&self, a: HirId, b: HirId) -> bool {
-    a == b || self.hir().parent_iter(b).any(|(id, _)| id == a)
+    a == b || self.hir_parent_iter(b).any(|(id, _)| id == a)
   }
 
   fn predicate_hash(&self, p: &Predicate<'tcx>) -> Hash64 {
@@ -330,7 +330,7 @@ impl PredicateObligationExt for PredicateObligation<'_> {
     let source_map = tcx.sess.source_map();
     let hir = tcx.hir();
 
-    let hir_id = hir.body_owner(body_id);
+    let hir_id = tcx.hir_body_owner(body_id);
     let body_span = hir.span(hir_id);
 
     // Backup span of the DefId

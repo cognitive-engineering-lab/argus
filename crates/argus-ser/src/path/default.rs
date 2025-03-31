@@ -233,6 +233,7 @@ fn characteristic_def_id_of_type_cached<'a>(
     | ty::FnPtr(..)
     | ty::Alias(..)
     | ty::Placeholder(..)
+    | ty::UnsafeBinder(..)
     | ty::Param(..)
     | ty::Infer(..)
     | ty::Bound(..)

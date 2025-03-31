@@ -47,7 +47,7 @@ fn bin_expressions(
     bins: vec![],
   };
 
-  binner.visit_body(ctx.tcx.hir().body(ctx.body_id));
+  binner.visit_body(ctx.tcx.hir_body(ctx.body_id));
 
   // Add remaining miscellaneous unbinned obligations
   let mut bins = binner.bins;
@@ -121,8 +121,8 @@ impl BinCreator<'_, '_> {
 impl<'a, 'tcx: 'a> HirVisitor<'tcx> for BinCreator<'a, 'tcx> {
   type NestedFilter = nested_filter::All;
 
-  fn nested_visit_map(&mut self) -> Self::Map {
-    self.ctx.tcx.hir()
+  fn maybe_tcx(&mut self) -> Self::MaybeTyCtxt {
+    self.ctx.tcx
   }
 
   // FIXME: after updating to nightly-2024-05-20 this binning logic broke slightly.
@@ -168,16 +168,15 @@ pub fn find_most_enclosing_node(
   body_id: BodyId,
   span: Span,
 ) -> Option<HirId> {
-  let hir = tcx.hir();
   let mut node_finder = FindNodeBySpan::new(tcx, span);
 
   log::trace!(
     "Finding HirId for span: {:?}, in body {:?}",
     span,
-    hir.body(body_id)
+    tcx.hir_body(body_id)
   );
 
-  node_finder.visit_body(hir.body(body_id));
+  node_finder.visit_body(tcx.hir_body(body_id));
   node_finder
     .result
     // NOTE: there should always be an enclosing body somewhere, this could be an expect
@@ -238,8 +237,8 @@ macro_rules! simple_visitors {
 impl<'tcx> HirVisitor<'tcx> for FindNodeBySpan<'tcx> {
   type NestedFilter = nested_filter::All;
 
-  fn nested_visit_map(&mut self) -> Self::Map {
-    self.tcx.hir()
+  fn maybe_tcx(&mut self) -> Self::MaybeTyCtxt {
+    self.tcx
   }
 
   simple_visitors! {
@@ -252,7 +251,7 @@ impl<'tcx> HirVisitor<'tcx> for FindNodeBySpan<'tcx> {
     [visit_pat_field, walk_pat_field, hir::PatField],
     [visit_expr, walk_expr, hir::Expr],
     [visit_expr_field, walk_expr_field, hir::ExprField],
-    [visit_ty, walk_ty, hir::Ty],
+    [visit_ty, walk_ty, hir::Ty<'_, hir::AmbigArg>],
     [visit_generic_param, walk_generic_param, hir::GenericParam],
   }
 }

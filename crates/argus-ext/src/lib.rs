@@ -2,6 +2,7 @@
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions, clippy::missing_errors_doc)]
 extern crate rustc_data_structures;
+extern crate rustc_hashes;
 extern crate rustc_hir;
 extern crate rustc_hir_typeck;
 extern crate rustc_infer;

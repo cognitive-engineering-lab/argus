@@ -137,7 +137,7 @@ impl RustcPlugin for ArgusPlugin {
         exit(0);
       }
       AC::Obligations { .. } | AC::Tree { .. } | AC::Bundle => {}
-    };
+    }
 
     let file = match &args.command {
       AC::Tree { file, .. } => Some(file),
@@ -257,13 +257,9 @@ pub fn run_with_callbacks(
 
   log::debug!("Running command with callbacks: {args:?}");
 
-  let compiler = rustc_driver::RunCompiler::new(&args, callbacks);
-
-  log::debug!("Building compiler ...");
-
   #[allow(unused_must_use)]
   rustc_driver::catch_fatal_errors(move || {
-    compiler.run();
+    rustc_driver::run_compiler(&args, callbacks);
   })
   .map_err(|_| ArgusError::BuildError { range: None });
 
@@ -285,12 +281,7 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
     }
 
     config.psess_created = Some(Box::new(|sess| {
-      let fallback_bundle = rustc_errors::fallback_fluent_bundle(
-        rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
-        false,
-      );
-
-      sess.dcx().make_silent(fallback_bundle, None, false);
+      sess.dcx().make_silent(None, false);
     }));
   }
 

@@ -1,7 +1,8 @@
 mod r#impl;
 
 use itertools::Itertools;
-use rustc_data_structures::{fx::FxHashMap as HashMap, stable_hasher::Hash64};
+use rustc_data_structures::fx::FxHashMap as HashMap;
+use rustc_hashes::Hash64;
 use rustc_hir::{def_id::DefId, BodyId, HirId};
 use rustc_infer::{infer::InferCtxt, traits::ObligationInspector};
 use rustc_middle::ty::{self, Predicate, TyCtxt, TypeVisitable, TypeckResults};
@@ -268,7 +269,7 @@ pub fn retain_method_calls<'tcx, T>(
       let tp =
         get_predicate(&trait_preds[*deref_pred]).expect_trait_predicate();
       let self_ty = tp.self_ty().skip_binder();
-      if all_base_tys.iter().any(|&t| t == self_ty) {
+      if all_base_tys.contains(&self_ty) {
         to_remove.push(*deref_pred);
       }
     }

@@ -13,7 +13,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
       - uses: DeterminateSystems/flake-checker-action@main
-      - run: nix develop --command ci-crate-pub ${{ secrets.CRATES_IO }}
+      - run: nix develop .#ci --command ci-crate-pub ${{ secrets.CRATES_IO }}
 
   publish-ide:
     runs-on: ubuntu-latest
@@ -23,4 +23,4 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
       - uses: DeterminateSystems/flake-checker-action@main
-      - run: nix develop --command ci-ext-pub ${{ secrets.VSCODE_MRKT }} ${{ secrets.OVSX_MRKT }}
+      - run: nix develop .#ci --command ci-ext-pub ${{ secrets.VSCODE_MRKT }} ${{ secrets.OVSX_MRKT }}

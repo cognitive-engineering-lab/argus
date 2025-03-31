@@ -37,27 +37,23 @@ pub enum TermKindDef<'tcx> {
   ),
 }
 
-pub struct ValTreeDef<'tcx> {
-  tree: ValTree<'tcx>,
-  ty: Ty<'tcx>,
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "Value"))]
+pub struct ValueDef<'tcx> {
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+  pub ty: Ty<'tcx>,
+  #[cfg_attr(feature = "testing", ts(type = "ValTree"))]
+  pub valtree: ValTree<'tcx>,
 }
 
-impl<'tcx> ValTreeDef<'tcx> {
-  pub fn new(tree: ValTree<'tcx>, ty: Ty<'tcx>) -> Self {
-    Self { tree, ty }
-  }
-}
-
-impl Serialize for ValTreeDef<'_> {
-  fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+impl ValueDef<'_> {
+  pub fn serialize<S>(value: &Value, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
-    ValTreeKind::from(self).serialize(s)
+    ValTreeKind::from(value).serialize(s)
   }
 }
-
-// NOTE: inner types for a ValTreeDef
 
 #[derive(Serialize)]
 #[cfg_attr(feature = "testing", derive(TS))]
@@ -65,8 +61,9 @@ impl Serialize for ValTreeDef<'_> {
 #[serde(tag = "type")]
 enum ValTreeKind<'tcx> {
   Ref {
-    #[cfg_attr(feature = "testing", ts(type = "ValTree"))]
-    inner: ValTreeDef<'tcx>,
+    #[serde(with = "ValueDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Value"))]
+    inner: Value<'tcx>,
   },
 
   #[serde(rename_all = "camelCase")]
@@ -124,53 +121,41 @@ enum LeafKind {
   Scalar,
 }
 
-impl<'tcx> From<&ValTreeDef<'tcx>> for ValTreeKind<'tcx> {
-  fn from(value: &ValTreeDef<'tcx>) -> Self {
+impl<'tcx> From<&Value<'tcx>> for ValTreeKind<'tcx> {
+  fn from(value: &Value<'tcx>) -> Self {
     InferCtxt::access(|infcx| {
       let tcx = &infcx.tcx;
       let this = value;
 
       let u8_type = tcx.types.u8;
-      match (this.tree, this.ty.kind()) {
-        (ty::ValTree::Branch(_), ty::Ref(_, inner_ty, _)) => {
+      match (*this.valtree, this.ty.kind()) {
+        (ty::ValTreeKind::Branch(_), ty::Ref(_, inner_ty, _)) => {
           match inner_ty.kind() {
             ty::Slice(t) if *t == u8_type => {
-              let bytes = this
-                .tree
-                .try_to_raw_bytes(*tcx, this.ty)
-                .unwrap_or_else(|| {
-                  panic!("expected bytes from slice valtree");
-                });
+              let bytes = this.try_to_raw_bytes(*tcx).unwrap_or_else(|| {
+                panic!("expected bytes from slice valtree");
+              });
               ValTreeKind::String {
                 data: format!("b\"{}\"", bytes.escape_ascii()),
                 is_deref: false,
               }
             }
             ty::Str => {
-              let bytes = this
-                .tree
-                .try_to_raw_bytes(*tcx, this.ty)
-                .unwrap_or_else(|| {
-                  panic!("expected bytes from slice valtree");
-                });
+              let bytes = this.try_to_raw_bytes(*tcx).unwrap_or_else(|| {
+                panic!("expected bytes from slice valtree");
+              });
               ValTreeKind::String {
                 data: String::from_utf8_lossy(bytes).to_string(),
                 is_deref: false,
               }
             }
-            _ => ValTreeKind::Ref {
-              inner: ValTreeDef::new(this.tree, *inner_ty),
-            },
+            _ => ValTreeKind::Ref { inner: *this },
           }
         }
-        (ty::ValTree::Branch(_), ty::Array(t, _)) if *t == u8_type => {
-          let bytes =
-            this
-              .tree
-              .try_to_raw_bytes(*tcx, this.ty)
-              .unwrap_or_else(|| {
-                panic!("expected bytes from slice valtree");
-              });
+        (ty::ValTreeKind::Branch(_), ty::Array(t, _)) if *t == u8_type => {
+          let bytes = this.try_to_raw_bytes(*tcx).unwrap_or_else(|| {
+            panic!("expected bytes from slice valtree");
+          });
 
           ValTreeKind::String {
             data: format!("b\"{}\"", bytes.escape_ascii()),
@@ -179,11 +164,14 @@ impl<'tcx> From<&ValTreeDef<'tcx>> for ValTreeKind<'tcx> {
         }
 
         (
-          ty::ValTree::Branch(_),
+          ty::ValTreeKind::Branch(_),
           ty::Array(..) | ty::Tuple(..) | ty::Adt(..),
         ) => {
-          let contents = tcx
-            .destructure_const(ty::Const::new_value(*tcx, this.tree, this.ty));
+          let contents = tcx.destructure_const(ty::Const::new_value(
+            *tcx,
+            this.valtree,
+            this.ty,
+          ));
           let fields = contents.fields;
           let kind = match this.ty.kind() {
             ty::Array(..) => ValTreeAggregateKind::Array,
@@ -221,14 +209,14 @@ impl<'tcx> From<&ValTreeDef<'tcx>> for ValTreeKind<'tcx> {
           ValTreeKind::Aggregate { fields, kind }
         }
 
-        (ty::ValTree::Leaf(leaf), ty::Ref(_, inner_ty, _)) => {
+        (ty::ValTreeKind::Leaf(leaf), ty::Ref(_, inner_ty, _)) => {
           ValTreeKind::Leaf {
-            data: ConstScalarIntDef::new(leaf, *inner_ty),
+            data: ConstScalarIntDef::new(*leaf, *inner_ty),
             kind: LeafKind::Ref,
           }
         }
-        (ty::ValTree::Leaf(leaf), _) => ValTreeKind::Leaf {
-          data: ConstScalarIntDef::new(leaf, this.ty),
+        (ty::ValTreeKind::Leaf(leaf), _) => ValTreeKind::Leaf {
+          data: ConstScalarIntDef::new(*leaf, this.ty),
           kind: LeafKind::Scalar,
         },
         _ => ValTreeKind::String {

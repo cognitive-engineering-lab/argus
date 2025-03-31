@@ -1,3 +1,4 @@
+use rustc_abi::Size;
 use rustc_apfloat::{
   ieee::{Double, Single},
   Float,
@@ -5,7 +6,6 @@ use rustc_apfloat::{
 use rustc_hir::def::DefKind;
 use rustc_middle::ty::*;
 use rustc_span::Symbol;
-use rustc_target::abi::Size;
 use serde::Serialize;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
@@ -66,8 +66,9 @@ enum ConstKindDef<'tcx> {
   },
   Placeholder,
   Value {
-    #[cfg_attr(feature = "testing", ts(type = "ValTree"))]
-    data: ValTreeDef<'tcx>,
+    #[serde(with = "ValueDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Value"))]
+    data: Value<'tcx>,
   },
   Error,
   Expr {
@@ -82,9 +83,7 @@ impl<'tcx> From<&Const<'tcx>> for ConstKindDef<'tcx> {
     match kind {
       ConstKind::Unevaluated(uc) => Self::Unevaluated { data: uc },
       ConstKind::Param(v) => Self::Param { data: v },
-      ConstKind::Value(ty, v) => Self::Value {
-        data: ValTreeDef::new(v, ty),
-      },
+      ConstKind::Value(data) => Self::Value { data },
       ConstKind::Expr(e) => Self::Expr {
         data: ExprDef::from(&e),
       },

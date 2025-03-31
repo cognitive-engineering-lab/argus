@@ -1,4 +1,5 @@
-use rustc_data_structures::stable_hasher::{Hash64, HashStable, StableHasher};
+use rustc_hashes::Hash64;
+use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 use rustc_middle::ty::{TyCtxt, TypeFoldable};
 use rustc_query_system::ich::StableHashingContext;
 

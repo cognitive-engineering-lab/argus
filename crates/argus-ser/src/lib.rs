@@ -25,6 +25,7 @@
 //! lists of elements are serialized with a prefixed `Slice__`.
 #![feature(rustc_private, decl_macro, let_chains)]
 #![allow(non_camel_case_types, non_snake_case)]
+extern crate rustc_abi;
 extern crate rustc_apfloat;
 extern crate rustc_ast_ir;
 extern crate rustc_data_structures;

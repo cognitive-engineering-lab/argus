@@ -9,8 +9,13 @@ import tmp from "tmp";
 import { webHtml } from "./page";
 
 export async function argusData(dir: string) {
+  const tmpdir = tmp.dirSync({ unsafeCleanup: true });
   const argusOutput = await execSilent("cargo", ["argus", "bundle"], {
-    cwd: dir
+    cwd: dir,
+    env: {
+      CARGO_TARGET_DIR: tmpdir.name,
+      ...process.env
+    }
   });
   const bundles: Result<BodyBundle[]> = JSON.parse(argusOutput);
   return bundles;
@@ -22,7 +27,7 @@ export const execSilent = async (
   args: string[],
   opts: ExecNotifyOpts
 ) => {
-  return await _execNotify(cmd, args, opts, (..._args: any[]) => {});
+  return await _execNotify(cmd, args, opts, (..._args: any[]) => { });
 };
 
 export async function sleep(waitTime: number) {

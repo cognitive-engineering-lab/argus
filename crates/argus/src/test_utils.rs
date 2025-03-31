@@ -1,4 +1,9 @@
-use std::{env, fs, io, panic, path::Path, process::Command, sync::Arc};
+use std::{
+  env, fs, io, panic,
+  path::Path,
+  process::Command,
+  sync::{Arc, LazyLock},
+};
 
 use anyhow::{Context, Result};
 use rustc_hir::BodyId;
@@ -19,16 +24,14 @@ use crate::{
   },
 };
 
-lazy_static::lazy_static! {
-  static ref SYSROOT: String = {
-    let rustc_output = Command::new("rustc")
-      .args(["--print", "sysroot"])
-      .output()
-      .unwrap()
-      .stdout;
-    String::from_utf8(rustc_output).unwrap().trim().to_owned()
-  };
-}
+static SYSROOT: LazyLock<String> = LazyLock::new(|| {
+  let rustc_output = Command::new("rustc")
+    .args(["--print", "sysroot"])
+    .output()
+    .unwrap()
+    .stdout;
+  String::from_utf8(rustc_output).unwrap().trim().to_owned()
+});
 
 pub const DUMMY_FILE_NAME: &str = "dummy.rs";
 
@@ -65,15 +68,16 @@ pub(crate) fn load_test_from_file(
     path.file_name().unwrap().to_string_lossy()
   );
   let c = fs::read(path)
-    .with_context(|| format!("failed to load test from {path:?}"))?;
+    .with_context(|| format!("failed to load test from {}", path.display()))?;
   let source = String::from_utf8(c)
-    .with_context(|| format!("UTF8 parse error in file: {path:?}"))?;
+    .with_context(|| format!("UTF8 parse error in file: {}", path.display()))?;
 
   let cfg = TestFileConfig::default();
 
   Ok((source, cfg))
 }
 
+#[allow(clippy::missing_panics_doc)]
 pub fn test_obligations_no_crash(
   path: &Path,
   mut assert_pass: impl for<'tcx> FnMut(Forgettable<FullData<'tcx>>, ObligationsInBody)
@@ -88,12 +92,12 @@ pub fn test_obligations_no_crash(
           analysis::body_data(tcx, body_id);
 
         assert_pass(full_data, obligations_in_body);
-      })
+      });
     });
     Ok(())
   };
 
-  inner().unwrap()
+  inner().unwrap();
 }
 
 pub fn test_locate_tree<'a, 'tcx: 'a>(
@@ -103,6 +107,7 @@ pub fn test_locate_tree<'a, 'tcx: 'a>(
   analysis::entry::pick_tree(hash, thunk)
 }
 
+#[allow(clippy::missing_panics_doc)]
 pub fn test_tree_for_target(
   path: &Path,
   mut range: CharRange,
@@ -120,8 +125,7 @@ pub fn test_tree_for_target(
       let bodies = find_enclosing_bodies(tcx, body_span).collect::<Vec<_>>();
       assert!(
         bodies.len() == 1,
-        "only one body must match a body range {:?}",
-        body_span
+        "only one body must match a body range {body_span:?}",
       );
 
       let body_id = bodies.first().unwrap();
@@ -137,9 +141,10 @@ pub fn test_tree_for_target(
     Ok(())
   };
 
-  inner().unwrap()
+  inner().unwrap();
 }
 
+#[allow(clippy::missing_panics_doc)]
 pub fn run_in_dir(
   dir: impl AsRef<Path>,
   test_fn: impl Fn(&Path) + std::panic::RefUnwindSafe,
@@ -165,7 +170,7 @@ pub fn run_in_dir(
 
       let res = panic::catch_unwind(|| test_fn(&path));
 
-      if let Err(_) = res {
+      if res.is_err() {
         failed = true;
         eprintln!("\n\n\x1b[31m!! {test_name}\x1b[0m\n\n");
       } else {
@@ -192,7 +197,7 @@ pub fn run_in_dir(
 pub fn for_each_body(tcx: TyCtxt, mut f: impl FnMut(BodyId, TyCtxt)) {
   find_bodies(tcx)
     .into_iter()
-    .for_each(|(_, body_id)| f(body_id, tcx))
+    .for_each(|(_, body_id)| f(body_id, tcx));
 }
 
 pub fn compile_normal(
@@ -203,7 +208,7 @@ pub fn compile_normal(
     input,
     &format!("--crate-type lib --sysroot {}", &*SYSROOT),
     callbacks,
-  )
+  );
 }
 
 #[allow(unused_must_use)]
@@ -214,23 +219,21 @@ pub fn compile(
 ) {
   let mut callbacks = TestCallbacks {
     callback: Some(callback),
+    input: input.into(),
   };
   let args = format!(
     "rustc {DUMMY_FILE_NAME} --edition=2021 -Z next-solver -A warnings {args}",
   );
-  let args = args.split(' ').map(|s| s.to_string()).collect::<Vec<_>>();
+  let args = args.split(' ').map(ToString::to_string).collect::<Vec<_>>();
 
-  // Explicitly ignore the unused return value. Many test cases are intended
-  // to fail compilation, but the analysis results should still be sound.
   rustc_driver::catch_fatal_errors(|| {
-    let mut compiler = rustc_driver::RunCompiler::new(&args, &mut callbacks);
-    compiler.set_file_loader(Some(Box::new(StringLoader(input.into()))));
-    compiler.run()
+    rustc_driver::run_compiler(&args, &mut callbacks);
   });
 }
 
 struct TestCallbacks<Cb> {
   callback: Option<Cb>,
+  input: String,
 }
 
 impl<Cb> rustc_driver::Callbacks for TestCallbacks<Cb>
@@ -238,19 +241,17 @@ where
   Cb: FnOnce(TyCtxt<'_>),
 {
   fn config(&mut self, config: &mut rustc_interface::Config) {
+    config.file_loader =
+      Some(Box::new(StringLoader(std::mem::take(&mut self.input))));
     config.psess_created = Some(Box::new(|sess| {
-      let fallback_bundle = rustc_errors::fallback_fluent_bundle(
-        rustc_driver::DEFAULT_LOCALE_RESOURCES.to_vec(),
-        false,
-      );
-      sess.dcx().make_silent(fallback_bundle, None, false);
+      sess.dcx().make_silent(None, false);
     }));
   }
 
-  fn after_expansion<'tcx>(
+  fn after_expansion(
     &mut self,
     _compiler: &rustc_interface::interface::Compiler,
-    tcx: TyCtxt<'tcx>,
+    tcx: TyCtxt,
   ) -> rustc_driver::Compilation {
     let callback = self.callback.take().unwrap();
     callback(tcx);

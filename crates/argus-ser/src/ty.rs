@@ -1,10 +1,10 @@
+use rustc_abi::ExternAbi;
 use rustc_data_structures::fx::FxIndexMap;
 use rustc_hir::{self as hir, def::DefKind, def_id::DefId, LangItem, Safety};
 use rustc_infer::traits::{ObligationCause, PredicateObligation};
 use rustc_macros::TypeVisitable;
 use rustc_middle::ty::{self, elaborate::supertraits};
 use rustc_span::symbol::{kw, Symbol};
-use rustc_target::spec::abi::Abi;
 use serde::Serialize;
 use smallvec::SmallVec;
 #[cfg(feature = "testing")]
@@ -169,6 +169,11 @@ pub enum TyKindDef<'tcx> {
     #[cfg_attr(feature = "testing", ts(type = "ParamTy"))]
     ty::ParamTy,
   ),
+  Binder(
+    #[serde(with = "Binder__TyDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Binder__Ty"))]
+    ty::UnsafeBinderInner<ty::TyCtxt<'tcx>>,
+  ),
   Bound(BoundTyDef),
   Alias(AliasTyKindDef<'tcx>),
   Dynamic(DynamicTyKindDef<'tcx>),
@@ -203,6 +208,7 @@ impl<'tcx> From<&ty::TyKind<'tcx>> for TyKindDef<'tcx> {
         ty: *ty,
         mutbl: *mutbl,
       }),
+      ty::TyKind::UnsafeBinder(inner) => Self::Binder(*inner),
       ty::TyKind::Foreign(d) => Self::Foreign(path::PathDefNoArgs::new(*d)),
       ty::TyKind::Closure(def_id, args) => {
         Self::Closure(path::PathDefWithArgs::new(*def_id, args))
@@ -595,6 +601,41 @@ impl PlaceholderTyDef {
   }
 }
 
+type PolyTy<'tcx> = Binder__TyDef<'tcx>;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export, rename = "PolyTy"))]
+pub struct Binder__TyDef<'tcx> {
+  #[serde(with = "TyDef")]
+  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
+  value: ty::Ty<'tcx>,
+
+  #[serde(with = "Slice__BoundVariableKindDef")]
+  #[cfg_attr(feature = "testing", ts(type = "BoundVariableKind[]"))]
+  bound_vars: &'tcx ty::List<ty::BoundVariableKind>,
+}
+
+impl<'tcx> PolyTy<'tcx> {
+  pub fn new(value: &ty::Binder<'tcx, ty::Ty<'tcx>>) -> Self {
+    Self {
+      bound_vars: value.bound_vars(),
+      value: value.skip_binder(),
+    }
+  }
+
+  pub fn serialize<S>(
+    value: &ty::Binder<'tcx, ty::Ty<'tcx>>,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    Self::new(value).serialize(s)
+  }
+}
+
 // -----------------------------------
 // Function signature definitions
 
@@ -649,7 +690,7 @@ pub struct FnSigDef<'tcx> {
 
   #[serde(with = "AbiDef")]
   #[cfg_attr(feature = "testing", ts(type = "Abi"))]
-  pub abi: Abi,
+  pub abi: ExternAbi,
 }
 
 #[derive(Serialize)]
@@ -662,7 +703,7 @@ pub enum SafetyDef {
 }
 
 #[derive(Serialize)]
-#[serde(remote = "Abi")]
+#[serde(remote = "ExternAbi")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "Abi"))]
 pub enum AbiDef {
@@ -678,6 +719,7 @@ pub enum AbiDef {
   SysV64 { unwind: bool },
   PtxKernel,
   Msp430Interrupt,
+  GpuKernel,
   X86Interrupt,
   EfiApi,
   AvrInterrupt,
@@ -957,10 +999,14 @@ impl RegionDef {
       ty::ReEarlyParam(ref data) if data.name != kw::Empty => {
         Self::Named { data: data.name }
       }
+      ty::ReLateParam(ty::LateParamRegion { kind, .. }) => {
+        if let Some(name) = kind.get_name() {
+          Self::Named { data: name }
+        } else {
+          Self::Anonymous
+        }
+      }
       ty::ReBound(_, ty::BoundRegion { kind: br, .. })
-      | ty::ReLateParam(ty::LateParamRegion {
-        bound_region: br, ..
-      })
       | ty::RePlaceholder(ty::Placeholder {
         bound: ty::BoundRegion { kind: br, .. },
         ..
