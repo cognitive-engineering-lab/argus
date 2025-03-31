@@ -8,11 +8,7 @@ description = "Rustc Ty serialization and TS bindings."
 license = "MIT"
 
 [features]
-testing = [
-  "ts-rs",
-  "rustc_utils/serde",
-  "rustc_utils/ts-rs",
-]
+testing = ["ts-rs", "rustc_utils/serde", "rustc_utils/ts-rs"]
 
 [lib]
 doctest = false
@@ -24,8 +20,8 @@ fluid-let.workspace = true
 rustc_utils.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-smallvec = "1.11.2"
-itertools = "0.12.0"
+itertools.workspace = true
+smallvec = "1.14.0"
 ts-rs = { version = "7.1.1", features = ["indexmap-impl"], optional = true }
 index_vec = { version = "0.1.3", features = ["serde"] }
 argus-ext = { version = "0.1.13", path = "../argus-ext" }
