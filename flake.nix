@@ -96,8 +96,7 @@
           });
 
           preBuild = ''
-            export PATH="$PATH:$PWD/scripts"
-            patchShebangs .
+            patchShebangs ./scripts
           '';
 
           postBuild = ''
