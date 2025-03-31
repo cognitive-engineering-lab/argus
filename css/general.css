@@ -190,21 +190,9 @@ kbd {
     vertical-align: middle;
 }
 
-sup {
-    /* Set the line-height for superscript and footnote references so that there
-       isn't an awkward space appearing above lines that contain the footnote.
-
-       See https://github.com/rust-lang/mdBook/pull/2443#discussion_r1813773583
-       for an explanation.
-    */
-    line-height: 0;
-}
-
-:not(.footnote-definition) + .footnote-definition {
+:not(.footnote-definition) + .footnote-definition,
+.footnote-definition + :not(.footnote-definition) {
     margin-block-start: 2em;
-}
-.footnote-definition:not(:has(+ .footnote-definition)) {
-    margin-block-end: 2em;
 }
 .footnote-definition {
     font-size: 0.9em;
