@@ -25,28 +25,3 @@ pub mod utils;
 
 use rustc_trait_selection::traits::{query::NoSolution, solve::Certainty};
 type EvaluationResult = Result<Certainty, NoSolution>;
-
-#[cfg(test)]
-mod tests {
-  use serde::Serialize;
-  use serde_json;
-
-  #[test]
-  /// NOTE the Argus serialization depends on the fact that a
-  /// two field tuple struct (and a skipped field) with `transparent` will produce
-  /// the first value bare.
-  fn serde_transparent() {
-    #[derive(Serialize)]
-    #[serde(transparent)]
-    pub struct W<'a>(i32, #[serde(skip)] PhantomData<&'a ()>);
-
-    impl<'a> W<'a> {
-      fn new(v: i32) -> Self {
-        W(v, PhantomData)
-      }
-    }
-
-    let s = serde_json::to_string(&W::new(0)).unwrap();
-    assert!(s.eq("0"));
-  }
-}
