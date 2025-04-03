@@ -42,13 +42,6 @@
   (apply string-append
          (intersperse (cons base subdirs) "/")))
 
-;; (define (copy-file-contents source-file destination-file)
-;;   (call-with-input-file source-file
-;;     (lambda (input-port)
-;;       (call-with-output-file destination-file
-;;         (lambda (output-port)
-;;           (copy-port input-port output-port))))))
-
 (define (ensure-directory-exists directory-path)
   (or (file-exists? directory-path)
       (mkdir directory-path)))

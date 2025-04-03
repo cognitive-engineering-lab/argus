@@ -70,7 +70,7 @@ enum ValTreeKind<'tcx> {
   String { data: String, is_deref: bool },
 
   Aggregate {
-    #[serde(with = "Slice__ConstDef")]
+    #[serde(with = "ConstDefs")]
     #[cfg_attr(feature = "testing", ts(type = "Const[]"))]
     fields: &'tcx [Const<'tcx>],
 
@@ -106,7 +106,7 @@ enum AdtAggregateKind {
   Fn,
   Const,
   Misc {
-    #[serde(with = "Slice__SymbolDef")]
+    #[serde(with = "SymbolDefs")]
     #[cfg_attr(feature = "testing", ts(type = "Symbol[]"))]
     names: Vec<Symbol>,
   },
@@ -256,7 +256,7 @@ pub enum ExprDef<'tcx> {
     #[serde(with = "ConstDef")]
     #[cfg_attr(feature = "testing", ts(type = "Const"))]
     Const<'tcx>,
-    #[serde(with = "Slice__ConstDef")]
+    #[serde(with = "ConstDefs")]
     #[cfg_attr(feature = "testing", ts(type = "Const[]"))]
     Vec<Const<'tcx>>,
   ),

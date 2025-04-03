@@ -6,7 +6,8 @@ import type {
   LeafKind,
   Term,
   UnOp,
-  ValTree
+  ValTree,
+  Value
 } from "@argus/common/bindings";
 import _ from "lodash";
 import React from "react";
@@ -152,6 +153,12 @@ const PrintUnOp = ({ o }: { o: UnOp }) => {
   throw new Error("Unknown unop", o);
 };
 
+export const PrintValue = ({ o }: { o: Value }) => (
+  <>
+    <PrintValueTree o={o.valtree} /> as <PrintTy o={o.ty} />
+  </>
+);
+
 export const PrintValueTree = ({ o }: { o: ValTree }) => {
   switch (o.type) {
     case "String": {
@@ -167,7 +174,7 @@ export const PrintValueTree = ({ o }: { o: ValTree }) => {
       return (
         <>
           {"&"}
-          <PrintValueTree o={o.inner} />
+          <PrintValue o={o.inner} />
         </>
       );
     }

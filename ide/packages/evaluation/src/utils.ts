@@ -27,7 +27,7 @@ export const execSilent = async (
   args: string[],
   opts: ExecNotifyOpts
 ) => {
-  return await _execNotify(cmd, args, opts, (..._args: any[]) => { });
+  return await _execNotify(cmd, args, opts, (..._args: any[]) => {});
 };
 
 export async function sleep(waitTime: number) {
