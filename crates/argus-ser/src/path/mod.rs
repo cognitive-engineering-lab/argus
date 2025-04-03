@@ -107,15 +107,10 @@ enum PathSegment<'tcx> {
     inner: Vec<PathSegment<'tcx>>,
   }, // < ... >
   GenericArgumentList {
-    #[serde(with = "serial_ty::Slice__GenericArgDef")]
+    #[serde(with = "serial_ty::GenericArgDefs")]
     #[cfg_attr(feature = "testing", ts(type = "GenericArg[]"))]
     entries: Vec<ty::GenericArg<'tcx>>,
   },
-  // CommaSeparated {
-  //   #[cfg_attr(feature = "testing", ts(type = "any[]"))]
-  //   entries: Vec<serde_json::Value>,
-  //   kind: CommaSeparatedKind,
-  // }, // ..., ..., ...
   Impl {
     #[cfg_attr(feature = "testing", ts(type = "DefinedPath"))]
     #[serde(skip_serializing_if = "Option::is_none")]

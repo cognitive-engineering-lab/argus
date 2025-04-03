@@ -31,7 +31,10 @@ uuid = { version = "1.7.0", features = ["v4", "fast-rng", "serde"] }
 
 # testing utils
 lazy_static = { version = "1.4", optional = true }
-ts-rs = { version = "7.1.1", features = ["indexmap-impl"], optional = true }
+ts-rs = { version = "7.1.1", features = [
+  "indexmap-impl",
+  "no-serde-warnings",
+], optional = true }
 
 [dev-dependencies]
 argus-lib = { path = ".", features = ["testing"] }

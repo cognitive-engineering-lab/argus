@@ -9,7 +9,7 @@ import React from "react";
 
 import { DBraced, Placeholder } from "../syntax";
 import { PrintDefinitionPath, PrintValuePath } from "./path";
-import { PrintExpr, PrintValueTree } from "./term";
+import { PrintExpr, PrintValue } from "./term";
 import { PrintBoundVariable, PrintSymbol } from "./ty";
 
 export const PrintConst = ({ o }: { o: Const }) => {
@@ -28,7 +28,7 @@ export const PrintConst = ({ o }: { o: Const }) => {
     case "Unevaluated":
       return <PrintUnevaluatedConst o={o.data} />;
     case "Value":
-      return <PrintValueTree o={o.data} />;
+      return <PrintValue o={o.data} />;
     case "Expr":
       return <PrintExpr o={o.data} />;
     default:

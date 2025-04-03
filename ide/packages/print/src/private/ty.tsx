@@ -26,6 +26,7 @@ import type {
   Polarity,
   PolyExistentialPredicates,
   PolyFnSig,
+  PolyTy,
   Region,
   // biome-ignore lint: lint/suspicious/noShadowRestrictedNames
   Symbol,
@@ -97,6 +98,10 @@ export const PrintBinder = <T,>({
     </>
   );
 };
+
+export const PrintPolyTy = ({ o }: { o: PolyTy }) => (
+  <PrintBinder binder={o} Child={({ value }) => <PrintTy o={value} />} />
+);
 
 export const PrintTy = ({ o }: { o: Ty }) => {
   const tyCtx = useContext(TyCtxt);
@@ -230,6 +235,8 @@ export const PrintTyKind = ({ o }: { o: TyKind }) => {
     return <PrintCoroutineTy o={o.Coroutine} />;
   } else if ("CoroutineWitness" in o) {
     return <PrintCoroutineWitnessTy o={o.CoroutineWitness} />;
+  } else if ("Binder" in o) {
+    return <PrintPolyTy o={o.Binder} />;
   }
 
   throw new Error("Unknown ty kind", o);

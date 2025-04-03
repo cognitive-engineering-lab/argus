@@ -49,6 +49,9 @@ use std::cell::Cell;
 pub mod interner;
 
 pub use argus::*;
+pub(crate) use argus_ser_macros::{
+  argus, serialize_custom_seq, Many, Maybe, Poly,
+};
 pub(crate) use r#dyn::DynCtxt;
 use rustc_infer::infer::InferCtxt;
 use rustc_trait_selection::traits::solve::Goal;
@@ -93,18 +96,6 @@ impl InferCtxtSerializeExt for InferCtxt<'_> {
   fn should_print_verbose(&self) -> bool {
     self.tcx.sess.verbose_internals()
   }
-}
-
-#[macro_export]
-macro_rules! serialize_custom_seq {
-  ($wrap:ident, $serializer:expr, $value:expr) => {{
-    use serde::ser::SerializeSeq;
-    let mut seq = $serializer.serialize_seq(Some($value.len()))?;
-    for e in $value.into_iter() {
-      seq.serialize_element(&$wrap(e))?;
-    }
-    seq.end()
-  }};
 }
 
 // ----------------------------------------

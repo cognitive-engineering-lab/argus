@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use rustc_abi::Size;
 use rustc_apfloat::{
   ieee::{Double, Single},
@@ -18,25 +20,15 @@ use super::{
 
 // TODO: one thing missing is being able to print
 // the `Ty` after the constant syntactic definition.
-pub struct ConstDef;
-impl ConstDef {
-  pub fn serialize<S>(value: &Const, s: S) -> Result<S::Ok, S::Error>
+#[derive(Many)]
+#[argus(remote = "Const")]
+pub struct ConstDef<'tcx>(PhantomData<&'tcx ()>);
+impl<'tcx> ConstDef<'tcx> {
+  pub fn serialize<S>(value: &Const<'tcx>, s: S) -> Result<S::Ok, S::Error>
   where
     S: serde::Serializer,
   {
     ConstKindDef::from(value).serialize(s)
-  }
-}
-
-pub struct Slice__ConstDef;
-impl Slice__ConstDef {
-  pub fn serialize<S>(value: &[Const], s: S) -> Result<S::Ok, S::Error>
-  where
-    S: serde::Serializer,
-  {
-    #[derive(Serialize)]
-    struct Wrapper<'a, 'tcx>(#[serde(with = "ConstDef")] &'a Const<'tcx>);
-    serialize_custom_seq! { Wrapper, s, value }
   }
 }
 
