@@ -1,0 +1,17 @@
+[package]
+name = "argus-ser-macros"
+version = "0.1.13"
+edition = "2021"
+authors = ["Gavin Gray <gavinleroy6@gmail.com>"]
+repository = "https://github.com/cognitive-engineering-lab/argus"
+description = "Rustc Ty serialization and TS bindings."
+license = "MIT"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2.0", features = ["extra-traits"] }
+quote = "1.0"
+proc-macro2 = "1.0"
+uuid = { version = "1.16.0", features = ["v4"] }

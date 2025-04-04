@@ -134,6 +134,7 @@ dependencies = [
  "anyhow",
  "argus-ext",
  "argus-ser",
+ "argus-ser-macros",
  "fluid-let",
  "index_vec",
  "itertools",
@@ -143,6 +144,16 @@ dependencies = [
  "serde_json",
  "smallvec",
  "ts-rs",
+]
+
+[[package]]
+name = "argus-ser-macros"
+version = "0.1.13"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "uuid",
 ]
 
 [[package]]

@@ -1,10 +1,6 @@
 [workspace]
 members = ["crates/*"]
-exclude = [
-  "crates/argus-cli/tests/workspaces",
-  "examples",
-  "crates/argus-ser-macros",
-]
+exclude = ["crates/argus-cli/tests/workspaces", "examples"]
 resolver = "2"
 
 [workspace.dependencies]
