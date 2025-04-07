@@ -426,7 +426,19 @@ pub(super) mod intermediate {
 
   pub type EvaluationResult = Result<Certainty, NoSolution>;
 
-  pub struct EvaluationResultDef;
+  #[cfg(feature = "testing")]
+  #[derive(Serialize, TS)]
+  #[serde(rename_all = "kebab-case")]
+  #[ts(export, rename = "EvaluationResult")]
+  #[allow(dead_code)]
+  /// NOTE only used for TS types
+  pub enum EvaluationResultDef {
+    Yes,
+    MaybeOverflow,
+    MaybeAmbiguity,
+    No,
+  }
+
   impl EvaluationResultDef {
     pub fn serialize<S: serde::Serializer>(
       value: &EvaluationResult,
