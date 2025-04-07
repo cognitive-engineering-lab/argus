@@ -426,10 +426,10 @@ pub(super) mod intermediate {
 
   pub type EvaluationResult = Result<Certainty, NoSolution>;
 
-  #[cfg(feature = "testing")]
-  #[derive(Serialize, TS)]
+  #[derive(Serialize)]
+  #[cfg_attr(feature = "testing", derive(TS))]
+  #[cfg_attr(feature = "testing", ts(export, rename = "EvaluationResult"))]
   #[serde(rename_all = "kebab-case")]
-  #[ts(export, rename = "EvaluationResult")]
   #[allow(dead_code)]
   /// NOTE only used for TS types
   pub enum EvaluationResultDef {
