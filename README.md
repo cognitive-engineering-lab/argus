@@ -10,9 +10,7 @@ Argus is a tool to help you with compiler errors related to traits. If you have 
 
 Argus relies on the New Trait Solver for Rust. Therefore, Argus inherits all the limitations of that solver which is also _under active development_. The New Trait Solver is known to be incomplete — while using Argus you may accidentally run into areas of Rust where the solver is limited. This does not mean that Argus is useless. The New Trait Solver is only used to type-check the current workspace and is still useful to debug a wide-range of trait errors.
 
-
-https://github.com/user-attachments/assets/9a544060-e8ad-455e-9831-5e5d48c96542
-
+<https://github.com/user-attachments/assets/9a544060-e8ad-455e-9831-5e5d48c96542>
 
 ## Installation
 
@@ -28,11 +26,11 @@ Argus is available as a VSCode extension. You can install Argus from the [VSCode
 Some additional software is needed to build Argus from source. For the TypeScript bindings, you need to install the language [Guile](https://www.gnu.org/software/guile/). The IDE requires [Depot](https://github.com/cognitive-engineering-lab/depot). Afterward run
 
 ```sh
-$ cargo make init-bindings
+cargo make init-bindings
 
-$ cargo install --path crates/argus-cli
+cargo install --path crates/argus-cli
 
-$ cd ide && depot build
+cd ide && depot build
 ```
 
 ## FAQ
@@ -43,8 +41,8 @@ If rustup fails, especially with an error like "could not rename the downloaded 
 
 To solve the issue, go to the command line and run:
 
-```
-rustup toolchain install nightly-2024-12-15 -c rust-src -c rustc-dev -c llvm-tools-preview
+```bash
+rustup toolchain install nightly-2025-03-03 -c rust-src -c rustc-dev -c llvm-tools-preview
 ```
 
 Then go back to VSCode and click "Continue" to let Argus continue installing.

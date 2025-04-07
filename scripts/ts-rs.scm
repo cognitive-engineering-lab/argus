@@ -5,8 +5,7 @@
              (ice-9 popen)
              (ice-9 rdelim)
              (ice-9 match)
-             (srfi srfi-1)
-             )
+             (srfi srfi-1))
 
 
 ;; add the bindings directory from each subdir of crates/
@@ -105,15 +104,9 @@
     (lines->file (append (or extra-lines '()) filtered-lines)
                  (push dest-dir "bindings.ts"))))
 
-;; TODO: put this in Rust somehow
-(define evaluation-result
-  (list "export type EvaluationResult = \"yes\" | \"maybe-overflow\" | \"maybe-ambiguity\" | \"no\";"))
-
 (define (main)
   (build-binding-interface
    (append gen-dirs ext-dirs)
-   dest-dir
-   evaluation-result
-   ))
+   dest-dir))
 
 (main)

@@ -1,6 +1,6 @@
 [package]
 name = "argus-ser"
-version = "0.1.13"
+version = "0.1.14"
 edition = "2021"
 authors = ["Gavin Gray <gavinleroy6@gmail.com>"]
 repository = "https://github.com/cognitive-engineering-lab/argus"
@@ -28,8 +28,8 @@ ts-rs = { version = "7.1.1", features = [
   "no-serde-warnings",
 ], optional = true }
 
-argus-ser-macros = { version = "0.1.13", path = "../argus-ser-macros" }
-argus-ext = { version = "0.1.13", path = "../argus-ext" }
+argus-ser-macros = { version = "0.1.14", path = "../argus-ser-macros" }
+argus-ext = { version = "0.1.14", path = "../argus-ext" }
 
 [dev-dependencies]
 argus-ser = { path = ".", features = ["testing"] }
