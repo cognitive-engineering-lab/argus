@@ -67,10 +67,12 @@
           cargo-watch
         ];
 
+        pnpm = pkgs.pnpm_9;
+        nodejs = pkgs.nodejs_22;
         ide-deps = with pkgs; [
           depot-js.packages.${system}.default
-          nodejs_20
-          pnpm_9
+          nodejs
+          pnpm
           biome
           vsce
         ];
@@ -113,25 +115,30 @@
           vsce package --allow-unused-files-pattern -o ${archiveBase}.${ext}
         '';
 
-        argus-ide = pkgs.stdenv.mkDerivation {
-          name = "argus-ide";
+        argus-ide = pkgs.stdenv.mkDerivation (finalAttrs: {
+          pname = "argus-ide";
           inherit version;
           src = pkgs.lib.cleanSource ./.;
-          nativeBuildInputs = native-deps ++ ide-deps;
+          nativeBuildInputs = native-deps ++ ide-deps ++ [
+            pnpm.configHook
+          ];
           env = env-vars;
 
-          preBuildPhase = ''
-            # Create a .npmrc file to set up offline mode
-            echo "prefer-offline=true" > .npmrc
-            echo "offline=true" >> .npmrc
-            
-            # Fetch all dependencies into a local store
-            export HOME=$TMPDIR
-            pnpm config set store-dir $TMPDIR/.pnpm-store
-            
-            # Download all dependencies before building
-            pnpm install --frozen-lockfile
-          '';
+          pnpmWorkspaces = [
+            "@argus/common"
+            "@argus/evaluation"
+            "@argus/itests"
+            "@argus/panoptes"
+            "@argus/print"
+            "@argus/system"
+            "argus" # The extension
+          ];
+          pnpmRoot = "ide";
+          pnpmDeps = pnpm.fetchDeps {
+            inherit (finalAttrs) pname version src pnpmWorkspaces;
+            hash = "sha256-j364V5JhDS78fy6hzQPDbzhzG/s0ERe8dL0zc7hzwhE=";
+            sourceRoot = "${finalAttrs.src.name}/ide";
+          };
 
           buildPhase = packageArgusWithExt "zip";
           installPhase = ''
@@ -142,19 +149,19 @@
             cp -LR evaluation $out/packages/evaluation 
             cp -LR extension $out/packages/extension
           '';
-        };
+        });
 
         argus-extension = pkgs.vscode-utils.buildVscodeExtension rec {
-          name = "argus-ide";
-          vscodeExtPublisher = "gavinleroy";
+          pname = "argus-ide";
           inherit version;
+          vscodeExtPublisher = "gavinleroy";
           src = "${argus-ide}/share/vscode/extensions/${archiveBase}.zip";
-          vscodeExtName = name;
+          vscodeExtName = pname;
           vscodeExtUniqueId = "gavinleroy.argus";
         };
 
         argus-book = pkgs.stdenv.mkDerivation {
-          name = "argus-book";
+          pname = "argus-book";
           inherit version;
           src = pkgs.lib.cleanSource ./book;
           buildInputs = book-deps;
