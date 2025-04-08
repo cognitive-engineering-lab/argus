@@ -110,6 +110,7 @@
           '';
         };
 
+        # FIXME we need to manage the pnpm deps with Nix
         archiveBase = "argus-${version}";
         packageArgusWithExt = ext: ''
           cp ${argus-cli}/lib/bindings.ts ide/packages/common/src/bindings.ts

@@ -115,10 +115,12 @@ impl PolyClauseWithBoundsDefs {
   }
 }
 
+type ClauseWithBounds<'tcx> = ClauseWithBoundsDef<'tcx>;
+
 #[derive(Debug, Clone, TypeVisitable, Serialize, Poly)]
+#[argus(remote = "ClauseWithBounds")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "ClauseWithBounds"))]
-#[argus(remote = "ClauseWithBoundsDef")]
 pub struct ClauseWithBoundsDef<'tcx> {
   #[serde(with = "myty::TyDef")]
   #[cfg_attr(feature = "testing", ts(type = "Ty"))]
