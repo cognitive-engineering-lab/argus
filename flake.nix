@@ -119,6 +119,20 @@
           src = pkgs.lib.cleanSource ./.;
           nativeBuildInputs = native-deps ++ ide-deps;
           env = env-vars;
+
+          preBuildPhase = ''
+            # Create a .npmrc file to set up offline mode
+            echo "prefer-offline=true" > .npmrc
+            echo "offline=true" >> .npmrc
+            
+            # Fetch all dependencies into a local store
+            export HOME=$TMPDIR
+            pnpm config set store-dir $TMPDIR/.pnpm-store
+            
+            # Download all dependencies before building
+            pnpm install --frozen-lockfile
+          '';
+
           buildPhase = packageArgusWithExt "zip";
           installPhase = ''
             mkdir -p $out/share/vscode/extensions
