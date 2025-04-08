@@ -152,11 +152,11 @@
         });
 
         argus-extension = pkgs.vscode-utils.buildVscodeExtension rec {
-          pname = "argus-ide";
+          name = "argus-ide";
           inherit version;
           vscodeExtPublisher = "gavinleroy";
           src = "${argus-ide}/share/vscode/extensions/${archiveBase}.zip";
-          vscodeExtName = pname;
+          vscodeExtName = name;
           vscodeExtUniqueId = "gavinleroy.argus";
         };
 
