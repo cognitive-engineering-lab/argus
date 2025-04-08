@@ -22,3 +22,6 @@ jobs:
 
       - name: Argus Test
         run: nix develop .#ci --show-trace --print-build-logs --verbose --command ci-check
+
+      - name: Build Extension
+        run : nix build .#argus-extension

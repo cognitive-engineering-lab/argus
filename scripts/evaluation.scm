@@ -1,6 +1,3 @@
-#!/usr/bin/env guile-wrapper.sh
-!#
-
 (use-modules (json)
              (srfi srfi-1)
              (web server)

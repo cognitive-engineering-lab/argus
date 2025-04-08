@@ -1,6 +1,3 @@
-#!/usr/bin/env guile-wrapper.sh
-!#
-
 (use-modules (ice-9 ftw)
              (ice-9 popen)
              (ice-9 rdelim)

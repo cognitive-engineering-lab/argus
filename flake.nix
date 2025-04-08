@@ -95,11 +95,6 @@
             CARGO_HOME="${placeholder "out"}/.cargo";
           });
 
-          preBuild = ''
-            export PATH="$PATH:$PWD/scripts"
-            patchShebangs .
-          '';
-
           postBuild = ''
             cargo make init-bindings
           '';
@@ -127,9 +122,11 @@
           buildPhase = packageArgusWithExt "zip";
           installPhase = ''
             mkdir -p $out/share/vscode/extensions
+            mkdir -p $out/packages
             mv ${archiveBase}.zip $out/share/vscode/extensions/
-            cd ../../../
-            cp -LR ide $out/lib
+            cd ../
+            cp -LR evaluation $out/packages/evaluation 
+            cp -LR extension $out/packages/extension
           '';
         };
 
