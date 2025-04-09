@@ -302,16 +302,20 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
         tcx.body_filename(body)
       {
         if target_file.is_none_or(|f| f.ends_with(&p)) {
-          log::info!("analyzing {:?}", body);
+          log::info!("analyzing {body:?}");
           match analysis.analyze(tcx, body) {
             Ok(v) => Some(v),
             Err(e) => {
-              log::error!("Error analyzing body {:?} {:?}", body, e);
+              log::error!("Error analyzing body {body:?} {e:?}");
               None
             }
           }
         } else {
-          log::debug!("Skipping file {:?} due to target {:?}", p, self.file);
+          log::debug!(
+            "Skipping file {} due to target {:?}",
+            p.display(),
+            self.file
+          );
           None
         }
       } else {

@@ -369,8 +369,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
         })
       else {
         log::error!(
-          "failed to find most enclosing hir id for {:?}",
-          parent_ids_of_error
+          "failed to find most enclosing hir id for {parent_ids_of_error:?}"
         );
         continue;
       };

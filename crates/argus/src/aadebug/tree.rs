@@ -193,7 +193,7 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
 
         log::debug!("FnSigs\n{:?}\n{:?}", t.self_ty(), t.trait_ref);
         log::debug!("Fn Args {:?}", t.trait_ref.args.into_type_list(tcx));
-        log::debug!("{} v {}", fn_arity, trait_arity);
+        log::debug!("{fn_arity} v {trait_arity}");
 
         match fn_arity.cmp(&trait_arity) {
           Ordering::Less => GoalKind::AddFnParams {

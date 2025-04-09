@@ -180,7 +180,7 @@
 
         ci-check = pkgs.writeScriptBin "ci-check" ''
           cargo fmt --check &&
-          cargo clippy &&
+          cargo clippy -- -D warnings &&
           codespell . &&
           cargo test
         '';

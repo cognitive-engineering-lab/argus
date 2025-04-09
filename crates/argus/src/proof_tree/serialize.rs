@@ -222,7 +222,7 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
       }
 
       if !inductive_impls.is_empty() {
-        log::trace!("inductive impls: {:?}", inductive_impls);
+        log::trace!("inductive impls: {inductive_impls:?}");
       }
 
       self.all_impl_candidates.insert(idx, Implementors {
