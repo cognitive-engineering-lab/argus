@@ -5,7 +5,7 @@
   "description": "A trait debugger for Rust",
   "license": "MIT",
   "icon": "argus-logo-128.png",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "engines": {
     "vscode": "^1.79.0"
   },
@@ -17,8 +17,12 @@
     "url": "https://github.com/cognitive-engineering-lab/argus",
     "type": "git"
   },
-  "categories": ["Programming Languages"],
-  "activationEvents": ["onLanguage:rust"],
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:rust"
+  ],
   "contributes": {
     "commands": [
       {
@@ -51,7 +55,12 @@
       }
     ]
   },
-  "files": ["dist", "argus-logo-128.png", "LICENSE", "README.md"],
+  "files": [
+    "dist",
+    "argus-logo-128.png",
+    "LICENSE",
+    "README.md"
+  ],
   "main": "./dist/argus.js",
   "exports": {
     ".": {

@@ -179,9 +179,9 @@
         };
 
         ci-check = pkgs.writeScriptBin "ci-check" ''
-          cargo fmt --check
-          cargo clippy
-          codespell .
+          cargo fmt --check &&
+          cargo clippy &&
+          codespell . &&
           cargo test
         '';
 
