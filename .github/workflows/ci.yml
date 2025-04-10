@@ -34,11 +34,10 @@ jobs:
 
       - name: Smokescreen Build Tests
         run : |
-          echo "Caching to ${{ vars.CACHIX_CACHE_NAME }}"
           nix build .#argus-extension -L &&
-          cachix push ${{ vars.CACHIX_CACHE_NAME }} &&
+          cachix push ${{ vars.CACHIX_CACHE_NAME }} result &&
           nix build .#argus-cli -L &&
-          cachix push ${{ vars.CACHIX_CACHE_NAME }}
+          cachix push ${{ vars.CACHIX_CACHE_NAME }} result 
 
       - name: Argus Test
         run: nix develop .#ci -L --command ci-check
