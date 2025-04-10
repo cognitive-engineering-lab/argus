@@ -23,5 +23,8 @@ jobs:
       - name: Argus Test
         run: nix develop .#ci --show-trace --print-build-logs --verbose --command ci-check
 
-      - name: Build Extension
-        run : nix build .#argus-extension
+      - name: Smokescreen Build Tests
+        run : |
+          nix build .#argus-extension &&
+          nix build .#argus-ide &&
+          nix build .#argus-cli

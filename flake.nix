@@ -69,12 +69,12 @@
 
         pnpm = pkgs.pnpm_9;
         nodejs = pkgs.nodejs_22;
-        ide-deps = with pkgs; [
-          depot-js.packages.${system}.default
+        ide-deps = [
           nodejs
           pnpm
-          biome
-          vsce
+          depot-js.packages.${system}.default
+          pkgs.biome
+          pkgs.vsce
         ];
 
         book-deps = with pkgs; [
@@ -124,6 +124,7 @@
           ];
           env = env-vars;
 
+          pnpmRoot = "ide";
           pnpmWorkspaces = [
             "@argus/common"
             "@argus/evaluation"
@@ -133,11 +134,10 @@
             "@argus/system"
             "argus" # The extension
           ];
-          pnpmRoot = "ide";
           pnpmDeps = pnpm.fetchDeps {
             inherit (finalAttrs) pname version src pnpmWorkspaces;
             hash = "sha256-j364V5JhDS78fy6hzQPDbzhzG/s0ERe8dL0zc7hzwhE=";
-            sourceRoot = "${finalAttrs.src.name}/ide";
+            sourceRoot = "${finalAttrs.src}/ide";
           };
 
           buildPhase = packageArgusWithExt "zip";
@@ -202,10 +202,10 @@
           argus-book;
         };
 
-        devShells.default = with pkgs; mkShell ({
+        devShells.default = pkgs.mkShell ({
           nativeBuildInputs = native-deps;
           buildInputs = cli-deps ++ ide-deps ++ book-deps ++ [
-            rust-analyzer
+            pkgs.rust-analyzer
             ci-check
           ];
 
@@ -216,10 +216,10 @@
           '';
         } // env-vars);
 
-        devShells.ci = with pkgs; mkShell ({
+        devShells.ci = pkgs.mkShell ({
           nativeBuildInputs = native-deps;
           buildInputs = cli-deps ++ ide-deps ++ book-deps ++ [
-            cargo-workspaces
+            pkgs.cargo-workspaces
             ci-check
             publishCrates
             publishExtension
