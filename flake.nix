@@ -137,7 +137,7 @@
           pnpmDeps = pnpm.fetchDeps {
             inherit (finalAttrs) pname version src pnpmWorkspaces;
             hash = "sha256-j364V5JhDS78fy6hzQPDbzhzG/s0ERe8dL0zc7hzwhE=";
-            sourceRoot = "${finalAttrs.src}/ide";
+            sourceRoot = "${finalAttrs.src.name}/ide";
           };
 
           buildPhase = packageArgusWithExt "zip";
