@@ -28,14 +28,16 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
       - uses: DeterminateSystems/flake-checker-action@main
-
-      - name: Argus Test
-        run: nix develop .#ci -L --command ci-check
-
       - uses: cachix/cachix-action@v14
         with:
           name: ${{ vars.CACHIX_CACHE_NAME }}
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: Smokescreen Build Tests
-        run : cachix watch-exec ${{ vars.CACHIX_CACHE_NAME }} -- nix build .#argus-extension -L
+        run : |
+          cachix watch-exec ${{ vars.CACHIX_CACHE_NAME }} -- nix build .#argus-cli -L
+          cachix watch-exec ${{ vars.CACHIX_CACHE_NAME }} -- nix build .#argus-ide -L
+          cachix watch-exec ${{ vars.CACHIX_CACHE_NAME }} -- nix build .#argus-extension -L
+
+      - name: Argus Test
+        run: nix develop .#ci -L --command ci-check
