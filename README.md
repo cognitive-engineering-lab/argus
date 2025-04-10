@@ -23,14 +23,14 @@ Argus is available as a VSCode extension. You can install Argus from the [VSCode
 
 ### Building from source
 
-Some additional software is needed to build Argus from source. For the TypeScript bindings, you need to install the language [Guile](https://www.gnu.org/software/guile/). The IDE requires [Depot](https://github.com/cognitive-engineering-lab/depot). Afterward run
+Some additional software is needed to build Argus from source. For the TypeScript bindings, you need to install the language [Guile](https://www.gnu.org/software/guile/) and [`cargo-make`](https://github.com/sagiegurari/cargo-make). The IDE requires [Depot](https://github.com/cognitive-engineering-lab/depot). Afterward run
 
 ```sh
 cargo make init-bindings
 
 cargo install --path crates/argus-cli
 
-cd ide && depot build
+cd ide && depot build --release
 ```
 
 ## FAQ
