@@ -190,7 +190,7 @@
         '';
 
         publishExtension = pkgs.writeScriptBin "ci-ext-pub" ((packageArgusWithExt "vsix") + ''
-          vsce publish -p "$1" --packagePath ${archiveBase}.vsix
+          vsce publish -p "$1" --packagePath ${archiveBase}.vsix &&
           pnpx ovsx publish ${archiveBase}.vsix -p "$2"
         '');
       in {
