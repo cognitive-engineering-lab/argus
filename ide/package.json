@@ -4,7 +4,6 @@
     "depot-version": "0.3.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.8.3",
     "@types/node": "20.2.5",
     "typedoc": "^0.25.1",
     "typescript": "^5.3.2",
