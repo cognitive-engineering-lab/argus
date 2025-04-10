@@ -7,7 +7,7 @@ on:
 
 jobs:
   publish-crates:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
       - uses: DeterminateSystems/nix-installer-action@main
@@ -16,7 +16,7 @@ jobs:
       - run: nix develop .#ci --command ci-crate-pub ${{ secrets.CRATES_IO }}
 
   publish-ide:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: publish-crates
     steps:
       - uses: actions/checkout@v3

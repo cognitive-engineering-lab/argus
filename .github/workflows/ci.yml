@@ -12,7 +12,16 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            arch: x86_64
+            output_name: amd64
+          - os: ['self-hosted', 'ARM64']
+            arch: aarch64
+            output_name: arm64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
 
@@ -21,10 +30,12 @@ jobs:
       - uses: DeterminateSystems/flake-checker-action@main
 
       - name: Argus Test
-        run: nix develop .#ci --show-trace --print-build-logs --verbose --command ci-check
+        run: nix develop .#ci -L --command ci-check
+
+      - uses: cachix/cachix-action@v14
+        with:
+          name: ${{ vars.CACHIX_CACHE_NAME }}
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: Smokescreen Build Tests
-        run : |
-          nix build .#argus-extension &&
-          nix build .#argus-ide &&
-          nix build .#argus-cli
+        run : cachix watch-exec ${{ vars.CACHIX_CACHE_NAME }} -- nix build .#argus-extension -L
