@@ -12,16 +12,7 @@ on:
 
 jobs:
   test:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-22.04
-            arch: x86_64
-            output_name: amd64
-          - os: ['self-hosted', 'ARM64']
-            arch: aarch64
-            output_name: arm64
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
 
@@ -32,12 +23,10 @@ jobs:
           name: ${{ vars.CACHIX_CACHE_NAME }}
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-      - name: Smokescreen Build Tests
-        run : |
-          nix build .#argus-extension -L &&
-          cachix push ${{ vars.CACHIX_CACHE_NAME }} result &&
-          nix build .#argus-cli -L &&
-          cachix push ${{ vars.CACHIX_CACHE_NAME }} result 
+      - run: nix build .#argus-extension -L
+      - run: cachix push ${{ vars.CACHIX_CACHE_NAME }} result
+      - run: nix build .#argus-cli -L
+      - run: cachix push ${{ vars.CACHIX_CACHE_NAME }} result 
 
       - name: Argus Test
         run: nix develop .#ci -L --command ci-check
