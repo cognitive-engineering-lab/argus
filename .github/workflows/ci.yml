@@ -34,8 +34,11 @@ jobs:
 
       - name: Smokescreen Build Tests
         run : |
-          cachix watch-exec ${{ vars.CACHIX_CACHE_NAME }} -- nix build .#argus-extension -L
-          cachix watch-exec ${{ vars.CACHIX_CACHE_NAME }} -- nix build .#argus-cli -L
+          echo "Caching to ${{ vars.CACHIX_CACHE_NAME }}"
+          nix build .#argus-extension -L &&
+          cachix push ${{ vars.CACHIX_CACHE_NAME }} &&
+          nix build .#argus-cli -L &&
+          cachix push ${{ vars.CACHIX_CACHE_NAME }}
 
       - name: Argus Test
         run: nix develop .#ci -L --command ci-check
