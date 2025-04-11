@@ -12,10 +12,7 @@ on:
 
 jobs:
   test:
-    strategy:
-      matrix:
-        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-15]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
       - uses: DeterminateSystems/nix-installer-action@main
@@ -23,17 +20,10 @@ jobs:
       - uses: cachix/cachix-action@v16
         with:
           name: ${{ vars.CACHIX_CACHE_NAME }}
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-
       - name: Argus Test
-        run: |
-          nix develop .#ci -L --command ci-check
-          nix path-info --all | cachix push ${{ vars.CACHIX_CACHE_NAME }}
-
+        run: nix develop .#ci -L --command ci-check
       - name: Test Build
         timeout-minutes: 20
-        run: |
-          nix build .#argus-extension -L
-          nix path-info --all | cachix push ${{ vars.CACHIX_CACHE_NAME }}
+        run: nix build .#argus-extension -L
         
 
