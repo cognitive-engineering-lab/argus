@@ -15,18 +15,23 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
-
       - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/flakehub-cache-action@main
       - uses: DeterminateSystems/flake-checker-action@main
       - uses: cachix/cachix-action@v14
         with:
           name: ${{ vars.CACHIX_CACHE_NAME }}
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-      - run: nix build .#argus-extension -L
-      - run: cachix push ${{ vars.CACHIX_CACHE_NAME }} result
-      - run: nix build .#argus-cli -L
-      - run: cachix push ${{ vars.CACHIX_CACHE_NAME }} result 
+      - name: Build CLI 
+        run: nix build .#argus-cli -L
+      - name: Cache
+        run: cachix push ${{ vars.CACHIX_CACHE_NAME }} result 
+
+      - name: Build Extension
+        run: nix build .#argus-extension -L
+      - name: Cache
+        run: cachix push ${{ vars.CACHIX_CACHE_NAME }} result
 
       - name: Argus Test
         run: nix develop .#ci -L --command ci-check
