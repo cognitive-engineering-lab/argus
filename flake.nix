@@ -115,6 +115,12 @@
           vsce package --allow-unused-files-pattern -o ${archiveBase}.${ext}
         '';
 
+        pnpmDepsHashes = {
+          "x86_64-linux" = "sha256-sjWzbU2/nZ4A+n0wd/4kYJkrKTl1dWTr0ZEIoSegBwU=";
+          "aarch64-linux" = "sha256-sJSoHA3kWOMSbV1TsB8kncWu96ocTAXnQLKG6NfvTLk=";
+          "aarch64-darwin" = "sha256-j364V5JhDS78fy6hzQPDbzhzG/s0ERe8dL0zc7hzwhE=";
+        };
+
         argus-ide = pkgs.stdenv.mkDerivation (finalAttrs: {
           pname = "argus-ide";
           inherit version;
@@ -137,7 +143,7 @@
           ];
           pnpmDeps = pnpm.fetchDeps {
             inherit (finalAttrs) pname version src pnpmWorkspaces;
-            hash = "sha256-sJSoHA3kWOMSbV1TsB8kncWu96ocTAXnQLKG6NfvTLk=";
+            hash = pnpmDepsHashes.${system};
             sourceRoot = "${finalAttrs.src.name}/ide";
           };
 
