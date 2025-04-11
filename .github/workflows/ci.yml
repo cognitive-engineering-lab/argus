@@ -24,7 +24,7 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
       - name: Smokescreen Build
-        run: nix build .#argus-extension -L
+        run: nix build .#argus-ide -L
       - name: Cache
         run: cachix push ${{ vars.CACHIX_CACHE_NAME }} result 
 
