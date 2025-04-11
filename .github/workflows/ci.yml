@@ -24,13 +24,17 @@ jobs:
           name: ${{ vars.CACHIX_CACHE_NAME }}
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-      - name: Argus Test
-        run: cachix watch-exec ${{ vars.CACHIX_CACHE_NAME }} -- nix develop .#ci -L --command ci-check
-
       - uses: mxschmitt/action-tmate@v3
 
+      - name: Argus Test
+        run: |
+          nix develop .#ci -L --command ci-check
+          cachix watch-store ${{ vars.CACHIX_CACHE_NAME }}
+
       - name: Test Build
-        timeout-minutes: 15
-        run: cachix watch-exec ${{ vars.CACHIX_CACHE_NAME }} -- nix build .#argus-extension -L
+        timeout-minutes: 20
+        run: |
+          nix build .#argus-extension -L
+          cachix watch-store ${{ vars.CACHIX_CACHE_NAME }}
         
 
