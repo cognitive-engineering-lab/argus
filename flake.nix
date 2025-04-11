@@ -137,7 +137,7 @@
           ];
           pnpmDeps = pnpm.fetchDeps {
             inherit (finalAttrs) pname version src pnpmWorkspaces;
-            hash = "sha256-j364V5JhDS78fy6hzQPDbzhzG/s0ERe8dL0zc7hzwhE=";
+            hash = "sha256-sjWzbU2/nZ4A+n0wd/4kYJkrKTl1dWTr0ZEIoSegBwU=";
             sourceRoot = "${finalAttrs.src.name}/ide";
           };
 
