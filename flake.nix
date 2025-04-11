@@ -121,6 +121,7 @@
           src = pkgs.lib.cleanSource ./.;
           nativeBuildInputs = native-deps ++ ide-deps ++ [
             pnpm.configHook
+            argus-cli
           ];
           env = env-vars;
 
@@ -154,6 +155,7 @@
         argus-extension = pkgs.vscode-utils.buildVscodeExtension rec {
           name = "argus-ide";
           inherit version;
+          nativeBuildInputs = [ argus-ide ];
           vscodeExtPublisher = "gavinleroy";
           src = "${argus-ide}/share/vscode/extensions/${archiveBase}.zip";
           vscodeExtName = name;

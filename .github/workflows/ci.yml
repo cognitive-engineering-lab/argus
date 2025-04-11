@@ -23,15 +23,10 @@ jobs:
           name: ${{ vars.CACHIX_CACHE_NAME }}
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-      - name: Build CLI 
-        run: nix build .#argus-cli -L
-      - name: Cache
-        run: cachix push ${{ vars.CACHIX_CACHE_NAME }} result 
-
-      - name: Build Extension
+      - name: Smokescreen Build
         run: nix build .#argus-extension -L
       - name: Cache
-        run: cachix push ${{ vars.CACHIX_CACHE_NAME }} result
+        run: cachix push ${{ vars.CACHIX_CACHE_NAME }} result 
 
       - name: Argus Test
         run: nix develop .#ci -L --command ci-check
