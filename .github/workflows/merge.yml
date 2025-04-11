@@ -6,7 +6,10 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-22.04-arm] # macos-15
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Delete huge unnecessary tools folder
         run: rm -rf /opt/hostedtoolcache
@@ -17,8 +20,8 @@ jobs:
         with:
           name: ${{ vars.CACHIX_CACHE_NAME }}
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-      - name: Cache Build
-        run: nix build .#argus-extension -L
-      - name: Cache
-        run: cachix push ${{ vars.CACHIX_CACHE_NAME }} result 
+      - name: Build & Cache
+        run: |
+          nix build .#argus-extension -L
+          nix path-info --all | cachix push ${{ vars.CACHIX_CACHE_NAME }}
 

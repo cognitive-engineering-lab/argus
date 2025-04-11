@@ -12,10 +12,11 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-15]
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: Delete huge unnecessary tools folder
-        run: rm -rf /opt/hostedtoolcache
       - uses: actions/checkout@v3
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/flake-checker-action@main
@@ -24,17 +25,15 @@ jobs:
           name: ${{ vars.CACHIX_CACHE_NAME }}
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-      - uses: mxschmitt/action-tmate@v3
-
       - name: Argus Test
         run: |
           nix develop .#ci -L --command ci-check
-          cachix watch-store ${{ vars.CACHIX_CACHE_NAME }}
+          nix path-info --all | cachix push ${{ vars.CACHIX_CACHE_NAME }}
 
       - name: Test Build
         timeout-minutes: 20
         run: |
           nix build .#argus-extension -L
-          cachix watch-store ${{ vars.CACHIX_CACHE_NAME }}
+          nix path-info --all | cachix push ${{ vars.CACHIX_CACHE_NAME }}
         
 
