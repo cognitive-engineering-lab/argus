@@ -36,14 +36,14 @@
           useFetchCargoVendor = true;
         };
 
-        env-vars = with pkgs; {
-          RUSTC_LINKER = "${llvmPackages.clangUseLLVM}/bin/clang";
-          SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt";
+        env-vars = {
+          RUSTC_LINKER = "${pkgs.llvmPackages.clangUseLLVM}/bin/clang";
+          SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
           # NOTE: The version of playwright-driver and that of the NPM playwright
           # `packages/evaluation/package.json` must match.
-          PLAYWRIGHT_BROWSERS_PATH="${playwright-driver.browsers}";
-        } // lib.optionalAttrs stdenv.isLinux {
-          PKG_CONFIG_PATH="${udev.dev}/lib/pkgconfig:${alsa-lib.dev}/lib/pkgconfig";
+          PLAYWRIGHT_BROWSERS_PATH="${pkgs.playwright-driver.browsers}";
+        } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+          PKG_CONFIG_PATH="${pkgs.udev.dev}/lib/pkgconfig:${pkgs.alsa-lib.dev}/lib/pkgconfig";
         };
 
         native-deps = with pkgs; [
@@ -137,7 +137,7 @@
           ];
           pnpmDeps = pnpm.fetchDeps {
             inherit (finalAttrs) pname version src pnpmWorkspaces;
-            hash = "sha256-sjWzbU2/nZ4A+n0wd/4kYJkrKTl1dWTr0ZEIoSegBwU=";
+            hash = "sha256-sJSoHA3kWOMSbV1TsB8kncWu96ocTAXnQLKG6NfvTLk=";
             sourceRoot = "${finalAttrs.src.name}/ide";
           };
 
