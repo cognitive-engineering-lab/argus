@@ -1,0 +1,22 @@
+name: merge
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/flake-checker-action@main
+      - uses: cachix/cachix-action@v14
+        with:
+          name: ${{ vars.CACHIX_CACHE_NAME }}
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      - name: Cache Build
+        run: nix build .#argus-extension -L
+      - name: Cache
+        run: cachix push ${{ vars.CACHIX_CACHE_NAME }} result 
+
