@@ -20,7 +20,6 @@ jobs:
       - uses: cachix/cachix-action@v16
         with:
           name: ${{ vars.CACHIX_CACHE_NAME }}
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: Argus Test
         run: nix develop .#ci -vL --command ci-check
       - name: Test Build
