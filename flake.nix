@@ -37,34 +37,33 @@
         };
 
         env-vars = {
-          RUSTC_LINKER = "${pkgs.llvmPackages.clangUseLLVM}/bin/clang";
           SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+        };
+
+        shell-env = {
           # NOTE: The version of playwright-driver and that of the NPM playwright
           # `packages/evaluation/package.json` must match.
           PLAYWRIGHT_BROWSERS_PATH="${pkgs.playwright-driver.browsers}";
         } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
           PKG_CONFIG_PATH="${pkgs.udev.dev}/lib/pkgconfig:${pkgs.alsa-lib.dev}/lib/pkgconfig";
+        } // pkgs.lib.optionalAttrs pkgs.stdenv.isDarwin {
+          RUSTC_LINKER = "${pkgs.llvmPackages.clangUseLLVM}/bin/clang";
         };
 
         native-deps = with pkgs; [
           pkg-config
           cacert
-        ] ++ lib.optionals stdenv.isDarwin [
-          darwin.apple_sdk.frameworks.SystemConfiguration
-        ] ++ lib.optionals stdenv.isLinux [
-          alsa-lib.dev
-          udev.dev
         ];
 
         cli-deps = with pkgs; [
-          llvmPackages_latest.llvm
-          llvmPackages_latest.lld
           toolchain
           guile
-          guile-json
           codespell
           cargo-make
           cargo-watch
+        ] ++ lib.optionals stdenv.isDarwin [
+          llvmPackages.llvm
+          llvmPackages.lld
         ];
 
         pnpm = pkgs.pnpm_9;
@@ -154,7 +153,6 @@
             mv ${archiveBase}.zip $out/share/vscode/extensions/
             cd ../
             cp -LR evaluation $out/packages/evaluation 
-            cp -LR extension $out/packages/extension
           '';
         });
 
@@ -214,7 +212,11 @@
           nativeBuildInputs = native-deps;
           buildInputs = cli-deps ++ ide-deps ++ book-deps ++ [
             pkgs.rust-analyzer
+            pkgs.playwright-driver.browsers
             ci-check
+          ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
+            pkgs.alsa-lib.dev
+            pkgs.udev.dev
           ];
 
           # Needed in order to run `cargo argus ...` within the directory
@@ -222,16 +224,17 @@
             export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$(rustc --print target-libdir)"
             export DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:$(rustc --print target-libdir)"
           '';
-        } // env-vars);
+        } // env-vars // shell-env);
 
         devShells.ci = pkgs.mkShell ({
           nativeBuildInputs = native-deps;
           buildInputs = cli-deps ++ ide-deps ++ book-deps ++ [
             pkgs.cargo-workspaces
+            pkgs.playwright-driver.browsers
             ci-check
             publishCrates
             publishExtension
           ];
-        } // env-vars);
+        } // env-vars // shell-env);
       });
 }
