@@ -37,7 +37,7 @@
         };
 
         env-vars = {
-          SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+          #SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
         };
 
         shell-env = {
@@ -51,8 +51,8 @@
         };
 
         native-deps = with pkgs; [
-          pkg-config
-          cacert
+          # pkg-config
+          # cacert
         ];
 
         cli-deps = with pkgs; [
