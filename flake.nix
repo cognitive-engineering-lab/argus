@@ -154,6 +154,7 @@
             mv ${archiveBase}.zip $out/share/vscode/extensions/
             cd ../
             cp -LR evaluation $out/packages/evaluation 
+            cp -LR panoptes $out/packages/panoptes 
           '';
         });
 
