@@ -45,20 +45,6 @@
           withFfmpeg = false;
         };
 
-        # Environment variables for building derivations
-        env-vars = { };
-
-        # Environment variables for the devShell
-        shell-env = {
-          PLAYWRIGHT_BROWSERS_PATH="${browsers}";
-        } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
-          PKG_CONFIG_PATH="${pkgs.udev.dev}/lib/pkgconfig:${pkgs.alsa-lib.dev}/lib/pkgconfig";
-        } // pkgs.lib.optionalAttrs pkgs.stdenv.isDarwin {
-          RUSTC_LINKER = "${pkgs.llvmPackages.clangUseLLVM}/bin/clang";
-        };
-
-        native-deps = [ ];
-
         cli-deps = with pkgs; [
           toolchain
           guile
@@ -92,13 +78,13 @@
           inherit version;
           src = pkgs.lib.cleanSource ./.;
           cargoLock.lockFile = ./Cargo.lock;
-          nativeBuildInputs = native-deps ++ cli-deps;
+          nativeBuildInputs = cli-deps;
           useFetchCargoVendor = true;
           doCheck = false;
 
-          env = (env-vars // {
+          env = {
             CARGO_HOME="${placeholder "out"}/.cargo";
-          });
+          };
 
           postBuild = ''
             cargo make init-bindings
@@ -110,7 +96,6 @@
           '';
         };
 
-        # FIXME we need to manage the pnpm deps with Nix
         archiveBase = "argus-${version}";
         packageArgusWithExt = ext: ''
           cp ${argus-cli}/lib/bindings.ts ide/packages/common/src/bindings.ts
@@ -118,22 +103,14 @@
           vsce package --allow-unused-files-pattern -o ${archiveBase}.${ext}
         '';
 
-        pnpmDepsHashes = {
-          "x86_64-linux" = "sha256-sjWzbU2/nZ4A+n0wd/4kYJkrKTl1dWTr0ZEIoSegBwU=";
-          #"aarch64-linux" = "sha256-sJSoHA3kWOMSbV1TsB8kncWu96ocTAXnQLKG6NfvTLk=";
-          "aarch64-linux" = "sha256-sjWzbU2/nZ4A+n0wd/4kYJkrKTl1dWTr0ZEIoSegBwU=";
-          "aarch64-darwin" = "sha256-sjWzbU2/nZ4A+n0wd/4kYJkrKTl1dWTr0ZEIoSegBwU=";
-        };
-
         argus-ide = pkgs.stdenv.mkDerivation (finalAttrs: {
           pname = "argus-ide";
           inherit version;
           src = pkgs.lib.cleanSource ./.;
-          nativeBuildInputs = native-deps ++ ide-deps ++ [
+          nativeBuildInputs = ide-deps ++ [
             pnpm.configHook
             argus-cli
           ];
-          env = env-vars;
 
           pnpmRoot = "ide";
           pnpmWorkspaces = [
@@ -147,7 +124,7 @@
           ];
           pnpmDeps = pnpm.fetchDeps {
             inherit (finalAttrs) pname version src pnpmWorkspaces;
-            hash = pnpmDepsHashes.${system};
+            hash = "sha256-sjWzbU2/nZ4A+n0wd/4kYJkrKTl1dWTr0ZEIoSegBwU=";
             sourceRoot = "${finalAttrs.src.name}/ide";
           };
 
@@ -205,6 +182,14 @@
           vsce publish -p "$1" --packagePath ${archiveBase}.vsix &&
           pnpx ovsx publish ${archiveBase}.vsix -p "$2"
         '');
+
+        shell-env = {
+          PLAYWRIGHT_BROWSERS_PATH="${browsers}";
+        } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+          PKG_CONFIG_PATH="${pkgs.udev.dev}/lib/pkgconfig:${pkgs.alsa-lib.dev}/lib/pkgconfig";
+        } // pkgs.lib.optionalAttrs pkgs.stdenv.isDarwin {
+          RUSTC_LINKER = "${pkgs.llvmPackages.clangUseLLVM}/bin/clang";
+        };
       in {
         packages = { 
           inherit 
@@ -215,7 +200,6 @@
         };
 
         devShells.default = pkgs.mkShell ({
-          nativeBuildInputs = native-deps;
           buildInputs = cli-deps ++ ide-deps ++ book-deps ++ [
             pkgs.rust-analyzer
             browsers
@@ -230,17 +214,15 @@
             export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$(rustc --print target-libdir)"
             export DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:$(rustc --print target-libdir)"
           '';
-        } // env-vars // shell-env);
+        } // shell-env);
 
         devShells.ci = pkgs.mkShell ({
-          nativeBuildInputs = native-deps;
           buildInputs = cli-deps ++ ide-deps ++ book-deps ++ [
             pkgs.cargo-workspaces
-            browsers
             ci-check
             publishCrates
             publishExtension
           ];
-        } // env-vars // shell-env);
+        } // shell-env);
       });
 }
