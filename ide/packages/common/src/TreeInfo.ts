@@ -33,7 +33,7 @@ type Reverse<T extends Direction> = T extends "to-root"
 
 function reverseDirection<D extends Direction>(d: Direction): Reverse<D> {
   // HACK: ugh, get rid of the `any` here.
-  return d === "to-root" ? "from-root" : ("to-root" as any);
+  return d === "to-root" ? ("from-root" as any) : ("to-root" as any);
 }
 
 class Path<T, D extends Direction> {

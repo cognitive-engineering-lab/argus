@@ -1,8 +1,16 @@
 import MonoSpace from "@argus/print/MonoSpace";
 import { VSCodeProgressRing } from "@vscode/webview-ui-toolkit/react";
-import _ from "lodash";
 import React, { useEffect, useState } from "react";
-import { type Highlighter, getHighlighter } from "shiki";
+
+import { type HighlighterCore, createHighlighterCore } from "@shikijs/core";
+import { createOnigurumaEngine } from "@shikijs/engine-oniguruma";
+
+import rust from "@shikijs/langs/rust";
+import dplus from "@shikijs/themes/dark-plus";
+import ldark from "@shikijs/themes/github-light-default";
+import lplus from "@shikijs/themes/light-plus";
+import cdark from "@shikijs/themes/synthwave-84";
+import wasm from "shiki/wasm";
 
 import "./Code.css";
 
@@ -14,11 +22,12 @@ const ARGUS_THEMES = {
 };
 
 const mkHighlighter = (() => {
-  let h: Promise<Highlighter | undefined>;
+  let h: Promise<HighlighterCore | undefined>;
   try {
-    h = getHighlighter({
-      themes: _.values(ARGUS_THEMES),
-      langs: ["rust"]
+    h = createHighlighterCore({
+      themes: [dplus, lplus, cdark, ldark],
+      langs: [rust],
+      engine: createOnigurumaEngine(wasm)
     });
   } catch (e: any) {
     console.error("Failed to initialize Shiki highlighter", e);
@@ -29,7 +38,7 @@ const mkHighlighter = (() => {
 })();
 
 const codeToHtml = async ({ code, lang }: { code: string; lang: string }) => {
-  let highlighter: Highlighter | undefined;
+  let highlighter: HighlighterCore | undefined;
 
   try {
     highlighter = await mkHighlighter();

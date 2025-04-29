@@ -42,7 +42,11 @@ const Expr = observer(({ idx }: { idx: ExprIdx }) => {
   const header = <Code code={expr.snippet} />;
 
   return (
-    <div onMouseEnter={addHighlight} onMouseLeave={removeHighlight}>
+    <div
+      onMouseEnter={addHighlight}
+      onMouseLeave={removeHighlight}
+      data-expr-idx={idx}
+    >
       <CollapsibleElement
         info={header}
         startOpen={openChildren}

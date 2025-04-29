@@ -25,9 +25,7 @@ import { HighlightTargetStore } from "./signals";
 const fnIndicator = <em>ƒ</em>;
 
 const ObligationBody = observer(({ bodyInfo }: { bodyInfo: BodyInfo }) => {
-  if (!bodyInfo.hasVisibleExprs()) {
-    return null;
-  }
+  if (!bodyInfo.hasVisibleExprs()) return null;
 
   const bodyName =
     bodyInfo.name === undefined ? (
@@ -46,7 +44,7 @@ const ObligationBody = observer(({ bodyInfo }: { bodyInfo: BodyInfo }) => {
 
   const header = (
     <>
-      <MonoSpace>
+      <MonoSpace idx={bodyInfo.hash}>
         {fnIndicator}
         {"\u00A0"}
         {bodyName}

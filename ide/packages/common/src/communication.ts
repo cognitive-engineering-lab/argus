@@ -1,4 +1,3 @@
-import { messageHandler } from "@estruyf/vscode/dist/client";
 import _ from "lodash";
 
 import type { BodyBundle, ProofNodeIdx } from "./bindings";
@@ -36,24 +35,10 @@ export interface MessageSystem {
   ): Promise<SystemReturn<T>>;
 }
 
-export const vscodeMessageSystem: MessageSystem = {
-  postData<T extends PanoptesToSystemCmds>(
-    command: T,
-    body: Omit<PanoptesToSystemMsg<T>, "command">
-  ) {
-    return messageHandler.send(command, { command, ...body });
-  },
-
-  requestData<T extends PanoptesToSystemCmds>(
-    command: T,
-    body: Omit<PanoptesToSystemMsg<T>, "command">
-  ): Promise<SystemReturn<T>> {
-    return messageHandler.request<SystemReturn<T>>(command, {
-      command,
-      ...body
-    });
-  }
-};
+export interface VSCodeMessageHandler {
+  send(message: string, payload?: any): void;
+  request<T>(message: string, payload?: any): Promise<T>;
+}
 
 export function createClosedMessageSystem(bodies: BodyBundle[]): MessageSystem {
   const systemMap = _.groupBy(bodies, bundle => bundle.filename);

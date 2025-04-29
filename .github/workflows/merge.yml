@@ -14,12 +14,6 @@ jobs:
       - uses: actions/checkout@v3
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/flake-checker-action@main
-      - uses: cachix/cachix-action@v16
-        with:
-          name: ${{ vars.CACHIX_CACHE_NAME }}
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - name: Build & Cache
-        run: |
-          nix build .#argus-extension -L
-          nix path-info --all | cachix push ${{ vars.CACHIX_CACHE_NAME }}
+        run: nix build .#argus-extension -L
 

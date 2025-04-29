@@ -5,6 +5,8 @@
     "dist"
   ],
   "depot": {
+    "platform": "browser",
+    "target": "lib",
     "depot-version": "0.3.0"
   },
   "main": "dist/lib.js",
@@ -17,20 +19,16 @@
     }
   },
   "type": "module",
-  "depot": {
-    "platform": "browser"
-  },
   "typedoc": {
     "entryPoint": "./src/lib.ts"
   },
   "devDependencies": {
-    "@estruyf/vscode": "^1.1.0",
-    "@types/lodash": "^4.17.0",
-    "@types/react": "^18.2.14",
+    "@types/lodash": "^4.17.16",
+    "@types/react": "catalog:",
     "cancelable-promise": "^4.3.1",
-    "jsdom": "^22.1.0",
+    "jsdom": "^26.1.0",
     "lodash": "^4.17.21",
-    "new-github-issue-url": "^1.0.0",
-    "react": "^18.3.1"
+    "new-github-issue-url": "^1.1.0",
+    "react": "catalog:"
   }
 }

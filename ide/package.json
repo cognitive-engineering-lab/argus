@@ -4,10 +4,10 @@
     "depot-version": "0.3.0"
   },
   "devDependencies": {
-    "@types/node": "20.2.5",
-    "typedoc": "^0.25.1",
-    "typescript": "^5.3.2",
-    "vite": "^4.4.9",
-    "vitest": "^0.34.6"
+    "@types/node": "22.14.1",
+    "typedoc": "^0.28.3",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.2",
+    "vitest": "^3.1.2"
   }
 }

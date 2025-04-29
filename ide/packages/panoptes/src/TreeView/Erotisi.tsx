@@ -133,9 +133,7 @@ const Erotisi = () => {
           <VSCodeButton onClick={no} appearance="secondary" ariaLabel="No">
             No
           </VSCodeButton>
-          <VSCodeButton onClick={yes} appearance="primary" ariaLabel="Yes">
-            Yes
-          </VSCodeButton>
+          <VSCodeButton>Yes</VSCodeButton>
         </div>
       </div>
     );

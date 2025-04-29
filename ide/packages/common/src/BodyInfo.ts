@@ -8,7 +8,6 @@ import type {
   ObligationIdx,
   ObligationsInBody
 } from "./bindings";
-// import { isVisibleObligation } from "./func";
 
 class BodyInfo {
   private existsImportantFailure;
