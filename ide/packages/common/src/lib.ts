@@ -29,6 +29,7 @@ export const ConfigConsts = {
 // Panoptes initial configuration for a single webview
 
 export type PanoptesOptionalData = {
+  scroll?: boolean;
   target?: ErrorJumpTargetInfo;
   evalMode?: EvaluationMode;
   rankMode?: SortStrategy;
