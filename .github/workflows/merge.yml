@@ -13,7 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/flakehub-cache-action@main
       - uses: DeterminateSystems/flake-checker-action@main
-      - name: Build & Cache
+      - name: Build
         run: nix build .#argus-extension -L
 
