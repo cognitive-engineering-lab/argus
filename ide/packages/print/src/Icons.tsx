@@ -1,6 +1,7 @@
 import React from "react";
 
 import "./Icons.css";
+import "@vscode/codicons/dist/codicon.css";
 import classNames from "classnames";
 
 type ButtonProps = {

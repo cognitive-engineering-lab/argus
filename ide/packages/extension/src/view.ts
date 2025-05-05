@@ -208,24 +208,14 @@ function getHtmlForWebview(
   initialData: FileInfo[] = [],
   target?: ErrorJumpTargetInfo
 ) {
-  const panoptesDir = vscode.Uri.joinPath(extensionUri, "dist", "panoptes");
-
+  const scriptDir = vscode.Uri.joinPath(extensionUri, "dist", "script");
   const scriptUri = panel.webview.asWebviewUri(
-    vscode.Uri.joinPath(panoptesDir, "dist", "panoptes.iife.js")
+    vscode.Uri.joinPath(scriptDir, "dist", "script.iife.js")
   );
 
+  const panoptesDir = vscode.Uri.joinPath(extensionUri, "dist", "panoptes");
   const styleUri = panel.webview.asWebviewUri(
-    vscode.Uri.joinPath(panoptesDir, "dist", "style.css")
-  );
-
-  const codiconsUri = panel.webview.asWebviewUri(
-    vscode.Uri.joinPath(
-      panoptesDir,
-      "node_modules",
-      "@vscode/codicons",
-      "dist",
-      "codicon.css"
-    )
+    vscode.Uri.joinPath(panoptesDir, "dist", "panoptes.css")
   );
 
   const config: PanoptesConfig = {
@@ -246,9 +236,8 @@ function getHtmlForWebview(
       <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Argus Inspector</title>
           <link rel="stylesheet" type="text/css" href=${styleUri}>
-          <link rel="stylesheet" type="text/css" href=${codiconsUri}>
+          <title>Argus Inspector</title>
       </head>
       <body>
           <div class=${ConfigConsts.EMBED_NAME} data-config=${configStr}></div>

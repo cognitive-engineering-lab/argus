@@ -36,35 +36,24 @@
           useFetchCargoVendor = true;
         };
 
-        env-vars = with pkgs; {
-          RUSTC_LINKER = "${llvmPackages.clangUseLLVM}/bin/clang";
-          SSL_CERT_FILE="${cacert}/etc/ssl/certs/ca-bundle.crt";
-          # NOTE: The version of playwright-driver and that of the NPM playwright
-          # `packages/evaluation/package.json` must match.
-          PLAYWRIGHT_BROWSERS_PATH="${playwright-driver.browsers}";
-        } // lib.optionalAttrs stdenv.isLinux {
-          PKG_CONFIG_PATH="${udev.dev}/lib/pkgconfig:${alsa-lib.dev}/lib/pkgconfig";
+        # NOTE: The version of playwright-driver and that of the NPM playwright
+        # `packages/evaluation/package.json` must match. 
+        # The Argus tests only need chromium
+        browsers = pkgs.playwright-driver.browsers.override {
+          withFirefox = false;
+          withWebkit = false;
+          withFfmpeg = false;
         };
 
-        native-deps = with pkgs; [
-          pkg-config
-          cacert
-        ] ++ lib.optionals stdenv.isDarwin [
-          darwin.apple_sdk.frameworks.SystemConfiguration
-        ] ++ lib.optionals stdenv.isLinux [
-          alsa-lib.dev
-          udev.dev
-        ];
-
         cli-deps = with pkgs; [
-          llvmPackages_latest.llvm
-          llvmPackages_latest.lld
           toolchain
           guile
-          guile-json
           codespell
           cargo-make
           cargo-watch
+        ] ++ lib.optionals stdenv.isDarwin [
+          llvmPackages.llvm
+          llvmPackages.lld
         ];
 
         pnpm = pkgs.pnpm_9;
@@ -89,13 +78,13 @@
           inherit version;
           src = pkgs.lib.cleanSource ./.;
           cargoLock.lockFile = ./Cargo.lock;
-          nativeBuildInputs = native-deps ++ cli-deps;
+          nativeBuildInputs = cli-deps;
           useFetchCargoVendor = true;
           doCheck = false;
 
-          env = (env-vars // {
+          env = {
             CARGO_HOME="${placeholder "out"}/.cargo";
-          });
+          };
 
           postBuild = ''
             cargo make init-bindings
@@ -107,7 +96,6 @@
           '';
         };
 
-        # FIXME we need to manage the pnpm deps with Nix
         archiveBase = "argus-${version}";
         packageArgusWithExt = ext: ''
           cp ${argus-cli}/lib/bindings.ts ide/packages/common/src/bindings.ts
@@ -119,10 +107,10 @@
           pname = "argus-ide";
           inherit version;
           src = pkgs.lib.cleanSource ./.;
-          nativeBuildInputs = native-deps ++ ide-deps ++ [
+          nativeBuildInputs = ide-deps ++ [
             pnpm.configHook
+            argus-cli
           ];
-          env = env-vars;
 
           pnpmRoot = "ide";
           pnpmWorkspaces = [
@@ -136,7 +124,7 @@
           ];
           pnpmDeps = pnpm.fetchDeps {
             inherit (finalAttrs) pname version src pnpmWorkspaces;
-            hash = "sha256-j364V5JhDS78fy6hzQPDbzhzG/s0ERe8dL0zc7hzwhE=";
+            hash = "sha256-sjWzbU2/nZ4A+n0wd/4kYJkrKTl1dWTr0ZEIoSegBwU=";
             sourceRoot = "${finalAttrs.src.name}/ide";
           };
 
@@ -147,13 +135,14 @@
             mv ${archiveBase}.zip $out/share/vscode/extensions/
             cd ../
             cp -LR evaluation $out/packages/evaluation 
-            cp -LR extension $out/packages/extension
+            cp -LR panoptes $out/packages/panoptes 
           '';
         });
 
         argus-extension = pkgs.vscode-utils.buildVscodeExtension rec {
           name = "argus-ide";
           inherit version;
+          nativeBuildInputs = [ argus-ide ];
           vscodeExtPublisher = "gavinleroy";
           src = "${argus-ide}/share/vscode/extensions/${archiveBase}.zip";
           vscodeExtName = name;
@@ -193,6 +182,14 @@
           vsce publish -p "$1" --packagePath ${archiveBase}.vsix &&
           pnpx ovsx publish ${archiveBase}.vsix -p "$2"
         '');
+
+        shell-env = {
+          PLAYWRIGHT_BROWSERS_PATH="${browsers}";
+        } // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+          PKG_CONFIG_PATH="${pkgs.udev.dev}/lib/pkgconfig:${pkgs.alsa-lib.dev}/lib/pkgconfig";
+        } // pkgs.lib.optionalAttrs pkgs.stdenv.isDarwin {
+          RUSTC_LINKER = "${pkgs.llvmPackages.clangUseLLVM}/bin/clang";
+        };
       in {
         packages = { 
           inherit 
@@ -203,10 +200,13 @@
         };
 
         devShells.default = pkgs.mkShell ({
-          nativeBuildInputs = native-deps;
           buildInputs = cli-deps ++ ide-deps ++ book-deps ++ [
             pkgs.rust-analyzer
+            browsers
             ci-check
+          ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
+            pkgs.alsa-lib.dev
+            pkgs.udev.dev
           ];
 
           # Needed in order to run `cargo argus ...` within the directory
@@ -214,16 +214,15 @@
             export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$(rustc --print target-libdir)"
             export DYLD_LIBRARY_PATH="$DYLD_LIBRARY_PATH:$(rustc --print target-libdir)"
           '';
-        } // env-vars);
+        } // shell-env);
 
         devShells.ci = pkgs.mkShell ({
-          nativeBuildInputs = native-deps;
           buildInputs = cli-deps ++ ide-deps ++ book-deps ++ [
             pkgs.cargo-workspaces
             ci-check
             publishCrates
             publishExtension
           ];
-        } // env-vars);
+        } // shell-env);
       });
 }

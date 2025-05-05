@@ -113,6 +113,7 @@ const Obligation = observer(
     const id = obligationCardId(file, obligation.hash);
     const ref = useRef<HTMLDivElement>(null);
     const messageSystem = useContext(AppContext.MessageSystemContext)!;
+    const cfg = useContext(AppContext.ConfigurationContext)!;
 
     const [addHighlight, removeHighlight] = makeHighlightPosters(
       messageSystem,
@@ -124,7 +125,7 @@ const Obligation = observer(
       HighlightTargetStore.value?.hash === obligation.hash;
 
     useLayoutEffect(() => {
-      if (isTargetObligation) {
+      if (isTargetObligation && cfg.scroll === true) {
         ref.current?.scrollIntoView({ behavior: "smooth" });
       }
     }, [isTargetObligation]);

@@ -1,0 +1,23 @@
+{
+  "name": "@argus/script",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist/script.iife.js",
+  "depot": {
+    "platform": "browser",
+    "target": "script",
+    "depot-version": "0.3.0"
+  },
+  "devDependencies": {
+    "@argus/common": "workspace:*",
+    "@argus/panoptes": "workspace:*",
+    "@estruyf/vscode": "^1.1.0",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "^4.4.1",
+    "jsdom": "^26.1.0",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  }
+}

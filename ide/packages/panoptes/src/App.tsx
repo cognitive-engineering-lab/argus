@@ -1,8 +1,4 @@
-import {
-  type MessageSystem,
-  createClosedMessageSystem,
-  vscodeMessageSystem
-} from "@argus/common/communication";
+import type { MessageSystem } from "@argus/common/communication";
 import {
   AppContext,
   type Settings,
@@ -44,7 +40,7 @@ import MiniBuffer from "./MiniBuffer";
 import Workspace from "./Workspace";
 import { HighlightTargetStore, MiniBufferDataStore } from "./signals";
 
-const webSysSpec: SystemSpec = {
+export const webSysSpec: SystemSpec = {
   osPlatform: "web-bundle",
   osRelease: "web-bundle",
   vscodeVersion: "unknown"
@@ -228,96 +224,97 @@ const SettingsPortal = ({ children }: React.PropsWithChildren) => (
 
 const settingsKeyText = (key: keyof Settings) => _.upperFirst(_.lowerCase(key));
 
-const App = observer(({ config }: { config: PanoptesConfig }) => {
-  const [openFiles, setOpenFiles] = useState(buildInitialData(config));
-  const [settings, setSettings] = useState<Settings>({
-    "show-hidden-obligations": false
-  });
-  const toggleSetting = (key: keyof Settings) =>
-    setSettings(curr => ({ ...curr, [key]: !curr[key] }));
+const App = observer(
+  ({
+    config,
+    system,
+    spec
+  }: {
+    config: Required<PanoptesConfig>;
+    system: MessageSystem;
+    spec: SystemSpec;
+  }) => {
+    const [openFiles, setOpenFiles] = useState(buildInitialData(config));
+    const [settings, setSettings] = useState<Settings>({
+      "show-hidden-obligations": false
+    });
 
-  const messageSystem =
-    config.type === "WEB_BUNDLE"
-      ? createClosedMessageSystem(config.closedSystem)
-      : vscodeMessageSystem;
-  const systemSpec =
-    config.type === "VSCODE_BACKING" ? config.spec : webSysSpec;
+    const toggleSetting = (key: keyof Settings) =>
+      setSettings(curr => ({ ...curr, [key]: !curr[key] }));
+    useEffect(() => {
+      const listen = (e: MessageEvent) =>
+        listener(
+          e,
+          setOpenFiles,
+          () => MiniBufferDataStore.pin(),
+          () => MiniBufferDataStore.unpin()
+        );
 
-  config.evalMode = config.evalMode ?? "release";
-  config.rankMode = config.rankMode ?? "inertia";
+      window.addEventListener("message", listen);
+      return () => window.removeEventListener("message", listen);
+    }, []);
 
-  const configNoUndef: Required<PanoptesConfig> = config as any;
+    useEffect(() => {
+      if (config.target !== undefined) {
+        HighlightTargetStore.set(config.target);
+      }
+    }, [config.target]);
 
-  useEffect(() => {
-    const listen = (e: MessageEvent) =>
-      listener(
-        e,
-        setOpenFiles,
-        () => MiniBufferDataStore.pin(),
-        () => MiniBufferDataStore.unpin()
-      );
-
-    window.addEventListener("message", listen);
-    return () => window.removeEventListener("message", listen);
-  }, []);
-
-  useEffect(() => {
-    if (config.target !== undefined) {
-      HighlightTargetStore.set(config.target);
-    }
-  }, [config.target]);
-
-  const Navbar = (
-    <>
-      <div className="app-nav">
-        <SettingsPortal>
-          <div className="SettingsArea">
-            {_.map(settingsToggles, (key, idx) => (
-              <VSCodeCheckbox
-                key={idx}
-                onChange={() => toggleSetting(key)}
-                checked={settings[key]}
-              >
-                {settingsKeyText(key)}
-              </VSCodeCheckbox>
-            ))}
-          </div>
-        </SettingsPortal>
-      </div>
-      <Spacer />
-    </>
-  );
-
-  // Rerender the App without changing the base files.
-  const resetState = () => setOpenFiles(currFiles => currFiles);
-  const WorkspaceContent = (
-    <AppContext.ConfigurationContext.Provider value={configNoUndef}>
-      <AppContext.SystemSpecContext.Provider value={systemSpec}>
-        <AppContext.MessageSystemContext.Provider value={messageSystem}>
-          <AppContext.SettingsContext.Provider value={settings}>
-            <DefPathRender.Provider value={CustomPathRenderer}>
-              <ProjectionPathRender.Provider value={CustomProjectionRender}>
-                <LocationActionable.Provider
-                  value={mkLocationActionable(messageSystem)}
+    const Navbar = (
+      <>
+        <div className="app-nav">
+          <SettingsPortal>
+            <div className="SettingsArea">
+              {_.map(settingsToggles, (key, idx) => (
+                <VSCodeCheckbox
+                  key={idx}
+                  onChange={() => toggleSetting(key)}
+                  checked={settings[key]}
                 >
-                  <Workspace files={openFiles} reset={resetState} />
-                  <FillScreen />
-                </LocationActionable.Provider>
-              </ProjectionPathRender.Provider>
-            </DefPathRender.Provider>
-          </AppContext.SettingsContext.Provider>
-        </AppContext.MessageSystemContext.Provider>
-      </AppContext.SystemSpecContext.Provider>
-    </AppContext.ConfigurationContext.Provider>
-  );
+                  {settingsKeyText(key)}
+                </VSCodeCheckbox>
+              ))}
+            </div>
+          </SettingsPortal>
+        </div>
+        <Spacer />
+      </>
+    );
 
-  return (
-    <div className="AppRoot">
-      {Navbar}
-      {WorkspaceContent}
-      <MiniBuffer />
-    </div>
-  );
-});
+    // Rerender the App without changing the base files.
+    const resetState = () => setOpenFiles(currFiles => currFiles);
+
+    const vscodeBacking = config.type === "VSCODE_BACKING";
+
+    const WorkspaceContent = (
+      <AppContext.ConfigurationContext.Provider value={config}>
+        <AppContext.SystemSpecContext.Provider value={spec}>
+          <AppContext.MessageSystemContext.Provider value={system}>
+            <AppContext.SettingsContext.Provider value={settings}>
+              <DefPathRender.Provider value={CustomPathRenderer}>
+                <ProjectionPathRender.Provider value={CustomProjectionRender}>
+                  <LocationActionable.Provider
+                    value={mkLocationActionable(system)}
+                  >
+                    <Workspace files={openFiles} reset={resetState} />
+                    {vscodeBacking && <FillScreen />}
+                  </LocationActionable.Provider>
+                </ProjectionPathRender.Provider>
+              </DefPathRender.Provider>
+            </AppContext.SettingsContext.Provider>
+          </AppContext.MessageSystemContext.Provider>
+        </AppContext.SystemSpecContext.Provider>
+      </AppContext.ConfigurationContext.Provider>
+    );
+
+    return (
+      <div className="AppRoot">
+        {vscodeBacking && Navbar}
+        {WorkspaceContent}
+        <MiniBuffer />
+      </div>
+    );
+  }
+);
 
 export default App;

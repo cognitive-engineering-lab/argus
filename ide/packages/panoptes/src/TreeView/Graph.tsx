@@ -10,9 +10,11 @@ import React, {
   useRef,
   useState
 } from "react";
-// @ts-ignore
-// biome-ignore lint/style/useImportType: ts-ignore
-import Tree, { Orientation, TreeLinkDatum, TreeNodeDatum } from "react-d3-tree";
+import Tree, {
+  type Orientation,
+  type TreeLinkDatum,
+  type TreeNodeDatum
+} from "react-d3-tree";
 
 import "./Graph.css";
 import { Node, Result } from "./Node";
@@ -34,7 +36,7 @@ const useCenteredTree = (
 
 const getEdgeClass =
   (tree: TreeInfo) => (link: TreeLinkDatum, _orientation: Orientation) => {
-    const sourceIdx = link.source.data.name as number;
+    const sourceIdx = Number.parseInt(link.source.data.name);
     const node = tree.node(sourceIdx);
     return "Goal" in node
       ? "edge__goal-to-candidate"
@@ -55,7 +57,7 @@ const TreeNode = ({
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const padding = 10;
 
-  const idx = nodeDatum.name as number;
+  const idx = Number.parseInt(nodeDatum.name);
   const node = treeInfo.node(idx);
 
   useLayoutEffect(() => {
@@ -115,9 +117,11 @@ const topologyToTreeData = (
   idx: number
 ): TreeNodeDatum => {
   let kids = topology.children[idx];
+  // FIXME the `any` was included after a version update,
+  // we should investigate if the interface changed somehow.
   let obj: TreeNodeDatum = {
-    name: idx
-  };
+    name: `${idx}`
+  } as any;
 
   if (kids) {
     let kobjs = _.map(kids, k => topologyToTreeData(topology, k));

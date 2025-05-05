@@ -2,26 +2,27 @@ import React, { useState, useEffect } from "react";
 
 import "./FillScreen.css";
 
-function getWindowDimensions() {
-  const { innerWidth: width, innerHeight: height } = window;
-  return {
-    width,
-    height
-  };
-}
+export function useWindowDimensions() {
+  const initialDimensions = { width: 600, height: 800 };
+  const [windowDimensions, setWindowDimensions] = useState(initialDimensions);
 
-function useWindowDimensions() {
-  const [windowDimensions, setWindowDimensions] = useState(
-    getWindowDimensions()
-  );
+  const getWindowDimensions = () => {
+    if (typeof window === "undefined") return initialDimensions;
+    return {
+      width: document.documentElement.clientWidth,
+      height: document.documentElement.clientHeight
+    };
+  };
 
   useEffect(() => {
-    function handleResize() {
+    const handleResize = () => {
       setWindowDimensions(getWindowDimensions());
-    }
+    };
 
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    if (typeof window !== "undefined") {
+      window.addEventListener("resize", handleResize);
+      return () => window.removeEventListener("resize", handleResize);
+    }
   }, []);
 
   return windowDimensions;

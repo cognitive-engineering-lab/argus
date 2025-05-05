@@ -4,7 +4,6 @@
     "src"
   ],
   "compilerOptions": {
-    "noEmit": true,
-    "skipLibCheck": true
+    "noEmit": true
   }
 }

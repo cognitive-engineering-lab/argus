@@ -32,6 +32,7 @@ async function argusScreenshots(
 ) {
   const browser = await chromium.launch({
     headless: !global.debugging,
+    channel: "chromium",
     ignoreDefaultArgs: ["--headless"],
     args: ["--headless=new"]
   });
