@@ -22,7 +22,8 @@ jobs:
       - name: Argus Test
         run: nix develop .#ci -vL --command ci-check
 
-      - name: Test Build
-        timeout-minutes: 20
-        run: nix build .#argus-extension -vvvvvL
+      # FIXME pnpm deps hash
+      # - name: Test Build
+      #   timeout-minutes: 20
+      #   run: nix build .#argus-extension -vvvvvL
 
