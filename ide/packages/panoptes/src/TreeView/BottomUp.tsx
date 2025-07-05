@@ -15,7 +15,7 @@ import {
   TreeInfo,
   type TreeView,
   type TreeViewWithRoot,
-  invertViewWithRoots
+  invertViewWithRoots,
 } from "@argus/common/TreeInfo";
 import { IcoComment } from "@argus/print/Icons";
 import { WrapImplCandidates, mkJumpToTopDownWrapper } from "./Wrappers";
@@ -27,7 +27,7 @@ import { TyCtxt } from "@argus/print/context";
 const RenderEvaluationViews = ({
   recommended,
   others,
-  mode
+  mode,
 }: {
   recommended: TreeViewWithRoot[];
   others: TreeViewWithRoot[];
@@ -78,7 +78,7 @@ const RenderEvaluationViews = ({
  */
 export const RenderBottomUpViews = ({
   recommended,
-  others
+  others,
 }: {
   recommended: TreeViewWithRoot[];
   others: TreeViewWithRoot[];
@@ -127,12 +127,7 @@ const mkGetChildren = (view: TreeView) => (idx: ProofNodeIdx) =>
   view.topology.children[idx] ?? [];
 
 const GroupedFailures = observer(
-  (views: {
-    tree: TreeViewWithRoot[];
-    inertia: number;
-    momentum: number;
-    velocity: number;
-  }) => {
+  (views: { tree: TreeViewWithRoot[]; inertia: number }) => {
     if (views.tree.length === 0) {
       return null;
     }
@@ -160,7 +155,7 @@ const GroupedFailures = observer(
           <p>
             The outlined obligations must be resolved <b>together</b>
           </p>
-        )
+        ),
       });
       setHovered(true);
     };
@@ -187,14 +182,12 @@ const GroupedFailures = observer(
 
 export const RenderBottomUpSets = ({
   views,
-  jumpTo
+  jumpTo,
 }: {
   jumpTo: (n: ProofNodeIdx) => void;
   views: {
     tree: TreeViewWithRoot[];
     inertia: number;
-    velocity: number;
-    momentum: number;
   }[];
 }) => {
   const argusRecommends = <GroupedFailures {..._.head(views)!} />;
@@ -213,7 +206,7 @@ export const RenderBottomUpSets = ({
 
   const SubsetRenderParams: TreeRenderParams = {
     Wrappers: [WrapImplCandidates, mkJumpToTopDownWrapper(jumpTo)],
-    styleEdges: false
+    styleEdges: false,
   };
 
   return (
@@ -229,8 +222,10 @@ export const RenderBottomUpSets = ({
 };
 
 const BottomUp = ({
-  jumpToTopDown
-}: { jumpToTopDown: (n: ProofNodeIdx) => void }) => {
+  jumpToTopDown,
+}: {
+  jumpToTopDown: (n: ProofNodeIdx) => void;
+}) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
   const cfg = useContext(AppContext.ConfigurationContext)!;
   const evaluationMode = cfg.evalMode ?? "release";
@@ -239,15 +234,13 @@ const BottomUp = ({
   const sets = tree.failedSetsSorted(rankMode);
 
   const makeSets = (sets: SetHeuristic[]) =>
-    _.map(sets, h => {
+    _.map(sets, (h) => {
       return {
         tree: invertViewWithRoots(
-          _.map(h.goals, g => g.idx),
+          _.map(h.goals, (g) => g.idx),
           tree
         ),
         inertia: TreeInfo.setInertia(h),
-        velocity: h.velocity,
-        momentum: h.momentum
       };
     });
 
@@ -256,9 +249,9 @@ const BottomUp = ({
   }
 
   const flattenSets = (sets: SetHeuristic[]) =>
-    _.flatMap(sets, h =>
+    _.flatMap(sets, (h) =>
       invertViewWithRoots(
-        _.map(h.goals, g => g.idx),
+        _.map(h.goals, (g) => g.idx),
         tree
       )
     );

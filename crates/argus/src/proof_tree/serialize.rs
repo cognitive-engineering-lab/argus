@@ -39,7 +39,7 @@ pub struct SerializedTreeVisitor<'tcx> {
   pub root: Option<ProofNodeIdx>,
   pub previous: Option<ProofNodeIdx>,
   pub nodes: IndexVec<ProofNodeIdx, Node>,
-  pub topology: TreeTopology,
+  pub topology: GraphTopology,
   pub cycle: Option<ProofCycle>,
   pub projection_values: HashMap<TyIdx, TyIdx>,
   pub all_impl_candidates: HashMap<ProofNodeIdx, Implementors>,
@@ -55,7 +55,7 @@ impl SerializedTreeVisitor<'_> {
       root: None,
       previous: None,
       nodes: IndexVec::default(),
-      topology: TreeTopology::new(),
+      topology: GraphTopology::new(),
       cycle: None,
       projection_values: HashMap::default(),
       all_impl_candidates: HashMap::default(),
@@ -147,27 +147,6 @@ impl SerializedTreeVisitor<'_> {
       cycle,
       analysis,
     })
-  }
-
-  // TODO: cycle detection is too expensive for large trees, and strictly
-  // comparing the JSON values is a bad idea in general. (This is what comparing
-  // interned keys does essentially). We should wait until the new trait solver
-  // has some mechanism for detecting cycles and piggy back off that.
-  // FIXME: this is currently disabled but we should check for cycles again...
-  #[allow(dead_code)]
-  fn check_for_cycle_from(&mut self, from: ProofNodeIdx) {
-    if self.cycle.is_some() {
-      return;
-    }
-
-    let to_root = self.topology.path_to_root(from);
-    let from_node = self.nodes[from];
-    if to_root
-      .iter_exclusive()
-      .any(|middle| self.nodes[*middle] == from_node)
-    {
-      self.cycle = Some(to_root.into());
-    }
   }
 }
 

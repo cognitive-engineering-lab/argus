@@ -113,7 +113,7 @@ pub struct SerializedTree {
 
   pub all_impl_candidates: HashMap<ProofNodeIdx, Implementors>,
 
-  pub topology: TreeTopology,
+  pub topology: GraphTopology,
 
   #[serde(skip_serializing_if = "Option::is_none")]
   pub cycle: Option<ProofCycle>,

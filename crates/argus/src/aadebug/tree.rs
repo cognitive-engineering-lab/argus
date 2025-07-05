@@ -16,7 +16,7 @@ use ts_rs::TS;
 use super::dnf::{And, Dnf};
 use crate::{
   analysis::EvaluationResult,
-  proof_tree::{topology::TreeTopology, ProofNodeIdx},
+  proof_tree::{topology::GraphTopology, ProofNodeIdx},
 };
 
 pub type I = ProofNodeIdx;
@@ -26,8 +26,7 @@ pub type I = ProofNodeIdx;
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct SetHeuristic {
-  pub momentum: usize,
-  pub velocity: usize,
+  pub inertia: usize,
   goals: Vec<Heuristic>,
 }
 
@@ -144,32 +143,6 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
 
   pub fn predicate(&self) -> ty::Predicate<'tcx> {
     self.goal.predicate
-  }
-
-  pub fn last_ancestor_pre_builtin(&self) -> Self {
-    let mut i = self.idx;
-    let tree = self.tree;
-
-    let not_builtin = |kind| {
-      !matches!(kind, ProbeKind::TraitCandidate {
-        source: CandidateSource::BuiltinImpl(..),
-        ..
-      })
-    };
-
-    let get_next_ancestor = |i: I| -> Option<I> {
-      let parent = tree.topology.parent(i)?;
-      match tree.ns[parent] {
-        N::C { kind, .. } if not_builtin(kind) => tree.topology.parent(parent),
-        _ => None,
-      }
-    };
-
-    while let Some(grandparent) = get_next_ancestor(i) {
-      i = grandparent;
-    }
-
-    tree.goal(i).expect("invalid ancestor")
   }
 
   fn analyze(&self) -> Heuristic {
@@ -337,7 +310,7 @@ pub enum N<'tcx> {
 pub struct T<'a, 'tcx: 'a> {
   pub root: I,
   pub ns: &'a IndexVec<I, N<'tcx>>,
-  pub topology: &'a TreeTopology,
+  pub topology: &'a GraphTopology,
   pub maybe_ambiguous: bool,
   report_performance: bool,
   dnf: RefCell<Option<Dnf<I>>>,
@@ -347,7 +320,7 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
   pub fn new(
     root: I,
     ns: &'a IndexVec<I, N<'tcx>>,
-    topology: &'a TreeTopology,
+    topology: &'a GraphTopology,
     maybe_ambiguous: bool,
     report_performance: bool,
   ) -> Self {
@@ -488,16 +461,10 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
       .map(|&idx| self.goal(idx).expect("goal").analyze())
       .collect::<Vec<_>>();
 
-    let momentum = goals.iter().fold(0, |acc, g| acc + g.kind.weight());
-    let velocity = and
-      .iter()
-      .map(|&idx| self.topology.depth(idx))
-      .max()
-      .unwrap_or(0);
+    let inertia = goals.iter().fold(0, |acc, g| acc + g.kind.weight());
 
     SetHeuristic {
-      momentum,
-      velocity,
+      inertia,
       goals,
     }
   }

@@ -31,9 +31,9 @@ impl<T> Idx for T where T: Copy + PartialEq + Eq + Hash + Debug + Serialize {}
 #[derive(Serialize, Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-pub struct TreeTopology {
+pub struct GraphTopology {
   pub children: HashMap<ProofNodeIdx, HashSet<ProofNodeIdx>>,
-  pub parent: HashMap<ProofNodeIdx, ProofNodeIdx>,
+  pub parents: HashMap<ProofNodeIdx, HashSet<ProofNodeIdx>>,
 }
 
 #[derive(Clone, Debug)]
@@ -97,21 +97,17 @@ impl<N: Idx> Path<N, FromRoot> {
   }
 }
 
-impl TreeTopology {
+impl GraphTopology {
   pub fn new() -> Self {
     Self {
       children: HashMap::default(),
-      parent: HashMap::default(),
+      parents: HashMap::default(),
     }
   }
 
   pub fn add(&mut self, from: ProofNodeIdx, to: ProofNodeIdx) {
     self.children.entry(from).or_default().insert(to);
-    self.parent.insert(to, from);
-  }
-
-  pub fn is_parent(&self, parent: ProofNodeIdx, child: ProofNodeIdx) -> bool {
-    self.parent.get(&child).is_some_and(|p| *p == parent)
+    self.parents.entry(to).or_default().insert(from);
   }
 
   pub fn is_leaf(&self, node: ProofNodeIdx) -> bool {
@@ -119,10 +115,6 @@ impl TreeTopology {
       None => true,
       Some(children) => children.is_empty(),
     }
-  }
-
-  pub fn parent(&self, to: ProofNodeIdx) -> Option<ProofNodeIdx> {
-    self.parent.get(&to).copied()
   }
 
   pub fn children(
@@ -140,42 +132,10 @@ impl TreeTopology {
     use itertools::Itertools;
     // TODO: just take the parents and chain the root
     self
-      .parent
+      .parents
       .keys()
       .copied()
       .chain(self.children.keys().copied())
       .unique()
-  }
-
-  pub fn path_to_root(&self, node: ProofNodeIdx) -> Path<ProofNodeIdx, ToRoot> {
-    let mut root = node;
-    let mut curr = Some(node);
-    let path = std::iter::from_fn(move || {
-      let rootp = &mut root;
-      let prev = curr;
-      if let Some(n) = curr {
-        curr = self.parent(n);
-        *rootp = n;
-      }
-
-      prev
-    });
-    let path = path.collect::<Vec<_>>();
-
-    Path {
-      root,
-      node,
-      path,
-      _marker: PhantomData,
-    }
-  }
-
-  pub fn depth(&self, mut idx: ProofNodeIdx) -> usize {
-    let mut d = 0;
-    while let Some(p) = self.parent(idx) {
-      d += 1;
-      idx = p;
-    }
-    d
   }
 }

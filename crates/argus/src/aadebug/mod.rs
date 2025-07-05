@@ -13,7 +13,7 @@ use serde::Serialize;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
-use crate::proof_tree::{topology::TreeTopology, ProofNodeIdx};
+use crate::proof_tree::{topology::GraphTopology, ProofNodeIdx};
 
 pub struct Storage<'tcx> {
   pub ns: IndexVec<ProofNodeIdx, tree::N<'tcx>>,
@@ -107,7 +107,7 @@ impl<'tcx> Storage<'tcx> {
   pub fn into_results(
     self,
     root: ProofNodeIdx,
-    topo: &TreeTopology,
+    topo: &GraphTopology,
   ) -> AnalysisResults {
     let tree =
       &tree::T::new(root, &self.ns, topo, false, self.report_performance);

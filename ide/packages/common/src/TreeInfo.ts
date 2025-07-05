@@ -12,7 +12,7 @@ import type {
   ResultIdx,
   SerializedTree,
   SetHeuristic,
-  TreeTopology
+  TreeTopology,
 } from "./bindings";
 import type { SortStrategy } from "./lib";
 
@@ -105,7 +105,7 @@ function makeTreeView(
       case "remove-tree":
         return;
     }
-    _.forEach(kids, kid => iterate(kid, newPrev));
+    _.forEach(kids, (kid) => iterate(kid, newPrev));
   };
 
   iterate(root);
@@ -113,7 +113,7 @@ function makeTreeView(
 
   if (children[root] !== undefined) {
     return {
-      topology: { children, parent }
+      topology: { children, parent },
     };
   }
 }
@@ -122,10 +122,7 @@ type ControlFlow = "keep" | "remove-tree" | "remove-node";
 
 class TopologyBuilder {
   private topo: TreeTopology;
-  constructor(
-    readonly root: ProofNodeIdx,
-    readonly tree: TreeInfo
-  ) {
+  constructor(readonly root: ProofNodeIdx, readonly tree: TreeInfo) {
     this.topo = { children: {}, parent: {} };
   }
 
@@ -160,7 +157,7 @@ class TopologyBuilder {
     }
 
     let previous = this.root;
-    _.forEach(_.tail(path), node => {
+    _.forEach(_.tail(path), (node) => {
       // We want to add a node from `previous` to `node` only if an
       // equivalent connection does not already exist. Equivalent is
       // defined by the `Node` the `ProofNodeIdx` points to.
@@ -168,7 +165,7 @@ class TopologyBuilder {
       const myNode = this.tree.node(node);
       const hasEquivalent = _.find(
         currKids,
-        kid => this.tree.node(kid) === myNode
+        (kid) => this.tree.node(kid) === myNode
       );
       if (hasEquivalent === undefined) {
         this.add(previous, node);
@@ -191,7 +188,7 @@ export function invertViewWithRoots(
   tree: TreeInfo
 ): TreeViewWithRoot[] {
   const groups: ProofNodeIdx[][] = _.values(
-    _.groupBy(leaves, leaf => {
+    _.groupBy(leaves, (leaf) => {
       const node = tree.node(leaf);
       if ("Goal" in node) {
         return node.Goal;
@@ -200,7 +197,7 @@ export function invertViewWithRoots(
     })
   );
 
-  return _.map(groups, group => {
+  return _.map(groups, (group) => {
     // Each element of the group is equivalent, so just take the first
     const builder = new TopologyBuilder(group[0], tree);
 
@@ -208,10 +205,10 @@ export function invertViewWithRoots(
     // contain successful nodes.
     const pathsToRoot = _.map(
       group,
-      parent => tree.pathToRoot(parent).pathInclusive
+      (parent) => tree.pathToRoot(parent).pathInclusive
     );
 
-    _.forEach(pathsToRoot, path => {
+    _.forEach(pathsToRoot, (path) => {
       // No need to take the tail, `addPathFromRoot` checks that the
       // roots are equal and then skips the first element.
       builder.addPathFromRoot(path);
@@ -293,9 +290,9 @@ export class TreeInfo {
       case "inertia":
         return _.sortBy(sets, TreeInfo.setInertia);
       case "depth":
-        return _.sortBy(sets, s => this.setDepth(s));
+        return _.sortBy(sets, (s) => this.setDepth(s));
       case "vars":
-        return _.sortBy(sets, s => this.setInferVars(s));
+        return _.sortBy(sets, (s) => this.setInferVars(s));
       default:
         throw new Error("Unknown sort strategy");
     }
@@ -305,11 +302,11 @@ export class TreeInfo {
     if (this.showHidden) return this.tree.analysis.problematicSets;
 
     const setHasBadUnification = (s: SetHeuristic) =>
-      _.some(s.goals, g => isBadUnification(g.kind));
+      _.some(s.goals, (g) => isBadUnification(g.kind));
 
     // Find the lowest inertia set that *does not* have a unification failure.
     const nonUnificationFailureLowestInertia = _.min(
-      _.map(this.tree.analysis.problematicSets, s =>
+      _.map(this.tree.analysis.problematicSets, (s) =>
         setHasBadUnification(s) ? undefined : TreeInfo.setInertia(s)
       )
     );
@@ -324,17 +321,17 @@ export class TreeInfo {
     // inertia lower than `nonUnificationFailureLowestInertia`.
     return _.filter(
       this.tree.analysis.problematicSets,
-      s =>
+      (s) =>
         !setHasBadUnification(s) ||
         TreeInfo.setInertia(s) < nonUnificationFailureLowestInertia
     );
   }
 
   private unificationFailures(): ProofNodeIdx[] {
-    const goals = _.flatMap(this.tree.analysis.problematicSets, s => s.goals);
+    const goals = _.flatMap(this.tree.analysis.problematicSets, (s) => s.goals);
     return _.map(
-      _.filter(goals, g => isBadUnification(g.kind)),
-      g => g.idx
+      _.filter(goals, (g) => isBadUnification(g.kind)),
+      (g) => g.idx
     );
   }
 
@@ -342,13 +339,13 @@ export class TreeInfo {
     if (this.showHidden) return [];
 
     const nonUnificationFailures = _.flatMap(
-      _.flatMap(this.failedSets(), s => _.map(s.goals, g => g.idx)),
-      n => this.pathToRoot(n).pathInclusive
+      _.flatMap(this.failedSets(), (s) => _.map(s.goals, (g) => g.idx)),
+      (n) => this.pathToRoot(n).pathInclusive
     );
 
     const uFs = _.flatMap(
       this.unificationFailures(),
-      n => this.pathToRoot(n).pathInclusive
+      (n) => this.pathToRoot(n).pathInclusive
     );
 
     return _.difference(uFs, nonUnificationFailures);
@@ -443,7 +440,7 @@ export class TreeInfo {
     if (current !== undefined) {
       return current;
     }
-    const childHeights = _.map(this.children(n), k => this.maxHeight(k));
+    const childHeights = _.map(this.children(n), (k) => this.maxHeight(k));
     const height = 1 + (_.max(childHeights) ?? 0);
     this._maxHeight.set(n, height);
     return height;
@@ -455,7 +452,7 @@ export class TreeInfo {
    * were deep, needlessely, and this threw a wrench in the order.
    */
   public static setInertia = (set: SetHeuristic) => {
-    return set.momentum;
+    return set.inertia;
   };
 
   public setDepth(set: SetHeuristic) {
@@ -469,8 +466,10 @@ export class TreeInfo {
   }
 
   public minInertiaOnPath(n: ProofNodeIdx): number {
-    const hs = _.filter(this.failedSets(), h =>
-      _.some(h.goals, g => _.includes(this.pathToRoot(g.idx).pathInclusive, n))
+    const hs = _.filter(this.failedSets(), (h) =>
+      _.some(h.goals, (g) =>
+        _.includes(this.pathToRoot(g.idx).pathInclusive, n)
+      )
     );
 
     // HACK: the high default is a hack to get rid of undefined,
