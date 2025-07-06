@@ -2,9 +2,10 @@ use std::{cell::RefCell, ops::Deref, time::Instant};
 
 use argus_ext::ty::{EvaluationResultExt, TyCtxtExt, TyExt};
 use index_vec::IndexVec;
+use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::{
-  traits::solve::{CandidateSource, Goal as RGoal},
+  traits::solve::Goal as RGoal,
   ty::{self, TyCtxt},
 };
 use rustc_trait_selection::solve::inspect::ProbeKind;
@@ -16,10 +17,8 @@ use ts_rs::TS;
 use super::dnf::{And, Dnf};
 use crate::{
   analysis::EvaluationResult,
-  proof_tree::{topology::GraphTopology, ProofNodeIdx},
+  proof_tree::{topology::GraphTopology, ProofNode as I},
 };
-
-pub type I = ProofNodeIdx;
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -35,7 +34,7 @@ pub struct SetHeuristic {
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct Heuristic {
-  idx: I,
+  proof_node: I,
   kind: GoalKind,
 }
 
@@ -107,7 +106,7 @@ impl GoalKind {
 
 #[allow(clippy::struct_field_names)]
 pub struct Goal<'a, 'tcx> {
-  idx: I,
+  proof_node: I,
   result: EvaluationResult,
   tree: &'a T<'a, 'tcx>,
   infcx: &'a InferCtxt<'tcx>,
@@ -116,13 +115,13 @@ pub struct Goal<'a, 'tcx> {
 
 impl From<Goal<'_, '_>> for I {
   fn from(val: Goal) -> Self {
-    val.idx
+    val.proof_node
   }
 }
 
 impl From<&Goal<'_, '_>> for I {
   fn from(val: &Goal) -> Self {
-    val.idx
+    val.proof_node
   }
 }
 
@@ -131,7 +130,7 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
     self
       .tree
       .topology
-      .children(self.idx)
+      .children(self.proof_node)
       .filter_map(move |i| self.tree.candidate(i))
   }
 
@@ -257,7 +256,7 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
     };
 
     Heuristic {
-      idx: self.idx,
+      proof_node: self.proof_node,
       kind,
     }
   }
@@ -265,7 +264,7 @@ impl<'a, 'tcx> Goal<'a, 'tcx> {
 
 #[allow(dead_code)]
 pub struct Candidate<'a, 'tcx> {
-  idx: I,
+  proof_node: I,
   retain: bool,
   result: EvaluationResult,
   tree: &'a T<'a, 'tcx>,
@@ -277,7 +276,7 @@ impl<'a, 'tcx> Candidate<'a, 'tcx> {
     self
       .tree
       .topology
-      .children(self.idx)
+      .children(self.proof_node)
       .filter_map(move |i| self.tree.goal(i))
   }
 
@@ -309,7 +308,7 @@ pub enum N<'tcx> {
 
 pub struct T<'a, 'tcx: 'a> {
   pub root: I,
-  pub ns: &'a IndexVec<I, N<'tcx>>,
+  pub ns: &'a HashMap<I, N<'tcx>>,
   pub topology: &'a GraphTopology,
   pub maybe_ambiguous: bool,
   report_performance: bool,
@@ -319,7 +318,7 @@ pub struct T<'a, 'tcx: 'a> {
 impl<'a, 'tcx: 'a> T<'a, 'tcx> {
   pub fn new(
     root: I,
-    ns: &'a IndexVec<I, N<'tcx>>,
+    ns: &'a HashMap<I, N<'tcx>>,
     topology: &'a GraphTopology,
     maybe_ambiguous: bool,
     report_performance: bool,
@@ -341,13 +340,13 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
   }
 
   pub fn goal(&self, i: I) -> Option<Goal<'_, 'tcx>> {
-    match &self.ns[i] {
+    match &self.ns[&i] {
       N::R {
         infcx,
         goal,
         result,
       } => Some(Goal {
-        idx: i,
+        proof_node: i,
         result: *result,
         tree: self,
         infcx,
@@ -358,13 +357,13 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
   }
 
   pub fn candidate(&self, i: I) -> Option<Candidate<'_, 'tcx>> {
-    match &self.ns[i] {
+    match &self.ns[&i] {
       N::C {
         kind,
         result,
         retain,
       } => Some(Candidate {
-        idx: i,
+        proof_node: i,
         retain: *retain,
         result: *result,
         tree: self,
@@ -393,7 +392,7 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
         .collect::<Vec<_>>();
 
       if nested.is_empty() {
-        return Dnf::single(goal.idx).into();
+        return Dnf::single(goal.proof_node).into();
       }
 
       Dnf::or(nested.into_iter())
@@ -463,10 +462,7 @@ impl<'a, 'tcx: 'a> T<'a, 'tcx> {
 
     let inertia = goals.iter().fold(0, |acc, g| acc + g.kind.weight());
 
-    SetHeuristic {
-      inertia,
-      goals,
-    }
+    SetHeuristic { inertia, goals }
   }
 }
 

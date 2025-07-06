@@ -6,20 +6,21 @@ import type {
   EvaluationResult,
   GoalIdx,
   GoalKind,
+  GraphTopology,
   Heuristic,
   Implementors,
-  ProofNodeIdx,
+  ProofNode,
+  ProofNodeUnpacked,
   ResultIdx,
   SerializedTree,
-  SetHeuristic,
-  TreeTopology,
+  SetHeuristic
 } from "./bindings";
 import type { SortStrategy } from "./lib";
 
-export type TreeViewWithRoot = TreeView & { root: ProofNodeIdx };
+export type TreeViewWithRoot = TreeView & { root: ProofNode };
 
 export interface TreeView {
-  topology: TreeTopology;
+  topology: GraphTopology;
   underlying?: TreeView;
 }
 
@@ -71,25 +72,27 @@ class Path<T, D extends Direction> {
 }
 
 function makeTreeView(
-  root: ProofNodeIdx,
-  cf: (n: ProofNodeIdx) => ControlFlow,
-  childrenOf: (n: ProofNodeIdx) => ProofNodeIdx[]
+  root: ProofNode,
+  cf: (n: ProofNode) => ControlFlow,
+  childrenOf: (n: ProofNode) => ProofNode[]
 ): TreeView | undefined {
-  const children: MultiRecord<ProofNodeIdx, ProofNodeIdx> = {};
-  const parent: Record<ProofNodeIdx, ProofNodeIdx> = {};
-  const addChildRel = (from: ProofNodeIdx, to: ProofNodeIdx) => {
+  const children: MultiRecord<ProofNode, ProofNode> = {};
+  const parents: MultiRecord<ProofNode, ProofNode> = {};
+  const addChildRel = (from: ProofNode, to: ProofNode) => {
     if (children[from]) {
       children[from].push(to);
     } else {
       children[from] = [to];
     }
-    if (parent[to]) {
-      throw new Error("parent already set");
+    if (parents[to]) {
+      parents[to].push(from);
+    } else {
+      parents[to] = [from];
     }
-    parent[to] = from;
   };
 
-  const iterate = (curr: ProofNodeIdx, prev?: ProofNodeIdx) => {
+  const iterate = (curr: ProofNode, prev?: ProofNode) => {
+    const alreadyVisitedSomeChildOfCurr = curr in children;
     const kids = childrenOf(curr);
     let newPrev = prev;
     switch (cf(curr)) {
@@ -98,6 +101,11 @@ function makeTreeView(
           addChildRel(prev, curr);
         }
         newPrev = curr;
+        if (alreadyVisitedSomeChildOfCurr) {
+          // already processed; continuing vs. not would affect termination without
+          // affecting the results computed
+          return;
+        }
         break;
       }
       case "remove-node":
@@ -105,7 +113,7 @@ function makeTreeView(
       case "remove-tree":
         return;
     }
-    _.forEach(kids, (kid) => iterate(kid, newPrev));
+    _.forEach(kids, kid => iterate(kid, newPrev));
   };
 
   iterate(root);
@@ -113,109 +121,126 @@ function makeTreeView(
 
   if (children[root] !== undefined) {
     return {
-      topology: { children, parent },
+      topology: { children, parents }
     };
   }
 }
 
 type ControlFlow = "keep" | "remove-tree" | "remove-node";
 
-class TopologyBuilder {
-  private topo: TreeTopology;
-  constructor(readonly root: ProofNodeIdx, readonly tree: TreeInfo) {
-    this.topo = { children: {}, parent: {} };
-  }
+// class TopologyBuilder {
+//   private topo: GraphTopology;
+//   constructor(
+//     readonly root: ProofNodeIdx,
+//     readonly tree: TreeInfo
+//   ) {
+//     this.topo = { children: {}, parents: {} };
+//   }
 
-  public toView(): TreeViewWithRoot {
-    return { topology: this.topo, root: this.root };
-  }
+//   public toView(): TreeViewWithRoot {
+//     return { topology: this.topo, root: this.root };
+//   }
 
-  get topology() {
-    return this.topo;
-  }
+//   get topology() {
+//     return this.topo;
+//   }
 
-  add(from: ProofNodeIdx, to: ProofNodeIdx) {
-    if (this.topo.children[from] === undefined) {
-      this.topo.children[from] = [];
-    }
-    this.topo.children[from].push(to);
-    this.topo.parent[to] = from;
-  }
+//   add(from: ProofNodeIdx, to: ProofNodeIdx) {
+//     if (this.topo.children[from] === undefined) {
+//       this.topo.children[from] = [];
+//     }
+//     this.topo.children[from].push(to);
+//     this.topo.parent[to] = from;
+//   }
 
-  /**
-   *
-   * @param root the root node from where this path should start.
-   * @param path a path to be added uniquely to the tree.
-   */
-  public addPathFromRoot(path: ProofNodeIdx[]) {
-    const thisRoot = _.head(path);
-    if (
-      thisRoot === undefined ||
-      !_.isEqual(this.tree.node(thisRoot), this.tree.node(this.root))
-    ) {
-      throw new Error("Path does not start from the root");
-    }
+//   /**
+//    *
+//    * @param root the root node from where this path should start.
+//    * @param path a path to be added uniquely to the tree.
+//    */
+//   public addPathFromRoot(path: ProofNodeIdx[]) {
+//     const thisRoot = _.head(path);
+//     if (
+//       thisRoot === undefined ||
+//       !_.isEqual(this.tree.node(thisRoot), this.tree.node(this.root))
+//     ) {
+//       throw new Error("Path does not start from the root");
+//     }
 
-    let previous = this.root;
-    _.forEach(_.tail(path), (node) => {
-      // We want to add a node from `previous` to `node` only if an
-      // equivalent connection does not already exist. Equivalent is
-      // defined by the `Node` the `ProofNodeIdx` points to.
-      const currKids = this.topo.children[previous] ?? [];
-      const myNode = this.tree.node(node);
-      const hasEquivalent = _.find(
-        currKids,
-        (kid) => this.tree.node(kid) === myNode
-      );
-      if (hasEquivalent === undefined) {
-        this.add(previous, node);
-        previous = node;
-      } else {
-        previous = hasEquivalent;
-      }
-    });
-  }
-}
+//     let previous = this.root;
+//     _.forEach(_.tail(path), node => {
+//       // We want to add a node from `previous` to `node` only if an
+//       // equivalent connection does not already exist. Equivalent is
+//       // defined by the `Node` the `ProofNodeIdx` points to.
+//       const currKids = this.topo.children[previous] ?? [];
+//       const myNode = this.tree.node(node);
+//       const hasEquivalent = _.find(
+//         currKids,
+//         kid => this.tree.node(kid) === myNode
+//       );
+//       if (hasEquivalent === undefined) {
+//         this.add(previous, node);
+//         previous = node;
+//       } else {
+//         previous = hasEquivalent;
+//       }
+//     });
+//   }
+// }
 
-/**
- * Invert the current `TreeView` on the `TreeInfo`, using `leaves` as the roots.
- * For the purpose of inverting a tree anchored at failed goals, some of these goals will
- * be 'distinct' nodes, but their inner `GoalIdx` will be the same. We want to root all of
- * these together.
- */
+// /**
+//  * Invert the current `TreeView` on the `TreeInfo`, using `leaves` as the roots.
+//  * For the purpose of inverting a tree anchored at failed goals, some of these goals will
+//  * be 'distinct' nodes, but their inner `GoalIdx` will be the same. We want to root all of
+//  * these together.
+//  */
+// export function invertViewWithRoots(
+//   leaves: ProofNodeIdx[],
+//   tree: TreeInfo
+// ): TreeViewWithRoot[] {
+//   const groups: ProofNodeIdx[][] = _.values(
+//     _.groupBy(leaves, leaf => {
+//       const node = tree.node(leaf);
+//       if ("Goal" in node) {
+//         return node.Goal;
+//       }
+//       throw new Error("Leaves must be goals");
+//     })
+//   );
+
+//   return _.map(groups, group => {
+//     // Each element of the group is equivalent, so just take the first
+//     const builder = new TopologyBuilder(group[0], tree);
+
+//     // Get the paths to the root from all leaves, filter paths that
+//     // contain successful nodes.
+//     const pathsToRoot = _.map(
+//       group,
+//       parent => tree.pathToRoot(parent).pathInclusive
+//     );
+
+//     _.forEach(pathsToRoot, path => {
+//       // No need to take the tail, `addPathFromRoot` checks that the
+//       // roots are equal and then skips the first element.
+//       builder.addPathFromRoot(path);
+//     });
+
+//     return builder.toView();
+//   });
+// }
+
 export function invertViewWithRoots(
-  leaves: ProofNodeIdx[],
+  leaves: ProofNode[],
   tree: TreeInfo
 ): TreeViewWithRoot[] {
-  const groups: ProofNodeIdx[][] = _.values(
-    _.groupBy(leaves, (leaf) => {
-      const node = tree.node(leaf);
-      if ("Goal" in node) {
-        return node.Goal;
-      }
-      throw new Error("Leaves must be goals");
-    })
-  );
-
-  return _.map(groups, (group) => {
-    // Each element of the group is equivalent, so just take the first
-    const builder = new TopologyBuilder(group[0], tree);
-
-    // Get the paths to the root from all leaves, filter paths that
-    // contain successful nodes.
-    const pathsToRoot = _.map(
-      group,
-      (parent) => tree.pathToRoot(parent).pathInclusive
-    );
-
-    _.forEach(pathsToRoot, (path) => {
-      // No need to take the tail, `addPathFromRoot` checks that the
-      // roots are equal and then skips the first element.
-      builder.addPathFromRoot(path);
-    });
-
-    return builder.toView();
-  });
+  const invertedTopology = {
+    children: tree.topology.parents,
+    parents: tree.topology.children
+  };
+  return leaves.map(leaf => ({
+    topology: invertedTopology,
+    root: leaf
+  }));
 }
 
 function isBadUnification(kind: GoalKind) {
@@ -226,22 +251,40 @@ function isBadUnification(kind: GoalKind) {
   );
 }
 
+export const unpackProofNode: (node: ProofNode) => ProofNodeUnpacked = node => {
+  // Extract the index by masking out the top 2 bits
+  const idx = node & ((1 << 30) - 1); // u32::MAX >> 2 equivalent
+
+  // Check the top 2 bits to determine the type
+  const topBits = node & ((1 << 31) | (1 << 30));
+
+  if (topBits === 0) {
+    // Both top bits are 0 -> Goal
+    return { Goal: idx };
+  } else if ((node & (1 << 31)) !== 0) {
+    // Top bit is 1 -> Candidate
+    return { Candidate: idx };
+  } else {
+    // Only second bit is 1 -> Result
+    return { Result: idx };
+  }
+};
+
 export class TreeInfo {
-  private _maxHeight: Map<ProofNodeIdx, number>;
-  private numInferVars: Map<ProofNodeIdx, number>;
+  // private _maxHeight: Map<ProofNode, number>;
+  private numInferVars: Map<ProofNode, number>;
 
   static new(tree: SerializedTree, showHidden = false) {
-    const childrenOf = (n: ProofNodeIdx) => {
+    const childrenOf = (n: ProofNode) => {
       return tree.topology.children[n] ?? [];
     };
-    const cf = (n: ProofNodeIdx): ControlFlow => {
+    const cf = (node: ProofNode): ControlFlow => {
       if (showHidden) {
         return "keep";
       }
-
-      const node = tree.nodes[n];
-      if ("Goal" in node) {
-        const goalData = tree.goals[node.Goal];
+      const unpacked = unpackProofNode(node);
+      if ("Goal" in unpacked) {
+        const goalData = tree.goals[unpacked.Goal];
         const result = tree.results[goalData.result];
         return "keep";
         // FIXME: I believe that this logic is correct, but argus crashes when enabled
@@ -249,8 +292,8 @@ export class TreeInfo {
         //   ? "remove-tree"
         //   : "remove-node";
       }
-      if ("Candidate" in node) {
-        const candidate = tree.candidates[node.Candidate];
+      if ("Candidate" in unpacked) {
+        const candidate = tree.candidates[unpacked.Candidate];
         return "Any" in candidate ? "remove-node" : "keep";
       }
       return "keep";
@@ -267,15 +310,15 @@ export class TreeInfo {
     readonly showHidden: boolean,
     readonly view: TreeView
   ) {
-    this._maxHeight = new Map();
+    // this._maxHeight = new Map();
     this.numInferVars = new Map();
   }
 
-  get topology(): TreeTopology {
+  get topology(): GraphTopology {
     return this.view.topology;
   }
 
-  get root(): ProofNodeIdx {
+  get root(): ProofNode {
     return this.tree.root;
   }
 
@@ -289,10 +332,10 @@ export class TreeInfo {
     switch (sortAs) {
       case "inertia":
         return _.sortBy(sets, TreeInfo.setInertia);
-      case "depth":
-        return _.sortBy(sets, (s) => this.setDepth(s));
+      // case "depth":
+      //   return _.sortBy(sets, s => this.setDepth(s));
       case "vars":
-        return _.sortBy(sets, (s) => this.setInferVars(s));
+        return _.sortBy(sets, s => this.setInferVars(s));
       default:
         throw new Error("Unknown sort strategy");
     }
@@ -302,11 +345,11 @@ export class TreeInfo {
     if (this.showHidden) return this.tree.analysis.problematicSets;
 
     const setHasBadUnification = (s: SetHeuristic) =>
-      _.some(s.goals, (g) => isBadUnification(g.kind));
+      _.some(s.goals, g => isBadUnification(g.kind));
 
     // Find the lowest inertia set that *does not* have a unification failure.
     const nonUnificationFailureLowestInertia = _.min(
-      _.map(this.tree.analysis.problematicSets, (s) =>
+      _.map(this.tree.analysis.problematicSets, s =>
         setHasBadUnification(s) ? undefined : TreeInfo.setInertia(s)
       )
     );
@@ -321,46 +364,42 @@ export class TreeInfo {
     // inertia lower than `nonUnificationFailureLowestInertia`.
     return _.filter(
       this.tree.analysis.problematicSets,
-      (s) =>
+      s =>
         !setHasBadUnification(s) ||
         TreeInfo.setInertia(s) < nonUnificationFailureLowestInertia
     );
   }
 
-  private unificationFailures(): ProofNodeIdx[] {
-    const goals = _.flatMap(this.tree.analysis.problematicSets, (s) => s.goals);
+  private unificationFailures(): ProofNode[] {
+    const goals = _.flatMap(this.tree.analysis.problematicSets, s => s.goals);
     return _.map(
-      _.filter(goals, (g) => isBadUnification(g.kind)),
-      (g) => g.idx
+      _.filter(goals, g => isBadUnification(g.kind)),
+      g => g.proofNode
     );
   }
 
-  private nodesInUnificationFailurePath(): ProofNodeIdx[] {
-    if (this.showHidden) return [];
+  // private nodesInUnificationFailurePath(): ProofNode[] {
+  //   if (this.showHidden) return [];
 
-    const nonUnificationFailures = _.flatMap(
-      _.flatMap(this.failedSets(), (s) => _.map(s.goals, (g) => g.idx)),
-      (n) => this.pathToRoot(n).pathInclusive
-    );
+  //   const nonUnificationFailures = _.flatMap(
+  //     _.flatMap(this.failedSets(), s => _.map(s.goals, g => g.proofNode)),
+  //     n => this.pathToRoot(n).pathInclusive
+  //   );
 
-    const uFs = _.flatMap(
-      this.unificationFailures(),
-      (n) => this.pathToRoot(n).pathInclusive
-    );
+  //   const uFs = _.flatMap(
+  //     this.unificationFailures(),
+  //     n => this.pathToRoot(n).pathInclusive
+  //   );
 
-    return _.difference(uFs, nonUnificationFailures);
-  }
+  //   return _.difference(uFs, nonUnificationFailures);
+  // }
 
-  public node(n: ProofNodeIdx) {
-    return this.tree.nodes[n];
-  }
+  // public depth(n: ProofNode) {
+  //   return this.pathToRoot(n).length;
+  // }
 
-  public depth(n: ProofNodeIdx) {
-    return this.pathToRoot(n).length;
-  }
-
-  public goalOfNode(n: ProofNodeIdx) {
-    const node = this.node(n);
+  public goalOfNode(n: ProofNode) {
+    const node = unpackProofNode(n);
     return "Goal" in node ? this.goal(node.Goal) : undefined;
   }
 
@@ -372,12 +411,13 @@ export class TreeInfo {
     return this.tree.goals[n];
   }
 
-  public parent(n: ProofNodeIdx): ProofNodeIdx | undefined {
-    return this.view.topology.parent[n];
+  public parents(n: ProofNode): ProofNode[] | undefined {
+    return this.view.topology.parents[n];
   }
 
-  public children(n: ProofNodeIdx): ProofNodeIdx[] {
-    const nodesToUnifyFailures = this.nodesInUnificationFailurePath();
+  public children(n: ProofNode): ProofNode[] {
+    // const nodesToUnifyFailures = this.nodesInUnificationFailurePath();
+    const nodesToUnifyFailures: ProofNode[] = []; // FIXME: it may be possible to re-enable this, with a little more work
     const children = this.view.topology.children[n] ?? [];
     return _.difference(children, nodesToUnifyFailures);
   }
@@ -390,8 +430,8 @@ export class TreeInfo {
     return this.result(this.goal(n).result);
   }
 
-  public nodeResult(n: ProofNodeIdx): EvaluationResult | undefined {
-    const node = this.node(n);
+  public nodeResult(n: ProofNode): EvaluationResult | undefined {
+    const node = unpackProofNode(n);
     if ("Result" in node) {
       return this.result(node.Result);
     } else if ("Goal" in node) {
@@ -401,31 +441,31 @@ export class TreeInfo {
     }
   }
 
-  public pathToRoot(from: ProofNodeIdx): Path<ProofNodeIdx, "to-root"> {
-    const path = [from];
-    let current = from;
-    while (current !== this.root) {
-      const parent = this.parent(current);
-      if (parent === undefined) {
-        break;
-      }
-      path.push(parent);
-      current = parent;
-    }
+  // public pathToRoot(from: ProofNodeIdx): Path<ProofNodeIdx, "to-root"> {
+  //   const path = [from];
+  //   let current = from;
+  //   while (current !== this.root) {
+  //     const parent = this.parent(current);
+  //     if (parent === undefined) {
+  //       break;
+  //     }
+  //     path.push(parent);
+  //     current = parent;
+  //   }
 
-    return new Path(from, this.root, path, "to-root");
-  }
+  //   return new Path(from, this.root, path, "to-root");
+  // }
 
-  public pathFromRoot(from: ProofNodeIdx): Path<ProofNodeIdx, "from-root"> {
-    return this.pathToRoot(from).reverse();
-  }
+  // public pathFromRoot(from: ProofNodeIdx): Path<ProofNodeIdx, "from-root"> {
+  //   return this.pathToRoot(from).reverse();
+  // }
 
-  public inferVars(n: ProofNodeIdx): number {
+  public inferVars(n: ProofNode): number {
     const current = this.numInferVars.get(n);
     if (current !== undefined) {
       return current;
     }
-    const node = this.tree.nodes[n];
+    const node = unpackProofNode(n);
     const niv = _.reduce(
       this.children(n),
       (sum, k) => sum + this.inferVars(k),
@@ -435,16 +475,16 @@ export class TreeInfo {
     return niv;
   }
 
-  public maxHeight(n: ProofNodeIdx): number {
-    const current = this._maxHeight.get(n);
-    if (current !== undefined) {
-      return current;
-    }
-    const childHeights = _.map(this.children(n), (k) => this.maxHeight(k));
-    const height = 1 + (_.max(childHeights) ?? 0);
-    this._maxHeight.set(n, height);
-    return height;
-  }
+  // public maxHeight(n: ProofNodeIdx): number {
+  //   const current = this._maxHeight.get(n);
+  //   if (current !== undefined) {
+  //     return current;
+  //   }
+  //   const childHeights = _.map(this.children(n), k => this.maxHeight(k));
+  //   const height = 1 + (_.max(childHeights) ?? 0);
+  //   this._maxHeight.set(n, height);
+  //   return height;
+  // }
 
   /**
    * Define the heuristic used for inertia in the system. Previously we were
@@ -455,21 +495,22 @@ export class TreeInfo {
     return set.inertia;
   };
 
-  public setDepth(set: SetHeuristic) {
-    const heuristicDepth = (h: Heuristic) => this.depth(h.idx);
-    return _.sum(_.map(set.goals, heuristicDepth));
-  }
+  // public setDepth(set: SetHeuristic) {
+  //   const heuristicDepth = (h: Heuristic) => this.depth(h.idx);
+  //   return _.sum(_.map(set.goals, heuristicDepth));
+  // }
 
   public setInferVars(set: SetHeuristic) {
-    const heuristicVars = (h: Heuristic) => this.inferVars(h.idx);
+    const heuristicVars = (h: Heuristic) => this.inferVars(h.proofNode);
     return _.sum(_.map(set.goals, heuristicVars));
   }
 
-  public minInertiaOnPath(n: ProofNodeIdx): number {
-    const hs = _.filter(this.failedSets(), (h) =>
-      _.some(h.goals, (g) =>
-        _.includes(this.pathToRoot(g.idx).pathInclusive, n)
-      )
+  public minInertiaOnPath(n: ProofNode): number {
+    // const hs = _.filter(this.failedSets(), h =>
+    //   _.some(h.goals, g => _.includes(this.pathToRoot(g.idx).pathInclusive, n))
+    // );
+    const hs: SetHeuristic[] = _.filter(this.failedSets(), h =>
+      _.some(h.goals, g => g.proofNode === n)
     );
 
     // HACK: the high default is a hack to get rid of undefined,
@@ -477,8 +518,8 @@ export class TreeInfo {
     return _.min(_.map(hs, TreeInfo.setInertia)) ?? 10_000;
   }
 
-  public implCandidates(idx: ProofNodeIdx): Implementors | undefined {
-    return this.tree.allImplCandidates[idx];
+  public implCandidates(node: ProofNode): Implementors | undefined {
+    return this.tree.allImplCandidates[node];
   }
 }
 

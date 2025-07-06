@@ -3,7 +3,6 @@ use argus_ext::{
   rustc::InferCtxtExt,
   ty::{EvaluationResultExt, ImplCandidateExt, PredicateExt, TyExt},
 };
-use index_vec::IndexVec;
 use rustc_ast_ir::{try_visit, visit::VisitorResult};
 use rustc_hir::def_id::DefId;
 use rustc_infer::infer::InferCtxt;
@@ -36,15 +35,14 @@ pub fn try_serialize<'tcx>(
 }
 
 pub struct SerializedTreeVisitor<'tcx> {
-  pub root: Option<ProofNodeIdx>,
-  pub previous: Option<ProofNodeIdx>,
-  pub nodes: IndexVec<ProofNodeIdx, Node>,
+  pub root: Option<ProofNode>,
+  pub previous: Option<ProofNode>,
   pub topology: GraphTopology,
   pub cycle: Option<ProofCycle>,
   pub projection_values: HashMap<TyIdx, TyIdx>,
-  pub all_impl_candidates: HashMap<ProofNodeIdx, Implementors>,
+  pub all_impl_candidates: HashMap<ProofNode, Implementors>,
 
-  deferred_leafs: Vec<(ProofNodeIdx, EvaluationResult)>,
+  deferred_leafs: Vec<(ProofNode, EvaluationResult)>,
   interners: Interners,
   aadebug: aadebug::Storage<'tcx>,
 }
@@ -54,7 +52,6 @@ impl SerializedTreeVisitor<'_> {
     SerializedTreeVisitor {
       root: None,
       previous: None,
-      nodes: IndexVec::default(),
       topology: GraphTopology::new(),
       cycle: None,
       projection_values: HashMap::default(),
@@ -108,7 +105,6 @@ impl SerializedTreeVisitor<'_> {
   pub fn into_tree(self) -> Result<SerializedTree> {
     let SerializedTreeVisitor {
       root: Some(root),
-      mut nodes,
       mut topology,
       cycle,
       projection_values,
@@ -127,8 +123,7 @@ impl SerializedTreeVisitor<'_> {
     // Handle the deferred leafs (an inconvenience we'll deal with later)
     for (parent, res) in deferred_leafs {
       let leaf = interners.mk_result_node(res);
-      let leaf_idx = nodes.push(leaf);
-      topology.add(parent, leaf_idx);
+      topology.add(parent, leaf);
     }
 
     let (goals, candidates, results) = interners.take();
@@ -136,7 +131,6 @@ impl SerializedTreeVisitor<'_> {
 
     Ok(SerializedTree {
       root,
-      nodes,
       goals,
       candidates,
       results,
@@ -153,7 +147,7 @@ impl SerializedTreeVisitor<'_> {
 impl<'tcx> SerializedTreeVisitor<'tcx> {
   fn record_all_impls(
     &mut self,
-    idx: ProofNodeIdx,
+    proof_node: ProofNode, // FIXME: should this always be a GoalIdx instead?
     goal: &InspectGoal<'_, 'tcx>,
   ) {
     // If the Goal is a TraitPredicate we will cache *all* possible implementors
@@ -204,7 +198,7 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
         log::trace!("inductive impls: {inductive_impls:?}");
       }
 
-      self.all_impl_candidates.insert(idx, Implementors {
+      self.all_impl_candidates.insert(proof_node, Implementors {
         trait_,
         impls,
         inductive_impls,
@@ -224,29 +218,28 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
     log::trace!("visit_goal {:?}", goal.goal());
 
     let here_node = self.interners.mk_goal_node(goal);
-    let here_idx = self.nodes.push(here_node);
 
     // Record all the possible candidate impls for this goal.
-    self.record_all_impls(here_idx, goal);
+    self.record_all_impls(here_node, goal);
 
     // Push node into the analysis tree.
-    self.aadebug.push_goal(here_idx, goal).unwrap();
+    self.aadebug.push_goal(here_node, goal).unwrap();
 
     // After interning the goal we can check whether or not
     // it's an successful alias relate predicate for two types.
     self.check_goal_projection(goal);
 
     if self.root.is_none() {
-      self.root = Some(here_idx);
+      self.root = Some(here_node);
     }
 
     if let Some(prev) = self.previous {
-      self.topology.add(prev, here_idx);
+      self.topology.add(prev, here_node);
     }
 
     let here_parent = self.previous;
 
-    let add_result_if_empty = |this: &mut Self, n: ProofNodeIdx| {
+    let add_result_if_empty = |this: &mut Self, n: ProofNode| {
       if this.topology.is_leaf(n) {
         this.deferred_leafs.push((n, goal.result()));
       }
@@ -254,22 +247,24 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
 
     for c in goal.candidates() {
       let here_candidate = self.interners.mk_candidate_node(&c);
-      let candidate_idx = self.nodes.push(here_candidate);
+      if self.topology.children.contains_key(&here_candidate) {
+        continue;
+      }
       self
         .aadebug
-        .push_candidate(candidate_idx, goal, &c)
+        .push_candidate(here_candidate, goal, &c)
         .unwrap();
 
-      self.topology.add(here_idx, candidate_idx);
-      self.previous = Some(candidate_idx);
+      self.topology.add(here_node, here_candidate);
+      self.previous = Some(here_candidate);
 
       c.visit_nested_roots(self);
 
       // FIXME: is this necessary now that we store all nodes?
-      add_result_if_empty(self, candidate_idx);
+      add_result_if_empty(self, here_candidate);
     }
 
-    add_result_if_empty(self, here_idx);
+    add_result_if_empty(self, here_node);
     self.previous = here_parent;
   }
 }

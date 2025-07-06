@@ -11,7 +11,7 @@ use serde::Serialize;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
-use super::ProofNodeIdx;
+use crate::proof_tree::ProofNode;
 
 #[cfg(feature = "testing")]
 pub trait Idx: Copy + PartialEq + Eq + Hash + Debug + Serialize + TS {}
@@ -27,13 +27,13 @@ impl<T> Idx for T where T: Copy + PartialEq + Eq + Hash + Debug + Serialize {}
 
 /// Parent child relationships between structures.
 // NOTE: instead of using a generic parameter `I: Idx` it's
-// more convenient to use `ProofNodeIdx` for ts-rs.
+// more convenient to use `Node` for ts-rs.
 #[derive(Serialize, Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct GraphTopology {
-  pub children: HashMap<ProofNodeIdx, HashSet<ProofNodeIdx>>,
-  pub parents: HashMap<ProofNodeIdx, HashSet<ProofNodeIdx>>,
+  pub children: HashMap<ProofNode, HashSet<ProofNode>>,
+  pub parents: HashMap<ProofNode, HashSet<ProofNode>>,
 }
 
 #[derive(Clone, Debug)]
@@ -78,8 +78,8 @@ impl<N: Idx> Path<N, ToRoot> {
   }
 }
 
-impl From<Path<ProofNodeIdx, ToRoot>> for super::ProofCycle {
-  fn from(val: Path<ProofNodeIdx, ToRoot>) -> super::ProofCycle {
+impl From<Path<ProofNode, ToRoot>> for super::ProofCycle {
+  fn from(val: Path<ProofNode, ToRoot>) -> super::ProofCycle {
     let from_root = val.reverse();
     super::ProofCycle(from_root.path)
   }
@@ -105,12 +105,12 @@ impl GraphTopology {
     }
   }
 
-  pub fn add(&mut self, from: ProofNodeIdx, to: ProofNodeIdx) {
+  pub fn add(&mut self, from: ProofNode, to: ProofNode) {
     self.children.entry(from).or_default().insert(to);
     self.parents.entry(to).or_default().insert(from);
   }
 
-  pub fn is_leaf(&self, node: ProofNodeIdx) -> bool {
+  pub fn is_leaf(&self, node: ProofNode) -> bool {
     match self.children.get(&node) {
       None => true,
       Some(children) => children.is_empty(),
@@ -119,8 +119,8 @@ impl GraphTopology {
 
   pub fn children(
     &self,
-    from: ProofNodeIdx,
-  ) -> impl Iterator<Item = ProofNodeIdx> + '_ {
+    from: ProofNode,
+  ) -> impl Iterator<Item = ProofNode> + '_ {
     self
       .children
       .get(&from)
@@ -128,7 +128,7 @@ impl GraphTopology {
       .flat_map(|c| c.iter().copied())
   }
 
-  pub fn iter(&self) -> impl Iterator<Item = ProofNodeIdx> + '_ {
+  pub fn iter(&self) -> impl Iterator<Item = ProofNode> + '_ {
     use itertools::Itertools;
     // TODO: just take the parents and chain the root
     self

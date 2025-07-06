@@ -1,4 +1,4 @@
-import type { ProofNodeIdx } from "@argus/common/bindings";
+import type { ProofNode } from "@argus/common/bindings";
 import { AppContext, TreeAppContext } from "@argus/common/context";
 import {
   IcoChevronDown,
@@ -12,6 +12,7 @@ import _ from "lodash";
 import React, { useContext, useEffect, useState } from "react";
 
 import "./Directory.css";
+import { unpackProofNode } from "@argus/common/TreeInfo";
 import Attention from "@argus/print/Attention";
 import { Node } from "./Node";
 import { WrapNode } from "./Wrappers";
@@ -81,31 +82,30 @@ export const CollapsibleElement = ({
 };
 
 export const DirNode = ({
-  idx,
+  node,
   Children
 }: {
-  idx: number;
+  node: number;
   Children: React.FC | null;
 }) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
   const { Wrappers, startOpenP } = useContext(TreeAppContext.TreeRenderContext);
-  const node = tree.node(idx);
 
   const arrows: ElementPair = [<IcoTriangleDown />, <IcoTriangleRight />];
   const dots: ElementPair = [<IcoDot />, <IcoDot />];
-  const icons = "Result" in node ? dots : arrows;
+  const icons = "Result" in unpackProofNode(node) ? dots : arrows;
   const infoChild = (
-    <span className={`proof-node-${idx}`}>
+    <span className={`proof-node-${node}`}>
       <Node node={node} />
     </span>
   );
   const info = (
-    <WrapNode wrappers={Wrappers ?? []} n={idx}>
+    <WrapNode wrappers={Wrappers ?? []} n={node}>
       {infoChild}
     </WrapNode>
   );
 
-  const startOpen = startOpenP ? startOpenP(idx) : false;
+  const startOpen = startOpenP ? startOpenP(node) : false;
 
   return (
     <CollapsibleElement
@@ -122,12 +122,12 @@ export const DirRecursive = ({
   level,
   getNext
 }: {
-  level: ProofNodeIdx[];
-  getNext: (idx: ProofNodeIdx) => ProofNodeIdx[];
+  level: ProofNode[];
+  getNext: (idx: ProofNode) => ProofNode[];
 }) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
   const { styleEdges, onMount } = useContext(TreeAppContext.TreeRenderContext);
-  const node = tree.node(level[0]);
+  const node = unpackProofNode(level[0]);
   const className = classNames("DirRecursive", {
     "is-candidate": styleEdges && "Candidate" in node,
     "is-subgoal": styleEdges && "Goal" in node,
@@ -146,7 +146,7 @@ export const DirRecursive = ({
           next.length > 0
             ? () => <DirRecursive level={next} getNext={getNext} />
             : null;
-        return <DirNode key={i} idx={current} Children={Children} />;
+        return <DirNode key={i} node={current} Children={Children} />;
       })}
     </div>
   );

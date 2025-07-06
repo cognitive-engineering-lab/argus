@@ -1,6 +1,6 @@
 import _ from "lodash";
 
-import type { BodyBundle, ProofNodeIdx } from "./bindings";
+import type { BodyBundle, ProofNode } from "./bindings";
 import { rangeContains } from "./func";
 import {
   type PanoptesToSystemCmds,
@@ -10,7 +10,7 @@ import {
 } from "./lib";
 
 export type InfoWrapperProps = {
-  n: ProofNodeIdx;
+  n: ProofNode;
   reportActive: (b: boolean) => void;
 };
 
@@ -19,7 +19,7 @@ export type InfoWrapper = React.FC<InfoWrapperProps>;
 export interface TreeRenderParams {
   Wrappers?: InfoWrapper[];
   styleEdges?: boolean;
-  startOpenP?: (n: ProofNodeIdx) => boolean;
+  startOpenP?: (n: ProofNode) => boolean;
   onMount?: () => void;
 }
 

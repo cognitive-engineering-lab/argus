@@ -74,19 +74,22 @@ impl Interners {
     self.candidates.get_data(&c).expect("missing candidate idx")
   }
 
-  pub fn mk_result_node(&mut self, result: EvaluationResult) -> Node {
-    Node::Result(self.intern_result(result))
+  pub fn mk_result_node(&mut self, result: EvaluationResult) -> ProofNode {
+    ProofNode::pack(ProofNodeUnpacked::Result(self.intern_result(result)))
   }
 
-  pub fn mk_goal_node(&mut self, goal: &InspectGoal) -> Node {
+  pub fn mk_goal_node(&mut self, goal: &InspectGoal) -> ProofNode {
     let infcx = goal.infcx();
     let result_idx = self.intern_result(goal.result());
     let goal = goal.goal();
     let goal_idx = self.intern_goal(infcx, &goal, result_idx);
-    Node::Goal(goal_idx)
+    ProofNode::pack(ProofNodeUnpacked::Goal(goal_idx))
   }
 
-  pub fn mk_candidate_node(&mut self, candidate: &InspectCandidate) -> Node {
+  pub fn mk_candidate_node(
+    &mut self,
+    candidate: &InspectCandidate,
+  ) -> ProofNode {
     let can_idx = match candidate.kind() {
       ProbeKind::Root { .. } => self.intern_can_string("root"),
       ProbeKind::NormalizedSelfTyAssembly => {
@@ -120,7 +123,7 @@ impl Interners {
       ProbeKind::RigidAlias { .. } => self.intern_can_string("rigid-alias"),
     };
 
-    Node::Candidate(can_idx)
+    ProofNode::pack(ProofNodeUnpacked::Candidate(can_idx))
   }
 
   fn intern_result(&mut self, result: EvaluationResult) -> ResultIdx {

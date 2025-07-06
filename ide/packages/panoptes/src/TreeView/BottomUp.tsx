@@ -3,7 +3,7 @@ import React, { useContext, useState } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import type { ProofNodeIdx, SetHeuristic } from "@argus/common/bindings";
+import type { ProofNode, SetHeuristic } from "@argus/common/bindings";
 import type { TreeRenderParams } from "@argus/common/communication";
 import { AppContext, TreeAppContext } from "@argus/common/context";
 import classNames from "classnames";
@@ -16,18 +16,19 @@ import {
   type TreeView,
   type TreeViewWithRoot,
   invertViewWithRoots,
+  unpackProofNode
 } from "@argus/common/TreeInfo";
 import { IcoComment } from "@argus/print/Icons";
 import { WrapImplCandidates, mkJumpToTopDownWrapper } from "./Wrappers";
 
-import { CollapsibleElement, DirRecursive } from "./Directory";
-import "./BottomUp.css";
 import { TyCtxt } from "@argus/print/context";
+import "./BottomUp.css";
+import { CollapsibleElement, DirRecursive } from "./Directory";
 
 const RenderEvaluationViews = ({
   recommended,
   others,
-  mode,
+  mode
 }: {
   recommended: TreeViewWithRoot[];
   others: TreeViewWithRoot[];
@@ -48,7 +49,7 @@ const RenderEvaluationViews = ({
   const [goals, setGoals] = React.useState<string[]>([]);
   const nodeList: React.ReactNode[] = _.compact(
     _.map(together, (leaf, i) => {
-      const node = tree.node(leaf.root);
+      const node = unpackProofNode(leaf.root);
       return "Goal" in node ? (
         <TyCtxt.Provider value={tyCtxt} key={i}>
           <PrintGoal o={tree.goal(node.Goal)} />
@@ -78,13 +79,13 @@ const RenderEvaluationViews = ({
  */
 export const RenderBottomUpViews = ({
   recommended,
-  others,
+  others
 }: {
   recommended: TreeViewWithRoot[];
   others: TreeViewWithRoot[];
 }) => {
-  const mkGetChildren = (view: TreeView) => (idx: ProofNodeIdx) =>
-    view.topology.children[idx] ?? [];
+  const mkGetChildren = (view: TreeView) => (node: ProofNode) =>
+    view.topology.children[node] ?? [];
 
   const mkTopLevel = (views: TreeViewWithRoot[]) =>
     _.map(views, (leaf, i) => (
@@ -108,22 +109,22 @@ export const RenderBottomUpViews = ({
   );
 };
 
-export function liftTo(
-  tree: TreeInfo,
-  idx: ProofNodeIdx,
-  target: "Goal" | "Candidate"
-) {
-  let curr: ProofNodeIdx | undefined = idx;
-  while (curr !== undefined && !(target in tree.node(curr))) {
-    curr = tree.parent(curr);
-  }
-  return curr;
-}
+// export function liftTo(
+//   tree: TreeInfo,
+//   node: ProofNode,
+//   target: "Goal" | "Candidate"
+// ) {
+//   let curr: ProofNode | undefined = node;
+//   while (curr !== undefined && !(target in unpackProofNode(curr))) {
+//     curr = tree.parent(curr);
+//   }
+//   return curr;
+// }
 
 export const sortedSubsets = (sets: SetHeuristic[]) =>
   _.sortBy(sets, TreeInfo.setInertia);
 
-const mkGetChildren = (view: TreeView) => (idx: ProofNodeIdx) =>
+const mkGetChildren = (view: TreeView) => (idx: ProofNode) =>
   view.topology.children[idx] ?? [];
 
 const GroupedFailures = observer(
@@ -155,7 +156,7 @@ const GroupedFailures = observer(
           <p>
             The outlined obligations must be resolved <b>together</b>
           </p>
-        ),
+        )
       });
       setHovered(true);
     };
@@ -182,9 +183,9 @@ const GroupedFailures = observer(
 
 export const RenderBottomUpSets = ({
   views,
-  jumpTo,
+  jumpTo
 }: {
-  jumpTo: (n: ProofNodeIdx) => void;
+  jumpTo: (n: ProofNode) => void;
   views: {
     tree: TreeViewWithRoot[];
     inertia: number;
@@ -206,7 +207,7 @@ export const RenderBottomUpSets = ({
 
   const SubsetRenderParams: TreeRenderParams = {
     Wrappers: [WrapImplCandidates, mkJumpToTopDownWrapper(jumpTo)],
-    styleEdges: false,
+    styleEdges: false
   };
 
   return (
@@ -222,9 +223,9 @@ export const RenderBottomUpSets = ({
 };
 
 const BottomUp = ({
-  jumpToTopDown,
+  jumpToTopDown
 }: {
-  jumpToTopDown: (n: ProofNodeIdx) => void;
+  jumpToTopDown: (n: ProofNode) => void;
 }) => {
   const tree = useContext(TreeAppContext.TreeContext)!;
   const cfg = useContext(AppContext.ConfigurationContext)!;
@@ -234,13 +235,13 @@ const BottomUp = ({
   const sets = tree.failedSetsSorted(rankMode);
 
   const makeSets = (sets: SetHeuristic[]) =>
-    _.map(sets, (h) => {
+    _.map(sets, h => {
       return {
         tree: invertViewWithRoots(
-          _.map(h.goals, (g) => g.idx),
+          _.map(h.goals, g => g.proofNode),
           tree
         ),
-        inertia: TreeInfo.setInertia(h),
+        inertia: TreeInfo.setInertia(h)
       };
     });
 
@@ -249,9 +250,9 @@ const BottomUp = ({
   }
 
   const flattenSets = (sets: SetHeuristic[]) =>
-    _.flatMap(sets, (h) =>
+    _.flatMap(sets, h =>
       invertViewWithRoots(
-        _.map(h.goals, (g) => g.idx),
+        _.map(h.goals, g => g.proofNode),
         tree
       )
     );

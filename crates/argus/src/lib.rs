@@ -44,7 +44,6 @@ mod tests {
       ty::ExprIdx,
       ty::ObligationIdx,
 
-      pty::ProofNodeIdx,
       pty::GoalIdx,
       pty::CandidateIdx,
       pty::ResultIdx,

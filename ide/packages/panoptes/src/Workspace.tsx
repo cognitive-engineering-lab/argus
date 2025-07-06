@@ -19,11 +19,17 @@ function basename(path: string) {
 const FatalErrorPanel = ({ error, resetErrorBoundary }: any) => (
   <div className="ErrorPanel">
     Whoops! This is not a drill, a fatal error occurred. Please{" "}
-    <ReportBugUrl displayText="click here" error={error.message} />
+    <ReportBugUrl
+      displayText="click here"
+      error={error.message}
+      logText={error.stack}
+    />
     to report this error to the Argus team.
     <button type="button" onClick={resetErrorBoundary}>
       Reset Argus
     </button>
+    <p>Error message: {error.message}</p>
+    <p>{error.stack}</p>
   </div>
 );
 

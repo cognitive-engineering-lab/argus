@@ -28,19 +28,53 @@ use crate::{
 
 ser::define_idx! {
   u32,
-  ProofNodeIdx,
   GoalIdx,
   CandidateIdx,
   ResultIdx
 }
 
-#[derive(Serialize, Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-pub enum Node {
+pub struct ProofNode(u32);
+
+/// [`ProofNodeUnpacked`] should only be used temporarily (e.g., not saved to
+/// the heap). In comparison to a [`ProofNode`], it is not as versatile because
+/// its JS representation cannot be used as a map key, and it is 8 bytes instead
+/// of 4.
+#[derive(Serialize, Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "testing", derive(TS))]
+#[cfg_attr(feature = "testing", ts(export))]
+pub enum ProofNodeUnpacked {
   Goal(GoalIdx),
   Candidate(CandidateIdx),
   Result(ResultIdx),
+}
+
+impl ProofNode {
+  pub fn pack(pnu: ProofNodeUnpacked) -> ProofNode {
+    let idx = match &pnu {
+      ProofNodeUnpacked::Goal(goal_idx) => goal_idx.raw(),
+      ProofNodeUnpacked::Candidate(candidate_idx) => candidate_idx.raw(),
+      ProofNodeUnpacked::Result(result_idx) => result_idx.raw(),
+    };
+    assert!(idx & ((1 << 31) | (1 << 30)) == 0);
+    ProofNode(match pnu {
+      ProofNodeUnpacked::Goal(_) => idx,
+      ProofNodeUnpacked::Candidate(_) => idx | (1 << 31),
+      ProofNodeUnpacked::Result(_) => idx | (1 << 30),
+    })
+  }
+  pub fn unpack(self) -> ProofNodeUnpacked {
+    let idx = self.0 & (u32::MAX >> 2);
+    if self.0 & ((1 << 31) | (1 << 30)) == 0 {
+      ProofNodeUnpacked::Goal(GoalIdx::from_raw(idx))
+    } else if self.0 & (1 << 31) != 0 {
+      ProofNodeUnpacked::Candidate(CandidateIdx::from_raw(idx))
+    } else {
+      ProofNodeUnpacked::Result(ResultIdx::from_raw(idx))
+    }
+  }
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -92,10 +126,7 @@ pub struct ResultData(
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
 pub struct SerializedTree {
-  pub root: ProofNodeIdx,
-
-  #[cfg_attr(feature = "testing", ts(type = "Node[]"))]
-  pub nodes: IndexVec<ProofNodeIdx, Node>,
+  pub root: ProofNode,
 
   #[cfg_attr(feature = "testing", ts(type = "GoalData[]"))]
   pub goals: IndexVec<GoalIdx, GoalData>,
@@ -111,7 +142,7 @@ pub struct SerializedTree {
 
   pub projection_values: HashMap<TyIdx, TyIdx>,
 
-  pub all_impl_candidates: HashMap<ProofNodeIdx, Implementors>,
+  pub all_impl_candidates: HashMap<ProofNode, Implementors>,
 
   pub topology: GraphTopology,
 
@@ -136,7 +167,7 @@ pub struct Implementors {
 #[derive(Serialize, Debug, Clone)]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export))]
-pub struct ProofCycle(Vec<ProofNodeIdx>);
+pub struct ProofCycle(Vec<ProofNode>);
 
 // ----------------------------------------
 // impls

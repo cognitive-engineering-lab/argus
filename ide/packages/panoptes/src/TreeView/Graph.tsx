@@ -1,5 +1,5 @@
-import type { TreeInfo } from "@argus/common/TreeInfo";
-import type { ProofNodeIdx, TreeTopology } from "@argus/common/bindings";
+import { type TreeInfo, unpackProofNode } from "@argus/common/TreeInfo";
+import type { GraphTopology, ProofNode } from "@argus/common/bindings";
 import { TreeAppContext } from "@argus/common/context";
 import _ from "lodash";
 import React, {
@@ -37,7 +37,7 @@ const useCenteredTree = (
 const getEdgeClass =
   (tree: TreeInfo) => (link: TreeLinkDatum, _orientation: Orientation) => {
     const sourceIdx = Number.parseInt(link.source.data.name);
-    const node = tree.node(sourceIdx);
+    const node = unpackProofNode(sourceIdx);
     return "Goal" in node
       ? "edge__goal-to-candidate"
       : "edge__candidate-to-goal";
@@ -58,7 +58,7 @@ const TreeNode = ({
   const padding = 10;
 
   const idx = Number.parseInt(nodeDatum.name);
-  const node = treeInfo.node(idx);
+  const node = unpackProofNode(idx);
 
   useLayoutEffect(() => {
     if (ref.current) {
@@ -104,7 +104,7 @@ const TreeNode = ({
           {"Result" in node ? (
             <Result idx={node.Result} />
           ) : (
-            <Node node={node} />
+            <Node node={idx} />
           )}
         </span>
       </foreignObject>
@@ -113,7 +113,7 @@ const TreeNode = ({
 };
 
 const topologyToTreeData = (
-  topology: TreeTopology,
+  topology: GraphTopology,
   idx: number
 ): TreeNodeDatum => {
   let kids = topology.children[idx];
@@ -134,7 +134,7 @@ const topologyToTreeData = (
   return obj;
 };
 
-const Graph = ({ root }: { root: ProofNodeIdx }) => {
+const Graph = ({ root }: { root: ProofNode }) => {
   const treeInfo = useContext(TreeAppContext.TreeContext)!;
   const [translate, containerRef] = useCenteredTree();
 

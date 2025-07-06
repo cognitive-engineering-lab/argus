@@ -1,4 +1,4 @@
-import type { CandidateIdx, ProofNodeIdx } from "@argus/common/bindings";
+import type { CandidateIdx, ProofNode } from "@argus/common/bindings";
 import type {
   InfoWrapper,
   InfoWrapperProps
@@ -9,19 +9,19 @@ import { IcoListUL, IcoTreeDown } from "@argus/print/Icons";
 import {} from "@floating-ui/react";
 import classNames from "classnames";
 import _ from "lodash";
-import React, { type ReactElement, useState, useContext } from "react";
+import React, { type ReactElement, useContext, useState } from "react";
 import Graph from "./Graph";
 import { Candidate } from "./Node";
 
-import "./Wrappers.css";
 import { PrintDefPath } from "@argus/print/lib";
 import Floating from "../Floating";
+import "./Wrappers.css";
 
 export const WrapNode = ({
   children,
   wrappers,
   n
-}: React.PropsWithChildren<{ wrappers: InfoWrapper[]; n: ProofNodeIdx }>) => {
+}: React.PropsWithChildren<{ wrappers: InfoWrapper[]; n: ProofNode }>) => {
   const [hovered, setHovered] = useState(false);
   const [actives, setActives] = useState(Array(wrappers.length).fill(false));
 
@@ -103,7 +103,7 @@ export const WrapImplCandidates = ({ n, reportActive }: InfoWrapperProps) => {
 };
 
 export const mkJumpToTopDownWrapper =
-  (jumpTo: (n: ProofNodeIdx) => void) =>
+  (jumpTo: (n: ProofNode) => void) =>
   ({ n }: InfoWrapperProps) => {
     const jumpToTree = (e: React.MouseEvent) => {
       e.preventDefault();

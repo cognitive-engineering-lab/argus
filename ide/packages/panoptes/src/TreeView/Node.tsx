@@ -1,7 +1,8 @@
+import { unpackProofNode } from "@argus/common/TreeInfo";
 import type {
   CandidateIdx,
   EvaluationResult,
-  Node as NodeTy,
+  ProofNode as NodeTy,
   ResultIdx
 } from "@argus/common/bindings";
 import { TreeAppContext } from "@argus/common/context";
@@ -75,8 +76,9 @@ export const Candidate = ({ idx }: { idx: CandidateIdx }) => {
   }
 };
 
-export const Node = ({ node }: { node: NodeTy }) => {
+export const Node = ({ node: nodePacked }: { node: NodeTy }) => {
   const treeInfo = useContext(TreeAppContext.TreeContext)!;
+  const node = unpackProofNode(nodePacked);
   if ("Result" in node) {
     return (
       <>

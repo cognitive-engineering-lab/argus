@@ -6,7 +6,7 @@ import {
   VSCodePanels
 } from "@vscode/webview-ui-toolkit/react";
 import _ from "lodash";
-import React, { useId, useState, useEffect } from "react";
+import React, { useEffect, useId, useState } from "react";
 
 import "./Panels.css";
 
