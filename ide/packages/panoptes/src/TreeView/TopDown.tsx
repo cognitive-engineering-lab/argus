@@ -46,9 +46,10 @@ const TopDown = ({ start }: { start?: ProofNode }) => {
     start === undefined
       ? undefined
       : (() => {
-          // const pathToRootFromStart = tree.pathToRoot(start);
-          // const startOpenP = (idx: ProofNode) =>
-          //   _.includes(pathToRootFromStart.pathInclusive, idx);
+          const pathToRootFromStart = tree.pathToRoot(start);
+          const startOpenP = (idx: ProofNode) =>
+            pathToRootFromStart !== undefined &&
+            _.includes(pathToRootFromStart.pathInclusive, idx);
           const onMount = () => {
             const element = document.querySelector<HTMLSpanElement>(
               `.proof-node-${start}`
@@ -60,7 +61,7 @@ const TopDown = ({ start }: { start?: ProofNode }) => {
             });
           };
           return {
-            startOpenP: (idx: any) => false, // FIXME: breaks switching from bottom-up view to top-down view while keeping the same node visible
+            startOpenP,
             onMount
           };
         })();

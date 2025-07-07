@@ -37,6 +37,9 @@ function reverseDirection<D extends Direction>(d: Direction): Reverse<D> {
   return d === "to-root" ? ("from-root" as any) : ("to-root" as any);
 }
 
+const BEST_EFFORT_PATH_BFS_MAX_LENGTH = 128;
+const BEST_EFFORT_PATH_BFS_MAX_BREADTH = 128;
+
 class Path<T, D extends Direction> {
   constructor(
     private readonly from: T,
@@ -277,25 +280,21 @@ export class TreeInfo {
     );
   }
 
-  // private nodesInUnificationFailurePath(): ProofNode[] {
-  //   if (this.showHidden) return [];
+  private nodesInUnificationFailurePath(): ProofNode[] {
+    if (this.showHidden) return [];
 
-  //   const nonUnificationFailures = _.flatMap(
-  //     _.flatMap(this.failedSets(), s => _.map(s.goals, g => g.proofNode)),
-  //     n => this.pathToRoot(n).pathInclusive
-  //   );
+    const nonUnificationFailures = _.flatMap(
+      _.flatMap(this.failedSets(), s => _.map(s.goals, g => g.proofNode)),
+      n => this.pathToRoot(n)?.pathInclusive ?? []
+    );
 
-  //   const uFs = _.flatMap(
-  //     this.unificationFailures(),
-  //     n => this.pathToRoot(n).pathInclusive
-  //   );
+    const uFs = _.flatMap(
+      this.unificationFailures(),
+      n => this.pathToRoot(n)?.pathInclusive ?? []
+    );
 
-  //   return _.difference(uFs, nonUnificationFailures);
-  // }
-
-  // public depth(n: ProofNode) {
-  //   return this.pathToRoot(n).length;
-  // }
+    return _.difference(uFs, nonUnificationFailures);
+  }
 
   public goalOfNode(n: ProofNode) {
     const node = unpackProofNode(n);
@@ -315,8 +314,7 @@ export class TreeInfo {
   }
 
   public children(n: ProofNode): ProofNode[] {
-    // const nodesToUnifyFailures = this.nodesInUnificationFailurePath();
-    const nodesToUnifyFailures: ProofNode[] = []; // FIXME: it may be possible to re-enable this, with a little more work
+    const nodesToUnifyFailures = this.nodesInUnificationFailurePath();
     const children = this.view.topology.children[n] ?? [];
     return _.difference(children, nodesToUnifyFailures);
   }
@@ -337,6 +335,54 @@ export class TreeInfo {
       return this.resultOfGoal(node.Goal);
     } else {
       return undefined;
+    }
+  }
+
+  public pathToRoot(from: ProofNode): Path<ProofNode, "to-root"> | undefined {
+    // bounded BFS
+    type Entry = {
+      byWayOf: ProofNode | undefined;
+    };
+    let frontier: Map<ProofNode, Entry> = new Map();
+    frontier.set(from, { byWayOf: undefined });
+    for (
+      let pathLength = 0;
+      pathLength < BEST_EFFORT_PATH_BFS_MAX_LENGTH;
+      pathLength++
+    ) {
+      for (const [target, _] of frontier) {
+        let updated = false;
+        const parents = this.parents(target);
+        if (!parents) {
+          if (target === this.root) {
+            let pathReversed = [];
+            for (
+              let current: ProofNode | undefined = target;
+              current !== undefined;
+              current = frontier.get(current)?.byWayOf
+            ) {
+              pathReversed.push(current);
+            }
+            return new Path(from, this.root, pathReversed.reverse(), "to-root");
+          }
+        }
+        for (const parent of parents ?? []) {
+          const alreadyReached = frontier.get(parent) !== undefined;
+          if (!alreadyReached) {
+            updated = true;
+            frontier.set(parent, { byWayOf: target });
+          }
+        }
+        if (!updated) {
+          frontier.delete(target);
+        }
+      }
+      if (
+        frontier.size === 0 ||
+        frontier.size > BEST_EFFORT_PATH_BFS_MAX_BREADTH
+      ) {
+        return undefined;
+      }
     }
   }
 
@@ -370,11 +416,14 @@ export class TreeInfo {
   }
 
   public minInertiaOnPath(n: ProofNode): number {
-    // const hs = _.filter(this.failedSets(), h =>
-    //   _.some(h.goals, g => _.includes(this.pathToRoot(g.idx).pathInclusive, n))
-    // );
     const hs: SetHeuristic[] = _.filter(this.failedSets(), h =>
-      _.some(h.goals, g => g.proofNode === n)
+      _.some(h.goals, g => {
+        const pathToRoot = this.pathToRoot(g.proofNode);
+        if (!pathToRoot) {
+          return g.proofNode === n;
+        }
+        return _.includes(this.pathToRoot(g.proofNode)?.pathInclusive, n);
+      })
     );
 
     // HACK: the high default is a hack to get rid of undefined,
