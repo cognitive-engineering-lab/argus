@@ -173,7 +173,6 @@ export const unpackProofNode: (node: ProofNode) => ProofNodeUnpacked = node => {
 };
 
 export class TreeInfo {
-  // private _maxHeight: Map<ProofNode, number>;
   private numInferVars: Map<ProofNode, number>;
 
   static new(tree: SerializedTree, showHidden = false) {
@@ -212,7 +211,6 @@ export class TreeInfo {
     readonly showHidden: boolean,
     readonly view: TreeView
   ) {
-    // this._maxHeight = new Map();
     this.numInferVars = new Map();
   }
 
@@ -234,8 +232,6 @@ export class TreeInfo {
     switch (sortAs) {
       case "inertia":
         return _.sortBy(sets, TreeInfo.setInertia);
-      // case "depth":
-      //   return _.sortBy(sets, s => this.setDepth(s));
       case "vars":
         return _.sortBy(sets, s => this.setInferVars(s));
       default:
@@ -343,38 +339,33 @@ export class TreeInfo {
     type Entry = {
       byWayOf: ProofNode | undefined;
     };
-    let frontier: Map<ProofNode, Entry> = new Map();
-    frontier.set(from, { byWayOf: undefined });
+    let shortestPaths: Map<ProofNode, Entry> = new Map();
+    shortestPaths.set(from, { byWayOf: undefined });
+    let frontier = shortestPaths;
     for (
       let pathLength = 0;
       pathLength < BEST_EFFORT_PATH_BFS_MAX_LENGTH;
       pathLength++
     ) {
+      let nextFrontier: Map<ProofNode, Entry> = new Map();
       for (const [target, _] of frontier) {
-        let updated = false;
         const parents = this.parents(target);
-        if (!parents) {
-          if (target === this.root) {
-            let pathReversed = [];
-            for (
-              let current: ProofNode | undefined = target;
-              current !== undefined;
-              current = frontier.get(current)?.byWayOf
-            ) {
-              pathReversed.push(current);
-            }
-            return new Path(from, this.root, pathReversed.reverse(), "to-root");
+        if (target === this.root) {
+          let pathReversed = [];
+          for (
+            let current: ProofNode | undefined = target;
+            current !== undefined;
+            current = shortestPaths.get(current)?.byWayOf
+          ) {
+            pathReversed.push(current);
           }
+          return new Path(from, this.root, pathReversed.reverse(), "to-root");
         }
         for (const parent of parents ?? []) {
-          const alreadyReached = frontier.get(parent) !== undefined;
+          const alreadyReached = shortestPaths.get(parent) !== undefined;
           if (!alreadyReached) {
-            updated = true;
-            frontier.set(parent, { byWayOf: target });
+            nextFrontier.set(parent, { byWayOf: target });
           }
-        }
-        if (!updated) {
-          frontier.delete(target);
         }
       }
       if (
@@ -382,6 +373,9 @@ export class TreeInfo {
         frontier.size > BEST_EFFORT_PATH_BFS_MAX_BREADTH
       ) {
         return undefined;
+      }
+      for (const entry of nextFrontier) {
+        shortestPaths.set(entry[0], entry[1]);
       }
     }
   }
