@@ -96,7 +96,7 @@ export async function forFileInBundle<T>(
 }
 
 function sanitizeSort(s: string | undefined): s is SortStrategy {
-  return s !== undefined && (s === "inertia" || s === "depth" || s === "vars");
+  return s !== undefined && (s === "inertia" || s === "vars");
 }
 
 export async function openPage(

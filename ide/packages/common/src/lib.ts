@@ -37,7 +37,7 @@ export type PanoptesOptionalData = {
 
 export type SystemSpec = Omit<IssueOptions, "logText">;
 export type EvaluationMode = "release" | "evaluate";
-export type SortStrategy = "inertia" | "depth" | "vars";
+export type SortStrategy = "inertia" | "vars";
 
 export interface FileInfo {
   fn: Filename;
