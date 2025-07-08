@@ -109,18 +109,6 @@ export const RenderBottomUpViews = ({
   );
 };
 
-// export function liftTo(
-//   tree: TreeInfo,
-//   node: ProofNode,
-//   target: "Goal" | "Candidate"
-// ) {
-//   let curr: ProofNode | undefined = node;
-//   while (curr !== undefined && !(target in unpackProofNode(curr))) {
-//     curr = tree.parent(curr);
-//   }
-//   return curr;
-// }
-
 export const sortedSubsets = (sets: SetHeuristic[]) =>
   _.sortBy(sets, TreeInfo.setInertia);
 

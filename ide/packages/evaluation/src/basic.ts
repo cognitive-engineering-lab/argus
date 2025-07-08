@@ -50,15 +50,6 @@ async function createWorkspaceRunner() {
       );
       const rank = _.min(_.map(_.compact(ranksStr), r => Number(r))) ?? -1;
 
-      // const numberTreeNodes =
-      //   _.max(
-      //     _.flatten(
-      //       _.map(bundles, bundle =>
-      //         _.map(_.values(bundle.trees), tree => tree.nodes.length)
-      //       )
-      //     )
-      //   ) ?? -1;
-
       await page.close();
       return {
         workspace,
