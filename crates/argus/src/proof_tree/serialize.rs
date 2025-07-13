@@ -223,7 +223,7 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
     self.record_all_impls(here_node, goal);
 
     // Push node into the analysis tree.
-    self.aadebug.push_goal(here_node, goal).unwrap();
+    self.aadebug.push_goal(here_node, goal);
 
     // After interning the goal we can check whether or not
     // it's an successful alias relate predicate for two types.
@@ -250,10 +250,7 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
       if self.topology.children.contains_key(&here_candidate) {
         continue;
       }
-      self
-        .aadebug
-        .push_candidate(here_candidate, goal, &c)
-        .unwrap();
+      self.aadebug.push_candidate(here_candidate, goal, &c);
 
       self.topology.add(here_node, here_candidate);
       self.previous = Some(here_candidate);

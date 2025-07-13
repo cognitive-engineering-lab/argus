@@ -1,7 +1,6 @@
 use std::{cell::RefCell, ops::Deref, time::Instant};
 
 use argus_ext::ty::{EvaluationResultExt, TyCtxtExt, TyExt};
-use index_vec::IndexVec;
 use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::{

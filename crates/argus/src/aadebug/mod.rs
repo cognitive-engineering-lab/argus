@@ -3,7 +3,6 @@ pub(crate) mod tree;
 
 use std::time::Instant;
 
-use anyhow::Result;
 use argus_ext::ty::EvaluationResultExt;
 use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_infer::traits::solve::GoalSource;
@@ -33,7 +32,7 @@ impl<'tcx> Storage<'tcx> {
   pub fn new(maybe_ambiguous: bool) -> Self {
     let report_performance = std::env::var("ARGUS_DNF_PERF").is_ok();
     Self {
-      ns: Default::default(),
+      ns: HashMap::default(),
       maybe_ambiguous,
       report_performance,
     }
@@ -43,7 +42,7 @@ impl<'tcx> Storage<'tcx> {
     &mut self,
     proof_node: ProofNode,
     goal: &InspectGoal<'_, 'tcx>,
-  ) -> Result<()> {
+  ) {
     let infcx = goal.infcx().fork();
     let result = goal.result();
     let goal = goal.goal();
@@ -52,8 +51,6 @@ impl<'tcx> Storage<'tcx> {
       goal,
       result,
     });
-
-    Ok(())
   }
 
   pub fn push_candidate(
@@ -61,7 +58,7 @@ impl<'tcx> Storage<'tcx> {
     proof_node: ProofNode,
     goal: &InspectGoal<'_, 'tcx>,
     candidate: &InspectCandidate<'_, 'tcx>,
-  ) -> Result<()> {
+  ) {
     let retain = (self.maybe_ambiguous && candidate.result().is_ok())
       || goal.infcx().probe(|_| {
         candidate
@@ -84,8 +81,6 @@ impl<'tcx> Storage<'tcx> {
       result: candidate.result(),
       retain,
     });
-
-    Ok(())
   }
 
   pub fn into_results(
