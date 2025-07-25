@@ -58,3 +58,27 @@ Argus or Argos Panoptes (Ancient Greek: Ἄργος Πανόπτης, "All-seein
 ## Having trouble? (or providing feedback!)
 
 We're happy to chat and answer questions on the [Argus Zulip channel](https://cognitive-engineering-lab.zulipchat.com/#narrow/stream/453634-argus). You can also reach the authors via email, <gavinleroy@brown.edu> and <wcrichto@brown.edu>, we'd love to hear your feedback as we iterate in the design and development of Argus!
+
+## Citation
+
+Argus was developed as a part of our academic research on [debugging trait errors](https://dl.acm.org/doi/10.1145/3729302). If you use Argus as a part of your research, please cite this paper:
+
+```bibtex
+@article{gck:argus,
+  author = {Gray, Gavin and Crichton, Will and Krishnamurthi, Shriram},
+  title = {An Interactive Debugger for Rust Trait Errors},
+  year = {2025},
+  issue_date = {June 2025},
+  publisher = {Association for Computing Machinery},
+  address = {New York, NY, USA},
+  volume = {9},
+  number = {PLDI},
+  url = {https://doi.org/10.1145/3729302},
+  doi = {10.1145/3729302},
+  journal = {Proc. ACM Program. Lang.},
+  month = jun,
+  articleno = {199},
+  numpages = {22},
+  keywords = {Rust, debugging, traits, type classes}
+}
+```

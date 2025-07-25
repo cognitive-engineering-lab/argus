@@ -201,7 +201,6 @@
 
         devShells.default = pkgs.mkShell ({
           buildInputs = cli-deps ++ ide-deps ++ book-deps ++ [
-            pkgs.rust-analyzer
             browsers
             ci-check
           ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
