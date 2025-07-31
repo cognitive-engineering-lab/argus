@@ -21,6 +21,8 @@ pub struct Interner<K: PartialEq + Eq + Hash, I: Idx, D> {
   keys: HashMap<K, I>,
 }
 
+const DEFAULT_CAPACITY: usize = 1_000;
+
 impl<K, I, D> Default for Interner<K, I, D>
 where
   K: PartialEq + Eq + Hash,
@@ -28,8 +30,8 @@ where
 {
   fn default() -> Self {
     Self {
-      values: IndexVec::with_capacity(1_000_000),
-      keys: HashMap::with_capacity(1_000_000),
+      values: IndexVec::with_capacity(DEFAULT_CAPACITY),
+      keys: HashMap::with_capacity(DEFAULT_CAPACITY),
     }
   }
 }
