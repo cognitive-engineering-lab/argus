@@ -28,8 +28,16 @@ use crate::{
 
 pub struct Interners {
   goals: Interner<(Hash64, ResultIdx), GoalIdx, GoalData>,
+  implementors: Interner<DefId, ImplementorsIdx, Implementors>,
   candidates: Interner<CanKey, CandidateIdx, CandidateData>,
   results: Interner<EvaluationResult, ResultIdx, ResultData>,
+}
+
+pub struct InternedData {
+  pub goals: IndexVec<GoalIdx, GoalData>,
+  pub implementors: IndexVec<ImplementorsIdx, Implementors>,
+  pub candidates: IndexVec<CandidateIdx, CandidateData>,
+  pub results: IndexVec<ResultIdx, ResultData>,
 }
 
 #[derive(PartialEq, Eq, Hash)]
@@ -43,23 +51,19 @@ impl Interners {
   pub fn default() -> Self {
     Self {
       goals: Interner::default(),
+      implementors: Interner::default(),
       candidates: Interner::default(),
       results: Interner::default(),
     }
   }
 
-  pub fn take(
-    self,
-  ) -> (
-    IndexVec<GoalIdx, GoalData>,
-    IndexVec<CandidateIdx, CandidateData>,
-    IndexVec<ResultIdx, ResultData>,
-  ) {
-    (
-      self.goals.consume(),
-      self.candidates.consume(),
-      self.results.consume(),
-    )
+  pub fn take(self) -> InternedData {
+    InternedData {
+      goals: self.goals.consume(),
+      implementors: self.implementors.consume(),
+      candidates: self.candidates.consume(),
+      results: self.results.consume(),
+    }
   }
 
   // NOTE: used in `test_utils`.
@@ -72,10 +76,6 @@ impl Interners {
   #[allow(dead_code)]
   pub fn candidate(&self, c: CandidateIdx) -> &CandidateData {
     self.candidates.get_data(&c).expect("missing candidate idx")
-  }
-
-  pub fn mk_result_node(&mut self, result: EvaluationResult) -> ProofNode {
-    ProofNode::pack(ProofNodeUnpacked::Result(self.intern_result(result)))
   }
 
   pub fn mk_goal_node(&mut self, goal: &InspectGoal) -> ProofNode {
@@ -212,5 +212,64 @@ impl Interners {
     );
 
     self.candidates.insert_no_key(CandidateData::from(string))
+  }
+
+  pub(super) fn intern_implementors(
+    &mut self,
+    infcx: &InferCtxt,
+    def_id: DefId,
+    tp: ty::PolyTraitPredicate,
+  ) -> ImplementorsIdx {
+    use argus_ext::{rustc::InferCtxtExt, ty::ImplCandidateExt};
+
+    if let Some(i) = self.implementors.get_idx(&def_id) {
+      return i;
+    }
+
+    let identity_trait_ref =
+      ty::TraitRef::identity(infcx.tcx, tp.skip_binder().trait_ref.def_id);
+
+    let trait_ = ser::TraitRefPrintOnlyTraitPathDef(identity_trait_ref);
+    let trait_ = tls::unsafe_access_interner(|ty_interner| {
+      ser::to_value_expect(infcx, ty_interner, &trait_)
+    });
+
+    // Gather all impls
+    let mut impls = vec![];
+    let mut inductive_impls = vec![];
+
+    let mut impl_candidates = infcx.all_impls(tp.def_id());
+
+    // HACK: Sort the `impl_candidates` by the number of *type* parameters. We use this
+    // as a proxy for complexity, that is, complexity of reading the impl, we want
+    // to show Argus users "simpler" impls first.
+    // This probably shouldn't happen here, as it's a concern of the frontend, but this is
+    // the last place we have all that information.
+    macro_rules! sort_by_count {
+      ($field:ident, $vec:expr) => {
+        $vec.sort_by_key(|c| {
+          infcx.tcx.generics_of(c.impl_def_id).own_counts().$field
+        })
+      };
+    }
+    sort_by_count!(types, impl_candidates);
+    sort_by_count!(lifetimes, impl_candidates);
+
+    for can in impl_candidates {
+      let can_idx = self.intern_impl(infcx, can.impl_def_id);
+      if can.is_inductive(infcx.tcx) {
+        inductive_impls.push(can_idx);
+      } else {
+        impls.push(can_idx);
+      }
+    }
+
+    let impls = Implementors {
+      trait_,
+      impls,
+      inductive_impls,
+    };
+
+    self.implementors.insert(def_id, impls)
   }
 }

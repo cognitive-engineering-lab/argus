@@ -94,10 +94,9 @@ pub trait InferCtxtExt<'tcx> {
     error: ty::Predicate<'tcx>,
   ) -> bool;
 
-  /// Private in TypeErrorCtxt
-  fn find_similar_impl_candidates(
+  fn all_impls(
     &self,
-    trait_pred: ty::PolyTraitPredicate<'tcx>,
+    def_id: rustc_span::def_id::DefId,
   ) -> Vec<ImplCandidate<'tcx>>;
 
   /// Public (wrapping for local `CandidateSimilarity`)
@@ -250,13 +249,13 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     }
   }
 
-  fn find_similar_impl_candidates(
+  fn all_impls(
     &self,
-    trait_pred: ty::PolyTraitPredicate<'tcx>,
+    def_id: rustc_span::def_id::DefId,
   ) -> Vec<ImplCandidate<'tcx>> {
-    let mut candidates: Vec<_> = self
+    self
       .tcx
-      .all_impls(trait_pred.def_id())
+      .all_impls(def_id)
       .filter_map(|def_id| {
         let imp = self.tcx.impl_trait_header(def_id).unwrap();
 
@@ -266,34 +265,13 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
           return None;
         }
 
-        let imp = imp.trait_ref.skip_binder();
-
-        self
-          .fuzzy_match_tys(
-            trait_pred.skip_binder().self_ty(),
-            imp.self_ty(),
-            false,
-          )
-          .map(|similarity| ImplCandidate {
-            trait_ref: imp,
-            similarity,
-            impl_def_id: def_id,
-          })
+        Some(ImplCandidate {
+          trait_ref: imp.trait_ref.skip_binder(),
+          similarity: CandidateSimilarity::Other,
+          impl_def_id: def_id,
+        })
       })
-      .collect();
-
-    if candidates
-      .iter()
-      .any(|c| matches!(c.similarity, CandidateSimilarity::Exact { .. }))
-    {
-      // If any of the candidates is a perfect match, we don't want to show all of them.
-      // This is particularly relevant for the case of numeric types (as they all have the
-      // same category).
-      candidates
-        .retain(|c| matches!(c.similarity, CandidateSimilarity::Exact { .. }));
-    }
-
-    candidates
+      .collect()
   }
 
   fn fuzzy_match_tys(

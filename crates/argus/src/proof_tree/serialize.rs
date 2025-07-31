@@ -1,8 +1,5 @@
 use anyhow::{bail, Result};
-use argus_ext::{
-  rustc::InferCtxtExt,
-  ty::{EvaluationResultExt, ImplCandidateExt, PredicateExt, TyExt},
-};
+use argus_ext::ty::{EvaluationResultExt, PredicateExt, TyExt};
 use rustc_ast_ir::{try_visit, visit::VisitorResult};
 use rustc_hir::def_id::DefId;
 use rustc_infer::infer::InferCtxt;
@@ -15,7 +12,10 @@ use rustc_trait_selection::{
   traits::solve,
 };
 
-use super::{interners::Interners, *};
+use super::{
+  interners::{InternedData, Interners},
+  *,
+};
 use crate::aadebug;
 
 pub fn try_serialize<'tcx>(
@@ -40,9 +40,8 @@ pub struct SerializedTreeVisitor<'tcx> {
   pub topology: GraphTopology,
   pub cycle: Option<ProofCycle>,
   pub projection_values: HashMap<TyIdx, TyIdx>,
-  pub all_impl_candidates: HashMap<ProofNode, Implementors>,
 
-  deferred_leafs: Vec<(ProofNode, EvaluationResult)>,
+  impls: HashMap<GoalIdx, ImplementorsIdx>,
   interners: Interners,
   aadebug: aadebug::Storage<'tcx>,
 }
@@ -55,9 +54,8 @@ impl SerializedTreeVisitor<'_> {
       topology: GraphTopology::new(),
       cycle: None,
       projection_values: HashMap::default(),
-      all_impl_candidates: HashMap::default(),
 
-      deferred_leafs: Vec::default(),
+      impls: HashMap::default(),
       interners: Interners::default(),
       aadebug: aadebug::Storage::new(maybe_ambiguous),
     }
@@ -105,13 +103,12 @@ impl SerializedTreeVisitor<'_> {
   pub fn into_tree(self) -> Result<SerializedTree> {
     let SerializedTreeVisitor {
       root: Some(root),
-      mut topology,
+      topology,
       cycle,
       projection_values,
-      mut interners,
+      impls,
+      interners,
       aadebug,
-      deferred_leafs,
-      all_impl_candidates,
       ..
     } = self
     else {
@@ -120,13 +117,12 @@ impl SerializedTreeVisitor<'_> {
 
     let analysis = aadebug.into_results(root, &topology);
 
-    // Handle the deferred leafs (an inconvenience we'll deal with later)
-    for (parent, res) in deferred_leafs {
-      let leaf = interners.mk_result_node(res);
-      topology.add(parent, leaf);
-    }
-
-    let (goals, candidates, results) = interners.take();
+    let InternedData {
+      goals,
+      implementors,
+      candidates,
+      results,
+    } = interners.take();
     let tys = crate::tls::take_interned_tys();
 
     Ok(SerializedTree {
@@ -135,8 +131,9 @@ impl SerializedTreeVisitor<'_> {
       candidates,
       results,
       tys,
+      implementors,
+      impls,
       projection_values,
-      all_impl_candidates,
       topology,
       cycle,
       analysis,
@@ -147,62 +144,16 @@ impl SerializedTreeVisitor<'_> {
 impl<'tcx> SerializedTreeVisitor<'tcx> {
   fn record_all_impls(
     &mut self,
-    proof_node: ProofNode, // FIXME: should this always be a GoalIdx instead?
+    goal_idx: GoalIdx,
     goal: &InspectGoal<'_, 'tcx>,
   ) {
     // If the Goal is a TraitPredicate we will cache *all* possible implementors
     if let Some(tp) = goal.goal().predicate.as_trait_predicate() {
+      let def_id = tp.def_id();
+
       let infcx = goal.infcx();
-      let tcx = infcx.tcx;
-
-      let identity_trait_ref =
-        ty::TraitRef::identity(tcx, tp.skip_binder().trait_ref.def_id);
-
-      let trait_ = ser::TraitRefPrintOnlyTraitPathDef(identity_trait_ref);
-      let trait_ = tls::unsafe_access_interner(|ty_interner| {
-        ser::to_value_expect(infcx, ty_interner, &trait_)
-      });
-
-      // Gather all impls
-      let mut impls = vec![];
-      let mut inductive_impls = vec![];
-      let mut impl_candidates = infcx.find_similar_impl_candidates(tp);
-
-      // HACK: Sort the `impl_candidates` by the number of *type* parameters. We use this
-      // as a proxy for complexity, that is, complexity of reading the impl, we want
-      // to show Argus users "simpler" impls first.
-      // This probably shouldn't happen here, as it's a concern of the frontend, but this is
-      // the last place we have all that information.
-      macro_rules! sort_by_count {
-        ($field:ident, $vec:expr) => {
-          $vec.sort_by(|c1, c2| {
-            let c1 = tcx.generics_of(c1.impl_def_id).own_counts().$field;
-            let c2 = tcx.generics_of(c2.impl_def_id).own_counts().$field;
-            c1.cmp(&c2)
-          })
-        };
-      }
-      sort_by_count!(types, impl_candidates);
-      sort_by_count!(lifetimes, impl_candidates);
-
-      for can in impl_candidates {
-        let can_idx = self.interners.intern_impl(infcx, can.impl_def_id);
-        if can.is_inductive(tcx) {
-          inductive_impls.push(can_idx);
-        } else {
-          impls.push(can_idx);
-        }
-      }
-
-      if !inductive_impls.is_empty() {
-        log::trace!("inductive impls: {inductive_impls:?}");
-      }
-
-      self.all_impl_candidates.insert(proof_node, Implementors {
-        trait_,
-        impls,
-        inductive_impls,
-      });
+      let impls_idx = self.interners.intern_implementors(infcx, def_id, tp);
+      self.impls.insert(goal_idx, impls_idx);
     }
   }
 }
@@ -220,7 +171,9 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
     let here_node = self.interners.mk_goal_node(goal);
 
     // Record all the possible candidate impls for this goal.
-    self.record_all_impls(here_node, goal);
+    if let ProofNodeUnpacked::Goal(goal_idx) = here_node.unpack() {
+      self.record_all_impls(goal_idx, goal);
+    }
 
     // Push node into the analysis tree.
     self.aadebug.push_goal(here_node, goal);
@@ -239,12 +192,6 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
 
     let here_parent = self.previous;
 
-    let add_result_if_empty = |this: &mut Self, n: ProofNode| {
-      if this.topology.is_leaf(n) {
-        this.deferred_leafs.push((n, goal.result()));
-      }
-    };
-
     for c in goal.candidates() {
       let here_candidate = self.interners.mk_candidate_node(&c);
       if self.topology.children.contains_key(&here_candidate) {
@@ -256,12 +203,8 @@ impl<'tcx> ProofTreeVisitor<'tcx> for SerializedTreeVisitor<'tcx> {
       self.previous = Some(here_candidate);
 
       c.visit_nested_roots(self);
-
-      // FIXME: is this necessary now that we store all nodes?
-      add_result_if_empty(self, here_candidate);
     }
 
-    add_result_if_empty(self, here_node);
     self.previous = here_parent;
   }
 }

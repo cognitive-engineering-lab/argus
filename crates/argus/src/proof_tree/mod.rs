@@ -1,14 +1,14 @@
 //! Proof tree types sent to the Argus frontend.
 
 mod format;
+mod hash_map;
 mod interners;
 pub(super) mod serialize;
 pub mod topology;
 
-use std::collections::HashMap;
-
 use argus_ext::ty::PredicateExt;
 use argus_ser::{self as ser, interner::TyIdx};
+use hash_map::HashMap;
 use index_vec::IndexVec;
 use rustc_infer::infer::InferCtxt;
 use rustc_middle::ty;
@@ -29,6 +29,7 @@ use crate::{
 ser::define_idx! {
   u32,
   GoalIdx,
+  ImplementorsIdx,
   CandidateIdx,
   ResultIdx
 }
@@ -140,9 +141,12 @@ pub struct SerializedTree {
   #[cfg_attr(feature = "testing", ts(type = "TyVal[]"))]
   pub tys: IndexVec<TyIdx, json::Value>,
 
-  pub projection_values: HashMap<TyIdx, TyIdx>,
+  #[cfg_attr(feature = "testing", ts(type = "Implementors[]"))]
+  pub implementors: IndexVec<ImplementorsIdx, Implementors>,
 
-  pub all_impl_candidates: HashMap<ProofNode, Implementors>,
+  pub impls: HashMap<GoalIdx, ImplementorsIdx>,
+
+  pub projection_values: HashMap<TyIdx, TyIdx>,
 
   pub topology: GraphTopology,
 

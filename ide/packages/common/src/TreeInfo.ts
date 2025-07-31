@@ -426,7 +426,11 @@ export class TreeInfo {
   }
 
   public implCandidates(node: ProofNode): Implementors | undefined {
-    return this.tree.allImplCandidates[node];
+    const unpacked = unpackProofNode(node);
+    if ("Goal" in unpacked) {
+      const implIdx = this.tree.impls[unpacked.Goal];
+      return this.tree.implementors[implIdx];
+    }
   }
 }
 

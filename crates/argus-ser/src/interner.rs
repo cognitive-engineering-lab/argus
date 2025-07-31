@@ -1,4 +1,3 @@
-use std::collections::HashMap; // FIXME: change back to above
 use std::{
   cell::RefCell,
   cmp::{Eq, PartialEq},
@@ -6,7 +5,7 @@ use std::{
 };
 
 use index_vec::{Idx, IndexVec};
-// use rustc_data_structures::fx::FxHashMap as HashMap;
+use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_middle::ty;
 
 crate::define_idx! {
@@ -60,5 +59,15 @@ where
 
   pub fn consume(self) -> IndexVec<I, D> {
     self.values
+  }
+}
+
+trait FxHashExt {
+  fn with_capacity(capacity: usize) -> Self;
+}
+
+impl<K, V> FxHashExt for HashMap<K, V> {
+  fn with_capacity(capacity: usize) -> Self {
+    HashMap::with_capacity_and_hasher(capacity, Default::default())
   }
 }
