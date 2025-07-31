@@ -280,10 +280,9 @@ pub(crate) fn group_predicates_by_ty<'tcx>(
 
 pub fn get_opt_impl_header(
   tcx: ty::TyCtxt,
-  def_id: DefId,
+  impl_def_id: DefId,
 ) -> Option<ImplHeader> {
   use rustc_data_structures::fx::FxIndexSet;
-  let impl_def_id = def_id;
 
   let trait_ref = tcx.impl_trait_ref(impl_def_id)?.instantiate_identity();
   let args = ty::GenericArgs::identity_for_item(tcx, impl_def_id);

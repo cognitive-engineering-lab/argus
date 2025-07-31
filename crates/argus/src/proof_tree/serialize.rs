@@ -150,7 +150,6 @@ impl<'tcx> SerializedTreeVisitor<'tcx> {
     // If the Goal is a TraitPredicate we will cache *all* possible implementors
     if let Some(tp) = goal.goal().predicate.as_trait_predicate() {
       let def_id = tp.def_id();
-
       let infcx = goal.infcx();
       let impls_idx = self.interners.intern_implementors(infcx, def_id, tp);
       self.impls.insert(goal_idx, impls_idx);
