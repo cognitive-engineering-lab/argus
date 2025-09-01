@@ -37,12 +37,12 @@ ts-rs = { version = "7.1.1", features = [
 ], optional = true }
 
 [dev-dependencies]
-argus-lib = { path = ".", features = ["testing"] }
-argus-ser = { path = "../argus-ser", features = ["testing"] }
-rustc_utils = { version = "=0.13.0-nightly-2025-03-03", features = [
+rustc_utils = { git = "https://github.com/DJMcNab/rustc_plugin", rev = "dee1d90c770bb44a6c3479c1f2a05cd4890e3010", features = [
   "serde",
   "ts-rs",
 ] }
+argus-lib = { path = ".", features = ["testing"] }
+argus-ser = { path = "../argus-ser", features = ["testing"] }
 test-log = "0.2.11"
 env_logger = "0.11.7"
 text-diff = "0.4"
