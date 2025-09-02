@@ -6,7 +6,7 @@ use rustc_hir::{self as hir, def::DefKind, def_id::DefId, LangItem, Safety};
 use rustc_infer::traits::{ObligationCause, PredicateObligation};
 use rustc_macros::TypeVisitable;
 use rustc_middle::ty::{self, elaborate::supertraits};
-use rustc_span::symbol::{kw, Symbol};
+use rustc_span::symbol::{sym, Symbol};
 use serde::Serialize;
 use smallvec::SmallVec;
 #[cfg(feature = "testing")]
@@ -940,7 +940,7 @@ impl<'tcx> RegionDef<'tcx> {
   pub fn new(value: &ty::Region<'tcx>) -> Self {
     let region = value;
     match region.kind() {
-      ty::ReEarlyParam(ref data) if data.name != kw::Empty => {
+      ty::ReEarlyParam(ref data) if data.name != sym::empty => {
         Self::named(data.name)
       }
       ty::ReLateParam(ty::LateParamRegion { kind, .. }) => {
@@ -999,7 +999,7 @@ impl<'tcx> GenericArgDef<'tcx> {
   where
     S: serde::Serializer,
   {
-    Self(value.unpack()).serialize(s)
+    Self(value.kind()).serialize(s)
   }
 }
 

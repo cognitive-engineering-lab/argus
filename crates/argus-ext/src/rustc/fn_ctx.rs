@@ -163,12 +163,12 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
     let find_param_matching = |matches: &dyn Fn(ty::ParamTerm) -> bool| {
       predicate_args.iter().find_map(|arg| {
         arg.walk().find(|arg| {
-          if let ty::GenericArgKind::Type(ty) = arg.unpack()
+          if let ty::GenericArgKind::Type(ty) = arg.kind()
             && let ty::Param(param_ty) = *ty.kind()
             && matches(ty::ParamTerm::Ty(param_ty))
           {
             true
-          } else if let ty::GenericArgKind::Const(ct) = arg.unpack()
+          } else if let ty::GenericArgKind::Const(ct) = arg.kind()
             && let ty::ConstKind::Param(param_ct) = ct.kind()
             && matches(ty::ParamTerm::Const(param_ct))
           {
@@ -424,7 +424,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
         // Handle `Self` param specifically, since it's separated in
         // the path representation
         if let Some(self_ty) = self_ty
-          && let ty::GenericArgKind::Type(ty) = param.unpack()
+          && let ty::GenericArgKind::Type(ty) = param.kind()
           && ty == self.tcx.types.self_param
         {
           error.obligation.cause.span = self_ty
@@ -440,7 +440,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
         }
         // Handle `Self` param specifically, since it's separated in
         // the path representation
-        if let ty::GenericArgKind::Type(ty) = param.unpack()
+        if let ty::GenericArgKind::Type(ty) = param.kind()
           && ty == self.tcx.types.self_param
         {
           error.obligation.cause.span = self_ty
@@ -820,7 +820,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
       return Ok(expr);
     }
 
-    let ty::GenericArgKind::Type(in_ty) = in_ty.unpack() else {
+    let ty::GenericArgKind::Type(in_ty) = in_ty.kind() else {
       return Err(expr);
     };
 
@@ -1132,7 +1132,7 @@ fn find_param_in_ty<'tcx>(
     if arg == param_to_point_at {
       return true;
     }
-    if let ty::GenericArgKind::Type(ty) = arg.unpack()
+    if let ty::GenericArgKind::Type(ty) = arg.kind()
       && let ty::Alias(ty::Projection | ty::Inherent, ..) = ty.kind()
     {
       // This logic may seem a bit strange, but typically when

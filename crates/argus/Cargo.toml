@@ -37,7 +37,7 @@ ts-rs = { version = "7.1.1", features = [
 ], optional = true }
 
 [dev-dependencies]
-rustc_utils = { git = "https://github.com/DJMcNab/rustc_plugin", rev = "3e1e8da657ea15d5c7e3d5f556073c09ff8df905", features = [
+rustc_utils = { git = "https://github.com/DJMcNab/rustc_plugin", rev = "70646a67a5591b48a275a7e97cd5f63ff4cf873c", features = [
   "serde",
   "ts-rs",
 ] }
