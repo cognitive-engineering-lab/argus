@@ -248,12 +248,11 @@ export const PrintCoroutineTy = ({ o }: { o: CoroutineTyKind }) => {
   const pathDef = <PrintDefinitionPath o={o.path} />;
   // NOTE: the upvars are tupled together into a single type.
   const upvars = <PrintTy o={o.upvarTys} />;
-  const witness = <PrintTy o={o.witness} />;
   // TODO: we can probably move the upvars and witness into a hidden div
   return (
     <DBraced>
       {movability}
-      {pathDef} upvar_tys={upvars} witness={witness}
+      {pathDef} upvar_tys={upvars}
     </DBraced>
   );
 };

@@ -8,7 +8,7 @@ log = "0.4"
 anyhow = "1.0.75"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.108"
-rustc_utils = { git = "https://github.com/DJMcNab/rustc_plugin", rev = "637919f550caa719b829848e02175d7d2b7cef0a" }
+rustc_utils = { git = "https://github.com/DJMcNab/rustc_plugin", rev = "8450cca325a5dc74cb88038ac1d38deaaaf0f448" }
 fluid-let = "1.0.0"
 itertools = "0.14.0"
 

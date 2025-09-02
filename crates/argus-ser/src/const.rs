@@ -80,9 +80,8 @@ impl<'tcx> From<&Const<'tcx>> for ConstKindDef<'tcx> {
         data: ExprDef::from(&e),
       },
       ConstKind::Error(..) => Self::Error,
-
       ConstKind::Bound(didx, bv) => Self::Bound {
-        data: BoundVariable::new(didx, bv),
+        data: BoundVariable::new(didx, bv.var),
       },
       ConstKind::Infer(ic) => Self::Infer { data: ic },
       ConstKind::Placeholder(..) => Self::Placeholder,

@@ -465,9 +465,6 @@ pub struct CoroutineTyKindDef<'tcx> {
   #[cfg_attr(feature = "testing", ts(type = "Ty"))]
   upvar_tys: ty::Ty<'tcx>,
 
-  #[serde(with = "TyDef")]
-  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
-  witness: ty::Ty<'tcx>,
   should_print_movability: bool,
 }
 
@@ -480,14 +477,12 @@ impl<'tcx> CoroutineTyKindDef<'tcx> {
       let tcx = infcx.tcx;
       let coroutine_kind = tcx.coroutine_kind(def_id).unwrap();
       let upvar_tys = args.as_coroutine().tupled_upvars_ty();
-      let witness = args.as_coroutine().witness();
       let movability = coroutine_kind.movability();
 
       Self {
         path: path::PathDefWithArgs::new(def_id, args),
         movability,
         upvar_tys,
-        witness,
         should_print_movability: matches!(
           coroutine_kind,
           hir::CoroutineKind::Coroutine(_)
@@ -519,10 +514,6 @@ pub struct CoroutineClosureTyKindDef<'tcx> {
   #[serde(with = "TyDef")]
   #[cfg_attr(feature = "testing", ts(type = "Ty"))]
   captures_by_ref: ty::Ty<'tcx>,
-
-  #[serde(with = "TyDef")]
-  #[cfg_attr(feature = "testing", ts(type = "Ty"))]
-  witness: ty::Ty<'tcx>,
 }
 
 impl<'tcx> CoroutineClosureTyKindDef<'tcx> {
@@ -535,7 +526,6 @@ impl<'tcx> CoroutineClosureTyKindDef<'tcx> {
     let upvar_tys = args.as_coroutine_closure().tupled_upvars_ty();
     let captures_by_ref =
       args.as_coroutine_closure().coroutine_captures_by_ref_ty();
-    let witness = args.as_coroutine_closure().coroutine_witness_ty();
 
     Self {
       path: path::PathDefWithArgs::new(def_id, args),
@@ -543,7 +533,6 @@ impl<'tcx> CoroutineClosureTyKindDef<'tcx> {
       signature_parts,
       upvar_tys,
       captures_by_ref,
-      witness,
     }
   }
 }
