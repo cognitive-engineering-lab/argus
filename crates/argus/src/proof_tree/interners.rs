@@ -100,7 +100,7 @@ impl Interners {
       ProbeKind::ProjectionCompatibility => {
         self.intern_can_string("upcase-proj-compat")
       }
-      ProbeKind::TraitCandidate { source, result } => match source {
+      ProbeKind::TraitCandidate { source, .. } => match source {
         CandidateSource::CoherenceUnknowable => {
           self.intern_can_string("coherence-unknowable")
         }
@@ -109,7 +109,8 @@ impl Interners {
         }
         CandidateSource::AliasBound => self.intern_can_string("alias-bound"),
         // The only two we really care about.
-        CandidateSource::ParamEnv(idx) => self.intern_can_param_env(),
+        // TODO: Handle ParamEnv sources
+        CandidateSource::ParamEnv(_) => self.intern_can_param_env(),
 
         CandidateSource::Impl(def_id) => {
           self.intern_impl(candidate.goal().infcx(), def_id)

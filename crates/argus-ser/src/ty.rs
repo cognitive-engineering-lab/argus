@@ -676,14 +676,16 @@ pub enum AbiDef {
   EfiApi,
   AvrInterrupt,
   AvrNonBlockingInterrupt,
-  CCmseNonSecureCall,
+  CmseNonSecureCall,
   System { unwind: bool },
   RustCall,
   Unadjusted,
   RustCold,
   RiscvInterruptM,
   RiscvInterruptS,
-  CCmseNonSecureEntry,
+  CmseNonSecureEntry,
+  RustInvalid,
+  Custom,
 }
 
 #[derive(Serialize)]
@@ -1962,7 +1964,14 @@ impl<'tcx> OpaqueImpl<'tcx> {
                   .extend(
                     // Group the return ty with its def id, if we had one.
                     entry.return_ty.map(|ty| {
-                      (tcx.require_lang_item(LangItem::FnOnceOutput, None), ty)
+                      (
+                        tcx.require_lang_item(
+                          LangItem::FnOnceOutput,
+                          // Guess of what right span is
+                          tcx.def_span(trait_ref.def_id),
+                        ),
+                        ty,
+                      )
                     }),
                   );
               }

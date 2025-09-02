@@ -281,7 +281,7 @@ impl<A: ArgusAnalysis, T: ToTarget, F: FnOnce() -> Option<T>>
     }
 
     config.psess_created = Some(Box::new(|sess| {
-      sess.dcx().make_silent(None, false);
+      sess.dcx().make_silent();
     }));
   }
 
