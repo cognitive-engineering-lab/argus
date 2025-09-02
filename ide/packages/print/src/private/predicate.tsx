@@ -199,6 +199,8 @@ export const PrintClauseKind = ({ o }: { o: ClauseKind }) => {
       o={o.HostEffect.predicate}
       constness={o.HostEffect.constness}
     />;
+  } else if ("UnstableFeature" in o) {
+    <>Unstable Feature: {o.UnstableFeature}</>;
   } else {
     throw new Error("Unknown clause kind", o);
   }

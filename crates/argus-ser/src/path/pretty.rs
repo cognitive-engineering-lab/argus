@@ -118,11 +118,11 @@ impl<'tcx> PathBuilder<'tcx> {
       self.segments.push(PathSegment::Colons);
     }
 
-    if let DefPathDataName::Named(name) = name {
-      if Ident::with_dummy_span(name).is_raw_guess() {
-        // CHANGE: write!(self, "r#")?;
-        self.segments.push(PathSegment::RawGuess);
-      }
+    if let DefPathDataName::Named(name) = name
+      && Ident::with_dummy_span(name).is_raw_guess()
+    {
+      // CHANGE: write!(self, "r#")?;
+      self.segments.push(PathSegment::RawGuess);
     }
 
     let verbose = self.should_print_verbose();

@@ -69,13 +69,11 @@ pub fn bundle(tcx: TyCtxt, body_id: BodyId) -> Result<BodyBundle> {
 
   let mut trees = HashMap::new();
   for obl in &t.1.obligations {
-    if obl.necessity == ObligationNecessity::Yes
-      || (obl.necessity == ObligationNecessity::OnError && obl.result.is_err())
-    {
-      if let Ok(stree) = entry::pick_tree(obl.hash, thunk) {
+    if (obl.necessity == ObligationNecessity::Yes
+      || (obl.necessity == ObligationNecessity::OnError && obl.result.is_err()))
+      && let Ok(stree) = entry::pick_tree(obl.hash, thunk) {
         trees.insert(obl.hash, stree);
       }
-    }
   }
 
   let filename = tcx

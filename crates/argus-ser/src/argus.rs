@@ -194,14 +194,12 @@ pub(crate) fn group_predicates_by_ty<'tcx>(
       continue;
     }
 
-    if let Some(poly_projection) = p.as_projection_clause() {
-      if let Some(output_defid) = fn_trait_output {
-        if poly_projection.item_def_id() == output_defid {
+    if let Some(poly_projection) = p.as_projection_clause()
+      && let Some(output_defid) = fn_trait_output
+        && poly_projection.item_def_id() == output_defid {
           fn_output_projections.push(poly_projection);
           continue;
         }
-      }
-    }
 
     other.push(p);
   }
@@ -216,8 +214,8 @@ pub(crate) fn group_predicates_by_ty<'tcx>(
         .into_iter()
         .map(|bclause| {
           let clause = bclause.skip_binder();
-          if let ClauseBound::Trait(p, tref) = clause {
-            if tcx.is_fn_trait(tref.def_id) {
+          if let ClauseBound::Trait(p, tref) = clause
+            && tcx.is_fn_trait(tref.def_id) {
               let poly_tr = bclause.rebind(tref);
 
               let mut to_remove = SmallVec::<[_; 4]>::new();
@@ -253,7 +251,6 @@ pub(crate) fn group_predicates_by_ty<'tcx>(
                 return ClauseBound::FnTrait(p, tref, ret_ty);
               }
             }
-          }
 
           clause
         })
@@ -307,8 +304,8 @@ pub fn get_opt_impl_header(
     Vec::with_capacity(predicates.len() + types_without_default_bounds.len());
 
   for (p, _) in predicates {
-    if let Some(poly_trait_ref) = p.as_trait_clause() {
-      if Some(poly_trait_ref.def_id()) == sized_trait {
+    if let Some(poly_trait_ref) = p.as_trait_clause()
+      && Some(poly_trait_ref.def_id()) == sized_trait {
         types_without_default_bounds
           // NOTE: we don't rely on the ordering of the types without bounds here,
           // so `swap_remove` is preferred because it's O(1) instead of `shift_remove`
@@ -316,7 +313,6 @@ pub fn get_opt_impl_header(
           .swap_remove(&poly_trait_ref.self_ty().skip_binder());
         continue;
       }
-    }
     pretty_predicates.push(*p);
   }
 

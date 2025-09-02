@@ -568,8 +568,7 @@ export const PrintBoundTyKind = ({ o }: { o: BoundTyKind }) => {
   if ("Anon" === o) {
     return null;
   } else if ("Param" in o) {
-    const [name] = o.Param;
-    return <PrintSymbol o={name} />;
+    return <PrintSymbol o={o.Param} />;
   }
 
   throw new Error("Unknown bound ty kind", o);
@@ -595,9 +594,8 @@ export const PrintBoundRegionKind = ({ o }: { o: BoundRegionKind }) => {
   } else if ("ClosureEnv" === o) {
     return null;
   }
-  if ("Named" in o && o.Named[0] !== "'_") {
-    const [name] = o.Named;
-    return <PrintSymbol o={name} />;
+  if ("Named" in o && o.Named !== "'_") {
+    return <PrintSymbol o={o.Named} />;
   }
 };
 

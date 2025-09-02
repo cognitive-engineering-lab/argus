@@ -343,16 +343,15 @@ impl<'tcx> AliasTyKindDef<'tcx> {
               // `type_of` on a type alias or assoc type should never cause a cycle.
               if let ty::Alias(ty::Opaque, ty::AliasTy { def_id: d, .. }) =
                 *infcx.tcx.type_of(parent).instantiate_identity().kind()
+                && d == def_id
               {
-                if d == def_id {
-                  // If the type alias directly starts with the `impl` of the
-                  // opaque type we're printing, then skip the `::{opaque#1}`.
-                  // CHANGE: p!(print_def_path(parent, args));
-                  // return Ok(())
-                  return Self::DefPath {
-                    data: path::PathDefWithArgs::new(parent, args),
-                  };
-                }
+                // If the type alias directly starts with the `impl` of the
+                // opaque type we're printing, then skip the `::{opaque#1}`.
+                // CHANGE: p!(print_def_path(parent, args));
+                // return Ok(())
+                return Self::DefPath {
+                  data: path::PathDefWithArgs::new(parent, args),
+                };
               }
               // Complex opaque type, e.g. `type Foo = (i32, impl Debug);`
               // CHANGE: p!(print_def_path(def_id, args));
@@ -1832,36 +1831,36 @@ impl<'tcx> OpaqueImpl<'tcx> {
     // If our trait_ref is FnOnce or any of its children, project it onto the parent FnOnce
     // super-trait ref and record it there.
     // We skip negative Fn* bounds since they can't use parenthetical notation anyway.
-    if polarity == ty::PredicatePolarity::Positive {
-      if let Some(fn_once_trait) = tcx.lang_items().fn_once_trait() {
-        // If we have a FnOnce, then insert it into
-        if trait_def_id == fn_once_trait {
-          let entry = fn_traits.entry(trait_ref).or_default();
-          // Optionally insert the return_ty as well.
-          if let Some((_, ty)) = proj_ty {
-            entry.return_ty = Some(ty);
-          }
-          entry.has_fn_once = true;
-          return;
-        } else if Some(trait_def_id) == tcx.lang_items().fn_mut_trait() {
-          let super_trait_ref = supertraits(tcx, trait_ref)
-            .find(|super_trait_ref| super_trait_ref.def_id() == fn_once_trait)
-            .unwrap();
-
-          fn_traits
-            .entry(super_trait_ref)
-            .or_default()
-            .fn_mut_trait_ref = Some(trait_ref);
-          return;
-        } else if Some(trait_def_id) == tcx.lang_items().fn_trait() {
-          let super_trait_ref = supertraits(tcx, trait_ref)
-            .find(|super_trait_ref| super_trait_ref.def_id() == fn_once_trait)
-            .unwrap();
-
-          fn_traits.entry(super_trait_ref).or_default().fn_trait_ref =
-            Some(trait_ref);
-          return;
+    if polarity == ty::PredicatePolarity::Positive
+      && let Some(fn_once_trait) = tcx.lang_items().fn_once_trait()
+    {
+      // If we have a FnOnce, then insert it into
+      if trait_def_id == fn_once_trait {
+        let entry = fn_traits.entry(trait_ref).or_default();
+        // Optionally insert the return_ty as well.
+        if let Some((_, ty)) = proj_ty {
+          entry.return_ty = Some(ty);
         }
+        entry.has_fn_once = true;
+        return;
+      } else if Some(trait_def_id) == tcx.lang_items().fn_mut_trait() {
+        let super_trait_ref = supertraits(tcx, trait_ref)
+          .find(|super_trait_ref| super_trait_ref.def_id() == fn_once_trait)
+          .unwrap();
+
+        fn_traits
+          .entry(super_trait_ref)
+          .or_default()
+          .fn_mut_trait_ref = Some(trait_ref);
+        return;
+      } else if Some(trait_def_id) == tcx.lang_items().fn_trait() {
+        let super_trait_ref = supertraits(tcx, trait_ref)
+          .find(|super_trait_ref| super_trait_ref.def_id() == fn_once_trait)
+          .unwrap();
+
+        fn_traits.entry(super_trait_ref).or_default().fn_trait_ref =
+          Some(trait_ref);
+        return;
       }
     }
 
