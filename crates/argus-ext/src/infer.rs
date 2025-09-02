@@ -1,9 +1,7 @@
 use rustc_hashes::Hash64;
 use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_middle::ty::{self, Predicate, TypeFoldable};
-use rustc_trait_selection::{
-  solve::InferCtxtSelectExt, traits::query::NoSolution,
-};
+use rustc_trait_selection::traits::{query::NoSolution, SelectionContext};
 
 use crate::{ty::TyCtxtExt, EvaluationResult};
 
@@ -67,8 +65,9 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
         param_env: obligation.param_env,
         recursion_depth: obligation.recursion_depth,
       };
+      let mut selection_ctx = SelectionContext::new(self);
 
-      match self.select_in_new_trait_solver(&trait_obligation) {
+      match selection_ctx.poly_select(&trait_obligation) {
         Ok(Some(_)) => Ok(Certainty::Yes),
         Ok(None) => Ok(Certainty::Maybe(MaybeCause::Ambiguity)),
         _ => Err(NoSolution),

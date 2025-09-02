@@ -23,7 +23,17 @@ Argus is available as a VSCode extension. You can install Argus from the [VSCode
 
 ### Building from source
 
-Some additional software is needed to build Argus from source. For the TypeScript bindings, you need to install the language [Guile](https://www.gnu.org/software/guile/) and [`cargo-make`](https://github.com/sagiegurari/cargo-make). The IDE requires [Depot](https://github.com/cognitive-engineering-lab/depot). Afterward run
+Some additional software is needed to build Argus from source. For the TypeScript bindings, you need to install the language [Guile](https://www.gnu.org/software/guile/) and [`cargo-make`](https://github.com/sagiegurari/cargo-make).
+
+The IDE requires [Depot](https://github.com/cognitive-engineering-lab/depot).
+Note that the released Depot version has a bug which prevents its usage. We recommend using [3676b134](https://github.com/cognitive-engineering-lab/depot/commit/3676b134767aba6a951ed5fdaa9e037255921475), i.e.
+
+```sh
+cargo install --locked --git https://github.com/cognitive-engineering-lab/depot --rev 3676b134767aba6a951ed5fdaa9e037255921475
+```
+
+You also need [biome](https://biomejs.dev/guides/manual-installation/) installed manually at version 1.9.4, and available in your path (see [#64](https://github.com/cognitive-engineering-lab/argus/pull/64)).
+Afterward run:
 
 ```sh
 cargo make init-bindings
@@ -42,7 +52,7 @@ If rustup fails, especially with an error like "could not rename the downloaded 
 To solve the issue, go to the command line and run:
 
 ```bash
-rustup toolchain install nightly-2025-06-01 -c rust-src -c rustc-dev -c llvm-tools-preview
+rustup toolchain install nightly-2025-04-01 -c rust-src -c rustc-dev -c llvm-tools-preview
 ```
 
 Then go back to VSCode and click "Continue" to let Argus continue installing.

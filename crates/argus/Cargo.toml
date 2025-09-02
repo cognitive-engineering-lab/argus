@@ -1,6 +1,6 @@
 [package]
 name = "argus-lib"
-version = "0.1.19"
+version = "0.1.20"
 edition = "2021"
 authors = ["Gavin Gray <gavinleroy6@gmail.com>"]
 repository = "https://github.com/cognitive-engineering-lab/argus"
@@ -22,8 +22,8 @@ serde.workspace = true
 serde_json.workspace = true
 itertools.workspace = true
 
-argus-ext = { version = "0.1.19", path = "../argus-ext" }
-argus-ser = { version = "0.1.19", path = "../argus-ser" }
+argus-ext = { version = "0.1.20", path = "../argus-ext" }
+argus-ser = { version = "0.1.20", path = "../argus-ser" }
 index_vec = { version = "0.1.3", features = ["serde"] }
 smallvec = "1.14.0"
 indexmap = { version = "2.2", features = ["serde"] }
@@ -37,7 +37,7 @@ ts-rs = { version = "7.1.1", features = [
 ], optional = true }
 
 [dev-dependencies]
-rustc_utils = { git = "https://github.com/DJMcNab/rustc_plugin", rev = "dee1d90c770bb44a6c3479c1f2a05cd4890e3010", features = [
+rustc_utils = { git = "https://github.com/DJMcNab/rustc_plugin", rev = "899a5e86b47adc92875c99dfe2c2d2d8e7a07f9f", features = [
   "serde",
   "ts-rs",
 ] }

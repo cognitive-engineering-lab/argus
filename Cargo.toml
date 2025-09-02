@@ -6,9 +6,9 @@ resolver = "2"
 [workspace.dependencies]
 log = "0.4"
 anyhow = "1.0.75"
-serde = { version = "1.0.192", features = ["derive"] }
+serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.108"
-rustc_utils = { git = "https://github.com/DJMcNab/rustc_plugin", rev = "dee1d90c770bb44a6c3479c1f2a05cd4890e3010" }
+rustc_utils = { git = "https://github.com/DJMcNab/rustc_plugin", rev = "899a5e86b47adc92875c99dfe2c2d2d8e7a07f9f" }
 fluid-let = "1.0.0"
 itertools = "0.14.0"
 

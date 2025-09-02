@@ -205,7 +205,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       let Ok(range) = CharRange::from_span(span, source_map) else {
         log::error!(
           "failed to get range for HIR: {}",
-          hir.node_to_string(hir_id)
+          self.tcx.hir_id_to_string(hir_id)
         );
         continue;
       };
@@ -472,7 +472,7 @@ mod tree_search {
         param_env: obligation.param_env,
       };
       let mut finder = BranchlessSearch::new(needle);
-      infcx.visit_proof_tree(goal, &mut finder);
+      let _ = infcx.visit_proof_tree(goal, &mut finder);
       finder.was_found()
     })
   }
