@@ -579,8 +579,8 @@ checksum = "caf4aa5b0f434c91fe5c7f1ecb6a5ece2130b02ad2a590589dda5146df959001"
 
 [[package]]
 name = "rustc_plugin"
-version = "0.14.0-nightly-2025-04-01"
-source = "git+https://github.com/DJMcNab/rustc_plugin?rev=899a5e86b47adc92875c99dfe2c2d2d8e7a07f9f#899a5e86b47adc92875c99dfe2c2d2d8e7a07f9f"
+version = "0.14.0-nightly-2025-05-01"
+source = "git+https://github.com/DJMcNab/rustc_plugin?rev=3e1e8da657ea15d5c7e3d5f556073c09ff8df905#3e1e8da657ea15d5c7e3d5f556073c09ff8df905"
 dependencies = [
  "cargo_metadata",
  "log",
@@ -598,8 +598,8 @@ checksum = "b3c5a95edfa0c893236ae4778bb7c4752760e4c0d245e19b5eff33c5aa5eb9dc"
 
 [[package]]
 name = "rustc_utils"
-version = "0.14.0-nightly-2025-04-01"
-source = "git+https://github.com/DJMcNab/rustc_plugin?rev=899a5e86b47adc92875c99dfe2c2d2d8e7a07f9f#899a5e86b47adc92875c99dfe2c2d2d8e7a07f9f"
+version = "0.14.0-nightly-2025-05-01"
+source = "git+https://github.com/DJMcNab/rustc_plugin?rev=3e1e8da657ea15d5c7e3d5f556073c09ff8df905#3e1e8da657ea15d5c7e3d5f556073c09ff8df905"
 dependencies = [
  "anyhow",
  "cfg-if",

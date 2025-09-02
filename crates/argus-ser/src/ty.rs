@@ -301,7 +301,7 @@ impl<'tcx> AliasTyKindDef<'tcx> {
         (
           ty::AliasTyKind::Projection
           | ty::AliasTyKind::Inherent
-          | ty::AliasTyKind::Weak,
+          | ty::AliasTyKind::Free,
           ref data,
         ) => {
           if !(infcx.should_print_verbose() || with_no_queries())
@@ -678,7 +678,6 @@ pub enum AbiDef {
   AvrNonBlockingInterrupt,
   CCmseNonSecureCall,
   System { unwind: bool },
-  RustIntrinsic,
   RustCall,
   Unadjusted,
   RustCold,
@@ -940,7 +939,7 @@ impl<'tcx> RegionDef<'tcx> {
 
   pub fn new(value: &ty::Region<'tcx>) -> Self {
     let region = value;
-    match **region {
+    match region.kind() {
       ty::ReEarlyParam(ref data) if data.name != kw::Empty => {
         Self::named(data.name)
       }
@@ -1328,9 +1327,9 @@ pub enum ClauseKindDef<'tcx> {
     ty::Ty<'tcx>,
   ),
   WellFormed(
-    #[serde(with = "GenericArgDef")]
+    #[serde(with = "TermDef")]
     #[cfg_attr(feature = "testing", ts(type = "GenericArg"))]
-    ty::GenericArg<'tcx>,
+    ty::Term<'tcx>,
   ),
   ConstEvaluatable(
     #[serde(with = "ConstDef")]
@@ -2005,7 +2004,7 @@ impl<'tcx> OpaqueImpl<'tcx> {
             };
 
             assoc.trait_container(tcx) == tcx.lang_items().coroutine_trait()
-              && assoc.name == rustc_span::sym::Return
+              && assoc.name() == rustc_span::sym::Return
           };
 
           for (assoc_item_def_id, term) in assoc_items {
@@ -2025,7 +2024,7 @@ impl<'tcx> OpaqueImpl<'tcx> {
               term.skip_binder()
             };
 
-            let name = tcx.associated_item(assoc_item_def_id).name;
+            let name = tcx.associated_item(assoc_item_def_id).name();
             assoc_args.push(AssocItemDef { name, term });
           }
 

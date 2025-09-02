@@ -139,7 +139,7 @@ pub fn replace_reported_errors(infcx: &InferCtxt) {
           *span,
           predicates
             .iter()
-            .map(|p| infcx.predicate_hash(p).into())
+            .map(|p| infcx.predicate_hash(&p.predicate).into())
             .collect::<Vec<_>>(),
         )
       })

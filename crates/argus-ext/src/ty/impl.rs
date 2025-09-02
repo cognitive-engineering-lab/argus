@@ -328,10 +328,9 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
 impl PredicateObligationExt for PredicateObligation<'_> {
   fn range(&self, tcx: &TyCtxt, body_id: BodyId) -> CharRange {
     let source_map = tcx.sess.source_map();
-    let hir = tcx.hir();
 
     let hir_id = tcx.hir_body_owner(body_id);
-    let body_span = hir.span(hir_id);
+    let body_span = tcx.hir_span(hir_id);
 
     // Backup span of the DefId
 

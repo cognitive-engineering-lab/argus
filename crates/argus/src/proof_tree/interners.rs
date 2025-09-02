@@ -96,7 +96,7 @@ impl Interners {
         self.intern_can_string("normalized-self-ty-asm")
       }
       ProbeKind::UnsizeAssembly => self.intern_can_string("unsize-asm"),
-      ProbeKind::UpcastProjectionCompatibility => {
+      ProbeKind::ProjectionCompatibility => {
         self.intern_can_string("upcase-proj-compat")
       }
       ProbeKind::TraitCandidate { source, .. } => match source {

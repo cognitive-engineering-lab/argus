@@ -179,20 +179,18 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
   }
 
   fn hir_id_to_span(&self, hir_id: HirId) -> Span {
-    let hir = self.tcx.hir();
     match self.tcx.hir_node(hir_id) {
       hir::Node::Expr(hir::Expr {
         kind: hir::ExprKind::MethodCall(_, _, _, span),
         ..
       }) => self.to_local(*span),
-      _ => self.to_local(hir.span_with_body(hir_id)),
+      _ => self.to_local(self.tcx.hir_span_with_body(hir_id)),
     }
   }
 
   fn sort_bins(&mut self, bins: Vec<Bin>) {
     use ExprKind as EK;
 
-    let hir = self.tcx.hir();
     let source_map = self.tcx.sess.source_map();
     for bin in bins {
       let Bin {
@@ -212,8 +210,8 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
 
       log::debug!(
           "Sorting at\nrange:{range:?}\nhir_span: {:?}\nfrom_expansion: {}\nspan: {span:?}",
-          hir.span_with_body(hir_id),
-          hir.span_with_body(hir_id).from_expansion()
+          self.tcx.hir_span_with_body(hir_id),
+          self.tcx.hir_span_with_body(hir_id).from_expansion()
         );
       let kind = match kind {
         BinKind::Misc => EK::Misc,
@@ -394,7 +392,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       };
 
       let expr = &self.exprs[*eid];
-      let span = self.tcx.hir().span(hir_id);
+      let span = self.tcx.hir_span(hir_id);
       let range = CharRange::from_span(span, self.tcx.sess.source_map())
         .expect("failed to get range for reported trait error");
 

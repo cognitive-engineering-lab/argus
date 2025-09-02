@@ -31,8 +31,7 @@ impl<'tcx> Visitor<'tcx> for BodyFinder<'tcx> {
     let body = self.tcx.hir_body(id);
     self.visit_body(body);
 
-    let hir = self.tcx.hir();
-    let span = hir.span_with_body(self.tcx.hir_body_owner(id));
+    let span = self.tcx.hir_span_with_body(self.tcx.hir_body_owner(id));
     log::trace!(
       "Searching body for {:?} with span {span:?} (local {:?})",
       self
