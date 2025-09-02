@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use argus_ext::ty::{EvaluationResultExt, PredicateExt, TyExt};
 use rustc_ast_ir::{try_visit, visit::VisitorResult};
 use rustc_hir::def_id::DefId;
@@ -90,11 +90,11 @@ impl SerializedTreeVisitor<'_> {
           let idx1: TyIdx = interner.borrow().get_idx(&t1)?;
           let idx2: TyIdx = interner.borrow().get_idx(&t2)?;
           Some((idx1, idx2))
-        }) {
-          if t1 != t2 && !self.projection_values.contains_key(&t1) {
-            let not_empty = self.projection_values.insert(t1, t2);
-            debug_assert!(not_empty.is_none());
-          }
+        }) && t1 != t2
+          && !self.projection_values.contains_key(&t1)
+        {
+          let not_empty = self.projection_values.insert(t1, t2);
+          debug_assert!(not_empty.is_none());
         }
       }
     }

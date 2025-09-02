@@ -2,8 +2,8 @@ use std::marker::PhantomData;
 
 use rustc_abi::Size;
 use rustc_apfloat::{
-  ieee::{Double, Single},
   Float,
+  ieee::{Double, Single},
 };
 use rustc_hir::def::DefKind;
 use rustc_middle::ty::*;
@@ -260,7 +260,7 @@ impl ConstScalarIntDef {
           data: format!("{}", char::try_from(int).is_ok()),
         },
         Ref(..) | RawPtr(..) | FnPtr(..) => {
-          let data = int.to_bits(tcx.data_layout.pointer_size);
+          let data = int.to_bits(tcx.data_layout.pointer_size());
           Self::Misc {
             data: format!("0x{data:x}"),
           }

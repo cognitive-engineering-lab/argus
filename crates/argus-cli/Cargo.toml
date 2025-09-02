@@ -1,7 +1,7 @@
 [package]
 name = "argus-cli"
 version = "0.1.20"
-edition = "2021"
+edition = "2024"
 authors = ["Gavin Gray <gavinleroy6@gmail.com>"]
 repository = "https://github.com/cognitive-engineering-lab/argus"
 description = "Trait debugger backend for IDE interactions."
@@ -12,7 +12,7 @@ license = "MIT"
 [dependencies]
 argus-lib = { version = "0.1.20", path = "../argus" }
 argus-ext = { version = "0.1.20", path = "../argus-ext" }
-rustc_plugin = { git = "https://github.com/DJMcNab/rustc_plugin", rev = "c228ff9d1e59ca1d86dd089ba97cf60d0c5acf7b" }
+rustc_plugin = { git = "https://github.com/DJMcNab/rustc_plugin", rev = "637919f550caa719b829848e02175d7d2b7cef0a" }
 
 rustc_utils.workspace = true
 log.workspace = true

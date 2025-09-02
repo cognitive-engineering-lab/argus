@@ -2,17 +2,17 @@ use std::marker::PhantomData;
 
 use rustc_abi::ExternAbi;
 use rustc_data_structures::fx::FxIndexMap;
-use rustc_hir::{self as hir, def::DefKind, def_id::DefId, LangItem, Safety};
+use rustc_hir::{self as hir, LangItem, Safety, def::DefKind, def_id::DefId};
 use rustc_infer::traits::{ObligationCause, PredicateObligation};
 use rustc_macros::TypeVisitable;
-use rustc_middle::ty::{self, elaborate::supertraits};
-use rustc_span::symbol::{sym, Symbol};
+use rustc_middle::ty::{self, TyCtxt, elaborate::supertraits};
+use rustc_span::symbol::{Symbol, sym};
 use serde::Serialize;
 use smallvec::SmallVec;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
-use super::{interner::TyIdx, r#const::*, term::*, *};
+use super::{r#const::*, interner::TyIdx, term::*, *};
 
 #[derive(Serialize, Many, Maybe)]
 #[serde(transparent)]
@@ -616,7 +616,9 @@ impl PlaceholderTyDef {
   {
     let serialize_kind = match value.bound.kind {
       ty::BoundTyKind::Anon => Self::Anon,
-      ty::BoundTyKind::Param(_, name) => Self::Named { data: name },
+      ty::BoundTyKind::Param(def) => Self::Named {
+        data: InferCtxt::access(|infcx| infcx.tcx.item_name(def)),
+      },
     };
 
     serialize_kind.serialize(s)
@@ -694,7 +696,6 @@ pub enum AbiDef {
 #[serde(remote = "ty::DynKind")]
 pub enum DynKindDef {
   Dyn,
-  DynStar,
 }
 
 #[derive(Serialize)]
@@ -787,14 +788,12 @@ impl BoundTyDef {
       ty::BoundTyKind::Anon => Self::Bound {
         data: BoundVariable::new(debruijn, ty.var),
       },
-      ty::BoundTyKind::Param(_, name) => Self::Named { data: name },
+      ty::BoundTyKind::Param(def) => Self::Named {
+        data: InferCtxt::access(|infcx| infcx.tcx.item_name(def)),
+      },
     }
   }
 }
-
-// ==================================================
-// VV TODO: the DefId's here need to be dealt with VV
-// ==================================================
 
 #[derive(Serialize, Many)]
 #[serde(remote = "ty::BoundVariableKind")]
@@ -815,13 +814,16 @@ pub enum BoundVariableKindDef {
 }
 
 #[derive(Serialize)]
-#[serde(remote = "ty::BoundRegionKind")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "BoundRegionKind"))]
 pub enum BoundRegionKindDef {
   Anon,
+  NamedAnon(
+    #[serde(with = "SymbolDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
+    Symbol,
+  ),
   Named(
-    #[serde(skip)] DefId,
     #[serde(with = "SymbolDef")]
     #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
     Symbol,
@@ -829,23 +831,60 @@ pub enum BoundRegionKindDef {
   ClosureEnv,
 }
 
+impl BoundRegionKindDef {
+  pub fn serialize<S>(
+    value: &ty::BoundRegionKind,
+    s: S,
+  ) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    let serialize_kind = match value {
+      ty::BoundRegionKind::Anon => BoundRegionKindDef::Anon,
+      ty::BoundRegionKind::NamedAnon(symbol) => {
+        BoundRegionKindDef::NamedAnon(*symbol)
+      }
+      ty::BoundRegionKind::Named(def_id) => {
+        BoundRegionKindDef::Named(InferCtxt::access(|infcx| {
+          infcx.tcx.item_name(def_id)
+        }))
+      }
+      ty::BoundRegionKind::ClosureEnv => BoundRegionKindDef::ClosureEnv,
+    };
+
+    serialize_kind.serialize(s)
+  }
+}
+
 #[derive(Serialize)]
-#[serde(remote = "ty::BoundTyKind")]
 #[cfg_attr(feature = "testing", derive(TS))]
 #[cfg_attr(feature = "testing", ts(export, rename = "BoundTyKind"))]
 pub enum BoundTyKindDef {
   Anon,
   Param(
-    #[serde(skip)] DefId,
     #[serde(with = "SymbolDef")]
     #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
     Symbol,
   ),
 }
 
-// ============================================================
-// ^^^^^^^^^ Above comment applies within this range ^^^^^^^^^^
-// ============================================================
+impl BoundTyKindDef {
+  pub fn serialize<S>(value: &ty::BoundTyKind, s: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
+    let serialize_kind = match value {
+      ty::BoundTyKind::Anon => BoundTyKindDef::Anon,
+      ty::BoundTyKind::Param(def_id) => {
+        BoundTyKindDef::Param(InferCtxt::access(|infcx| {
+          infcx.tcx.item_name(def_id)
+        }))
+      }
+    };
+
+    serialize_kind.serialize(s)
+  }
+}
 
 #[derive(Serialize)]
 #[serde(remote = "ty::IntTy")]
@@ -939,14 +978,14 @@ impl<'tcx> RegionDef<'tcx> {
     }
   }
 
-  pub fn new(value: &ty::Region<'tcx>) -> Self {
+  pub fn new(value: &ty::Region<'tcx>, tcx: TyCtxt<'tcx>) -> Self {
     let region = value;
     match region.kind() {
       ty::ReEarlyParam(ref data) if data.name != sym::empty => {
         Self::named(data.name)
       }
       ty::ReLateParam(ty::LateParamRegion { kind, .. }) => {
-        if let Some(name) = kind.get_name() {
+        if let Some(name) = kind.get_name(tcx) {
           Self::named(name)
         } else {
           Self::Anonymous
@@ -956,9 +995,9 @@ impl<'tcx> RegionDef<'tcx> {
       | ty::RePlaceholder(ty::Placeholder {
         bound: ty::BoundRegion { kind: br, .. },
         ..
-      }) if br.is_named() => {
-        if let ty::BoundRegionKind::Named(_, name) = br {
-          Self::named(name)
+      }) if br.is_named(tcx) => {
+        if let ty::BoundRegionKind::Named(def_id) = br {
+          Self::named(tcx.item_name(def_id))
         } else {
           Self::Anonymous
         }
@@ -979,7 +1018,7 @@ impl<'tcx> RegionDef<'tcx> {
   where
     S: serde::Serializer,
   {
-    Self::new(value).serialize(s)
+    InferCtxt::access(|infcx| Self::new(value, infcx.tcx)).serialize(s)
   }
 }
 
@@ -1343,6 +1382,11 @@ pub enum ClauseKindDef<'tcx> {
     #[cfg_attr(feature = "testing", ts(type = "HostEffectPredicate"))]
     ty::HostEffectPredicate<'tcx>,
   ),
+  UnstableFeature(
+    #[serde(with = "SymbolDef")]
+    #[cfg_attr(feature = "testing", ts(type = "Symbol"))]
+    Symbol,
+  ),
 }
 
 impl<'tcx> ClauseKindDef<'tcx> {
@@ -1362,6 +1406,7 @@ impl<'tcx> ClauseKindDef<'tcx> {
       ty::ClauseKind::WellFormed(v) => Self::WellFormed(*v),
       ty::ClauseKind::ConstEvaluatable(v) => Self::ConstEvaluatable(*v),
       ty::ClauseKind::HostEffect(v) => Self::HostEffect(*v),
+      ty::ClauseKind::UnstableFeature(v) => Self::UnstableFeature(*v),
     }
   }
 
