@@ -16,7 +16,7 @@ use rustc_trait_selection::{
   solve::inspect::{InspectCandidate, InspectGoal},
   traits::{
     solve,
-    solve::{inspect::ProbeKind, CandidateSource},
+    solve::{CandidateSource, inspect::ProbeKind},
   },
 };
 

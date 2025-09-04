@@ -1,7 +1,7 @@
 use argus_ext::ty::TyCtxtExt;
 use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_hir::{
-  self as hir, intravisit::Visitor as HirVisitor, BodyId, HirId,
+  self as hir, BodyId, HirId, intravisit::Visitor as HirVisitor,
 };
 use rustc_middle::{hir::nested_filter, ty::TyCtxt};
 use rustc_span::Span;

@@ -16,8 +16,8 @@ pub(crate) use crate::types::intermediate::{
 use crate::{
   proof_tree::SerializedTree,
   types::{
-    intermediate::{Forgettable, FullData},
     BodyBundle, ObligationNecessity, ObligationsInBody, Target,
+    intermediate::{Forgettable, FullData},
   },
 };
 
@@ -71,9 +71,10 @@ pub fn bundle(tcx: TyCtxt, body_id: BodyId) -> Result<BodyBundle> {
   for obl in &t.1.obligations {
     if (obl.necessity == ObligationNecessity::Yes
       || (obl.necessity == ObligationNecessity::OnError && obl.result.is_err()))
-      && let Ok(stree) = entry::pick_tree(obl.hash, thunk) {
-        trees.insert(obl.hash, stree);
-      }
+      && let Ok(stree) = entry::pick_tree(obl.hash, thunk)
+    {
+      trees.insert(obl.hash, stree);
+    }
   }
 
   let filename = tcx

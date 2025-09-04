@@ -9,8 +9,8 @@
 use rustc_infer::{
   infer::{self, InferCtxt},
   traits::{
-    query::NoSolution, MismatchedProjectionTypes, PredicateObligation,
-    SelectionError,
+    MismatchedProjectionTypes, PredicateObligation, SelectionError,
+    query::NoSolution,
   },
 };
 use rustc_middle::ty::{
@@ -20,7 +20,7 @@ use rustc_middle::ty::{
 use rustc_span::DUMMY_SP;
 use rustc_trait_selection::{
   infer::InferCtxtExt as RustcInferCtxtExt,
-  traits::{elaborate, FulfillmentError, FulfillmentErrorCode},
+  traits::{FulfillmentError, FulfillmentErrorCode, elaborate},
 };
 
 use crate::EvaluationResult;

@@ -1,7 +1,7 @@
 use argus_ext::{
   infer::InferCtxtExt,
   ty::{
-    retain_error_sources, retain_method_calls, TyCtxtExt, TypeckResultsExt,
+    TyCtxtExt, TypeckResultsExt, retain_error_sources, retain_method_calls,
   },
   utils::SpanExt as ArgusSpanExt,
 };
@@ -16,8 +16,8 @@ use rustc_utils::source_map::{range::CharRange, span::SpanExt};
 use serde_json as json;
 
 use super::{
-  hir::{self as hier_hir, Bin, BinKind},
   EvaluationResult,
+  hir::{self as hier_hir, Bin, BinKind},
 };
 use crate::{
   ext::InferCtxtExt as LocalInferCtxtExt,
@@ -209,10 +209,10 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       };
 
       log::debug!(
-          "Sorting at\nrange:{range:?}\nhir_span: {:?}\nfrom_expansion: {}\nspan: {span:?}",
-          self.tcx.hir_span_with_body(hir_id),
-          self.tcx.hir_span_with_body(hir_id).from_expansion()
-        );
+        "Sorting at\nrange:{range:?}\nhir_span: {:?}\nfrom_expansion: {}\nspan: {span:?}",
+        self.tcx.hir_span_with_body(hir_id),
+        self.tcx.hir_span_with_body(hir_id).from_expansion()
+      );
       let kind = match kind {
         BinKind::Misc => EK::Misc,
         BinKind::CallableExpr => EK::CallableExpr,

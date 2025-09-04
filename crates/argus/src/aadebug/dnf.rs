@@ -1,4 +1,4 @@
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 
 const MAX_CONJUNCTS: usize = 4;
 
@@ -50,11 +50,7 @@ impl<I: Copy> Dnf<I> {
 
   pub fn or(vs: impl Iterator<Item = Self>) -> Option<Self> {
     let vs = vs.flat_map(|Self(v)| v).collect::<Vec<_>>();
-    if vs.is_empty() {
-      None
-    } else {
-      Some(Self(vs))
-    }
+    if vs.is_empty() { None } else { Some(Self(vs)) }
   }
 
   #[allow(clippy::needless_pass_by_value)]

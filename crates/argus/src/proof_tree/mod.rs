@@ -21,8 +21,8 @@ use ts_rs::TS;
 use crate::{
   aadebug, tls,
   types::{
-    intermediate::{EvaluationResult, EvaluationResultDef},
     ObligationNecessity,
+    intermediate::{EvaluationResult, EvaluationResultDef},
   },
 };
 

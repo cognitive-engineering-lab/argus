@@ -196,10 +196,11 @@ pub(crate) fn group_predicates_by_ty<'tcx>(
 
     if let Some(poly_projection) = p.as_projection_clause()
       && let Some(output_defid) = fn_trait_output
-        && poly_projection.item_def_id() == output_defid {
-          fn_output_projections.push(poly_projection);
-          continue;
-        }
+      && poly_projection.item_def_id() == output_defid
+    {
+      fn_output_projections.push(poly_projection);
+      continue;
+    }
 
     other.push(p);
   }
@@ -215,55 +216,55 @@ pub(crate) fn group_predicates_by_ty<'tcx>(
         .map(|bclause| {
           let clause = bclause.skip_binder();
           if let ClauseBound::Trait(p, tref) = clause
-            && tcx.is_fn_trait(tref.def_id) {
-              let poly_tr = bclause.rebind(tref);
+            && tcx.is_fn_trait(tref.def_id)
+          {
+            let poly_tr = bclause.rebind(tref);
 
-              let mut to_remove = SmallVec::<[_; 4]>::new();
-              let mut matching_projection = None;
+            let mut to_remove = SmallVec::<[_; 4]>::new();
+            let mut matching_projection = None;
 
-              for (i, p) in fn_output_projections.iter().enumerate() {
-               if  tcx.does_trait_ref_occur_in(
-                    poly_tr,
-                    p.map_bound(|p| {
-                      ty::PredicateKind::Clause(ty::ClauseKind::Projection(p))
-                    })
-                     .upcast(tcx),
-                  ) {
-                 log::debug!("Removing matching projection {p:#?}");
-                 to_remove.push(i);
-               }
-              }
-
-              while let Some(i) = to_remove.pop() {
-                matching_projection = Some(fn_output_projections.remove(i));
-              }
-
-              if let Some(proj) = matching_projection {
-                log::debug!(
-                  "Matching projections for {bclause:?} {matching_projection:#?}"
-                );
-                let ret_ty = proj
-                  .term()
-                  .skip_binder()
-                  .as_type()
-                  .expect("FnOnce::Output Ty");
-
-                return ClauseBound::FnTrait(p, tref, ret_ty);
+            for (i, p) in fn_output_projections.iter().enumerate() {
+              if tcx.does_trait_ref_occur_in(
+                poly_tr,
+                p.map_bound(|p| {
+                  ty::PredicateKind::Clause(ty::ClauseKind::Projection(p))
+                })
+                .upcast(tcx),
+              ) {
+                log::debug!("Removing matching projection {p:#?}");
+                to_remove.push(i);
               }
             }
+
+            while let Some(i) = to_remove.pop() {
+              matching_projection = Some(fn_output_projections.remove(i));
+            }
+
+            if let Some(proj) = matching_projection {
+              log::debug!(
+                "Matching projections for {bclause:?} {matching_projection:#?}"
+              );
+              let ret_ty = proj
+                .term()
+                .skip_binder()
+                .as_type()
+                .expect("FnOnce::Output Ty");
+
+              return ClauseBound::FnTrait(p, tref, ret_ty);
+            }
+          }
 
           clause
         })
         .collect();
 
-    PolyClauseWithBoundsDef::new(
-        &ty::Binder::bind_with_vars(
-            ClauseWithBoundsDef {
-                ty,
-                bounds: unbounds,
-            },
-            bound_vars,
-        ))
+      PolyClauseWithBoundsDef::new(&ty::Binder::bind_with_vars(
+        ClauseWithBoundsDef {
+          ty,
+          bounds: unbounds,
+        },
+        bound_vars,
+      ))
     })
     .collect::<Vec<_>>();
 
@@ -305,14 +306,15 @@ pub fn get_opt_impl_header(
 
   for (p, _) in predicates {
     if let Some(poly_trait_ref) = p.as_trait_clause()
-      && Some(poly_trait_ref.def_id()) == sized_trait {
-        types_without_default_bounds
-          // NOTE: we don't rely on the ordering of the types without bounds here,
-          // so `swap_remove` is preferred because it's O(1) instead of `shift_remove`
-          // which is O(n).
-          .swap_remove(&poly_trait_ref.self_ty().skip_binder());
-        continue;
-      }
+      && Some(poly_trait_ref.def_id()) == sized_trait
+    {
+      types_without_default_bounds
+        // NOTE: we don't rely on the ordering of the types without bounds here,
+        // so `swap_remove` is preferred because it's O(1) instead of `shift_remove`
+        // which is O(n).
+        .swap_remove(&poly_trait_ref.self_ty().skip_binder());
+      continue;
+    }
     pretty_predicates.push(*p);
   }
 

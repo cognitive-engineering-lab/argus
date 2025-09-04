@@ -1,8 +1,8 @@
 use proc_macro2::Span;
 use syn::{
-  parse::{Parse, ParseStream},
   Attribute, Expr, Generics, Ident, Item, ItemEnum, ItemStruct, Lifetime,
   LitStr, Path, Token, WherePredicate,
+  parse::{Parse, ParseStream},
 };
 use uuid::Uuid;
 
