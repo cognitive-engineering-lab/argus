@@ -37,7 +37,7 @@ ts-rs = { version = "7.1.1", features = [
 ], optional = true }
 
 [dev-dependencies]
-rustc_utils = { version = "=0.14.0-nightly-2025-08-20", features = [
+rustc_utils = { version = "=0.14.1-nightly-2025-08-20", features = [
   "serde",
   "ts-rs",
 ] }
