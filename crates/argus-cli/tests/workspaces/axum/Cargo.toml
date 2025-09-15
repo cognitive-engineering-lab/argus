@@ -1,8 +1,8 @@
 [package]
 name = "axum-tests"
 version = "0.0.1"
-authors = [ "gavinleroy <gavinleroy6@gmail.com>" ]
-edition = "2021"
+authors = ["gavinleroy <gavinleroy6@gmail.com>"]
+edition = "2024"
 
 [dependencies]
 axum = "0.7"

@@ -12,7 +12,7 @@ use serde::Serialize;
 #[cfg(feature = "testing")]
 use ts_rs::TS;
 
-use crate::proof_tree::{topology::GraphTopology, ProofNode};
+use crate::proof_tree::{ProofNode, topology::GraphTopology};
 
 pub struct Storage<'tcx> {
   pub ns: HashMap<ProofNode, tree::N<'tcx>>,
@@ -43,7 +43,7 @@ impl<'tcx> Storage<'tcx> {
     proof_node: ProofNode,
     goal: &InspectGoal<'_, 'tcx>,
   ) {
-    let infcx = goal.infcx().fork();
+    let infcx = Box::new(goal.infcx().fork());
     let result = goal.result();
     let goal = goal.goal();
     self.ns.insert(proof_node, tree::N::R {

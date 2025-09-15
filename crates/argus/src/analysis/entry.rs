@@ -1,7 +1,7 @@
 //! Code that relates two pieces of data, or computes the
 //! rleationships between large structures.
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use argus_ext::ty::EvaluationResultExt;
 use fluid_let::fluid_let;
 use rustc_hir::BodyId;
@@ -11,14 +11,14 @@ use rustc_trait_selection::traits::solve::Goal;
 
 use crate::{
   analysis::{
-    hir, transform, EvaluationResult, INCLUDE_SUCCESSES, OBLIGATION_TARGET,
+    EvaluationResult, INCLUDE_SUCCESSES, OBLIGATION_TARGET, hir, transform,
   },
   ext::InferCtxtExt,
-  proof_tree::{serialize::try_serialize, SerializedTree},
+  proof_tree::{SerializedTree, serialize::try_serialize},
   tls,
   types::{
-    intermediate::{ErrorAssemblyCtx, Forgettable, FullData},
     ObligationHash, ObligationNecessity, ObligationsInBody,
+    intermediate::{ErrorAssemblyCtx, Forgettable, FullData},
   },
 };
 

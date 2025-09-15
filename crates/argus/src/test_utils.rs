@@ -19,8 +19,8 @@ use crate::{
   analysis,
   proof_tree::SerializedTree,
   types::{
-    intermediate::{Forgettable, FullData},
     ObligationHash, ObligationsInBody, Target,
+    intermediate::{Forgettable, FullData},
   },
 };
 
@@ -80,9 +80,11 @@ pub(crate) fn load_test_from_file(
 #[allow(clippy::missing_panics_doc)]
 pub fn test_obligations_no_crash(
   path: &Path,
-  mut assert_pass: impl for<'tcx> FnMut(Forgettable<FullData<'tcx>>, ObligationsInBody)
-    + Send
-    + Sync,
+  mut assert_pass: impl for<'tcx> FnMut(
+    Forgettable<FullData<'tcx>>,
+    ObligationsInBody,
+  ) + Send
+  + Sync,
 ) {
   let inner = || -> Result<()> {
     let (source, _cfg) = load_test_from_file(path)?;
@@ -244,7 +246,7 @@ where
     config.file_loader =
       Some(Box::new(StringLoader(std::mem::take(&mut self.input))));
     config.psess_created = Some(Box::new(|sess| {
-      sess.dcx().make_silent(None, false);
+      sess.dcx().make_silent();
     }));
   }
 

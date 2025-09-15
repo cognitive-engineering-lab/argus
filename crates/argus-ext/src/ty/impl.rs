@@ -1,15 +1,15 @@
 use rustc_hashes::Hash64;
-use rustc_hir::{def_id::DefId, BodyId, HirId};
+use rustc_hir::{BodyId, HirId, def_id::DefId};
 use rustc_hir_typeck::inspect_typeck;
 use rustc_infer::{
   infer::InferCtxt,
-  traits::{solve::CandidateSource, ObligationInspector, PredicateObligation},
+  traits::{ObligationInspector, PredicateObligation, solve::CandidateSource},
 };
 use rustc_middle::ty::{
   self, Predicate, Ty, TyCtxt, TypeSuperVisitable, TypeVisitable, TypeVisitor,
   TypeckResults,
 };
-use rustc_span::{symbol::sym, FileName, Span};
+use rustc_span::{FileName, Span, symbol::sym};
 use rustc_trait_selection::{
   solve::inspect::{InspectCandidate, ProbeKind},
   traits::{
@@ -21,7 +21,7 @@ use rustc_utils::source_map::range::CharRange;
 
 #[allow(clippy::wildcard_imports)]
 use super::*;
-use crate::{hash::StableHash, rustc::ImplCandidate, EvaluationResult};
+use crate::{EvaluationResult, hash::StableHash, rustc::ImplCandidate};
 
 impl EvaluationResultExt for EvaluationResult {
   fn is_yes(&self) -> bool {
@@ -328,10 +328,9 @@ impl<'tcx> TyCtxtExt<'tcx> for TyCtxt<'tcx> {
 impl PredicateObligationExt for PredicateObligation<'_> {
   fn range(&self, tcx: &TyCtxt, body_id: BodyId) -> CharRange {
     let source_map = tcx.sess.source_map();
-    let hir = tcx.hir();
 
     let hir_id = tcx.hir_body_owner(body_id);
-    let body_span = hir.span(hir_id);
+    let body_span = tcx.hir_span(hir_id);
 
     // Backup span of the DefId
 

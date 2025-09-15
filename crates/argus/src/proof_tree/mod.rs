@@ -21,8 +21,8 @@ use ts_rs::TS;
 use crate::{
   aadebug, tls,
   types::{
-    intermediate::{EvaluationResult, EvaluationResultDef},
     ObligationNecessity,
+    intermediate::{EvaluationResult, EvaluationResultDef},
   },
 };
 
@@ -110,7 +110,8 @@ pub enum CandidateData {
     hd: json::Value,
     is_user_visible: bool,
   },
-  ParamEnv(usize),
+  // TODO?
+  ParamEnv(()),
   // TODO remove variant once everything is structured
   Any(String),
 }

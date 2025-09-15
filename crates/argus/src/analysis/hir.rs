@@ -1,7 +1,7 @@
 use argus_ext::ty::TyCtxtExt;
 use rustc_data_structures::fx::FxHashMap as HashMap;
 use rustc_hir::{
-  self as hir, intravisit::Visitor as HirVisitor, BodyId, HirId,
+  self as hir, BodyId, HirId, intravisit::Visitor as HirVisitor,
 };
 use rustc_middle::{hir::nested_filter, ty::TyCtxt};
 use rustc_span::Span;
@@ -105,7 +105,7 @@ impl BinCreator<'_, '_> {
     if !obligations.is_empty() {
       log::debug!(
         "Associating obligations with {kind:?} {:?}\n{:#?}",
-        self.ctx.tcx.hir().node_to_string(target),
+        self.ctx.tcx.hir_id_to_string(target),
         obligations
       );
 
@@ -134,7 +134,7 @@ impl<'a, 'tcx: 'a> HirVisitor<'tcx> for BinCreator<'a, 'tcx> {
 
     log::debug!(
       "Visiting expression: {}",
-      self.ctx.tcx.hir().node_to_string(ex.hir_id)
+      self.ctx.tcx.hir_id_to_string(ex.hir_id)
     );
 
     match ex.kind {

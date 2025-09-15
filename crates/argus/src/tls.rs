@@ -16,14 +16,14 @@ use rustc_infer::{infer::InferCtxt, traits::PredicateObligation};
 use rustc_span::Span;
 use serde_json as json;
 pub use unsafe_tls::{
-  access_interner as unsafe_access_interner, store as unsafe_store_data,
-  take as unsafe_take_data, take_interned_values as take_interned_tys,
-  FullObligationData, UODIdx,
+  FullObligationData, UODIdx, access_interner as unsafe_access_interner,
+  store as unsafe_store_data, take as unsafe_take_data,
+  take_interned_values as take_interned_tys,
 };
 
 use crate::{
   proof_tree::SerializedTree,
-  types::{intermediate::Provenance, Obligation, ObligationHash},
+  types::{Obligation, ObligationHash, intermediate::Provenance},
 };
 
 const DRAIN_WINDOW: usize = 100;
@@ -139,7 +139,7 @@ pub fn replace_reported_errors(infcx: &InferCtxt) {
           *span,
           predicates
             .iter()
-            .map(|p| infcx.predicate_hash(p).into())
+            .map(|p| infcx.predicate_hash(&p.predicate).into())
             .collect::<Vec<_>>(),
         )
       })

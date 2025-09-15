@@ -1,4 +1,4 @@
-#![feature(rustc_private, let_chains, box_patterns)]
+#![feature(rustc_private, box_patterns)]
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions, clippy::missing_errors_doc)]
 extern crate rustc_data_structures;

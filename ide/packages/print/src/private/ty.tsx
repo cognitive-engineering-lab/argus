@@ -248,12 +248,11 @@ export const PrintCoroutineTy = ({ o }: { o: CoroutineTyKind }) => {
   const pathDef = <PrintDefinitionPath o={o.path} />;
   // NOTE: the upvars are tupled together into a single type.
   const upvars = <PrintTy o={o.upvarTys} />;
-  const witness = <PrintTy o={o.witness} />;
   // TODO: we can probably move the upvars and witness into a hidden div
   return (
     <DBraced>
       {movability}
-      {pathDef} upvar_tys={upvars} witness={witness}
+      {pathDef} upvar_tys={upvars}
     </DBraced>
   );
 };
@@ -568,8 +567,7 @@ export const PrintBoundTyKind = ({ o }: { o: BoundTyKind }) => {
   if ("Anon" === o) {
     return null;
   } else if ("Param" in o) {
-    const [name] = o.Param;
-    return <PrintSymbol o={name} />;
+    return <PrintSymbol o={o.Param} />;
   }
 
   throw new Error("Unknown bound ty kind", o);
@@ -595,9 +593,8 @@ export const PrintBoundRegionKind = ({ o }: { o: BoundRegionKind }) => {
   } else if ("ClosureEnv" === o) {
     return null;
   }
-  if ("Named" in o && o.Named[0] !== "'_") {
-    const [name] = o.Named;
-    return <PrintSymbol o={name} />;
+  if ("Named" in o && o.Named !== "'_") {
+    return <PrintSymbol o={o.Named} />;
   }
 };
 

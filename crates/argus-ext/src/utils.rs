@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use regex::Regex;
-use rustc_span::{source_map::SourceMap, Span};
+use rustc_span::{Span, source_map::SourceMap};
 use rustc_utils::source_map::range::CharRange;
 
 pub trait CharRangeExt: Copy + Sized {

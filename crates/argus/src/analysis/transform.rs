@@ -1,7 +1,7 @@
 use argus_ext::{
   infer::InferCtxtExt,
   ty::{
-    retain_error_sources, retain_method_calls, TyCtxtExt, TypeckResultsExt,
+    TyCtxtExt, TypeckResultsExt, retain_error_sources, retain_method_calls,
   },
   utils::SpanExt as ArgusSpanExt,
 };
@@ -16,8 +16,8 @@ use rustc_utils::source_map::{range::CharRange, span::SpanExt};
 use serde_json as json;
 
 use super::{
-  hir::{self as hier_hir, Bin, BinKind},
   EvaluationResult,
+  hir::{self as hier_hir, Bin, BinKind},
 };
 use crate::{
   ext::InferCtxtExt as LocalInferCtxtExt,
@@ -179,20 +179,18 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
   }
 
   fn hir_id_to_span(&self, hir_id: HirId) -> Span {
-    let hir = self.tcx.hir();
     match self.tcx.hir_node(hir_id) {
       hir::Node::Expr(hir::Expr {
         kind: hir::ExprKind::MethodCall(_, _, _, span),
         ..
       }) => self.to_local(*span),
-      _ => self.to_local(hir.span_with_body(hir_id)),
+      _ => self.to_local(self.tcx.hir_span_with_body(hir_id)),
     }
   }
 
   fn sort_bins(&mut self, bins: Vec<Bin>) {
     use ExprKind as EK;
 
-    let hir = self.tcx.hir();
     let source_map = self.tcx.sess.source_map();
     for bin in bins {
       let Bin {
@@ -205,16 +203,16 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       let Ok(range) = CharRange::from_span(span, source_map) else {
         log::error!(
           "failed to get range for HIR: {}",
-          hir.node_to_string(hir_id)
+          self.tcx.hir_id_to_string(hir_id)
         );
         continue;
       };
 
       log::debug!(
-          "Sorting at\nrange:{range:?}\nhir_span: {:?}\nfrom_expansion: {}\nspan: {span:?}",
-          hir.span_with_body(hir_id),
-          hir.span_with_body(hir_id).from_expansion()
-        );
+        "Sorting at\nrange:{range:?}\nhir_span: {:?}\nfrom_expansion: {}\nspan: {span:?}",
+        self.tcx.hir_span_with_body(hir_id),
+        self.tcx.hir_span_with_body(hir_id).from_expansion()
+      );
       let kind = match kind {
         BinKind::Misc => EK::Misc,
         BinKind::CallableExpr => EK::CallableExpr,
@@ -394,7 +392,7 @@ impl<'a, 'tcx: 'a> ObligationsBuilder<'a, 'tcx> {
       };
 
       let expr = &self.exprs[*eid];
-      let span = self.tcx.hir().span(hir_id);
+      let span = self.tcx.hir_span(hir_id);
       let range = CharRange::from_span(span, self.tcx.sess.source_map())
         .expect("failed to get range for reported trait error");
 
@@ -472,7 +470,7 @@ mod tree_search {
         param_env: obligation.param_env,
       };
       let mut finder = BranchlessSearch::new(needle);
-      infcx.visit_proof_tree(goal, &mut finder);
+      let _ = infcx.visit_proof_tree(goal, &mut finder);
       finder.was_found()
     })
   }

@@ -315,7 +315,7 @@ mod string {
 
   use std::{fmt::Display, str::FromStr};
 
-  use serde::{de, Deserialize, Deserializer, Serializer};
+  use serde::{Deserialize, Deserializer, Serializer, de};
 
   pub fn serialize<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
   where
@@ -349,7 +349,7 @@ pub(super) mod intermediate {
   };
 
   use anyhow::Result;
-  use rustc_hir::{hir_id::HirId, BodyId};
+  use rustc_hir::{BodyId, hir_id::HirId};
 
   use super::*;
 

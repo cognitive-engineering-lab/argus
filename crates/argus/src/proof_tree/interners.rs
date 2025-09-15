@@ -16,7 +16,7 @@ use rustc_trait_selection::{
   solve::inspect::{InspectCandidate, InspectGoal},
   traits::{
     solve,
-    solve::{inspect::ProbeKind, CandidateSource},
+    solve::{CandidateSource, inspect::ProbeKind},
   },
 };
 
@@ -43,7 +43,8 @@ pub struct InternedData {
 #[derive(PartialEq, Eq, Hash)]
 enum CanKey {
   Impl(DefId),
-  ParamEnv(usize),
+  // TODO?
+  ParamEnv(()),
   Str(&'static str),
 }
 
@@ -96,7 +97,7 @@ impl Interners {
         self.intern_can_string("normalized-self-ty-asm")
       }
       ProbeKind::UnsizeAssembly => self.intern_can_string("unsize-asm"),
-      ProbeKind::UpcastProjectionCompatibility => {
+      ProbeKind::ProjectionCompatibility => {
         self.intern_can_string("upcase-proj-compat")
       }
       ProbeKind::TraitCandidate { source, .. } => match source {
@@ -108,7 +109,8 @@ impl Interners {
         }
         CandidateSource::AliasBound => self.intern_can_string("alias-bound"),
         // The only two we really care about.
-        CandidateSource::ParamEnv(idx) => self.intern_can_param_env(idx),
+        // TODO: Handle ParamEnv sources
+        CandidateSource::ParamEnv(_) => self.intern_can_param_env(),
 
         CandidateSource::Impl(def_id) => {
           self.intern_impl(candidate.goal().infcx(), def_id)
@@ -174,14 +176,14 @@ impl Interners {
     self.candidates.insert(CanKey::Str(s), s.into())
   }
 
-  fn intern_can_param_env(&mut self, idx: usize) -> CandidateIdx {
-    if let Some(i) = self.candidates.get_idx(&CanKey::ParamEnv(idx)) {
+  fn intern_can_param_env(&mut self) -> CandidateIdx {
+    if let Some(i) = self.candidates.get_idx(&CanKey::ParamEnv(())) {
       return i;
     }
 
     self
       .candidates
-      .insert(CanKey::ParamEnv(idx), CandidateData::ParamEnv(idx))
+      .insert(CanKey::ParamEnv(()), CandidateData::ParamEnv(()))
   }
 
   pub(super) fn intern_impl(

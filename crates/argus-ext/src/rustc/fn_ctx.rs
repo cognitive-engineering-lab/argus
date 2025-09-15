@@ -14,7 +14,7 @@ use rustc_infer::{infer::InferCtxt, traits::ObligationCauseCode};
 use rustc_middle::ty::{
   self, Ty, TyCtxt, TypeSuperVisitable, TypeVisitable, TypeVisitor,
 };
-use rustc_span::{symbol::kw, Span};
+use rustc_span::{Span, symbol::kw};
 use rustc_trait_selection::traits;
 
 pub struct FnCtxtSimulator<'a, 'tcx: 'a> {
@@ -30,6 +30,21 @@ impl<'a, 'tcx: 'a> FnCtxtSimulator<'a, 'tcx> {
     FnCtxtSimulator {
       typeck_results,
       infcx,
+    }
+  }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum ParamTerm {
+  Ty(ty::ParamTy),
+  Const(ty::ParamConst),
+}
+
+impl ParamTerm {
+  pub fn index(self) -> usize {
+    match self {
+      ParamTerm::Ty(ty) => ty.index as usize,
+      ParamTerm::Const(ct) => ct.index as usize,
     }
   }
 }
@@ -160,17 +175,17 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
         _ => return false,
       };
 
-    let find_param_matching = |matches: &dyn Fn(ty::ParamTerm) -> bool| {
+    let find_param_matching = |matches: &dyn Fn(ParamTerm) -> bool| {
       predicate_args.iter().find_map(|arg| {
         arg.walk().find(|arg| {
-          if let ty::GenericArgKind::Type(ty) = arg.unpack()
+          if let ty::GenericArgKind::Type(ty) = arg.kind()
             && let ty::Param(param_ty) = *ty.kind()
-            && matches(ty::ParamTerm::Ty(param_ty))
+            && matches(ParamTerm::Ty(param_ty))
           {
             true
-          } else if let ty::GenericArgKind::Const(ct) = arg.unpack()
+          } else if let ty::GenericArgKind::Const(ct) = arg.kind()
             && let ty::ConstKind::Param(param_ct) = ct.kind()
-            && matches(ty::ParamTerm::Const(param_ct))
+            && matches(ParamTerm::Const(param_ct))
           {
             true
           } else {
@@ -195,14 +210,14 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
         .tcx
         .parent(generics.param_at(param_term.index(), self.tcx).def_id)
         != def_id
-        && !matches!(param_term, ty::ParamTerm::Ty(ty) if ty.name == kw::SelfUpper)
+        && !matches!(param_term, ParamTerm::Ty(ty) if ty.name == kw::SelfUpper)
     });
     // Finally, the `Self` parameter is possibly the reason that the predicate
     // is unsatisfied. This is less likely to be true for methods, because
     // method probe means that we already kinda check that the predicates due
     // to the `Self` type are true.
     let mut self_param_to_point_at = find_param_matching(
-      &|param_term| matches!(param_term, ty::ParamTerm::Ty(ty) if ty.name == kw::SelfUpper),
+      &|param_term| matches!(param_term, ParamTerm::Ty(ty) if ty.name == kw::SelfUpper),
     );
 
     // Finally, for ambiguity-related errors, we actually want to look
@@ -424,7 +439,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
         // Handle `Self` param specifically, since it's separated in
         // the path representation
         if let Some(self_ty) = self_ty
-          && let ty::GenericArgKind::Type(ty) = param.unpack()
+          && let ty::GenericArgKind::Type(ty) = param.kind()
           && ty == self.tcx.types.self_param
         {
           error.obligation.cause.span = self_ty
@@ -440,7 +455,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
         }
         // Handle `Self` param specifically, since it's separated in
         // the path representation
-        if let ty::GenericArgKind::Type(ty) = param.unpack()
+        if let ty::GenericArgKind::Type(ty) = param.kind()
           && ty == self.tcx.types.self_param
         {
           error.obligation.cause.span = self_ty
@@ -820,7 +835,7 @@ impl<'a, 'tcx: 'a> FnCtxtExt<'tcx> for FnCtxtSimulator<'a, 'tcx> {
       return Ok(expr);
     }
 
-    let ty::GenericArgKind::Type(in_ty) = in_ty.unpack() else {
+    let ty::GenericArgKind::Type(in_ty) = in_ty.kind() else {
       return Err(expr);
     };
 
@@ -1132,7 +1147,7 @@ fn find_param_in_ty<'tcx>(
     if arg == param_to_point_at {
       return true;
     }
-    if let ty::GenericArgKind::Type(ty) = arg.unpack()
+    if let ty::GenericArgKind::Type(ty) = arg.kind()
       && let ty::Alias(ty::Projection | ty::Inherent, ..) = ty.kind()
     {
       // This logic may seem a bit strange, but typically when

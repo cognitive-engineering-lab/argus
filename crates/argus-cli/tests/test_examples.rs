@@ -6,7 +6,7 @@ use std::{
   sync::Once,
 };
 
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result, ensure};
 
 static SETUP: Once = Once::new();
 

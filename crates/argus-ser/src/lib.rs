@@ -23,7 +23,7 @@
 //!
 //! If you need to serialize an optional type then prefix it with `Option__`, and
 //! lists of elements are serialized with a prefixed `Slice__`.
-#![feature(rustc_private, decl_macro, let_chains)]
+#![feature(rustc_private, decl_macro)]
 #![allow(non_camel_case_types, non_snake_case)]
 extern crate rustc_abi;
 extern crate rustc_apfloat;
@@ -50,7 +50,7 @@ pub mod interner;
 
 pub use argus::*;
 pub(crate) use argus_ser_macros::{
-  argus, serialize_custom_seq, Many, Maybe, Poly,
+  Many, Maybe, Poly, argus, serialize_custom_seq,
 };
 pub(crate) use r#dyn::DynCtxt;
 use rustc_infer::infer::InferCtxt;

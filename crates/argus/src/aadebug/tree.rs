@@ -16,7 +16,7 @@ use ts_rs::TS;
 use super::dnf::{And, Dnf};
 use crate::{
   analysis::EvaluationResult,
-  proof_tree::{topology::GraphTopology, ProofNode as I},
+  proof_tree::{ProofNode as I, topology::GraphTopology},
 };
 
 #[derive(Serialize, Debug, Clone)]
@@ -299,7 +299,7 @@ pub enum N<'tcx> {
     retain: bool,
   },
   R {
-    infcx: InferCtxt<'tcx>,
+    infcx: Box<InferCtxt<'tcx>>,
     goal: RGoal<'tcx, ty::Predicate<'tcx>>,
     result: EvaluationResult,
   },

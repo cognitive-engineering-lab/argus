@@ -16,7 +16,7 @@ impl TermDef {
   where
     S: serde::Serializer,
   {
-    TermKindDef::serialize(&value.unpack(), s)
+    TermKindDef::serialize(&value.kind(), s)
   }
 }
 

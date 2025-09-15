@@ -88,8 +88,8 @@ impl<'tcx> InferCtxtExt<'tcx> for InferCtxt<'tcx> {
     &self,
     obligation: &PredicateObligation<'tcx>,
   ) -> ObligationNecessity {
-    use rustc_infer::traits::ObligationCauseCode;
     use ObligationNecessity as ON;
+    use rustc_infer::traits::ObligationCauseCode;
 
     let p = &obligation.predicate;
     let code = obligation.cause.code();

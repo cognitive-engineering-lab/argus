@@ -1,10 +1,10 @@
 //! This is a copy of the `BodyFinder` from `rustc_utils` but it
 //! does *not* skip const/static items. Funny enough, these items
 //! often have important trait constraints evaluated (think derive macros).
-use rustc_hir::{intravisit::Visitor, BodyId};
+use rustc_hir::{BodyId, intravisit::Visitor};
 use rustc_middle::{hir::nested_filter::OnlyBodies, ty::TyCtxt};
 use rustc_span::Span;
-use rustc_utils::{block_timer, SpanExt};
+use rustc_utils::{SpanExt, block_timer};
 
 struct BodyFinder<'tcx> {
   tcx: TyCtxt<'tcx>,
@@ -31,8 +31,7 @@ impl<'tcx> Visitor<'tcx> for BodyFinder<'tcx> {
     let body = self.tcx.hir_body(id);
     self.visit_body(body);
 
-    let hir = self.tcx.hir();
-    let span = hir.span_with_body(self.tcx.hir_body_owner(id));
+    let span = self.tcx.hir_span_with_body(self.tcx.hir_body_owner(id));
     log::trace!(
       "Searching body for {:?} with span {span:?} (local {:?})",
       self

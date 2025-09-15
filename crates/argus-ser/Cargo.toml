@@ -1,14 +1,14 @@
 [package]
 name = "argus-ser"
-version = "0.1.19"
-edition = "2021"
+version = "0.1.20"
+edition = "2024"
 authors = ["Gavin Gray <gavinleroy6@gmail.com>"]
 repository = "https://github.com/cognitive-engineering-lab/argus"
 description = "Rustc Ty serialization and TS bindings."
 license = "MIT"
 
 [features]
-testing = ["ts-rs", "rustc_utils/serde", "rustc_utils/ts-rs"]
+testing = ["ts-rs", "rustc_utils/ts-rs"]
 
 [lib]
 doctest = false
@@ -17,7 +17,7 @@ doctest = false
 log.workspace = true
 anyhow.workspace = true
 fluid-let.workspace = true
-rustc_utils.workspace = true
+rustc_utils = { workspace = true, features = ["serde"] }
 serde.workspace = true
 serde_json.workspace = true
 itertools.workspace = true
@@ -28,8 +28,8 @@ ts-rs = { version = "7.1.1", features = [
   "no-serde-warnings",
 ], optional = true }
 
-argus-ser-macros = { version = "0.1.19", path = "../argus-ser-macros" }
-argus-ext = { version = "0.1.19", path = "../argus-ext" }
+argus-ser-macros = { version = "0.1.20", path = "../argus-ser-macros" }
+argus-ext = { version = "0.1.20", path = "../argus-ext" }
 
 [dev-dependencies]
 argus-ser = { path = ".", features = ["testing"] }

@@ -143,8 +143,10 @@ impl<'tcx> PathBuilderDefault<'tcx> for PathBuilder<'tcx> {
     impl_trait_ref: Option<ty::TraitRef<'tcx>>,
   ) {
     log::trace!(
-        "default_print_impl_path: impl_def_id={:?}, self_ty={}, impl_trait_ref={:?}",
-        impl_def_id, self_ty, impl_trait_ref
+      "default_print_impl_path: impl_def_id={:?}, self_ty={}, impl_trait_ref={:?}",
+      impl_def_id,
+      self_ty,
+      impl_trait_ref
     );
 
     let key = self.tcx().def_key(impl_def_id);
